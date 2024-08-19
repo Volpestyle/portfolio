@@ -1,17 +1,16 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
-import { Libre_Bodoni } from "@next/font/google";
-import { Hanken_Grotesk } from "@next/font/google";
+import type { Metadata } from "next";
+import { Libre_Bodoni } from "next/font/google";
+import { Hanken_Grotesk } from "next/font/google";
 
-const libreBodoni = Libre_Bodoni({
+export const libreBodoni = Libre_Bodoni({
   subsets: ["latin"],
   weight: ["400", "700"],
   style: ["normal", "italic"],
   variable: "--font-libre-bodoni",
 });
 
-const hankenGrotesk = Hanken_Grotesk({
+export const hankenGrotesk = Hanken_Grotesk({
   subsets: ["latin"],
   weight: ["400", "700"],
   style: ["normal", "italic"],
@@ -30,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={"dark font-sans"}>{children}</body>
+      <body className={`${hankenGrotesk.variable} font-sans`}>{children}</body>
     </html>
   );
 }
