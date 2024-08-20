@@ -2,8 +2,6 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import Layout from "@/components/Layout";
 import { Loader } from "lucide-react";
 
 interface Repository {
@@ -36,7 +34,7 @@ export default function Projects() {
   }, []);
 
   return (
-    <Layout>
+    <>
       <h1 className="text-3xl font-bold mb-6">My Code</h1>
 
       {loading ? (
@@ -48,7 +46,7 @@ export default function Projects() {
           {repos.map((repo) => (
             <Card
               key={repo.id}
-              className="p-4 bg-black bg-opacity-10 text-white"
+              className="p-4 bg-black bg-opacity-10 text-white border-white"
             >
               <h2 className="text-xl font-bold mb-2">{repo.name}</h2>
               <p className="mb-4 text-sm">{repo.description}</p>
@@ -65,6 +63,6 @@ export default function Projects() {
           ))}
         </div>
       )}
-    </Layout>
+    </>
   );
 }

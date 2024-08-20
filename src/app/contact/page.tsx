@@ -2,7 +2,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import Layout from "@/components/Layout";
 
 export default function Contact() {
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -11,7 +10,7 @@ export default function Contact() {
   };
 
   return (
-    <Layout>
+    <>
       <h1 className="text-3xl font-bold mb-6">Contact Me</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -52,6 +51,6 @@ export default function Contact() {
           Send
         </Button>
       </form>
-    </Layout>
+    </>
   );
 }
