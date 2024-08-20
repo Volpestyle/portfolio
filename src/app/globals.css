@@ -67,3 +67,12 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes slideUp {
+  from {
+    transform: translateY(-33.33%);
+  }
+  to {
+    transform: translateY(-66.66%);
+  }
+}
