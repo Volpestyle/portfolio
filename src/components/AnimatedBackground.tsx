@@ -17,7 +17,7 @@ const AnimatedBackground: React.FC = () => {
         left: 0,
         width: "100%",
         height: "300%", // Increased height
-        backgroundImage: "url('/images/handstand.jpg')",
+        backgroundImage: "url('/images/me-bg.png')",
         backgroundSize: "cover",
         backgroundPosition: "center top",
         zIndex: -1,

@@ -9,7 +9,7 @@ const StaticBackground: React.FC = () => {
         left: 0,
         width: "100%",
         height: "100%",
-        backgroundImage: "url('/images/handstand.jpg')",
+        backgroundImage: "url('/images/me-bg.png')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         zIndex: -1,

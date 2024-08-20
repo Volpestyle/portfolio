@@ -48,7 +48,7 @@ export default function Projects() {
           {repos.map((repo) => (
             <Card
               key={repo.id}
-              className="p-4 bg-black bg-opacity-90 text-white"
+              className="p-4 bg-black bg-opacity-10 text-white"
             >
               <h2 className="text-xl font-bold mb-2">{repo.name}</h2>
               <p className="mb-4 text-sm">{repo.description}</p>
