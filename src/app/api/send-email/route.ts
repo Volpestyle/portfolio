@@ -46,6 +46,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ status: result.$metadata.httpStatusCode });
   } catch (error) {
     console.error("Error sending email:", error);
-    return NextResponse.json({ error: "Error sending email" }, { status: 500 });
+    return NextResponse.json({ error }, { status: 500 });
   }
 }
