@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 
-const ses = new SESClient({
-  region: "us-east-2",
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-});
-
 export async function POST(request: Request) {
   try {
     const { name, email, message } = await request.json();
+
+    const ses = new SESClient({
+      region: "us-east-2",
+      credentials: {
+        accessKeyId: process.env.ACCESS_KEY_ID!,
+        secretAccessKey: process.env.SECRET_ACCESS_KEY!,
+      },
+    });
 
     const params = {
       Source: "contact@jcvolpe.me",
