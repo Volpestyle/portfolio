@@ -1,6 +1,9 @@
 # My portfolio website
-An introduction to me and my development work.
 Live at [jcvolpe.me](https://jcvolpe.me).
+
+An introduction to me and my development work.
+
+## About
 A [Next.js](https://nextjs.org/) 13 project using [TailwindCSS](https://tailwindcss.com/), [ShadCn](https://ui.shadcn.com/), and [React Spring](https://www.react-spring.dev/).
 
 ## Running Locally
