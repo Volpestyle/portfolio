@@ -9,6 +9,17 @@ interface Repository {
   description: string;
   html_url: string;
   isStarred?: boolean;
+  created_at: string;
+  pushed_at: string;
+}
+
+function formatDate(dateString: string): string {
+  const options: Intl.DateTimeFormatOptions = {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  };
+  return new Date(dateString).toLocaleDateString(undefined, options);
 }
 
 const allowedRepos = new Set([
@@ -49,6 +60,8 @@ async function getRepositories() {
         acc[isStarred ? "starred" : "normal"].push({
           ...repo,
           isStarred,
+          created_at: repo.created_at,
+          pushed_at: repo.pushed_at,
         });
       }
       return acc;
@@ -77,7 +90,18 @@ export default async function Projects() {
             {repo.isStarred && <StarIcon />}
             <h2 className="text-xl font-bold mb-2">{repo.name}</h2>
             <p className="mb-4 text-sm">{repo.description}</p>
-            <Button asChild className="bg-white text-black hover:bg-gray-200">
+            <p className="mt-4 text-xs text-gray-400">
+              <span className="font-bold">Created:</span>{" "}
+              {formatDate(repo.created_at)}
+            </p>
+            <p className="mt-1 mb-2 text-xs text-gray-400">
+              <span className="font-bold">Last commit:</span>{" "}
+              {formatDate(repo.pushed_at)}
+            </p>
+            <Button
+              asChild
+              className="bg-white text-black hover:bg-gray-200 mt-2"
+            >
               <Link href={`/projects/${repo.name}`}>View Details</Link>
             </Button>
           </Card>

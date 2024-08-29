@@ -10,13 +10,22 @@ export default function Home() {
       <h1 className="text-4xl md:text-6xl font-bold mb-6">
         welcome to my portfolio.
       </h1>
-      <Button
-        size="lg"
-        className="bg-white text-black hover:bg-gray-200"
-        asChild
-      >
-        <Link href="/projects">Projects</Link>
-      </Button>
+      <div className="flex gap-4">
+        <Button
+          size="lg"
+          className="bg-white text-black hover:bg-gray-200"
+          asChild
+        >
+          <Link href="/about">About</Link>
+        </Button>
+        <Button
+          size="lg"
+          className="bg-white text-black hover:bg-gray-200"
+          asChild
+        >
+          <Link href="/projects">Projects</Link>
+        </Button>
+      </div>
     </div>
   );
 }

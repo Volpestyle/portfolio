@@ -83,16 +83,15 @@ export default function About() {
         <h1 className="text-3xl font-bold mb-4">About Me</h1>
         <p className="mb-4">
           I'm a software engineer from Chicago, IL USA. In May 2021, I graduated
-          from Iowa State University with a B.S. in Software Engineering. 📚
-          Over the years I've found many passions. From animation, graphic
+          from Iowa State University with a B.S. in Software Engineering 📚.
+          Over the years I've found many passions, from animation, graphic
           design, and writing music, to full stack web development. I think the
-          common theme here is - I love to make things 🧑‍🎨.
+          common theme here is that I love to make things 🧑‍🎨.
         </p>
         <p>
-          But ever since I started using computers as a kid, I found myself
-          interested in writing code, inspired by the endless possibilities.
-          Here you'll find some of the products of my creative efforts,
-          including my work and projects I'm most proud of :)
+          I always found myself interested in writing code, inspired by the
+          endless possibilities. Here you'll find some of the products of my
+          creative efforts, including my work and projects I'm most proud of :)
         </p>
         <h2 className="text-2xl font-bold mb-2 mt-4">My Resume</h2>
         <iframe

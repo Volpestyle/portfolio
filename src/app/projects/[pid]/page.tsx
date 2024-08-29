@@ -12,6 +12,15 @@ import { ExternalLinkIcon } from "@/lib/svgs";
 import { CustomLink } from "@/components/CustomLink";
 import { ArrowLeft } from "lucide-react";
 
+function formatDate(dateString: string): string {
+  const options: Intl.DateTimeFormatOptions = {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  };
+  return new Date(dateString).toLocaleDateString(undefined, options);
+}
+
 async function getReadme(pid: string) {
   const response = await fetch(
     `https://api.github.com/repos/volpestyle/${pid}/readme`,
@@ -41,12 +50,20 @@ async function getRepoUrl(pid: string) {
   }
 
   const data = await response.json();
-  return data.html_url;
+  return {
+    url: data.html_url,
+    created_at: data.created_at,
+    pushed_at: data.pushed_at,
+  };
 }
 
 export default function ProjectDetail({ params }: { params: { pid: string } }) {
   const [readme, setReadme] = useState<string>("");
-  const [repoUrl, setRepoUrl] = useState<string>("#");
+  const [repoInfo, setRepoInfo] = useState<{
+    url: string;
+    created_at: string;
+    pushed_at: string;
+  } | null>(null);
   const [carouselImages, setCarouselImages] = useState<string[]>([]);
   const [carouselInitialIndex, setCarouselInitialIndex] = useState(0);
   const [isCarouselOpen, setIsCarouselOpen] = useState(false);
@@ -54,16 +71,16 @@ export default function ProjectDetail({ params }: { params: { pid: string } }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [readmeContent, repoUrlContent] = await Promise.all([
+        const [readmeContent, repoInfoContent] = await Promise.all([
           getReadme(params.pid),
           getRepoUrl(params.pid),
         ]);
         setReadme(readmeContent);
-        setRepoUrl(repoUrlContent);
+        setRepoInfo(repoInfoContent);
       } catch (error) {
         console.error("Error fetching data:", error);
         setReadme("Failed to load README. Please try again later.");
-        setRepoUrl("#");
+        setRepoInfo(null);
       }
     };
 
@@ -88,16 +105,19 @@ export default function ProjectDetail({ params }: { params: { pid: string } }) {
   };
 
   return (
-    <div className="space-y-4">
+    <div>
       <div className="flex justify-between items-center mb-6">
         <Button asChild className="bg-white text-black hover:bg-gray-200">
           <Link href="/projects" className="flex items-center">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
           </Link>
         </Button>
+      </div>
+      <div className="flex items-center mb-4">
+        <h1 className="text-3xl font-bold mr-4">{params.pid}</h1>
         <Button asChild className="bg-white text-black hover:bg-gray-200">
           <a
-            href={repoUrl}
+            href={repoInfo?.url}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center"
@@ -107,7 +127,14 @@ export default function ProjectDetail({ params }: { params: { pid: string } }) {
           </a>
         </Button>
       </div>
-      <h1 className="text-3xl font-bold mb-4">{params.pid}</h1>
+      <div className="text-sm text-gray-400">
+        <span className="font-bold">Created:</span>{" "}
+        {repoInfo && formatDate(repoInfo.created_at)}
+      </div>
+      <div className="text-sm text-gray-400 mb-4">
+        <span className="font-bold">Last commit:</span>{" "}
+        {repoInfo && formatDate(repoInfo.pushed_at)}
+      </div>
       <div className="markdown-body text-white">
         <ReactMarkdown
           rehypePlugins={[rehypeHighlight]}
