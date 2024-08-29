@@ -222,3 +222,12 @@
 .markdown-body li + li {
   margin-top: 0.25em;
 }
+
+.markdown-body a {
+  color: #58a6ff;
+  text-decoration: none;
+}
+
+.markdown-body a:hover {
+  text-decoration: underline;
+}

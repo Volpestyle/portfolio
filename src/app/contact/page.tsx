@@ -1,12 +1,47 @@
 "use client";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Loader } from "lucide-react";
 
 export default function Contact() {
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<"success" | "error" | null>(
+    null
+  );
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // Handle form submission logic here
+    setIsSubmitting(true);
+    setSubmitStatus(null);
+
+    try {
+      const response = await fetch("/api/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name, email, message }),
+      });
+
+      if (response.ok) {
+        setSubmitStatus("success");
+        setName("");
+        setEmail("");
+        setMessage("");
+      } else {
+        setSubmitStatus("error");
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      setSubmitStatus("error");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -20,6 +55,8 @@ export default function Contact() {
           <Input
             id="name"
             name="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             required
             className="text-black bg-white"
           />
@@ -32,6 +69,8 @@ export default function Contact() {
             id="email"
             name="email"
             type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
             className="text-black bg-white"
           />
@@ -43,14 +82,35 @@ export default function Contact() {
           <Textarea
             id="message"
             name="message"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
             required
             className="text-black bg-white"
           />
         </div>
-        <Button type="submit" className="bg-white text-black hover:bg-gray-200">
-          Send
+        <Button
+          type="submit"
+          className="bg-white text-black hover:bg-gray-200"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <>
+              <Loader className="mr-2 h-4 w-4 animate-spin" />
+              Sending...
+            </>
+          ) : (
+            "Send"
+          )}
         </Button>
       </form>
+      {submitStatus === "success" && (
+        <p className="mt-4 text-green-500">Message sent successfully!</p>
+      )}
+      {submitStatus === "error" && (
+        <p className="mt-4 text-red-500">
+          Failed to send message. Please try again later.
+        </p>
+      )}
     </>
   );
 }

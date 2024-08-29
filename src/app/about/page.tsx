@@ -2,6 +2,8 @@
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { siLinkedin, siGithub, siYoutube, siSpotify } from "simple-icons/icons";
+import { useState } from "react";
+import ResumeModal from "@/components/ResumeModal";
 
 interface SocialLink {
   name: string;
@@ -28,6 +30,8 @@ const SocialIcon: React.FC<{ icon: { path: string; hex: string } }> = ({
 );
 
 export default function About() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const socialLinks: SocialLink[] = [
     {
       name: "LinkedIn",
@@ -95,12 +99,19 @@ export default function About() {
           src="/resume/summer-2024.pdf"
           className="w-full h-96 mb-4"
         ></iframe>
-        <Button className="bg-white text-black hover:bg-gray-200">
+        <Button className="bg-white text-black hover:bg-gray-200 mr-2">
           <a href="/resume/summer-2024.pdf" download>
-            Download Resume
+            Download resume
           </a>
         </Button>
+        <Button
+          className="bg-white text-black hover:bg-gray-200"
+          onClick={() => setIsModalOpen(true)}
+        >
+          View full screen
+        </Button>
       </div>
+      <ResumeModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }

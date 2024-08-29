@@ -8,6 +8,9 @@ import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import ImageRenderer from "@/components/ImageRenderer";
 import ImageCarousel from "@/components/ImageCarousel";
+import { ExternalLinkIcon } from "@/lib/svgs";
+import { CustomLink } from "@/components/CustomLink";
+import { ArrowLeft } from "lucide-react";
 
 async function getReadme(pid: string) {
   const response = await fetch(
@@ -40,23 +43,6 @@ async function getRepoUrl(pid: string) {
   const data = await response.json();
   return data.html_url;
 }
-
-const ExternalLinkIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    fill="none"
-    viewBox="0 0 24 24"
-    strokeWidth={1.5}
-    stroke="currentColor"
-    className="w-4 h-4 ml-1"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-    />
-  </svg>
-);
 
 export default function ProjectDetail({ params }: { params: { pid: string } }) {
   const [readme, setReadme] = useState<string>("");
@@ -104,24 +90,24 @@ export default function ProjectDetail({ params }: { params: { pid: string } }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">{params.pid}</h1>
-        <div className="space-x-2">
-          <Button asChild className="bg-white text-black hover:bg-gray-200">
-            <Link href="/projects">Back to Projects</Link>
-          </Button>
-          <Button asChild className="bg-white text-black hover:bg-gray-200">
-            <a
-              href={repoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center"
-            >
-              View on GitHub
-              <ExternalLinkIcon />
-            </a>
-          </Button>
-        </div>
+        <Button asChild className="bg-white text-black hover:bg-gray-200">
+          <Link href="/projects" className="flex items-center">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
+          </Link>
+        </Button>
+        <Button asChild className="bg-white text-black hover:bg-gray-200">
+          <a
+            href={repoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center"
+          >
+            View on GitHub
+            <ExternalLinkIcon />
+          </a>
+        </Button>
       </div>
+      <h1 className="text-3xl font-bold mb-4">{params.pid}</h1>
       <div className="markdown-body text-white">
         <ReactMarkdown
           rehypePlugins={[rehypeHighlight]}
@@ -133,6 +119,9 @@ export default function ProjectDetail({ params }: { params: { pid: string } }) {
                 onImageLoad={handleImageLoad}
                 onImageClick={handleImageClick}
               />
+            ),
+            a: ({ href, children }) => (
+              <CustomLink href={href || "#"}>{children}</CustomLink>
             ),
           }}
         >
