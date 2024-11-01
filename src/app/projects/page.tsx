@@ -25,19 +25,18 @@ function formatDate(dateString: string): string {
 const allowedRepos = new Set([
   "AED-Sheets",
   "AWS-IAM-Projects",
-  "EldenRing-Build-Planner",
-  "HTMLCanvas-Snake",
   "Parse-Tree-Calculator",
   "personal-web-app",
   "personal-website-v1",
   "portfolio",
+  "slash-siege",
   "rubiks-cube",
 ]);
 
 const starredRepos = new Set([
   "AWS-IAM-Projects",
   "AED-Sheets",
-  "portfolio",
+  "slash-siege",
   "rubiks-cube",
 ]);
 
