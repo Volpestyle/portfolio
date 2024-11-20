@@ -95,11 +95,11 @@ export default function About() {
         </p>
         <h2 className="text-2xl font-bold mb-2 mt-4">My Resume</h2>
         <iframe
-          src="/resume/summer-2024.pdf"
+          src="/resume/jcv-resume-2024.pdf"
           className="w-full h-96 mb-4"
         ></iframe>
         <Button className="bg-white text-black hover:bg-gray-200 mr-2">
-          <a href="/resume/summer-2024.pdf" download>
+          <a href="/resume/jcv-resume-2024.pdf" download>
             Download resume
           </a>
         </Button>
