@@ -24,7 +24,7 @@ const ResumeModal: React.FC<ResumeModalProps> = ({ isOpen, onClose }) => {
           </Button>
         </div>
         <iframe
-          src="/resume/summer-2024.pdf"
+          src="/resume/jcv-resume-2024.pdf"
           className="flex-grow w-full bg-white"
           title="Resume"
         />
