@@ -23,27 +23,27 @@ function formatDate(dateString: string): string {
 }
 
 const allowedRepos = new Set([
-  "AED-Sheets",
+  "slash-siege",
+  "rubiks-cube",
   "AWS-IAM-Projects",
+  "AED-Sheets",
+  "portfolio",
   "Parse-Tree-Calculator",
   "personal-web-app",
   "personal-website-v1",
-  "portfolio",
-  "slash-siege",
-  "rubiks-cube",
 ]);
 
 const starredRepos = new Set([
-  "AWS-IAM-Projects",
-  "AED-Sheets",
   "slash-siege",
   "rubiks-cube",
+  "AWS-IAM-Projects",
+  "AED-Sheets",
 ]);
 
 async function getRepositories() {
   const response = await fetch(
     "https://api.github.com/users/volpestyle/repos?per_page=100",
-    { next: { revalidate: 3600 } } // Revalidate every hour
+    { next: { revalidate: 3600 } }
   );
 
   if (!response.ok) {
@@ -52,24 +52,18 @@ async function getRepositories() {
 
   const data: Repository[] = await response.json();
 
-  return data.reduce(
-    (acc, repo) => {
-      if (allowedRepos.has(repo.name)) {
-        const isStarred = starredRepos.has(repo.name);
-        acc[isStarred ? "starred" : "normal"].push({
-          ...repo,
-          isStarred,
-          created_at: repo.created_at,
-          pushed_at: repo.pushed_at,
-        });
-      }
-      return acc;
-    },
-    { starred: [], normal: [] } as {
-      starred: Repository[];
-      normal: Repository[];
-    }
-  );
+  // Create a map for quick lookup
+  const repoMap = new Map(data.map((repo) => [repo.name, repo]));
+
+  // Filter in order of allowedRepos
+  return {
+    starred: Array.from(starredRepos)
+      .filter((name) => repoMap.has(name))
+      .map((name) => ({ ...repoMap.get(name)!, isStarred: true })),
+    normal: Array.from(allowedRepos)
+      .filter((name) => !starredRepos.has(name) && repoMap.has(name))
+      .map((name) => ({ ...repoMap.get(name)!, isStarred: false })),
+  };
 }
 
 export default async function Projects() {
