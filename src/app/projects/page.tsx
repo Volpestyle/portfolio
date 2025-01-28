@@ -1,9 +1,6 @@
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { StarIcon } from '@/lib/svgs';
 import { Octokit } from '@octokit/rest';
 import { GITHUB_CONFIG } from '@/lib/constants';
+import { ProjectCard } from './ProjectCard';
 
 function formatDate(dateString: string): string {
   const options: Intl.DateTimeFormatOptions = {
@@ -26,19 +23,38 @@ interface GistFile {
   content: string;
 }
 
-async function getRepositories() {
+interface RepoData {
+  id: number;
+  name: string;
+  description: string | null;
+  created_at: string;
+  pushed_at: string;
+  html_url: string;
+  isStarred: boolean;
+}
+
+async function getRepositories(): Promise<{ starred: RepoData[]; normal: RepoData[] }> {
+  console.log('Environment check:', {
+    GITHUB_TOKEN_length: process.env.GITHUB_TOKEN?.length || 0,
+    PORTFOLIO_GIST_ID_length: process.env.PORTFOLIO_GIST_ID?.length || 0,
+    NODE_ENV: process.env.NODE_ENV,
+  });
+
   const octokit = new Octokit({
     auth: process.env.GITHUB_TOKEN,
   });
 
   try {
-    // Log the token presence (don't log the actual token)
-    console.log('GitHub Token exists:', !!process.env.GITHUB_TOKEN);
-    console.log('Gist ID exists:', !!process.env.PORTFOLIO_GIST_ID);
+    console.log('Using token:', !!process.env.GITHUB_TOKEN);
+    console.log('Using gist ID:', !!process.env.PORTFOLIO_GIST_ID);
+
+    if (!process.env.GITHUB_TOKEN || !process.env.PORTFOLIO_GIST_ID) {
+      throw new Error('Missing required environment variables');
+    }
 
     // First fetch the gist containing portfolio config
     const gistResponse = await octokit.rest.gists.get({
-      gist_id: process.env.PORTFOLIO_GIST_ID!,
+      gist_id: process.env.PORTFOLIO_GIST_ID,
     });
 
     // Log successful gist fetch
@@ -60,8 +76,12 @@ async function getRepositories() {
     const portfolioRepoNames = new Set(portfolioConfig.repositories.map((r) => r.name));
     const starredRepoNames = new Set(portfolioConfig.repositories.filter((r) => r.isStarred).map((r) => r.name));
 
+    // Add logging for the filtered repos
+    console.log('Portfolio repos found:', portfolioRepoNames.size);
+    console.log('Starred repos found:', starredRepoNames.size);
+
     // Filter and categorize repos
-    return {
+    const result = {
       starred: repos.data
         .filter((repo) => starredRepoNames.has(repo.name))
         .map((repo) => ({
@@ -79,6 +99,13 @@ async function getRepositories() {
           pushed_at: repo.pushed_at || '',
         })),
     };
+
+    console.log('Final repos count:', {
+      starred: result.starred.length,
+      normal: result.normal.length,
+    });
+
+    return result;
   } catch (error) {
     // Detailed error logging
     console.error('Error in getRepositories:', {
@@ -91,43 +118,10 @@ async function getRepositories() {
 }
 
 export default async function Projects() {
-  try {
-    const { starred, normal } = await getRepositories();
-    const repos = [...starred, ...normal];
+  const { starred, normal } = await getRepositories();
+  const repos = [...starred, ...normal];
 
-    if (!repos.length) {
-      throw new Error('No repositories found');
-    }
-
-    return (
-      <>
-        <h1 className="mb-6 text-3xl font-bold">My Code</h1>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {repos.map((repo) => (
-            <Card key={repo.id} className="relative border-white bg-black bg-opacity-10 p-4 text-white">
-              {repo.isStarred && <StarIcon />}
-              <h2 className="mb-2 text-xl font-bold">{repo.name}</h2>
-              <p className="mb-4 text-sm">{repo.description}</p>
-              <p className="mt-4 text-xs text-gray-400">
-                <span className="font-bold">Created:</span> {formatDate(repo.created_at)}
-              </p>
-              <p className="mb-2 mt-1 text-xs text-gray-400">
-                <span className="font-bold">Last commit:</span> {formatDate(repo.pushed_at)}
-              </p>
-              <Button asChild className="mt-2 bg-white text-black hover:bg-gray-200">
-                <Link href={`/projects/${repo.name}`}>View Details</Link>
-              </Button>
-            </Card>
-          ))}
-        </div>
-      </>
-    );
-  } catch (error: unknown) {
-    const err = error as { message?: string };
-    console.error('Failed to load repositories:', err);
-
-    // Fallback content
+  if (!repos.length) {
     return (
       <div className="text-center">
         <h1 className="mb-6 text-3xl font-bold">My Code</h1>
@@ -135,6 +129,17 @@ export default async function Projects() {
       </div>
     );
   }
+
+  return (
+    <>
+      <h1 className="mb-6 text-3xl font-bold">My Code</h1>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {repos.map((repo) => (
+          <ProjectCard key={repo.id} repo={repo} />
+        ))}
+      </div>
+    </>
+  );
 }
 
 export const dynamic = 'force-dynamic';
