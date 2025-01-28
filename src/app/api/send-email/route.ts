@@ -8,9 +8,7 @@ const ses = new SESClient({
   credentials: {
     accessKeyId: process.env.ACCESS_KEY_ID ?? '',
     secretAccessKey: process.env.SECRET_ACCESS_KEY ?? '',
-  },
-  // Add this to help debug credential loading
-  logger: console,
+  }
 });
 
 // Add OPTIONS handler for CORS preflight
