@@ -25,17 +25,22 @@ export default function Contact() {
         },
         body: JSON.stringify({ name, email, message }),
       });
+      const data = await response.json();
 
-      if (response.ok) {
+      if (!response.ok) {
+        console.error('Email API Error:', {
+          status: response.status,
+          data,
+        });
+        setSubmitStatus('error');
+      } else {
         setSubmitStatus('success');
         setName('');
         setEmail('');
         setMessage('');
-      } else {
-        setSubmitStatus('error');
       }
     } catch (error) {
-      console.error('Error submitting form:', error);
+      console.error('Email submission error:', error);
       setSubmitStatus('error');
     } finally {
       setIsSubmitting(false);

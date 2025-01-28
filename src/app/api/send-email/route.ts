@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { headers } from 'next/headers';
 
+// Initialize SES outside the handler
 const ses = new SESClient({
   region: process.env.REGION!,
   credentials: {
@@ -9,7 +11,33 @@ const ses = new SESClient({
   },
 });
 
+// Add OPTIONS handler for CORS preflight
+export async function OPTIONS() {
+  return NextResponse.json({}, {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
+}
+
 export async function POST(request: Request) {
+  console.log('[Email API] Request received');
+  // Check request method
+  if (request.method !== 'POST') {
+    return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+  }
+
+  // Get request headers
+  const headersList = headers();
+  const contentType = headersList.get('content-type');
+
+  // Validate content type
+  if (!contentType?.includes('application/json')) {
+    return NextResponse.json({ error: 'Content type must be application/json' }, { status: 415 });
+  }
+
   try {
     // Log environment check (don't log actual values)
     console.log('AWS Credentials Check:', {
@@ -61,8 +89,10 @@ export async function POST(request: Request) {
       },
     };
 
+    console.log('[Email API] Sending email to:', params.Destination.ToAddresses);
     const command = new SendEmailCommand(params);
     const response = await ses.send(command);
+    console.log('[Email API] Email sent successfully:', response.MessageId);
 
     return NextResponse.json({
       success: true,
@@ -70,10 +100,10 @@ export async function POST(request: Request) {
     });
   } catch (error: unknown) {
     const err = error as { message?: string; code?: string };
-    console.error('Email sending error:', {
+    console.error('[Email API] Error:', {
       message: err.message,
       code: err.code,
-      error: err
+      stack: (error as Error).stack
     });
 
     return NextResponse.json(
@@ -84,5 +114,15 @@ export async function POST(request: Request) {
       },
       { status: 500 }
     );
+  } finally {
+    // Add CORS headers to response
+    const response = NextResponse.next();
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'POST');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
   }
 }
+
+// Add route segment config
+export const runtime = 'edge'; // 'nodejs' (default) | 'edge'
+export const dynamic = 'force-dynamic';
