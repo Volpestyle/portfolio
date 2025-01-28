@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 
 const ses = new SESClient({
-  region: process.env.AWS_REGION!,
+  region: process.env.REGION!,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   try {
     // Log environment check (don't log actual values)
     console.log('AWS Credentials Check:', {
-      regionExists: !!process.env.AWS_REGION,
+      regionExists: !!process.env.REGION,
       accessKeyExists: !!process.env.AWS_ACCESS_KEY_ID,
       secretKeyExists: !!process.env.AWS_SECRET_ACCESS_KEY,
     });
