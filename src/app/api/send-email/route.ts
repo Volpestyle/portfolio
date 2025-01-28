@@ -1,9 +1,25 @@
 import { NextResponse } from 'next/server';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 
+const ses = new SESClient({
+  region: process.env.AWS_REGION!,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+});
+
 export async function POST(request: Request) {
   try {
-    const { name, email, message } = await request.json();
+    // Log environment check (don't log actual values)
+    console.log('AWS Credentials Check:', {
+      regionExists: !!process.env.AWS_REGION,
+      accessKeyExists: !!process.env.AWS_ACCESS_KEY_ID,
+      secretKeyExists: !!process.env.AWS_SECRET_ACCESS_KEY,
+    });
+
+    const body = await request.json();
+    const { name, email, message } = body;
 
     // Validate inputs
     if (!name || !email || !message) {
@@ -15,14 +31,6 @@ export async function POST(request: Request) {
     if (!emailRegex.test(email)) {
       return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
     }
-
-    const ses = new SESClient({
-      region: 'us-east-2',
-      credentials: {
-        accessKeyId: process.env.ACCESS_KEY_ID!,
-        secretAccessKey: process.env.SECRET_ACCESS_KEY!,
-      },
-    });
 
     const params = {
       Source: 'volpestyle@gmail.com', // Use your verified Gmail for now
@@ -54,18 +62,25 @@ export async function POST(request: Request) {
     };
 
     const command = new SendEmailCommand(params);
-    const result = await ses.send(command);
+    const response = await ses.send(command);
 
     return NextResponse.json({
       success: true,
-      messageId: result.MessageId,
+      messageId: response.MessageId,
     });
-  } catch (error: any) {
-    console.error('Error sending email:', error);
+  } catch (error: unknown) {
+    const err = error as { message?: string; code?: string };
+    console.error('Email sending error:', {
+      message: err.message,
+      code: err.code,
+      error: err
+    });
+
     return NextResponse.json(
       {
         error: 'Failed to send email',
-        details: error.message,
+        details: err.message || 'Unknown error',
+        code: err.code
       },
       { status: 500 }
     );
