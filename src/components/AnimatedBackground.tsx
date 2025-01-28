@@ -4,19 +4,30 @@ import { useSpring, animated } from '@react-spring/web';
 import { usePathname } from 'next/navigation';
 
 const AnimatedBackground: React.FC = () => {
-  const [key, setKey] = useState(0);
+  const [startPosition, setStartPosition] = useState(0);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const pathname = usePathname();
 
-  // Need to force re-render, fixes animation not starting on refresh
   useEffect(() => {
-    setKey((prevKey) => prevKey + 1);
-  }, []);
+    // Trigger animation start
+    setIsLoaded(true);
+  }, [pathname]);
 
   const props = useSpring({
-    from: { transform: 'translateY(0%)' },
+    from: { transform: `translateY(${startPosition}%)` },
     to: { transform: 'translateY(-50%)' },
     config: { duration: 60000 },
-    reset: true,
+    reset: false,
     loop: true,
+    immediate: !isLoaded, // Prevent animation until component is ready
+    onChange: ({ value }) => {
+      // Store current position in sessionStorage
+      const match = value.transform.match(/translateY\(([-\d.]+)%\)/);
+      if (match) {
+        const position = parseFloat(match[1]);
+        sessionStorage.setItem('backgroundPosition', position.toString());
+      }
+    },
   });
 
   return (
@@ -32,6 +43,7 @@ const AnimatedBackground: React.FC = () => {
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         zIndex: -1,
+        willChange: 'transform', // Optimize performance
       }}
     />
   );
