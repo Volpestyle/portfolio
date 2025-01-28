@@ -2,13 +2,15 @@ import { NextResponse } from 'next/server';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { headers } from 'next/headers';
 
-// Initialize SES outside the handler
+// Initialize SES with explicit region and credentials
 const ses = new SESClient({
-  region: process.env.REGION!,
+  region: process.env.REGION,
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    accessKeyId: process.env.ACCESS_KEY_ID ?? '',
+    secretAccessKey: process.env.SECRET_ACCESS_KEY ?? '',
   },
+  // Add this to help debug credential loading
+  logger: console,
 });
 
 // Add OPTIONS handler for CORS preflight
@@ -39,11 +41,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Log environment check (don't log actual values)
-    console.log('AWS Credentials Check:', {
-      regionExists: !!process.env.REGION,
-      accessKeyExists: !!process.env.AWS_ACCESS_KEY_ID,
-      secretKeyExists: !!process.env.AWS_SECRET_ACCESS_KEY,
+    // Log environment check with more detail
+    console.log('[Email API] AWS Config:', {
+      region: process.env.REGION,
+      accessKeyIdLength: process.env.ACCESS_KEY_ID?.length,
+      secretKeyLength: process.env.SECRET_ACCESS_KEY?.length,
+      // Log first few chars of keys to verify correct values (be careful in prod)
+      accessKeyPrefix: process.env.ACCESS_KEY_ID?.slice(0, 4),
+      secretKeyPrefix: process.env.SECRET_ACCESS_KEY?.slice(0, 4),
     });
 
     const body = await request.json();

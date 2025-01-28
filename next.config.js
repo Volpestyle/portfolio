@@ -11,16 +11,12 @@ const nextConfig = {
     ],
   },
   env: {
-    // Server-side only (sensitive) variables
-    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
-    AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
-    REGION: process.env.REGION,
+    // Server-side only variables
     GITHUB_TOKEN: process.env.GITHUB_TOKEN,
     PORTFOLIO_GIST_ID: process.env.PORTFOLIO_GIST_ID,
-
-    // Public variables (if needed)
-    NEXT_PUBLIC_SITE_URL: process.env.SITE_URL,
-    // Add other public variables here
+    ACCESS_KEY_ID: process.env.ACCESS_KEY_ID,
+    SECRET_ACCESS_KEY: process.env.SECRET_ACCESS_KEY,
+    REGION: process.env.REGION,
   },
 };
 

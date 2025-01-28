@@ -2,15 +2,6 @@ import { Octokit } from '@octokit/rest';
 import { GITHUB_CONFIG } from '@/lib/constants';
 import { ProjectCard } from './ProjectCard';
 
-function formatDate(dateString: string): string {
-  const options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  };
-  return new Date(dateString).toLocaleDateString(undefined, options);
-}
-
 interface GistContent {
   repositories: {
     name: string;
