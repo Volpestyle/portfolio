@@ -9,6 +9,17 @@ interface ImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   onImageClick: (src: string) => void;
 }
 
+/**
+ * A component that renders an image from either a direct URL or a GitHub repository.
+ * @param {string} src - The source path or URL of the image
+ * @param {string} alt - Alt text for the image
+ * @param {string} pid - The GitHub repository ID/name
+ * @param {number|string} width - Width of the image
+ * @param {number|string} height - Height of the image
+ * @param {function} onImageLoad - Callback fired when image is loaded with final src
+ * @param {function} onImageClick - Callback fired when image is clicked
+ * @param {object} rest - Additional image props passed through
+ */
 const ImageRenderer: React.FC<ImageProps> = ({ src, alt, pid, width, height, onImageLoad, onImageClick, ...rest }) => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
 
