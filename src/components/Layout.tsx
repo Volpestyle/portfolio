@@ -1,10 +1,10 @@
-"use client";
-import React, { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { useSpring, animated, config } from "@react-spring/web";
+'use client';
+import React, { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { useSpring, animated, config } from '@react-spring/web';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -26,28 +26,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     config: { duration: 1000, easing: (t) => t * (2 - t) }, // Ease-out quad
   });
 
-  const NavButton: React.FC<{ href: string; children: React.ReactNode }> = ({
-    href,
-    children,
-  }) => {
+  const NavButton: React.FC<{ href: string; children: React.ReactNode }> = ({ href, children }) => {
     const isActive = pathname === href;
     return (
-      <Button
-        variant="onBlack"
-        asChild
-        className={isActive ? "bg-white bg-opacity-20" : ""}
-      >
+      <Button variant="onBlack" asChild className={isActive ? 'bg-white bg-opacity-20' : ''}>
         <Link href={href}>{children}</Link>
       </Button>
     );
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-4xl overflow-hidden relative z-10 bg-black bg-opacity-50 text-white border-white">
-        <div className="flex flex-col min-h-[80vh]">
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <Card className="relative z-10 w-full max-w-4xl overflow-hidden border-white bg-black bg-opacity-50 text-white">
+        <div className="flex min-h-[80vh] flex-col">
           {/* Navbar */}
-          <nav className="p-4 flex justify-between items-center border-b border-white">
+          <nav className="flex items-center justify-between border-b border-white p-4">
             <Link href="/" className="text-xl font-bold">
               JCV
             </Link>
@@ -60,11 +53,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </nav>
 
           {/* Main content */}
-          <animated.main
-            key={key}
-            className="flex-grow p-4"
-            style={springProps}
-          >
+          <animated.main key={key} className="flex-grow p-4" style={springProps}>
             {children}
           </animated.main>
         </div>

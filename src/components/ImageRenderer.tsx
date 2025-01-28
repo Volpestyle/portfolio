@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect } from "react";
-import Image from "next/image";
+import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 
 interface ImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   pid: string;
@@ -9,36 +9,24 @@ interface ImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   onImageClick: (src: string) => void;
 }
 
-const ImageRenderer: React.FC<ImageProps> = ({
-  src,
-  alt,
-  pid,
-  width,
-  height,
-  onImageLoad,
-  onImageClick,
-  ...rest
-}) => {
+const ImageRenderer: React.FC<ImageProps> = ({ src, alt, pid, width, height, onImageLoad, onImageClick, ...rest }) => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (!src) return;
 
     const fetchImage = async () => {
-      if (src.startsWith("http")) {
+      if (src.startsWith('http')) {
         setImageSrc(src);
         onImageLoad(src);
         return;
       }
 
-      const branches = ["main", "master"];
+      const branches = ['main', 'master'];
       for (const branch of branches) {
-        const url = `https://raw.githubusercontent.com/volpestyle/${pid}/${branch}/${src.replace(
-          /^\.\//,
-          ""
-        )}`;
+        const url = `https://raw.githubusercontent.com/volpestyle/${pid}/${branch}/${src.replace(/^\.\//, '')}`;
         try {
-          const response = await fetch(url, { method: "HEAD" });
+          const response = await fetch(url, { method: 'HEAD' });
           if (response.ok) {
             setImageSrc(url);
             onImageLoad(url);
@@ -64,10 +52,10 @@ const ImageRenderer: React.FC<ImageProps> = ({
     <div className="py-4">
       <Image
         src={imageSrc}
-        alt={alt || ""}
+        alt={alt || ''}
         width={imageWidth}
         height={imageHeight}
-        className="max-w-full h-auto cursor-pointer"
+        className="h-auto max-w-full cursor-pointer"
         onClick={() => onImageClick(imageSrc)}
         priority // This ensures the image is loaded immediately
         {...rest}

@@ -1,9 +1,9 @@
-import "./globals.css";
-import { ReactNode } from "react";
-import AnimatedBackground from "@/components/AnimatedBackground";
-import Layout from "@/components/Layout";
-import { hankenGrotesk } from "./fonts";
-import { Metadata } from "next";
+import './globals.css';
+import { ReactNode } from 'react';
+import AnimatedBackground from '@/components/AnimatedBackground';
+import Layout from '@/components/Layout';
+import { hankenGrotesk } from './fonts';
+import { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: "JCV's Portfolio",

@@ -1,18 +1,16 @@
-"use client";
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Loader } from "lucide-react";
+'use client';
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Loader } from 'lucide-react';
 
 export default function Contact() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<"success" | "error" | null>(
-    null
-  );
+  const [submitStatus, setSubmitStatus] = useState<'success' | 'error' | null>(null);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -20,25 +18,25 @@ export default function Contact() {
     setSubmitStatus(null);
 
     try {
-      const response = await fetch("/api/send-email", {
-        method: "POST",
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({ name, email, message }),
       });
 
       if (response.ok) {
-        setSubmitStatus("success");
-        setName("");
-        setEmail("");
-        setMessage("");
+        setSubmitStatus('success');
+        setName('');
+        setEmail('');
+        setMessage('');
       } else {
-        setSubmitStatus("error");
+        setSubmitStatus('error');
       }
     } catch (error) {
-      console.error("Error submitting form:", error);
-      setSubmitStatus("error");
+      console.error('Error submitting form:', error);
+      setSubmitStatus('error');
     } finally {
       setIsSubmitting(false);
     }
@@ -46,10 +44,10 @@ export default function Contact() {
 
   return (
     <>
-      <h1 className="text-3xl font-bold mb-6">Contact Me</h1>
+      <h1 className="mb-6 text-3xl font-bold">Contact Me</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="name" className="block mb-2 text-white">
+          <label htmlFor="name" className="mb-2 block text-white">
             Name
           </label>
           <Input
@@ -58,11 +56,11 @@ export default function Contact() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="text-black bg-white"
+            className="bg-white text-black"
           />
         </div>
         <div>
-          <label htmlFor="email" className="block mb-2 text-white">
+          <label htmlFor="email" className="mb-2 block text-white">
             Email Address
           </label>
           <Input
@@ -72,11 +70,11 @@ export default function Contact() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="text-black bg-white"
+            className="bg-white text-black"
           />
         </div>
         <div>
-          <label htmlFor="message" className="block mb-2 text-white">
+          <label htmlFor="message" className="mb-2 block text-white">
             Message
           </label>
           <Textarea
@@ -85,32 +83,22 @@ export default function Contact() {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             required
-            className="text-black bg-white"
+            className="bg-white text-black"
           />
         </div>
-        <Button
-          type="submit"
-          className="bg-white text-black hover:bg-gray-200"
-          disabled={isSubmitting}
-        >
+        <Button type="submit" className="bg-white text-black hover:bg-gray-200" disabled={isSubmitting}>
           {isSubmitting ? (
             <>
               <Loader className="mr-2 h-4 w-4 animate-spin" />
               Sending...
             </>
           ) : (
-            "Send"
+            'Send'
           )}
         </Button>
       </form>
-      {submitStatus === "success" && (
-        <p className="mt-4 text-green-500">Message sent successfully!</p>
-      )}
-      {submitStatus === "error" && (
-        <p className="mt-4 text-red-500">
-          Failed to send message. Please try again later.
-        </p>
-      )}
+      {submitStatus === 'success' && <p className="mt-4 text-green-500">Message sent successfully!</p>}
+      {submitStatus === 'error' && <p className="mt-4 text-red-500">Failed to send message. Please try again later.</p>}
     </>
   );
 }

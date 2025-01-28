@@ -1,12 +1,23 @@
-import { NextResponse } from "next/server";
-import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+import { NextResponse } from 'next/server';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 
 export async function POST(request: Request) {
   try {
     const { name, email, message } = await request.json();
 
+    // Validate inputs
+    if (!name || !email || !message) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
+    }
+
     const ses = new SESClient({
-      region: "us-east-2",
+      region: 'us-east-2',
       credentials: {
         accessKeyId: process.env.ACCESS_KEY_ID!,
         secretAccessKey: process.env.SECRET_ACCESS_KEY!,
@@ -14,38 +25,49 @@ export async function POST(request: Request) {
     });
 
     const params = {
-      Source: "contact@jcvolpe.me",
+      Source: 'volpestyle@gmail.com', // Use your verified Gmail for now
       Destination: {
-        ToAddresses: ["volpestyle@gmail.com"],
+        ToAddresses: ['volpestyle@gmail.com'], // Same email
       },
       Message: {
         Subject: {
-          Data: `New message from ${name}`,
-          Charset: "UTF-8",
+          Data: `Portfolio Contact Form: ${name}`,
+          Charset: 'UTF-8',
         },
         Body: {
-          Text: {
-            Data: `Name: ${name}\nEmail: ${email}\nMessage: ${message}`,
-            Charset: "UTF-8",
-          },
           Html: {
-            Data: `<p><strong>Name:</strong> ${name}</p>
-                   <p><strong>Email:</strong> ${email}</p>
-                   <p><strong>Message:</strong> ${message}</p>`,
-            Charset: "UTF-8",
+            Data: `
+              <h2>New Contact Form Submission</h2>
+              <p><strong>Name:</strong> ${name}</p>
+              <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
+              <p><strong>Message:</strong></p>
+              <p>${message.replace(/\n/g, '<br>')}</p>
+            `,
+            Charset: 'UTF-8',
+          },
+          Text: {
+            Data: [`Name: ${name}`, `Email: ${email}`, `Message: ${message}`].join('\n'),
+            Charset: 'UTF-8',
           },
         },
       },
     };
 
     const command = new SendEmailCommand(params);
-
     const result = await ses.send(command);
-    console.log("Email sent successfully:", result);
 
-    return NextResponse.json({ status: result.$metadata.httpStatusCode });
-  } catch (error) {
-    console.error("Error sending email:", error);
-    return NextResponse.json({ error }, { status: 500 });
+    return NextResponse.json({
+      success: true,
+      messageId: result.MessageId,
+    });
+  } catch (error: any) {
+    console.error('Error sending email:', error);
+    return NextResponse.json(
+      {
+        error: 'Failed to send email',
+        details: error.message,
+      },
+      { status: 500 }
+    );
   }
 }
