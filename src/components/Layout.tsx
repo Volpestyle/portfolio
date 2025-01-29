@@ -54,6 +54,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               href="/"
               prefetch={true}
               className={`text-lg font-bold transition-all hover:opacity-80 sm:text-xl ${pathname === '/' ? 'border-b-2 border-white pb-0.5' : ''}`}
+              onClick={() => isTouch && setHoverText(hoverMessages.home)}
               onMouseEnter={() => !isTouch && setHoverText(hoverMessages.home)}
               onMouseLeave={() => !isTouch && setHoverText('')}
             >
