@@ -60,16 +60,9 @@ export function useAutoCycle({ texts, isBaseTextComplete, hoverTextComplete, isT
             setHoverText('');
             clearTimeout(id);
         };
-    }, [
-        isTouch,
-        updateText,
-        isBaseTextComplete,
-        interval,
-        texts,
-        hoverText,
-        hoverTextComplete,
-        setHoverText
-    ]);
+        // adding hoverText and hoverTextComplete to the dependency array breaks (the cycle?)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isTouch, updateText, isBaseTextComplete, interval, texts]);
 
     return {
         activeIndex,

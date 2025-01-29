@@ -7,7 +7,6 @@ import { DeviceProvider } from '@/context/DeviceContext';
 import { ReactNode } from 'react';
 
 export function Providers({ children }: { children: ReactNode }) {
-  // Create a client
   const [queryClient] = useState(
     () =>
       new QueryClient({
