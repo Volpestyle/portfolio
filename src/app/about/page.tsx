@@ -75,13 +75,14 @@ export default function About() {
       <div className="md:w-1/2">
         <h1 className="mb-4 text-3xl font-bold">About Me</h1>
         <p className="preserve-case mb-4">
-          I'm a software engineer from Chicago, IL USA. In May 2021, I graduated from Iowa State University with a B.S.
-          in Software Engineering 📚. Over the years I've found many passions, from animation, graphic design, and
-          writing music, to full stack web development. I think the common theme here is that I love to make things 🧑‍🎨.
+          I&apos;m a software engineer from Chicago, IL USA. In May 2021, I graduated from Iowa State University with a
+          B.S. in Software Engineering 📚. Over the years I&apos;ve found many passions, from animation, graphic design,
+          and writing music, to full stack web development. I think the common theme here is that I love to make things
+          🧑‍🎨.
         </p>
         <p className="preserve-case">
-          I always found myself interested in writing code, inspired by the endless possibilities. Here you'll find some
-          of the products of my creative efforts, including my work and projects I'm most proud of :)
+          I always found myself interested in writing code, inspired by the endless possibilities. Here you&apos;ll find
+          some of the products of my creative efforts, including my work and projects I&apos;m most proud of :)
         </p>
         <h2 className="mb-2 mt-4 text-2xl font-bold">my resume</h2>
         <iframe src={`/resume/${RESUME_CONFIG.RESUME_FILENAME}`} className="mb-4 h-96 w-full"></iframe>

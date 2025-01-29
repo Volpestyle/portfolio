@@ -60,7 +60,16 @@ export function useAutoCycle({ texts, isBaseTextComplete, hoverTextComplete, isT
             setHoverText('');
             clearTimeout(id);
         };
-    }, [isTouch, updateText, isBaseTextComplete, interval, texts]);
+    }, [
+        isTouch,
+        updateText,
+        isBaseTextComplete,
+        interval,
+        texts,
+        hoverText,
+        hoverTextComplete,
+        setHoverText
+    ]);
 
     return {
         activeIndex,
