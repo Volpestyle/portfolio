@@ -3,14 +3,13 @@ import { Octokit } from '@octokit/rest';
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: Record<string, string> }
+    { params }: { params: Promise<{ owner: string; repo: string }> }
 ) {
     const octokit = new Octokit({
         auth: process.env.GITHUB_TOKEN,
     });
 
-    const owner = params.owner;
-    const repo = params.repo;
+    const { owner, repo } = await params;
 
     try {
         const { data } = await octokit.rest.repos.get({

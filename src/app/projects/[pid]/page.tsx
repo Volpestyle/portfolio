@@ -36,7 +36,7 @@ async function getProjectData(pid: string) {
   }
 }
 
-export default async function ProjectDetail({ params }: { params: { pid: string } }) {
+export default async function ProjectDetail({ params }: { params: Promise<{ pid: string }> }) {
   const { pid } = await params;
   const { readme, repoInfo } = await getProjectData(pid);
   return <ProjectContent pid={pid} readme={readme} repoInfo={repoInfo} />;
