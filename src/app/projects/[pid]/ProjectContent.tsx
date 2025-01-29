@@ -1,15 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
-import ImageRenderer from '@/components/ImageRenderer';
 import ImageCarousel from '@/components/ImageCarousel';
 import { ExternalLinkIcon } from '@/lib/svgs';
-import { CustomLink } from '@/components/CustomLink';
 import { ArrowLeft } from 'lucide-react';
+import rehypeRaw from 'rehype-raw';
+import { ImageRenderer } from '@/components/ImageRenderer';
+import { useQuery } from '@tanstack/react-query';
 
 interface ProjectContentProps {
   pid: string;
@@ -31,25 +32,68 @@ function formatDate(dateString: string): string {
 }
 
 export function ProjectContent({ pid, readme, repoInfo }: ProjectContentProps) {
-  const [carouselImages, setCarouselImages] = useState<string[]>([]);
   const [carouselInitialIndex, setCarouselInitialIndex] = useState(0);
   const [isCarouselOpen, setIsCarouselOpen] = useState(false);
 
-  const handleImageLoad = (src: string) => {
-    setCarouselImages((prevImages) => {
-      if (!prevImages.includes(src)) {
-        return [...prevImages, src];
-      }
-      return prevImages;
-    });
-  };
+  const { data: allImages = [], refetch: refetchImages } = useQuery({
+    queryKey: ['projectImages', pid],
+    queryFn: () => {
+      return Array.from(document.querySelectorAll('.markdown-body img'))
+        .map((img) => (img as HTMLImageElement).src)
+        .filter(Boolean);
+    },
+    enabled: false,
+  });
 
-  const handleImageClick = (src: string) => {
-    const index = carouselImages.indexOf(src);
-    if (index !== -1) {
-      setCarouselInitialIndex(index);
+  const handleImageClick = (clickedSrc: string) => {
+    if (!clickedSrc) return;
+
+    const clickedIndex = allImages.indexOf(clickedSrc);
+    if (allImages.length > 0) {
+      setCarouselInitialIndex(clickedIndex >= 0 ? clickedIndex : 0);
       setIsCarouselOpen(true);
     }
+  };
+
+  const markdownComponents = {
+    p: ({ node, children, ...props }: any) => {
+      // Check if paragraph contains only image and text nodes
+      const containsOnlyImageAndText = node?.children?.every(
+        (child: any) => child.tagName === 'img' || (child.type === 'text' && /^[\s.]*$/.test(child.value)) // Only whitespace or dots
+      );
+
+      // If it's an image-only paragraph, wrap in div
+      if (containsOnlyImageAndText) {
+        return <div className="my-4 flex flex-col items-start gap-2">{children}</div>;
+      }
+
+      // For mixed content (text + image), ensure proper wrapping
+      const hasImage = node?.children?.some((child: any) => child.tagName === 'img');
+      if (hasImage) {
+        return <div className="my-4">{children}</div>;
+      }
+
+      // Regular paragraph
+      return <p {...props}>{children}</p>;
+    },
+    img: ({ src, alt, ...props }: any) => {
+      if (!src) return null;
+      return (
+        <span className="inline-block">
+          <ImageRenderer
+            pid={pid}
+            src={src}
+            alt={alt || ''}
+            onImageClick={handleImageClick}
+            onImageLoad={() => {
+              // This refetch is necessary to keep an updated list of all img URLS to put into the carousel
+              refetchImages();
+            }}
+            {...props}
+          />
+        </span>
+      );
+    },
   };
 
   return (
@@ -76,25 +120,20 @@ export function ProjectContent({ pid, readme, repoInfo }: ProjectContentProps) {
       <div className="mb-4 text-sm text-gray-400">
         <span className="font-bold">Last commit:</span> {formatDate(repoInfo.pushed_at)}
       </div>
-      <div className="markdown-body text-white">
-        <ReactMarkdown
-          rehypePlugins={[rehypeHighlight]}
-          components={{
-            img: (props) => (
-              <ImageRenderer {...props} pid={pid} onImageLoad={handleImageLoad} onImageClick={handleImageClick} />
-            ),
-            a: ({ href, children }) => <CustomLink href={href || '#'}>{children}</CustomLink>,
-          }}
-        >
+      <div className="markdown-body preserve-case">
+        <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeHighlight]} components={markdownComponents}>
           {readme}
         </ReactMarkdown>
       </div>
-      <ImageCarousel
-        images={carouselImages}
-        initialIndex={carouselInitialIndex}
-        isOpen={isCarouselOpen}
-        onClose={() => setIsCarouselOpen(false)}
-      />
+
+      {allImages.length > 0 && (
+        <ImageCarousel
+          images={allImages}
+          initialIndex={carouselInitialIndex}
+          isOpen={isCarouselOpen}
+          onClose={() => setIsCarouselOpen(false)}
+        />
+      )}
     </div>
   );
 }

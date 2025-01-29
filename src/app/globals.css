@@ -57,14 +57,15 @@
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
+
+  body {
+    @apply bg-background lowercase text-white;
+  }
 }
 
 @layer base {
   * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
+    @apply border-[hsl(var(--border))];
   }
 }
 
@@ -74,5 +75,24 @@
   }
   to {
     transform: translateY(-66.66%);
+  }
+}
+
+@keyframes background-slide {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+@layer utilities {
+  .preserve-case {
+    text-transform: none;
+  }
+
+  .animate-background {
+    animation: background-slide 60s linear infinite;
   }
 }

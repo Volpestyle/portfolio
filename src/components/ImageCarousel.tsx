@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Modal from 'react-modal';
 import Image from 'next/image';
+import Modal from '@/components/ui/modal';
 
 interface ImageCarouselProps {
   images: string[];
@@ -27,53 +27,39 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({ images, initialIndex, isO
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onRequestClose={onClose}
-      contentLabel="Image Carousel"
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      overlayClassName="fixed inset-0 bg-black bg-opacity-75 z-50"
-      style={{
-        overlay: {
-          zIndex: 9999,
-        },
-        content: {
-          position: 'relative',
-          background: 'none',
-          border: 'none',
-          padding: 0,
-        },
-      }}
-    >
-      <div className="relative flex h-full w-full items-center justify-center">
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 z-10 text-4xl text-white hover:text-gray-300"
-          aria-label="Close modal"
-        >
-          ×
-        </button>
-        <Image
-          src={images[currentIndex]}
-          alt={`Image ${currentIndex + 1}`}
-          width={1920}
-          height={1080}
-          className="max-h-[90vh] max-w-[90vw] object-contain"
-        />
-        <button
-          onClick={goToPrevious}
-          className="absolute left-4 top-1/2 -translate-y-1/2 transform text-6xl text-white hover:text-gray-300"
-          aria-label="Previous image"
-        >
-          ‹
-        </button>
-        <button
-          onClick={goToNext}
-          className="absolute right-4 top-1/2 -translate-y-1/2 transform text-6xl text-white hover:text-gray-300"
-          aria-label="Next image"
-        >
-          ›
-        </button>
+    <Modal isOpen={isOpen} onClose={onClose}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="relative flex h-full w-full items-center justify-center">
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 z-10 text-4xl text-white hover:text-gray-300"
+            aria-label="Close modal"
+          >
+            ×
+          </button>
+          <Image
+            src={images[currentIndex]}
+            alt={`Image ${currentIndex + 1}`}
+            width={1920}
+            height={1080}
+            className="max-h-[90vh] max-w-[90vw] object-contain"
+            priority
+          />
+          <button
+            onClick={goToPrevious}
+            className="absolute left-4 top-1/2 -translate-y-1/2 transform text-6xl text-white hover:text-gray-300"
+            aria-label="Previous image"
+          >
+            ‹
+          </button>
+          <button
+            onClick={goToNext}
+            className="absolute right-4 top-1/2 -translate-y-1/2 transform text-6xl text-white hover:text-gray-300"
+            aria-label="Next image"
+          >
+            ›
+          </button>
+        </div>
       </div>
     </Modal>
   );

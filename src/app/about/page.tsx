@@ -46,8 +46,15 @@ export default function About() {
   return (
     <div className="flex flex-col gap-6 md:flex-row">
       <div className="md:w-1/2">
-        <Image src="/images/skateboard.jpg" alt="James" width={400} height={400} className="mb-4 rounded-lg" />
-        <div className="flex flex-wrap gap-4">
+        <Image
+          src="/images/skateboard.jpg"
+          alt="James"
+          width={400}
+          height={400}
+          priority
+          className="mb-4 h-auto w-full rounded-lg object-cover"
+        />
+        <div className="flex flex-col gap-4">
           {socialLinks.map((link) => (
             <a
               key={link.name}
@@ -67,24 +74,24 @@ export default function About() {
       </div>
       <div className="md:w-1/2">
         <h1 className="mb-4 text-3xl font-bold">About Me</h1>
-        <p className="mb-4">
+        <p className="preserve-case mb-4">
           I'm a software engineer from Chicago, IL USA. In May 2021, I graduated from Iowa State University with a B.S.
           in Software Engineering 📚. Over the years I've found many passions, from animation, graphic design, and
           writing music, to full stack web development. I think the common theme here is that I love to make things 🧑‍🎨.
         </p>
-        <p>
+        <p className="preserve-case">
           I always found myself interested in writing code, inspired by the endless possibilities. Here you'll find some
           of the products of my creative efforts, including my work and projects I'm most proud of :)
         </p>
-        <h2 className="mb-2 mt-4 text-2xl font-bold">My Resume</h2>
+        <h2 className="mb-2 mt-4 text-2xl font-bold">my resume</h2>
         <iframe src={`/resume/${RESUME_CONFIG.RESUME_FILENAME}`} className="mb-4 h-96 w-full"></iframe>
         <Button className="mr-2 bg-white text-black hover:bg-gray-200">
           <a href={`/resume/${RESUME_CONFIG.RESUME_FILENAME}`} download>
-            Download resume
+            download resume
           </a>
         </Button>
         <Button className="bg-white text-black hover:bg-gray-200" onClick={() => setIsModalOpen(true)}>
-          View full screen
+          view full screen
         </Button>
       </div>
       <ResumeModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />

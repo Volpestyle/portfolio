@@ -1,42 +1,13 @@
 'use client';
-import React, { useEffect, useState } from 'react';
-import { useSpring, animated } from '@react-spring/web';
+import React from 'react';
 
 const AnimatedBackground: React.FC = () => {
-  // mounted state to ensure animation starts after component is mounted
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const props = useSpring({
-    from: { transform: 'translateY(0%)' },
-    to: { transform: 'translateY(-50%)' },
-    config: {
-      duration: 60000,
-      precision: 0.1,
-    },
-    loop: true,
-    immediate: !mounted, // Don't start animation until mounted
-    reset: true,
-  });
-
   return (
-    <animated.div
+    <div
+      className="animate-background fixed left-0 top-0 -z-10 h-[200%] w-full bg-cover bg-center will-change-transform"
       style={{
-        ...props,
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '200%',
         backgroundImage: "url('/images/me-bg.png')",
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        zIndex: -1,
-        willChange: 'transform',
-        backfaceVisibility: 'hidden', // Improve performance
+        backfaceVisibility: 'hidden',
       }}
       data-testid="animated-background"
     />

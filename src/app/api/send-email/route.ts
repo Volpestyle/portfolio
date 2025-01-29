@@ -8,18 +8,21 @@ const ses = new SESClient({
   credentials: {
     accessKeyId: process.env.ACCESS_KEY_ID ?? '',
     secretAccessKey: process.env.SECRET_ACCESS_KEY ?? '',
-  }
+  },
 });
 
 // Add OPTIONS handler for CORS preflight
 export async function OPTIONS() {
-  return NextResponse.json({}, {
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+  return NextResponse.json(
+    {},
+    {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      },
+    }
+  );
 }
 
 export async function POST(request: Request) {
@@ -30,7 +33,7 @@ export async function POST(request: Request) {
   }
 
   // Get request headers
-  const headersList = headers();
+  const headersList = await headers();
   const contentType = headersList.get('content-type');
 
   // Validate content type
@@ -106,14 +109,14 @@ export async function POST(request: Request) {
     console.error('[Email API] Error:', {
       message: err.message,
       code: err.code,
-      stack: (error as Error).stack
+      stack: (error as Error).stack,
     });
 
     return NextResponse.json(
       {
         error: 'Failed to send email',
         details: err.message || 'Unknown error',
-        code: err.code
+        code: err.code,
       },
       { status: 500 }
     );

@@ -1,10 +1,11 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { usePathname } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { useSpring, animated, config } from '@react-spring/web';
+import { useHover } from '@/context/HoverContext';
+import { hoverMessages } from '@/constants/messages';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,24 +13,28 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const pathname = usePathname();
-  const [key, setKey] = useState(0);
+  const { setHoverText } = useHover();
 
-  // Need to force re-render, fixes animations not starting on refresh
-  useEffect(() => {
-    setKey((prevKey) => prevKey + 1);
-  }, [pathname]);
+  const navItems = [
+    { href: '/about', label: 'About', hoverText: hoverMessages.about },
+    { href: '/projects', label: 'Projects', hoverText: hoverMessages.projects },
+    { href: '/contact', label: 'Contact', hoverText: hoverMessages.contact },
+  ];
 
-  const springProps = useSpring({
-    from: { opacity: 0 },
-    to: { opacity: 1 },
-    reset: true,
-    config: { duration: 1000, easing: (t) => t * (2 - t) }, // Ease-out quad
-  });
-
-  const NavButton: React.FC<{ href: string; children: React.ReactNode }> = ({ href, children }) => {
+  const NavButton: React.FC<{ href: string; children: React.ReactNode; hoverText?: string }> = ({
+    href,
+    children,
+    hoverText,
+  }) => {
     const isActive = pathname === href;
     return (
-      <Button variant="onBlack" asChild className={isActive ? 'bg-white bg-opacity-20' : ''}>
+      <Button
+        variant="onBlack"
+        asChild
+        className={`${isActive ? 'bg-white bg-opacity-20' : ''} text-sm sm:text-base`}
+        onMouseEnter={() => hoverText && setHoverText(hoverText)}
+        onMouseLeave={() => setHoverText('')}
+      >
         <Link href={href}>{children}</Link>
       </Button>
     );
@@ -40,22 +45,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <Card className="relative z-10 w-full max-w-4xl overflow-hidden border-white bg-black bg-opacity-50 text-white">
         <div className="flex min-h-[80vh] flex-col">
           {/* Navbar */}
-          <nav className="flex items-center justify-between border-b border-white p-4">
-            <Link href="/" className="text-xl font-bold">
+          <nav className="flex items-center justify-between border-b border-white p-2 sm:p-4">
+            <Link
+              href="/"
+              className={`text-lg font-bold transition-all hover:opacity-80 sm:text-xl ${pathname === '/' ? 'border-b-2 border-white pb-0.5' : ''}`}
+              onMouseEnter={() => setHoverText(hoverMessages.home)}
+            >
               JCV
             </Link>
-            <div className="space-x-4">
-              <NavButton href="/">Home</NavButton>
-              <NavButton href="/about">About</NavButton>
-              <NavButton href="/projects">Projects</NavButton>
-              <NavButton href="/contact">Contact</NavButton>
+            <div className="space-x-1 sm:space-x-4">
+              {navItems.map((item) => (
+                <NavButton key={item.href} href={item.href} hoverText={item.hoverText}>
+                  {item.label}
+                </NavButton>
+              ))}
             </div>
           </nav>
 
-          {/* Main content */}
-          <animated.main key={key} className="flex-grow p-4" style={springProps}>
-            {children}
-          </animated.main>
+          <main className="animate-fadeIn grow p-4">{children}</main>
         </div>
       </Card>
     </div>

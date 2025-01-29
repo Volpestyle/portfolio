@@ -1,49 +1,109 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useReducer, useTransition, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader } from 'lucide-react';
+import { Loader, X } from 'lucide-react';
+import { FormFieldId, InputType, State, SubmitStatus, initialState, reducer, type FormFieldConfig } from './types';
+
+const formFields: FormFieldConfig[] = [
+  {
+    id: FormFieldId.Name,
+    label: 'Name',
+    type: InputType.Text,
+    Component: Input,
+  },
+  {
+    id: FormFieldId.Email,
+    label: 'Email Address',
+    type: InputType.Email,
+    Component: Input,
+  },
+  {
+    id: FormFieldId.Message,
+    label: 'Message',
+    Component: Textarea,
+  },
+];
+
+// Update helper function
+const getFormFieldValue = (state: State, id: FormFieldId): string => {
+  return state[id];
+};
 
 export default function Contact() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [message, setMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<'success' | 'error' | null>(null);
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const [isPending, startTransition] = useTransition();
+  const [isVisible, setIsVisible] = useState(false);
+  const {
+    [FormFieldId.Name]: name,
+    [FormFieldId.Email]: email,
+    [FormFieldId.Message]: message,
+    submitStatus,
+    errorMessage,
+  } = state;
+
+  // Reset visibility when status changes
+  useEffect(() => {
+    if (submitStatus) {
+      requestAnimationFrame(() => {
+        setIsVisible(true);
+      });
+    }
+  }, [submitStatus]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setIsSubmitting(true);
-    setSubmitStatus(null);
+    dispatch({ type: 'SET_SUBMIT_STATUS', status: null });
+    dispatch({ type: 'SET_ERROR_MESSAGE', message: '' });
+    setIsVisible(false);
 
-    try {
-      const response = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name, email, message }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error('Email API Error:', {
-          status: response.status,
-          data,
+    startTransition(async () => {
+      try {
+        const response = await fetch('/api/send-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name, email, message }),
         });
-        setSubmitStatus('error');
-      } else {
-        setSubmitStatus('success');
-        setName('');
-        setEmail('');
-        setMessage('');
+        const data = await response.json();
+
+        if (!response.ok) {
+          console.error('Email API Error:', {
+            status: response.status,
+            data,
+          });
+          dispatch({
+            type: 'SET_SUBMIT_RESULT',
+            status: SubmitStatus.Error,
+            message: data.error || 'Failed to send message. Please try again later.',
+          });
+        } else {
+          dispatch({
+            type: 'SET_SUBMIT_RESULT',
+            status: SubmitStatus.Success,
+            resetForm: true,
+          });
+        }
+      } catch (error) {
+        console.error('Email submission error:', error);
+        dispatch({
+          type: 'SET_SUBMIT_RESULT',
+          status: SubmitStatus.Error,
+          message: 'An unexpected error occurred. Please try again later.',
+        });
       }
-    } catch (error) {
-      console.error('Email submission error:', error);
-      setSubmitStatus('error');
-    } finally {
-      setIsSubmitting(false);
+    });
+  };
+
+  const handleDismissNotification = () => {
+    setIsVisible(false);
+  };
+
+  const handleAnimationEnd = () => {
+    if (!isVisible) {
+      dispatch({ type: 'SET_SUBMIT_STATUS', status: null });
     }
   };
 
@@ -51,48 +111,31 @@ export default function Contact() {
     <>
       <h1 className="mb-6 text-3xl font-bold">Contact Me</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="name" className="mb-2 block text-white">
-            Name
-          </label>
-          <Input
-            id="name"
-            name="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            className="bg-white text-black"
-          />
-        </div>
-        <div>
-          <label htmlFor="email" className="mb-2 block text-white">
-            Email Address
-          </label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="bg-white text-black"
-          />
-        </div>
-        <div>
-          <label htmlFor="message" className="mb-2 block text-white">
-            Message
-          </label>
-          <Textarea
-            id="message"
-            name="message"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            required
-            className="bg-white text-black"
-          />
-        </div>
-        <Button type="submit" className="bg-white text-black hover:bg-gray-200" disabled={isSubmitting}>
-          {isSubmitting ? (
+        {formFields.map(({ id, label, type, Component }) => (
+          <div key={id}>
+            <label htmlFor={id} className="mb-2 block text-white">
+              {label}
+            </label>
+            <Component
+              id={id}
+              name={id}
+              type={type}
+              value={getFormFieldValue(state, id as FormFieldId)}
+              onChange={(e) =>
+                dispatch({
+                  type: 'SET_FIELD',
+                  field: id as FormFieldId,
+                  value: e.target.value,
+                })
+              }
+              required
+              className="bg-white text-black"
+            />
+          </div>
+        ))}
+
+        <Button type="submit" className="bg-white text-black hover:bg-gray-200" disabled={isPending}>
+          {isPending ? (
             <>
               <Loader className="mr-2 h-4 w-4 animate-spin" />
               Sending...
@@ -102,8 +145,26 @@ export default function Contact() {
           )}
         </Button>
       </form>
-      {submitStatus === 'success' && <p className="mt-4 text-green-500">Message sent successfully!</p>}
-      {submitStatus === 'error' && <p className="mt-4 text-red-500">Failed to send message. Please try again later.</p>}
+
+      {submitStatus && (
+        <div
+          className={`relative mt-4 inline-flex items-center rounded-md p-3 transition-all duration-300 ease-in-out ${
+            submitStatus === SubmitStatus.Success ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
+          } ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'}`}
+          onTransitionEnd={handleAnimationEnd}
+        >
+          <span className="mr-2">
+            {submitStatus === SubmitStatus.Success ? 'Message sent successfully!' : errorMessage}
+          </span>
+          <button
+            onClick={handleDismissNotification}
+            className="rounded-full p-1.5 transition-colors hover:bg-black/10"
+            aria-label="Dismiss notification"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </>
   );
 }

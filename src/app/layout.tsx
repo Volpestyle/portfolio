@@ -2,8 +2,9 @@ import './globals.css';
 import { ReactNode } from 'react';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import Layout from '@/components/Layout';
-import { hankenGrotesk } from './fonts';
+import { jetbrainsMono, sourceCodePro, firaCode, spaceMono, ibmPlexMono, robotoMono } from './fonts';
 import { Metadata } from 'next';
+import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: "JCV's Portfolio",
@@ -12,10 +13,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body className={`dark ${hankenGrotesk.variable} font-sans`}>
+    <html
+      lang="en"
+      className={` ${jetbrainsMono.variable} ${sourceCodePro.variable} ${firaCode.variable} ${spaceMono.variable} ${ibmPlexMono.variable} ${robotoMono.variable} `}
+    >
+      <body className="font-roboto-mono">
         <AnimatedBackground />
-        <Layout>{children}</Layout>
+
+        <Providers>
+          <Layout>{children}</Layout>
+        </Providers>
       </body>
     </html>
   );

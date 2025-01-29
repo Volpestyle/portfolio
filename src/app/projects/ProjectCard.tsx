@@ -28,8 +28,10 @@ function formatDate(dateString: string): string {
 export function ProjectCard({ repo }: ProjectCardProps) {
   return (
     <Card className="relative border-white bg-black bg-opacity-10 p-4 text-white">
-      {repo.isStarred && <StarIcon />}
-      <h2 className="mb-2 text-xl font-bold">{repo.name}</h2>
+      <h2 className="mb-2 flex items-center justify-between text-xl font-bold">
+        {repo.name}
+        {repo.isStarred && <StarIcon />}
+      </h2>
       <p className="mb-4 text-sm">{repo.description}</p>
       <p className="mt-4 text-xs text-gray-400">
         <span className="font-bold">Created:</span> {formatDate(repo.created_at)}

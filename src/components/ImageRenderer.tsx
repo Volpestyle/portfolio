@@ -1,12 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Image from 'next/image';
+import React, { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useRepoDetails, getGithubRawUrl, useGithubImage } from '@/lib/github';
+import { GITHUB_CONFIG } from '@/lib/constants';
 
-interface ImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
+interface ImageRendererProps {
+  src: string;
+  alt: string;
   pid: string;
-  onImageLoad: (src: string) => void;
-  onImageClick: (src: string) => void;
+  width?: number | string;
+  height?: number | string;
+  onImageLoad?: (src: string) => void;
+  onImageClick?: (src: string) => void;
+  [key: string]: any;
 }
 
 /**
@@ -20,59 +27,30 @@ interface ImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
  * @param {function} onImageClick - Callback fired when image is clicked
  * @param {object} rest - Additional image props passed through
  */
-const ImageRenderer: React.FC<ImageProps> = ({ src, alt, pid, width, height, onImageLoad, onImageClick, ...rest }) => {
-  const [imageSrc, setImageSrc] = useState<string | null>(null);
+export function ImageRenderer({ src, alt, pid, onImageClick, onImageLoad, ...props }: ImageRendererProps) {
+  const { data: repoData, isLoading: isRepoLoading } = useRepoDetails(GITHUB_CONFIG.USERNAME, pid);
+  const { data: imageSrc, isLoading: isImageLoading } = useGithubImage(GITHUB_CONFIG.USERNAME, pid, repoData, src);
 
-  useEffect(() => {
-    if (!src) return;
+  const handleLoad = () => {
+    onImageLoad?.(imageSrc!);
+  };
 
-    const fetchImage = async () => {
-      if (src.startsWith('http')) {
-        setImageSrc(src);
-        onImageLoad(src);
-        return;
-      }
-
-      const branches = ['main', 'master'];
-      for (const branch of branches) {
-        const url = `https://raw.githubusercontent.com/volpestyle/${pid}/${branch}/${src.replace(/^\.\//, '')}`;
-        try {
-          const response = await fetch(url, { method: 'HEAD' });
-          if (response.ok) {
-            setImageSrc(url);
-            onImageLoad(url);
-            return;
-          }
-        } catch (error) {
-          console.error(`Error checking image at ${url}:`, error);
-        }
-      }
-
-      console.error(`Failed to find image: ${src}`);
-    };
-
-    fetchImage();
-  }, [src, pid, onImageLoad]);
+  if (isRepoLoading || isImageLoading) {
+    return <div className="h-48 w-full animate-pulse rounded-lg bg-gray-200" />;
+  }
 
   if (!imageSrc) return null;
 
-  const imageWidth = width ? parseInt(width.toString(), 10) : 500;
-  const imageHeight = height ? parseInt(height.toString(), 10) : 300;
-
   return (
     <div className="py-4">
-      <Image
+      <img
         src={imageSrc}
-        alt={alt || ''}
-        width={imageWidth}
-        height={imageHeight}
-        className="h-auto max-w-full cursor-pointer"
-        onClick={() => onImageClick(imageSrc)}
-        priority // This ensures the image is loaded immediately
-        {...rest}
+        alt={alt}
+        className="h-auto max-w-full cursor-pointer rounded-lg shadow-md transition-opacity hover:opacity-90"
+        onClick={() => onImageClick?.(imageSrc)}
+        onLoad={handleLoad}
+        {...props}
       />
     </div>
   );
-};
-
-export default ImageRenderer;
+}
