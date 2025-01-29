@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useHover } from '@/context/HoverContext';
 import { hoverMessages } from '@/constants/messages';
+import { useDeviceContext } from '@/context/DeviceContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,6 +15,7 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const pathname = usePathname();
   const { setHoverText } = useHover();
+  const { isTouch } = useDeviceContext();
 
   const navItems = [
     { href: '/about', label: 'About', hoverText: hoverMessages.about },
@@ -32,10 +34,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         variant="onBlack"
         asChild
         className={`${isActive ? 'bg-white bg-opacity-20' : ''} text-sm sm:text-base`}
-        onMouseEnter={() => hoverText && setHoverText(hoverText)}
-        onMouseLeave={() => setHoverText('')}
+        onMouseEnter={() => !isTouch && hoverText && setHoverText(hoverText)}
+        onMouseLeave={() => !isTouch && setHoverText('')}
       >
-        <Link href={href}>{children}</Link>
+        <Link href={href} prefetch={true}>
+          {children}
+        </Link>
       </Button>
     );
   };
@@ -48,8 +52,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <nav className="flex items-center justify-between border-b border-white p-2 sm:p-4">
             <Link
               href="/"
+              prefetch={true}
               className={`text-lg font-bold transition-all hover:opacity-80 sm:text-xl ${pathname === '/' ? 'border-b-2 border-white pb-0.5' : ''}`}
-              onMouseEnter={() => setHoverText(hoverMessages.home)}
+              onMouseEnter={() => !isTouch && setHoverText(hoverMessages.home)}
+              onMouseLeave={() => !isTouch && setHoverText('')}
             >
               JCV
             </Link>
