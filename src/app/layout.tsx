@@ -19,7 +19,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <body className="font-roboto-mono">
         <AnimatedBackground />
-
         <Providers>
           <Layout>{children}</Layout>
         </Providers>
