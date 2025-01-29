@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { headers } from 'next/headers';
 
@@ -12,7 +12,9 @@ const ses = new SESClient({
 });
 
 // Add OPTIONS handler for CORS preflight
-export async function OPTIONS() {
+export async function OPTIONS(
+  request: NextRequest
+): Promise<NextResponse> {
   return NextResponse.json(
     {},
     {
@@ -25,7 +27,9 @@ export async function OPTIONS() {
   );
 }
 
-export async function POST(request: Request) {
+export async function POST(
+  request: NextRequest
+): Promise<NextResponse> {
   console.log('[Email API] Request received');
   // Check request method
   if (request.method !== 'POST') {

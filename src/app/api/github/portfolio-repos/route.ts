@@ -1,8 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { Octokit } from '@octokit/rest';
 import { GITHUB_CONFIG } from '@/lib/constants';
 
-export async function GET() {
+export async function GET(
+    request: NextRequest
+): Promise<NextResponse> {
     const octokit = new Octokit({
         auth: process.env.GITHUB_TOKEN,
     });
@@ -48,4 +50,6 @@ export async function GET() {
         console.error('Error fetching portfolio repos:', error);
         return NextResponse.json({ error: 'Failed to fetch repos' }, { status: 500 });
     }
-} 
+}
+
+export const dynamic = 'force-dynamic'; 

@@ -1,20 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Octokit } from '@octokit/rest';
 
+type Params = { owner: string; repo: string };
+
 export async function GET(
     request: NextRequest,
-    context: {
-        params: {
-            owner: string;
-            repo: string;
-        }
-    }
+    { params }: { params: Params }
 ): Promise<NextResponse> {
     const octokit = new Octokit({
         auth: process.env.GITHUB_TOKEN,
     });
 
-    const { owner, repo } = context.params;
+    const { owner, repo } = params;
 
     try {
         const { data } = await octokit.rest.repos.get({
@@ -28,4 +25,6 @@ export async function GET(
         console.error('Error fetching repo info:', error);
         return NextResponse.json({ default_branch: 'main' }, { status: 500 });
     }
-} 
+}
+
+export const dynamic = 'force-dynamic'; 
