@@ -1,22 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Octokit } from '@octokit/rest';
 
-type RouteParams = {
-    params: {
-        owner: string;
-        repo: string;
-    };
-};
-
 export async function GET(
     request: NextRequest,
-    { params }: RouteParams
+    context: {
+        params: {
+            owner: string;
+            repo: string;
+        }
+    }
 ): Promise<NextResponse> {
     const octokit = new Octokit({
         auth: process.env.GITHUB_TOKEN,
     });
 
-    const { owner, repo } = params;
+    const { owner, repo } = context.params;
 
     try {
         const { data } = await octokit.rest.repos.get({
