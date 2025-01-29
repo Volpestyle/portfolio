@@ -35,7 +35,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         asChild
         className={`${isActive ? 'bg-white bg-opacity-20' : ''} text-sm sm:text-base`}
         onMouseEnter={() => !isTouch && hoverText && setHoverText(hoverText)}
-        onMouseLeave={() => !isTouch && setHoverText('')}
+        onMouseLeave={() => {}}
       >
         <Link href={href} prefetch={true}>
           {children}
@@ -56,7 +56,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               className={`text-lg font-bold transition-all hover:opacity-80 sm:text-xl ${pathname === '/' ? 'border-b-2 border-white pb-0.5' : ''}`}
               onClick={() => isTouch && setHoverText(hoverMessages.home)}
               onMouseEnter={() => !isTouch && setHoverText(hoverMessages.home)}
-              onMouseLeave={() => !isTouch && setHoverText('')}
+              onMouseLeave={() => {}}
             >
               JCV
             </Link>

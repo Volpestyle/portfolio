@@ -11,16 +11,12 @@ const HoverContext = createContext<HoverContextType | undefined>(undefined);
 export function HoverProvider({ children }: { children: ReactNode }) {
   const [hoverText, setHoverText] = useState('');
 
-  const setHoverTextCallback = useCallback((text: string) => {
-    setHoverText(text);
-  }, []);
-
   const value = useMemo(
     () => ({
       hoverText,
-      setHoverText: setHoverTextCallback,
+      setHoverText,
     }),
-    [hoverText, setHoverTextCallback]
+    [hoverText]
   );
 
   return <HoverContext.Provider value={value}>{children}</HoverContext.Provider>;

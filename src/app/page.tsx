@@ -41,7 +41,7 @@ export default function Home() {
   const { buttonWidth, buttonGap, ref } = useButtonMeasurements();
 
   // if on touch device, cycle through hover texts automatically while underlining the current button
-  const { activeIndex, handleNextCycle } = useAutoCycle({
+  const { activeIndex } = useAutoCycle({
     texts,
     isBaseTextComplete,
     hoverTextComplete,
@@ -55,13 +55,8 @@ export default function Home() {
           <TypeWriter
             baseText="hi, i'm james."
             hoverText={hoverText}
-            onBaseComplete={() => {
-              setIsBaseTextComplete(true);
-            }}
-            onHoverTextComplete={() => {
-              setHoverTextComplete(true);
-              handleNextCycle();
-            }}
+            onBaseComplete={() => setIsBaseTextComplete(true)}
+            onHoverTextComplete={(isComplete) => setHoverTextComplete(isComplete)}
           />
         </div>
       </div>
