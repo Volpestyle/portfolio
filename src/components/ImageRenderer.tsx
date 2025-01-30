@@ -1,20 +1,16 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useRepoDetails, getGithubRawUrl, useGithubImage } from '@/lib/github';
-import { GITHUB_CONFIG } from '@/lib/constants';
+import React from 'react';
+import { useRepoDetails, useGithubImage } from '@/lib/github';
 import Image from 'next/image';
 
 interface ImageRendererProps {
+  pid: string;
   src: string;
   alt: string;
-  pid: string;
-  width?: number;
-  height?: number;
-  onImageLoad?: (src: string) => void;
   onImageClick?: (src: string) => void;
-  [key: string]: any;
+  onImageLoad?: () => void;
+  className?: string;
 }
 
 /**
@@ -22,18 +18,16 @@ interface ImageRendererProps {
  * @param {string} src - The source path or URL of the image
  * @param {string} alt - Alt text for the image
  * @param {string} pid - The GitHub repository ID/name
- * @param {number} width - Width of the image
- * @param {number} height - Height of the image
  * @param {function} onImageLoad - Callback fired when image is loaded with final src
  * @param {function} onImageClick - Callback fired when image is clicked
- * @param {object} rest - Additional image props passed through
+ * @param {string} className - Additional CSS classes for the image
  */
-export function ImageRenderer({ src, alt, pid, onImageClick, onImageLoad, ...props }: ImageRendererProps) {
-  const { data: repoData, isLoading: isRepoLoading } = useRepoDetails(GITHUB_CONFIG.USERNAME, pid);
-  const { data: imageSrc, isLoading: isImageLoading } = useGithubImage(GITHUB_CONFIG.USERNAME, pid, repoData, src);
+export function ImageRenderer({ pid, src, alt, onImageClick, onImageLoad, className }: ImageRendererProps) {
+  const { data: repoData, isLoading: isRepoLoading } = useRepoDetails(pid);
+  const { data: imageSrc, isLoading: isImageLoading } = useGithubImage(pid, repoData, src);
 
   const handleLoad = () => {
-    onImageLoad?.(imageSrc!);
+    onImageLoad?.();
   };
 
   if (isRepoLoading || isImageLoading) {
@@ -50,10 +44,9 @@ export function ImageRenderer({ src, alt, pid, onImageClick, onImageLoad, ...pro
         width={800}
         height={600}
         unoptimized
-        className="h-auto max-w-full cursor-pointer rounded-lg shadow-md transition-opacity hover:opacity-90"
+        className={`h-auto w-auto max-w-full cursor-pointer ${className || ''}`}
         onClick={() => onImageClick?.(imageSrc)}
         onLoad={() => handleLoad()}
-        {...props}
       />
     </div>
   );

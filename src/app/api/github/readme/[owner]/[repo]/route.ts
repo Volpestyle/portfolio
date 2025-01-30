@@ -8,19 +8,19 @@ export async function GET(
     const octokit = new Octokit({
         auth: process.env.GITHUB_TOKEN,
     });
-
     const { owner, repo } = await params;
-
     try {
-        const { data } = await octokit.rest.repos.get({
-            owner,
-            repo,
-        });
+        const readme = await octokit.rest.repos
+            .getReadme({
+                owner,
+                repo
+            })
+            .then((response) => Buffer.from(response.data.content, 'base64').toString());
 
-        return Response.json(data);
+        return Response.json({ readme });
     } catch (error) {
-        console.error('Error fetching repo info:', error);
-        return Response.json({ default_branch: 'main' }, { status: 500 });
+        console.error('Error fetching project data:', error);
+        return Response.json({ error: 'Project not found' }, { status: 404 });
     }
 }
 

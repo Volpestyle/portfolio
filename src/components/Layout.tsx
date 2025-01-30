@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { useHover } from '@/context/HoverContext';
 import { hoverMessages } from '@/constants/messages';
 import { useDeviceContext } from '@/context/DeviceContext';
+import { ErrorBoundary } from './ErrorBoundary';
+import { TanStackQueryDevtools } from './ReactQueryDevtools';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -69,9 +71,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
           </nav>
 
-          <main className="animate-fadeIn grow p-4">{children}</main>
+          <main className="animate-fadeIn grow p-4">
+            <ErrorBoundary>{children}</ErrorBoundary>
+          </main>
         </div>
       </Card>
+      <TanStackQueryDevtools />
     </div>
   );
 };

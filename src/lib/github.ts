@@ -1,9 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { GITHUB_CONFIG } from './constants';
 
 /**
  * Interface representing GitHub repository data
  */
-interface RepoData {
+export type RepoData = {
     id: number;
     name: string;
     description: string | null;
@@ -23,26 +24,6 @@ const defaultQueryConfig = {
     retry: 1,
 };
 
-/**
- * Hook to fetch the default branch of a GitHub repository
- * @param owner - The GitHub username or organization name
- * @param repoId - The repository name
- * @returns Query object containing the default branch name
- */
-export function useDefaultBranch(owner: string, repoId: string) {
-    return useQuery({
-        queryKey: ['repo', owner, repoId],
-        queryFn: async () => {
-            const response = await fetch(`/api/github/repo-info/${owner}/${repoId}`);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch repo info: ${response.status}`);
-            }
-            const data = await response.json();
-            return data.default_branch;
-        },
-        ...defaultQueryConfig,
-    });
-}
 
 /**
  * Hook to check if an image exists in a GitHub repository and get its raw URL
@@ -52,12 +33,12 @@ export function useDefaultBranch(owner: string, repoId: string) {
  * @param path - Path to the image file in the repository
  * @returns Query object containing the raw image URL if it exists
  */
-export function useGithubImage(owner: string, repo: string, repoData: RepoData | undefined, path: string) {
+export function useGithubImage(repo: string, repoData: RepoData | undefined, path: string, owner = GITHUB_CONFIG.USERNAME) {
     return useQuery({
         queryKey: ['image', owner, repo, repoData?.default_branch, path],
         queryFn: async () => {
             if (!repoData?.default_branch) throw new Error('Branch not available');
-            const url = getGithubRawUrl(owner, repo, repoData.default_branch, path);
+            const url = getGithubRawUrl(repo, repoData.default_branch, path, owner);
             const response = await fetch(url, { method: 'HEAD' });
             if (!response.ok) throw new Error(`Image not found: ${url}`);
             return url;
@@ -75,10 +56,12 @@ export function useGithubImage(owner: string, repo: string, repoData: RepoData |
  * @param path - Path to the file in the repository
  * @returns Raw GitHub URL for the file
  */
-export function getGithubRawUrl(owner: string, repo: string, branch: string, path: string): string {
+export function getGithubRawUrl(repo: string, branch: string, path: string, owner = GITHUB_CONFIG.USERNAME): string {
     const cleanPath = path.replace(/^\.\//, '').replace(/\?raw=true$/, '');
     return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${cleanPath}`;
 }
+
+export type PortfolioReposResponse = { starred: RepoData[]; normal: RepoData[] };
 
 /**
  * Hook to fetch portfolio repositories, both 'starred' and 'normal'
@@ -86,6 +69,8 @@ export function getGithubRawUrl(owner: string, repo: string, branch: string, pat
  * @returns Query object containing an object with starred and normal repositories
  */
 export function usePortfolioRepos() {
+    const queryClient = useQueryClient();
+
     return useQuery({
         queryKey: ['portfolioRepos'],
         queryFn: async () => {
@@ -93,8 +78,15 @@ export function usePortfolioRepos() {
             if (!response.ok) {
                 throw new Error('Failed to fetch portfolio repos');
             }
-            const data = await response.json();
-            return data as { starred: RepoData[]; normal: RepoData[] };
+            const data = await response.json() as PortfolioReposResponse;
+
+            // Pre-fill cache for each repo
+            [...data.starred, ...data.normal].forEach((repo) => {
+                // Cache for 'repo' query
+                queryClient.setQueryData(['repo', repo.name], repo);
+            });
+
+            return data;
         },
         ...defaultQueryConfig,
     });
@@ -106,9 +98,9 @@ export function usePortfolioRepos() {
  * @param repo - The repository name
  * @returns Query object containing detailed repository information
  */
-export function useRepoDetails(owner: string, repo: string) {
+export function useRepoDetails(repo: string, owner: string = GITHUB_CONFIG.USERNAME) {
     return useQuery({
-        queryKey: ['repoDetails', owner, repo],
+        queryKey: ['repo', repo],
         queryFn: async () => {
             const response = await fetch(`/api/github/repo-info/${owner}/${repo}`);
             if (!response.ok) {
@@ -127,17 +119,22 @@ export function useRepoDetails(owner: string, repo: string) {
  * @param repo - The repository name
  * @returns Query object containing the README content as a string
  */
-export function useRepoReadme(owner: string, repo: string) {
+export function useRepoReadme(repo: string, owner: string = GITHUB_CONFIG.USERNAME) {
     return useQuery({
-        queryKey: ['repoReadme', owner, repo],
+        queryKey: ['repoReadme', repo],
         queryFn: async () => {
             const response = await fetch(`/api/github/readme/${owner}/${repo}`);
             if (!response.ok) {
                 throw new Error('Failed to fetch readme');
             }
-            const data = await response.json();
-            return data.content as string;
+            const { readme } = await response.json();
+
+            if (!readme) {
+                throw new Error('README content is missing from the response');
+            }
+
+            return readme;
         },
         ...defaultQueryConfig,
     });
-} 
+}
