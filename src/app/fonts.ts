@@ -1,11 +1,4 @@
-import {
-  JetBrains_Mono,
-  Fira_Code,
-  Source_Code_Pro,
-  Space_Mono,
-  IBM_Plex_Mono,
-  Roboto_Mono
-} from 'next/font/google';
+import { JetBrains_Mono, Fira_Code, Source_Code_Pro, Space_Mono, IBM_Plex_Mono, Roboto_Mono } from 'next/font/google';
 
 export const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],

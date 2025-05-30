@@ -35,7 +35,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, className }) =
       onClose={onClose}
       className={cn(
         'backdrop:bg-black/50 backdrop:backdrop-blur-sm',
-        'open:animate-fade-in p-4',
+        'p-4 open:animate-fade-in',
         'rounded-lg bg-white shadow-xl',
         'w-full max-w-lg',
         className
