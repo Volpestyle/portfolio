@@ -1,7 +1,7 @@
 'use client';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
-import { siLinkedin, siGithub, siYoutube, siSpotify } from 'simple-icons/icons';
+import { siLinkedin, siGithub, siYoutube, siSpotify, siX } from 'simple-icons/icons';
 import { useState } from 'react';
 import ResumeModal from '@/components/ResumeModal';
 import { RESUME_CONFIG } from '@/lib/constants';
@@ -31,6 +31,11 @@ export default function About() {
       url: 'https://www.linkedin.com/in/james-volpe/',
     },
     { name: 'GitHub', icon: siGithub, url: 'https://github.com/Volpestyle' },
+    {
+      name: 'X',
+      icon: siX,
+      url: 'https://x.com/c0wboyboopbop',
+    },
     {
       name: 'YouTube',
       icon: siYoutube,
