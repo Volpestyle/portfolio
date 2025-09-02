@@ -96,13 +96,6 @@ export function ProjectLoader({ pid }: { pid: string }) {
       >
         {/* Project metadata and actions */}
         <div className="mb-6">
-          <Link href="/projects">
-            <Button variant="ghost" className="mb-6 group">
-              <ChevronLeft className="w-4 h-4 mr-2 group-hover:-translate-x-0.5 transition-transform" />
-              Back to Projects
-            </Button>
-          </Link>
-          
           {repoInfo && (
             <>
               <div className="mb-4 flex items-center">
