@@ -26,14 +26,6 @@ export function DocumentContent({ content, pid, path, projectName }: DocumentCon
       content={content}
       pid={pid}
       breadcrumbs={breadcrumbs}
-    >
-      {/* Back to README Button */}
-      <Link href={`/projects/${pid}`}>
-        <Button variant="ghost" className="mb-6 group">
-          <ChevronLeft className="w-4 h-4 mr-2 group-hover:-translate-x-0.5 transition-transform" />
-          Back to README
-        </Button>
-      </Link>
-    </MarkdownViewer>
+    />
   );
 }
