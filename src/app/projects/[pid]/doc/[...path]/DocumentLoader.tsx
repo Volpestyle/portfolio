@@ -45,14 +45,6 @@ export function DocumentLoader({ pid, path }: DocumentLoaderProps) {
             ))}
           </nav>
 
-          {/* Back to README Button */}
-          <Link href={`/projects/${pid}`}>
-            <Button variant="ghost" className="mb-6 group">
-              <ChevronLeft className="w-4 h-4 mr-2 group-hover:-translate-x-0.5 transition-transform" />
-              Back to README
-            </Button>
-          </Link>
-
           {/* Error Message */}
           <div className="flex flex-col items-center justify-center py-20">
             <div className="text-red-500 text-center">
