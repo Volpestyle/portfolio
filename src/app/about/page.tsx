@@ -26,20 +26,20 @@ export default function About() {
 
   const socialLinks: SocialLink[] = [
     {
-      name: 'LinkedIn',
-      icon: siLinkedin,
-      url: 'https://www.linkedin.com/in/james-volpe/',
-    },
-    { name: 'GitHub', icon: siGithub, url: 'https://github.com/Volpestyle' },
-    {
-      name: 'X',
+      name: 'Twitter (x)',
       icon: siX,
       url: 'https://x.com/c0wboyboopbop',
     },
+    { name: 'GitHub', icon: siGithub, url: 'https://github.com/Volpestyle' },
     {
       name: 'YouTube',
       icon: siYoutube,
       url: 'https://www.youtube.com/@vuhlp/videos',
+    },
+    {
+      name: 'LinkedIn (ew)',
+      icon: siLinkedin,
+      url: 'https://www.linkedin.com/in/james-volpe/',
     },
     {
       name: 'Spotify',
@@ -49,7 +49,7 @@ export default function About() {
   ];
 
   return (
-    <div className="flex flex-col gap-6 md:flex-row">
+    <div className="m-4 flex flex-col gap-6 md:flex-row">
       <div className="md:w-1/2">
         <Image
           src="/images/skateboard.jpg"
@@ -80,14 +80,10 @@ export default function About() {
       <div className="md:w-1/2">
         <h1 className="mb-4 text-3xl font-bold">About Me</h1>
         <p className="preserve-case mb-4">
-          I&apos;m a software engineer from Chicago, IL USA. In May 2021, I graduated from Iowa State University with a
+          I&apos;m a software engineer from Chicago, IL USA. I graduated from Iowa State University in May 2021, with a
           B.S. in Software Engineering 📚. Over the years I&apos;ve found many passions, from animation, graphic design,
           and writing music, to full stack web development. I think the common theme here is that I love to make things
           🧑‍🎨.
-        </p>
-        <p className="preserve-case">
-          I always found myself interested in writing code, inspired by the endless possibilities. Here you&apos;ll find
-          some of the products of my creative efforts, including my work and projects I&apos;m most proud of :)
         </p>
         <h2 className="mb-2 mt-4 text-2xl font-bold">my resume</h2>
         <iframe src={`/resume/${RESUME_CONFIG.RESUME_FILENAME}`} className="mb-4 h-96 w-full"></iframe>

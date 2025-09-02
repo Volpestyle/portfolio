@@ -27,9 +27,9 @@ export function ProjectsLoader() {
   const repos = [...repoData.starred, ...repoData.normal];
 
   return (
-    <>
-      <h1 className="mb-6 text-3xl font-bold">My Code</h1>
+    <div className="m-4">
+      <h1 className="mb-6 text-3xl font-bold">My Work</h1>
       <ProjectsGrid repos={repos} />
-    </>
+    </div>
   );
 }

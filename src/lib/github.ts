@@ -41,13 +41,30 @@ export function useGithubImage(
   return useQuery({
     queryKey: ['image', owner, repo, repoData?.default_branch, path],
     queryFn: async () => {
+      // If path starts with /, it's a local public asset
+      if (path.startsWith('/')) {
+        return path;
+      }
+      
+      // If it's an external URL, return as-is
+      if (path.startsWith('http://') || path.startsWith('https://')) {
+        return path;
+      }
+      
+      // For private repos, assume local path
+      if (repoData?.private) {
+        // If it doesn't start with /, add it
+        return path.startsWith('/') ? path : `/${path}`;
+      }
+      
+      // For public repos, fetch from GitHub
       if (!repoData?.default_branch) throw new Error('Branch not available');
       const url = getGithubRawUrl(repo, repoData.default_branch, path, owner);
       const response = await fetch(url, { method: 'HEAD' });
       if (!response.ok) throw new Error(`Image not found: ${url}`);
       return url;
     },
-    enabled: !!repoData?.default_branch,
+    enabled: !!repoData,
     ...defaultQueryConfig,
   });
 }
@@ -138,6 +155,32 @@ export function useRepoReadme(repo: string, owner: string = GITHUB_CONFIG.USERNA
       }
 
       return readme;
+    },
+    ...defaultQueryConfig,
+  });
+}
+
+/**
+ * Hook to fetch document content from a repository
+ * @param repo - The repository name
+ * @param docPath - Path to the document
+ * @param owner - The GitHub username or organization name
+ * @returns Query object containing the document content and project name
+ */
+export function useDocumentContent(repo: string, docPath: string, owner: string = GITHUB_CONFIG.USERNAME) {
+  return useQuery({
+    queryKey: ['document', owner, repo, docPath],
+    queryFn: async () => {
+      const response = await fetch(`/api/documents/${owner}/${repo}/${docPath}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to load document');
+      }
+      const data = await response.json();
+      return {
+        content: data.content,
+        projectName: data.projectName
+      };
     },
     ...defaultQueryConfig,
   });

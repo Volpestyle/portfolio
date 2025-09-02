@@ -71,7 +71,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
           </nav>
 
-          <main className="animate-fadeIn grow p-4">
+          <main className="animate-fadeIn grow">
             <ErrorBoundary>{children}</ErrorBoundary>
           </main>
         </div>

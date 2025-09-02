@@ -1,17 +1,14 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import ReactMarkdown from 'react-markdown';
-import rehypeHighlight from 'rehype-highlight';
 import ImageCarousel from '@/components/ImageCarousel';
 import { ExternalLinkIcon } from '@/lib/svgs';
-import { ArrowLeft } from 'lucide-react';
-import rehypeRaw from 'rehype-raw';
-import { ImageRenderer } from '@/components/ImageRenderer';
+import { ChevronLeft } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { RepoData } from '@/lib/github';
+import { MarkdownViewer } from '@/components/MarkdownViewer';
 
 interface ProjectContentProps {
   pid: string;
@@ -37,7 +34,15 @@ export function ProjectContent({ pid, readme, repoInfo }: ProjectContentProps) {
     queryKey: ['projectImages', pid],
     queryFn: () => {
       return Array.from(document.querySelectorAll('.markdown-body img'))
-        .map((img) => (img as HTMLImageElement).src)
+        .map((img) => {
+          const src = (img as HTMLImageElement).src;
+          // Convert localhost URLs back to relative paths
+          if (src.includes('localhost')) {
+            const url = new URL(src);
+            return url.pathname;
+          }
+          return src;
+        })
         .filter(Boolean);
     },
     enabled: false,
@@ -47,7 +52,14 @@ export function ProjectContent({ pid, readme, repoInfo }: ProjectContentProps) {
     (clickedSrc: string) => {
       if (!clickedSrc) return;
 
-      const clickedIndex = allImages.indexOf(clickedSrc);
+      // Normalize the clicked source to match what's in allImages
+      let normalizedSrc = clickedSrc;
+      if (clickedSrc.includes('localhost')) {
+        const url = new URL(clickedSrc);
+        normalizedSrc = url.pathname;
+      }
+
+      const clickedIndex = allImages.indexOf(normalizedSrc);
       if (allImages.length > 0) {
         setCarouselInitialIndex(clickedIndex >= 0 ? clickedIndex : 0);
         setIsCarouselOpen(true);
@@ -60,76 +72,52 @@ export function ProjectContent({ pid, readme, repoInfo }: ProjectContentProps) {
     refetchImages();
   }, [refetchImages]);
 
-  const markdownComponents = useMemo(
-    () => ({
-      p: ({ node, children, ...props }: any) => {
-        // Check if paragraph contains only image and text nodes
-        const containsOnlyImageAndText = node?.children?.every(
-          (child: any) => child.tagName === 'img' || (child.type === 'text' && /^[\s.]*$/.test(child.value)) // Only whitespace or dots
-        );
-
-        // If it's an image-only paragraph, wrap in div
-        if (containsOnlyImageAndText) {
-          return <div className="my-4 flex flex-col items-start gap-2">{children}</div>;
-        }
-
-        // For mixed content (text + image), ensure proper wrapping
-        const hasImage = node?.children?.some((child: any) => child.tagName === 'img');
-        if (hasImage) {
-          return <div className="my-4">{children}</div>;
-        }
-
-        // Regular paragraph
-        return <p {...props}>{children}</p>;
-      },
-      img: ({ src, alt, ...props }: any) => {
-        if (!src) return null;
-        return (
-          <span className="inline-block">
-            <ImageRenderer
-              pid={pid}
-              src={src}
-              alt={alt || ''}
-              onImageClick={handleImageClick}
-              onImageLoad={handleImageLoad}
-              {...props}
-            />
-          </span>
-        );
-      },
-    }),
-    [pid, handleImageClick, handleImageLoad]
-  );
+  const breadcrumbs = [
+    { label: 'Projects', href: '/projects' },
+    { label: pid }
+  ];
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <Button asChild className="bg-white text-black hover:bg-gray-200">
-          <Link href="/projects" className="flex items-center">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
+    <>
+      <MarkdownViewer
+        content={readme}
+        pid={pid}
+        breadcrumbs={breadcrumbs}
+        handleImageClick={handleImageClick}
+        handleImageLoad={handleImageLoad}
+      >
+        {/* Project metadata and actions */}
+        <div className="mb-6">
+          <Link href="/projects">
+            <Button variant="ghost" className="mb-6 group">
+              <ChevronLeft className="w-4 h-4 mr-2 group-hover:-translate-x-0.5 transition-transform" />
+              Back to Projects
+            </Button>
           </Link>
-        </Button>
-      </div>
-      <div className="mb-4 flex items-center">
-        <h1 className="mr-4 text-3xl font-bold">{pid}</h1>
-        <Button asChild className="bg-white text-black hover:bg-gray-200">
-          <a href={repoInfo.html_url} target="_blank" rel="noopener noreferrer" className="flex items-center">
-            View on GitHub
-            <ExternalLinkIcon />
-          </a>
-        </Button>
-      </div>
-      <div className="text-sm text-gray-400">
-        <span className="font-bold">Created:</span> {formatDate(repoInfo.created_at)}
-      </div>
-      <div className="mb-4 text-sm text-gray-400">
-        <span className="font-bold">Last commit:</span> {formatDate(repoInfo.pushed_at)}
-      </div>
-      <div className="markdown-body preserve-case">
-        <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeHighlight]} components={markdownComponents}>
-          {readme}
-        </ReactMarkdown>
-      </div>
+          
+          <div className="mb-4 flex items-center">
+            <h1 className="mr-4 text-3xl font-bold">{pid}</h1>
+            {repoInfo.private ? (
+              <Button disabled className="bg-gray-600 text-gray-300 cursor-not-allowed">
+                Private Repo
+              </Button>
+            ) : (
+              <Button asChild className="bg-white text-black hover:bg-gray-200">
+                <a href={repoInfo.html_url} target="_blank" rel="noopener noreferrer" className="flex items-center">
+                  View on GitHub
+                  <ExternalLinkIcon />
+                </a>
+              </Button>
+            )}
+          </div>
+          <div className="text-sm text-gray-400">
+            <span className="font-bold">Created:</span> {formatDate(repoInfo.created_at)}
+          </div>
+          <div className="text-sm text-gray-400">
+            <span className="font-bold">Last commit:</span> {formatDate(repoInfo.pushed_at)}
+          </div>
+        </div>
+      </MarkdownViewer>
 
       {allImages.length > 0 && (
         <ImageCarousel
@@ -139,6 +127,6 @@ export function ProjectContent({ pid, readme, repoInfo }: ProjectContentProps) {
           onClose={() => setIsCarouselOpen(false)}
         />
       )}
-    </div>
+    </>
   );
 }

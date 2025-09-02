@@ -36,6 +36,22 @@ export function ImageRenderer({ pid, src, alt, onImageClick, onImageLoad, classN
 
   if (!imageSrc) return null;
 
+  // For local paths (starting with /), use img tag instead of Next/Image
+  // to avoid hostname configuration issues
+  if (imageSrc.startsWith('/')) {
+    return (
+      <div className="py-4">
+        <img
+          src={imageSrc}
+          alt={alt}
+          className={`h-auto w-auto max-w-full cursor-pointer ${className || ''}`}
+          onClick={() => onImageClick?.(imageSrc)}
+          onLoad={() => handleLoad()}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="py-4">
       <Image

@@ -37,14 +37,22 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({ images, initialIndex, isO
           >
             ×
           </button>
-          <Image
-            src={images[currentIndex]}
-            alt={`Image ${currentIndex + 1}`}
-            width={1920}
-            height={1080}
-            className="max-h-[90vh] max-w-[90vw] object-contain"
-            priority
-          />
+          {images[currentIndex]?.startsWith('/') ? (
+            <img
+              src={images[currentIndex]}
+              alt={`Image ${currentIndex + 1}`}
+              className="max-h-[90vh] max-w-[90vw] object-contain"
+            />
+          ) : (
+            <Image
+              src={images[currentIndex]}
+              alt={`Image ${currentIndex + 1}`}
+              width={1920}
+              height={1080}
+              className="max-h-[90vh] max-w-[90vw] object-contain"
+              priority
+            />
+          )}
           <button
             onClick={goToPrevious}
             className="absolute left-4 top-1/2 -translate-y-1/2 transform text-6xl text-white hover:text-gray-300"

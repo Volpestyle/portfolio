@@ -108,7 +108,7 @@ export default function Contact() {
   };
 
   return (
-    <>
+    <div className="m-4">
       <h1 className="mb-6 text-3xl font-bold">Contact Me</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         {formFields.map(({ id, label, type, Component }) => (
@@ -165,6 +165,6 @@ export default function Contact() {
           </button>
         </div>
       )}
-    </>
+    </div>
   );
 }

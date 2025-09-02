@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Octokit } from '@octokit/rest';
 import { GITHUB_CONFIG } from '@/lib/constants';
-
-// Types for portfolio configuration
-interface PortfolioRepo {
-  name: string;
-  isStarred?: boolean;
-}
-
-interface PortfolioConfig {
-  repositories: PortfolioRepo[];
-}
+import { PortfolioConfig, PortfolioRepoConfig, PrivateRepoData } from '@/types/portfolio';
 
 class ConfigError extends Error {
   constructor(message: string) {
@@ -63,29 +54,64 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       throw new ConfigError('Invalid portfolio configuration: repositories must be an array');
     }
 
-    // Get all repos
+    // Get all public repos from GitHub
     const repos = await octokit.rest.repos.listForUser({
       username: GITHUB_CONFIG.USERNAME,
       per_page: 100,
     });
 
-    // Create sets for quick lookup
-    const portfolioRepoNames = new Set(portfolioConfig.repositories.map((r) => r.name));
-    const starredRepoNames = new Set(portfolioConfig.repositories.filter((r) => r.isStarred).map((r) => r.name));
-
+    // Create maps for quick lookup
+    const portfolioRepoMap = new Map<string, PortfolioRepoConfig>(
+      portfolioConfig.repositories.map((r) => [r.name, r])
+    );
+    
+    const publicRepoMap = new Map(repos.data.map((r) => [r.name, r]));
+    
+    // Process repositories
+    const processedRepos: (typeof repos.data[0] | PrivateRepoData)[] = [];
+    
+    for (const repoConfig of portfolioConfig.repositories) {
+      const publicRepo = publicRepoMap.get(repoConfig.name);
+      
+      if (publicRepo) {
+        // It's a public repo - use GitHub API data
+        processedRepos.push({
+          ...publicRepo,
+          isStarred: repoConfig.isStarred || false,
+        });
+      } else if (repoConfig.isPrivate) {
+        // It's a private repo - use data from config
+        const privateRepoData: PrivateRepoData = {
+          name: repoConfig.name,
+          full_name: `${repoConfig.owner || GITHUB_CONFIG.USERNAME}/${repoConfig.name}`,
+          private: true,
+          owner: {
+            login: repoConfig.owner || GITHUB_CONFIG.USERNAME,
+          },
+          description: repoConfig.description || null,
+          homepage: repoConfig.homepage || repoConfig.demoUrl || null,
+          language: repoConfig.language || null,
+          topics: repoConfig.topics,
+          created_at: repoConfig.createdAt || new Date().toISOString(),
+          updated_at: repoConfig.updatedAt || new Date().toISOString(),
+          isStarred: repoConfig.isStarred || false,
+          readme: repoConfig.readme,
+          techStack: repoConfig.techStack,
+          demoUrl: repoConfig.demoUrl,
+          screenshots: repoConfig.screenshots,
+        };
+        processedRepos.push(privateRepoData);
+      }
+    }
+    
+    // Separate starred and normal repos
     const result = {
-      starred: repos.data
-        .filter((repo) => starredRepoNames.has(repo.name))
-        .map((repo) => ({
-          ...repo,
-          isStarred: true,
-        })),
-      normal: repos.data
-        .filter((repo) => portfolioRepoNames.has(repo.name) && !starredRepoNames.has(repo.name))
-        .map((repo) => ({
-          ...repo,
-          isStarred: false,
-        })),
+      starred: processedRepos.filter((repo) => 
+        'isStarred' in repo && repo.isStarred
+      ),
+      normal: processedRepos.filter((repo) => 
+        !('isStarred' in repo) || !repo.isStarred
+      ),
     };
 
     return NextResponse.json(result);
