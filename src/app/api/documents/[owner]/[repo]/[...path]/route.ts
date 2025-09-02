@@ -86,7 +86,7 @@ export async function GET(
 
     return NextResponse.json({ 
       content: docFile.content,
-      projectName: repoConfig.displayName || repoConfig.name
+      projectName: repoConfig.name
     });
   } catch (error) {
     console.error('Error loading document:', error);
