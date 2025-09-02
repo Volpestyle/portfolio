@@ -13,6 +13,7 @@ export type RepoData = {
   html_url: string;
   isStarred: boolean;
   default_branch: string;
+  private?: boolean;
 };
 
 /**
