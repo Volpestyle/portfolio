@@ -37,7 +37,7 @@ export default function About() {
       url: 'https://www.youtube.com/@vuhlp/videos',
     },
     {
-      name: 'LinkedIn (ew)',
+      name: 'LinkedIn',
       icon: siLinkedin,
       url: 'https://www.linkedin.com/in/james-volpe/',
     },
