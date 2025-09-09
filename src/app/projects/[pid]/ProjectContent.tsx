@@ -40,21 +40,6 @@ export function ProjectContent({ pid, readme, repoInfo }: ProjectContentProps) {
             </Button>
           </Link>
 
-          <div className="mb-4 flex items-center">
-            <h1 className="mr-4 text-3xl font-bold">{pid}</h1>
-            {repoInfo.private ? (
-              <Button disabled className="cursor-not-allowed bg-gray-600 text-gray-300">
-                Private Repo
-              </Button>
-            ) : (
-              <Button asChild className="bg-white text-black hover:bg-gray-200">
-                <a href={repoInfo.html_url} target="_blank" rel="noopener noreferrer" className="flex items-center">
-                  View on GitHub
-                  <ExternalLinkIcon />
-                </a>
-              </Button>
-            )}
-          </div>
           <div className="text-sm text-gray-400">
             <span className="font-bold">Created:</span> {formatDate(repoInfo.created_at)}
           </div>

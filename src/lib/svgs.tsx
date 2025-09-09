@@ -1,11 +1,11 @@
-export const ExternalLinkIcon = () => (
+export const ExternalLinkIcon: React.FC<{ className?: string }> = ({ className = 'ml-1 h-4 w-4' }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     fill="none"
     viewBox="0 0 24 24"
     strokeWidth={1.5}
     stroke="currentColor"
-    className="ml-1 h-4 w-4"
+    className={className}
   >
     <path
       strokeLinecap="round"
