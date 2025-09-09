@@ -17,7 +17,7 @@ class GistError extends Error {
   }
 }
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<Response> {
   // Validate environment variables
   if (!process.env.GITHUB_TOKEN) {
     return serverErrorResponse('GitHub token is not configured');

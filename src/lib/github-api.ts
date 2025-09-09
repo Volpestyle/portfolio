@@ -1,6 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { GITHUB_CONFIG } from '@/lib/constants';
-import { PortfolioConfig, RepositoryConfig } from '@/types/portfolio';
+import { PortfolioConfig, PortfolioRepoConfig } from '@/types/portfolio';
 
 let octokitInstance: Octokit | null = null;
 
@@ -51,7 +51,7 @@ export function findRepoConfig(
   portfolioConfig: PortfolioConfig,
   owner: string,
   repo: string
-): RepositoryConfig | undefined {
+): PortfolioRepoConfig | undefined {
   return portfolioConfig.repositories.find(
     (r) => r.name === repo && (r.owner || GITHUB_CONFIG.USERNAME) === owner
   );

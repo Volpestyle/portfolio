@@ -1,5 +1,12 @@
 import { NextRequest } from 'next/server';
-import { createOctokit, getPortfolioConfig, findRepoConfig, getActualRepoName, notFoundResponse, getReadmeFromGist } from '@/lib/github-api';
+import {
+  createOctokit,
+  getPortfolioConfig,
+  findRepoConfig,
+  getActualRepoName,
+  notFoundResponse,
+  getReadmeFromGist,
+} from '@/lib/github-api';
 import { GITHUB_CONFIG } from '@/lib/constants';
 
 /**
@@ -134,7 +141,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   } catch (error) {
     // If README not found (likely private repo), check portfolio config
     const portfolioConfig = await getPortfolioConfig();
-    
+
     if (!portfolioConfig) {
       return notFoundResponse('README');
     }
@@ -148,7 +155,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // Check if README is stored in a separate gist
     if (repoConfig.readmeGistId) {
       const readmeContent = await getReadmeFromGist(repoConfig.readmeGistId);
-      
+
       if (!readmeContent) {
         return notFoundResponse('README');
       }

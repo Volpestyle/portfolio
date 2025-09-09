@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createOctokit, getPortfolioConfig, findRepoConfig, notFoundResponse, serverErrorResponse } from '@/lib/github-api';
 import { GITHUB_CONFIG } from '@/lib/constants';
+import { DocumentConfig } from '@/types/portfolio';
 
 export async function GET(
   request: NextRequest,
@@ -31,7 +32,7 @@ export async function GET(
     }
 
     // Find the document config for this path
-    const docConfig = repoConfig.documents.find((d) => d.path === docPath);
+    const docConfig = repoConfig.documents.find((d: DocumentConfig) => d.path === docPath);
     
     if (!docConfig) {
       return notFoundResponse('Document');
