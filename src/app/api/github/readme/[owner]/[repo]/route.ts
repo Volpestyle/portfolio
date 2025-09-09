@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
-import { Octokit } from '@octokit/rest';
+import { createOctokit, getPortfolioConfig, findRepoConfig, getActualRepoName, notFoundResponse, getReadmeFromGist } from '@/lib/github-api';
 import { GITHUB_CONFIG } from '@/lib/constants';
-import { PortfolioConfig } from '@/types/portfolio';
 
 /**
  * Transforms relative URLs to absolute GitHub URLs
@@ -107,45 +106,11 @@ function transformImageUrls(content: string, owner: string, originalRepo: string
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ owner: string; repo: string }> }) {
-  const octokit = new Octokit({
-    auth: process.env.GITHUB_TOKEN,
-  });
+  const octokit = createOctokit();
   const { owner, repo } = await params;
 
-  // First check if this repo has a publicName mapping in the portfolio config
-  let actualRepoName = repo;
-
-  if (process.env.PORTFOLIO_GIST_ID) {
-    try {
-      const gistResponse = await octokit.rest.gists.get({
-        gist_id: process.env.PORTFOLIO_GIST_ID,
-      });
-
-      const portfolioFile = gistResponse.data.files?.[GITHUB_CONFIG.PORTFOLIO_CONFIG_FILENAME];
-
-      if (portfolioFile && portfolioFile.content) {
-        const portfolioConfig: PortfolioConfig = JSON.parse(portfolioFile.content);
-
-        // Find the repo in the config
-        const repoConfig = portfolioConfig.repositories.find(
-          (r) => r.name === repo && (r.owner || GITHUB_CONFIG.USERNAME) === owner
-        );
-
-        if (repoConfig?.isPrivate) {
-          // If this repo has a publicRepo override, use that
-          if (repoConfig.publicRepo) {
-            actualRepoName = repoConfig.publicRepo;
-          } else {
-            // Default: append 'public' to the repo name
-            actualRepoName = `${repo}public`;
-          }
-        }
-      }
-    } catch (configError) {
-      // Continue with original repo name if config fetch fails
-      console.error('Error checking portfolio config:', configError);
-    }
-  }
+  // Get the actual repo name (handling private repos with public counterparts)
+  const actualRepoName = await getActualRepoName(owner, repo);
 
   try {
     // Try to get the README from GitHub API using the actual repo name
@@ -168,90 +133,54 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return Response.json({ readme: transformedReadme });
   } catch (error) {
     // If README not found (likely private repo), check portfolio config
-    if (!process.env.PORTFOLIO_GIST_ID) {
-      console.error('Portfolio gist ID not configured');
-      return Response.json({ error: 'README not found' }, { status: 404 });
+    const portfolioConfig = await getPortfolioConfig();
+    
+    if (!portfolioConfig) {
+      return notFoundResponse('README');
     }
 
-    try {
-      // Fetch the portfolio config from gist
-      const gistResponse = await octokit.rest.gists.get({
-        gist_id: process.env.PORTFOLIO_GIST_ID,
-      });
+    const repoConfig = findRepoConfig(portfolioConfig, owner, repo);
 
-      const portfolioFile = gistResponse.data.files?.[GITHUB_CONFIG.PORTFOLIO_CONFIG_FILENAME];
+    if (!repoConfig || !repoConfig.isPrivate) {
+      return notFoundResponse('README');
+    }
 
-      if (!portfolioFile || !portfolioFile.content) {
-        return Response.json({ error: 'README not found' }, { status: 404 });
+    // Check if README is stored in a separate gist
+    if (repoConfig.readmeGistId) {
+      const readmeContent = await getReadmeFromGist(repoConfig.readmeGistId);
+      
+      if (!readmeContent) {
+        return notFoundResponse('README');
       }
 
-      const portfolioConfig: PortfolioConfig = JSON.parse(portfolioFile.content);
-
-      // Find the repo in the config
-      const repoConfig = portfolioConfig.repositories.find(
-        (r) => r.name === repo && (r.owner || GITHUB_CONFIG.USERNAME) === owner
-      );
-
-      if (!repoConfig || !repoConfig.isPrivate) {
-        return Response.json({ error: 'README not found' }, { status: 404 });
-      }
-
-      // Check if README is stored in a separate gist
-      if (repoConfig.readmeGistId) {
-        try {
-          const readmeGistResponse = await octokit.rest.gists.get({
-            gist_id: repoConfig.readmeGistId,
-          });
-
-          const files = readmeGistResponse.data.files;
-
-          if (!files || Object.keys(files).length === 0) {
-            return Response.json({ error: 'No files found in gist' }, { status: 404 });
-          }
-
-          // Just get the first (and likely only) file in the gist
-          const firstFile = files[Object.keys(files)[0]];
-
-          if (!firstFile || !firstFile.content) {
-            return Response.json({ error: 'README content not found in gist' }, { status: 404 });
-          }
-
-          // Transform image URLs if this is a private repo being served from public repo
-          let transformedReadme = firstFile.content;
-          if (actualRepoName !== repo) {
-            // First convert any relative URLs to absolute URLs pointing to the public repo
-            transformedReadme = convertRelativeToAbsoluteUrls(firstFile.content, owner, actualRepoName);
-            // Then transform any existing absolute URLs from private to public repo
-            transformedReadme = transformImageUrls(transformedReadme, owner, repo, actualRepoName);
-          }
-
-          return Response.json({ readme: transformedReadme });
-        } catch (gistError) {
-          console.error('Error fetching README from gist:', gistError);
-          return Response.json({ error: 'README gist not found' }, { status: 404 });
-        }
-      }
-
-      // Fall back to inline README in config
-      if (!repoConfig.readme) {
-        return Response.json({ error: 'README not found' }, { status: 404 });
-      }
-
-      // Transform image URLs if this is a private repo with a public counterpart
-      let transformedReadme = repoConfig.readme;
+      // Transform image URLs if this is a private repo being served from public repo
+      let transformedReadme = readmeContent;
       if (actualRepoName !== repo) {
         // First convert any relative URLs to absolute URLs pointing to the public repo
-        transformedReadme = convertRelativeToAbsoluteUrls(repoConfig.readme, owner, actualRepoName);
+        transformedReadme = convertRelativeToAbsoluteUrls(readmeContent, owner, actualRepoName);
         // Then transform any existing absolute URLs from private to public repo
         transformedReadme = transformImageUrls(transformedReadme, owner, repo, actualRepoName);
       }
 
-      // Return the README from config
       return Response.json({ readme: transformedReadme });
-    } catch (configError) {
-      console.error('Error fetching README from config:', configError);
-      return Response.json({ error: 'README not found' }, { status: 404 });
     }
+
+    // Fall back to inline README in config
+    if (!repoConfig.readme) {
+      return notFoundResponse('README');
+    }
+
+    // Transform image URLs if this is a private repo with a public counterpart
+    let transformedReadme = repoConfig.readme;
+    if (actualRepoName !== repo) {
+      // First convert any relative URLs to absolute URLs pointing to the public repo
+      transformedReadme = convertRelativeToAbsoluteUrls(repoConfig.readme, owner, actualRepoName);
+      // Then transform any existing absolute URLs from private to public repo
+      transformedReadme = transformImageUrls(transformedReadme, owner, repo, actualRepoName);
+    }
+
+    // Return the README from config
+    return Response.json({ readme: transformedReadme });
   }
 }
 

@@ -1,73 +1,27 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import { useRepoDetails, useRepoReadme } from '@/lib/github';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import ImageCarousel from '@/components/ImageCarousel';
 import { ExternalLinkIcon } from '@/lib/svgs';
 import { ChevronLeft } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
 import { MarkdownViewer } from '@/components/MarkdownViewer';
-
-function formatDate(dateString: string): string {
-  const options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  };
-  return new Date(dateString).toLocaleDateString(undefined, options);
-}
+import { formatDate } from '@/lib/utils';
+import { useImageCarousel } from '@/hooks/useImageCarousel';
 
 export function ProjectLoader({ pid }: { pid: string }) {
-  const [carouselInitialIndex, setCarouselInitialIndex] = useState(0);
-  const [isCarouselOpen, setIsCarouselOpen] = useState(false);
-  
   const { data: repoInfo, isLoading: isRepoInfoLoading, error: repoInfoError } = useRepoDetails(pid);
   const { data: readme, isLoading: isReadmeLoading, error: readmeError } = useRepoReadme(pid);
-
-  // get all images from the markdown for carousel
-  const { data: allImages = [], refetch: refetchImages } = useQuery({
-    queryKey: ['projectImages', pid],
-    queryFn: () => {
-      return Array.from(document.querySelectorAll('.markdown-body img'))
-        .map((img) => {
-          const src = (img as HTMLImageElement).src;
-          // Convert localhost URLs back to relative paths
-          if (src.includes('localhost')) {
-            const url = new URL(src);
-            return url.pathname;
-          }
-          return src;
-        })
-        .filter(Boolean);
-    },
-    enabled: false,
-  });
-
-  const handleImageClick = useCallback(
-    (clickedSrc: string) => {
-      if (!clickedSrc) return;
-
-      // Normalize the clicked source to match what's in allImages
-      let normalizedSrc = clickedSrc;
-      if (clickedSrc.includes('localhost')) {
-        const url = new URL(clickedSrc);
-        normalizedSrc = url.pathname;
-      }
-
-      const clickedIndex = allImages.indexOf(normalizedSrc);
-      if (allImages.length > 0) {
-        setCarouselInitialIndex(clickedIndex >= 0 ? clickedIndex : 0);
-        setIsCarouselOpen(true);
-      }
-    },
-    [allImages]
-  );
-
-  const handleImageLoad = useCallback(() => {
-    refetchImages();
-  }, [refetchImages]);
+  
+  const {
+    allImages,
+    carouselInitialIndex,
+    isCarouselOpen,
+    handleImageClick,
+    handleImageLoad,
+    closeCarousel,
+  } = useImageCarousel({ pid, fromDOM: true, enabled: false });
 
   const breadcrumbs = [
     { label: 'Projects', href: '/projects' },
@@ -129,7 +83,7 @@ export function ProjectLoader({ pid }: { pid: string }) {
           images={allImages}
           initialIndex={carouselInitialIndex}
           isOpen={isCarouselOpen}
-          onClose={() => setIsCarouselOpen(false)}
+          onClose={closeCarousel}
         />
       )}
     </>

@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { StarIcon } from '@/lib/svgs';
+import { formatDate } from '@/lib/utils';
 
 interface ProjectCardProps {
   repo: {
@@ -14,15 +15,6 @@ interface ProjectCardProps {
     pushed_at: string;
     isStarred: boolean;
   };
-}
-
-function formatDate(dateString: string): string {
-  const options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  };
-  return new Date(dateString).toLocaleDateString(undefined, options);
 }
 
 export function ProjectCard({ repo }: ProjectCardProps) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Octokit } from '@octokit/rest';
+import { createOctokit, getPortfolioConfig, serverErrorResponse } from '@/lib/github-api';
 import { GITHUB_CONFIG } from '@/lib/constants';
-import { PortfolioConfig, PortfolioRepoConfig, PrivateRepoData } from '@/types/portfolio';
+import { PortfolioRepoConfig, PrivateRepoData } from '@/types/portfolio';
 
 class ConfigError extends Error {
   constructor(message: string) {
@@ -20,34 +20,21 @@ class GistError extends Error {
 export async function GET(request: NextRequest): Promise<NextResponse> {
   // Validate environment variables
   if (!process.env.GITHUB_TOKEN) {
-    return NextResponse.json({ error: 'GitHub token is not configured' }, { status: 500 });
+    return serverErrorResponse('GitHub token is not configured');
   }
 
   if (!process.env.PORTFOLIO_GIST_ID) {
-    return NextResponse.json({ error: 'Portfolio gist ID is not configured' }, { status: 500 });
+    return serverErrorResponse('Portfolio gist ID is not configured');
   }
 
-  const octokit = new Octokit({
-    auth: process.env.GITHUB_TOKEN,
-  });
+  const octokit = createOctokit();
 
   try {
-    // Fetch gist containing portfolio config
-    const gistResponse = await octokit.rest.gists.get({
-      gist_id: process.env.PORTFOLIO_GIST_ID,
-    });
-
-    const portfolioFile = gistResponse.data.files?.[GITHUB_CONFIG.PORTFOLIO_CONFIG_FILENAME];
-
-    if (!portfolioFile || !portfolioFile.content) {
+    // Fetch portfolio configuration
+    const portfolioConfig = await getPortfolioConfig();
+    
+    if (!portfolioConfig) {
       throw new GistError('Portfolio configuration file not found in gist');
-    }
-
-    let portfolioConfig: PortfolioConfig;
-    try {
-      portfolioConfig = JSON.parse(portfolioFile.content);
-    } catch (e) {
-      throw new ConfigError('Invalid JSON in portfolio configuration');
     }
 
     if (!Array.isArray(portfolioConfig.repositories)) {
