@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { StarIcon } from '@/lib/svgs';
 import { formatDate } from '@/lib/utils';
 import { ArrowRight } from 'lucide-react';
+import { useState } from 'react';
 
 interface ProjectCardProps {
   repo: {
@@ -19,10 +20,25 @@ interface ProjectCardProps {
 }
 
 export function ProjectCard({ repo }: ProjectCardProps) {
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
     <Card className="relative border-white bg-black bg-opacity-10 p-4 text-white">
       <h2 className="mb-2 flex items-center justify-between text-xl font-bold">
-        {repo.name}
+        <Link 
+          href={`/projects/${repo.name}`}
+          className="relative inline-block rounded transition-all duration-300 hover:bg-white hover:text-black"
+          style={{
+            paddingLeft: isHovered ? '12px' : '0px',
+            paddingRight: isHovered ? '12px' : '0px',
+            paddingTop: '8px',
+            paddingBottom: '8px',
+          }}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+        >
+          {repo.name}
+        </Link>
         {repo.isStarred && <StarIcon />}
       </h2>
       <p className="mb-4 text-sm">{repo.description}</p>
@@ -35,11 +51,11 @@ export function ProjectCard({ repo }: ProjectCardProps) {
       <div className="group relative mt-2 inline-block">
         <Button
           asChild
-          className="relative h-10 w-10 overflow-hidden rounded-full bg-white text-black transition-all duration-300 hover:w-32 hover:bg-gray-200"
+          className="relative h-10 w-10 border border-white bg-transparent text-white transition-all duration-300 hover:w-32 hover:border-white hover:bg-white hover:text-black"
         >
           <Link href={`/projects/${repo.name}`}>
             <div className="relative flex h-full w-full items-center justify-center">
-              <span className="absolute whitespace-nowrap opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+              <span className="absolute whitespace-nowrap text-black opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                 View Details
               </span>
               <ArrowRight className="absolute h-5 w-5 transition-all duration-300 group-hover:translate-x-10 group-hover:opacity-0" />
