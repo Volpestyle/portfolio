@@ -2,7 +2,8 @@
   "repositories": [
     {
       "name": "public-repo-example",
-      "isStarred": true
+      "isStarred": true,
+      "icon": "code"
     },
     {
       "name": "private-app-example",
@@ -18,6 +19,7 @@
       "createdAt": "2023-01-15T00:00:00Z",
       "updatedAt": "2024-12-20T00:00:00Z",
       "screenshots": ["/screenshots/app-dashboard.png", "/screenshots/app-analytics.png"],
+      "icon": "rocket",
       "readme": "# Private App Example\n\n## Overview\n\nThis is a comprehensive enterprise application built with modern web technologies.\n\n## Features\n\n- **Real-time Analytics**: Live data visualization and monitoring\n- **User Management**: Advanced role-based access control\n- **API Integration**: Seamless third-party service integration\n- **Responsive Design**: Optimized for all devices\n\n## Tech Stack\n\n- **Frontend**: Next.js 14, TypeScript, Tailwind CSS\n- **Backend**: Node.js, Express\n- **Database**: PostgreSQL with Prisma ORM\n- **Authentication**: NextAuth.js\n- **Deployment**: Vercel\n\n## Architecture\n\nThe application follows a microservices architecture with:\n- Separate services for authentication, data processing, and analytics\n- Redis for caching\n- WebSocket connections for real-time updates\n\n## Performance\n\n- Lighthouse score: 98/100\n- Core Web Vitals: All green\n- Average load time: < 2 seconds\n\n## Security\n\n- End-to-end encryption\n- OWASP Top 10 compliance\n- Regular security audits\n\n## Screenshots\n\n### Dashboard\n![Dashboard](/screenshots/app-dashboard.png)\n\n### Analytics\n![Analytics](/screenshots/app-analytics.png)\n\n## Demo\n\nCheck out the live demo at [demo.example-app.com](https://demo.example-app.com)\n\n---\n\n*Note: This is a private repository. The source code is not publicly available.*"
     },
     {
@@ -30,6 +32,7 @@
       "techStack": ["Python", "TensorFlow", "FastAPI", "React", "PostgreSQL"],
       "createdAt": "2023-06-01T00:00:00Z",
       "updatedAt": "2024-11-15T00:00:00Z",
+      "icon": "cpu",
       "readme": "# ML Data Platform\n\n## About\n\nA cutting-edge machine learning platform for data analysis and predictions.\n\n## Key Features\n\n- Automated model training\n- Real-time predictions\n- Data visualization\n- API access\n\n## Technologies\n\n- Python with TensorFlow\n- FastAPI backend\n- React frontend\n- PostgreSQL database\n\n*Private repository - source code not available*"
     },
     {
@@ -43,6 +46,7 @@
       "techStack": ["Node.js", "TypeScript", "Express"],
       "createdAt": "2024-01-01T00:00:00Z",
       "updatedAt": "2024-12-20T00:00:00Z",
+      "icon": "server",
       "readmeGistId": "your-readme-gist-id-here"
     },
     {
@@ -56,6 +60,7 @@
       "topics": ["swift", "ios", "go", "aws-lambda"],
       "techStack": ["Swift", "Go", "AWS Lambda", "SAM"],
       "readmeGistId": "your-readme-gist-id",
+      "icon": "palette",
       "documents": [
         {
           "path": "docs/DESIGN.md",

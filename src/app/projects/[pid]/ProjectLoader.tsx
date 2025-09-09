@@ -13,24 +13,15 @@ import { useImageCarousel } from '@/hooks/useImageCarousel';
 export function ProjectLoader({ pid }: { pid: string }) {
   const { data: repoInfo, isLoading: isRepoInfoLoading, error: repoInfoError } = useRepoDetails(pid);
   const { data: readme, isLoading: isReadmeLoading, error: readmeError } = useRepoReadme(pid);
-  
-  const {
-    allImages,
-    carouselInitialIndex,
-    isCarouselOpen,
-    handleImageClick,
-    handleImageLoad,
-    closeCarousel,
-  } = useImageCarousel({ pid, fromDOM: true, enabled: false });
 
-  const breadcrumbs = [
-    { label: 'Projects', href: '/projects' },
-    { label: pid }
-  ];
+  const { allImages, carouselInitialIndex, isCarouselOpen, handleImageClick, handleImageLoad, closeCarousel } =
+    useImageCarousel({ pid, fromDOM: true, enabled: false });
+
+  const breadcrumbs = [{ label: 'Projects', href: '/projects' }, { label: pid }];
 
   if (readmeError || repoInfoError) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-black">
         <div className="text-red-500">Error: {readmeError?.message || repoInfoError?.message}</div>
       </div>
     );

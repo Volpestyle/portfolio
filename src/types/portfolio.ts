@@ -22,6 +22,7 @@ export interface PortfolioRepoConfig {
   createdAt?: string;
   updatedAt?: string;
   homepage?: string;
+  icon?: string;
 }
 
 export interface PortfolioConfig {
@@ -47,4 +48,5 @@ export interface PrivateRepoData {
   techStack?: string[];
   demoUrl?: string;
   screenshots?: string[];
+  icon?: string;
 }

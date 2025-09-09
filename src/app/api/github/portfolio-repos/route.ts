@@ -65,6 +65,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         processedRepos.push({
           ...publicRepo,
           isStarred: repoConfig.isStarred || false,
+          icon: repoConfig.icon,
         });
       } else if (repoConfig.isPrivate) {
         // It's a private repo - use data from config
@@ -86,6 +87,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           techStack: repoConfig.techStack,
           demoUrl: repoConfig.demoUrl,
           screenshots: repoConfig.screenshots,
+          icon: repoConfig.icon,
         };
         processedRepos.push(privateRepoData);
       }

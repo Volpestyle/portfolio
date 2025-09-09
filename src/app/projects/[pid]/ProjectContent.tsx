@@ -17,19 +17,10 @@ interface ProjectContentProps {
 }
 
 export function ProjectContent({ pid, readme, repoInfo }: ProjectContentProps) {
-  const {
-    allImages,
-    carouselInitialIndex,
-    isCarouselOpen,
-    handleImageClick,
-    handleImageLoad,
-    closeCarousel,
-  } = useImageCarousel({ pid, fromDOM: true, enabled: false });
+  const { allImages, carouselInitialIndex, isCarouselOpen, handleImageClick, handleImageLoad, closeCarousel } =
+    useImageCarousel({ pid, fromDOM: true, enabled: false });
 
-  const breadcrumbs = [
-    { label: 'Projects', href: '/projects' },
-    { label: pid }
-  ];
+  const breadcrumbs = [{ label: 'Projects', href: '/projects' }, { label: pid }];
 
   return (
     <>
@@ -43,16 +34,16 @@ export function ProjectContent({ pid, readme, repoInfo }: ProjectContentProps) {
         {/* Project metadata and actions */}
         <div className="mb-6">
           <Link href="/projects">
-            <Button variant="ghost" className="mb-6 group">
-              <ChevronLeft className="w-4 h-4 mr-2 group-hover:-translate-x-0.5 transition-transform" />
+            <Button variant="ghost" className="group mb-6">
+              <ChevronLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
               Back to Projects
             </Button>
           </Link>
-          
+
           <div className="mb-4 flex items-center">
             <h1 className="mr-4 text-3xl font-bold">{pid}</h1>
             {repoInfo.private ? (
-              <Button disabled className="bg-gray-600 text-gray-300 cursor-not-allowed">
+              <Button disabled className="cursor-not-allowed bg-gray-600 text-gray-300">
                 Private Repo
               </Button>
             ) : (

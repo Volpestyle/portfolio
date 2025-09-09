@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { StarIcon } from '@/lib/svgs';
 import { formatDate } from '@/lib/utils';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Code2, Sparkles, Rocket, Database, Globe, Palette, Server, Cpu, Zap, Shield, Cloud, Package, Terminal, GitBranch, Scissors } from 'lucide-react';
 import { useState } from 'react';
 
 interface ProjectCardProps {
@@ -16,18 +16,38 @@ interface ProjectCardProps {
     created_at: string;
     pushed_at: string;
     isStarred: boolean;
+    icon?: string;
   };
 }
 
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  'code': Code2,
+  'sparkles': Sparkles,
+  'rocket': Rocket,
+  'database': Database,
+  'globe': Globe,
+  'palette': Palette,
+  'server': Server,
+  'cpu': Cpu,
+  'zap': Zap,
+  'shield': Shield,
+  'cloud': Cloud,
+  'package': Package,
+  'terminal': Terminal,
+  'git': GitBranch,
+  'scissors': Scissors,
+};
+
 export function ProjectCard({ repo }: ProjectCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const Icon = repo.icon ? iconMap[repo.icon.toLowerCase()] || ArrowRight : ArrowRight;
 
   return (
     <Card className="relative border-white bg-black bg-opacity-10 p-4 text-white">
       <h2 className="mb-2 flex items-center justify-between text-xl font-bold">
         <Link 
           href={`/projects/${repo.name}`}
-          className="relative inline-block rounded transition-all duration-300 hover:bg-white hover:text-black"
+          className="group relative inline-flex items-center gap-2 rounded transition-all duration-300 hover:bg-white hover:text-black"
           style={{
             paddingLeft: isHovered ? '12px' : '0px',
             paddingRight: isHovered ? '12px' : '0px',
@@ -38,6 +58,7 @@ export function ProjectCard({ repo }: ProjectCardProps) {
           onMouseLeave={() => setIsHovered(false)}
         >
           {repo.name}
+          <Icon className="h-4 w-4 opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0 -translate-x-2" />
         </Link>
         {repo.isStarred && <StarIcon />}
       </h2>

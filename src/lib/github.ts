@@ -14,6 +14,7 @@ export type RepoData = {
   isStarred: boolean;
   default_branch: string;
   private?: boolean;
+  icon?: string;
 };
 
 /**
