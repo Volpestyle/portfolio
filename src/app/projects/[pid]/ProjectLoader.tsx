@@ -50,21 +50,19 @@ export function ProjectLoader({ pid }: { pid: string }) {
                     Private Repo
                   </Button>
                 ) : (
-                  <div className="group relative inline-block">
-                    <Button
-                      asChild
-                      className="relative h-10 w-10 border border-white bg-transparent text-white transition-all duration-300 hover:w-40 hover:border-white hover:bg-white hover:text-black"
-                    >
-                      <a href={repoInfo.html_url} target="_blank" rel="noopener noreferrer">
-                        <div className="relative flex h-full w-full items-center justify-center">
-                          <span className="absolute whitespace-nowrap text-black opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                            View on GitHub
-                          </span>
-                          <ExternalLinkIcon className="absolute h-5 w-5 transition-all duration-300 group-hover:translate-x-10 group-hover:opacity-0" />
-                        </div>
-                      </a>
-                    </Button>
-                  </div>
+                  <Button
+                    asChild
+                    className="group relative h-10 w-10 overflow-hidden border border-white bg-transparent text-white transition-all duration-300 hover:w-40 hover:border-white hover:bg-white hover:text-black"
+                  >
+                    <a href={repoInfo.html_url} target="_blank" rel="noopener noreferrer">
+                      <div className="relative flex h-full w-full items-center justify-center">
+                        <span className="absolute whitespace-nowrap text-black opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                          View on GitHub
+                        </span>
+                        <ExternalLinkIcon className="absolute h-5 w-5 transition-all duration-300 group-hover:translate-x-10 group-hover:opacity-0" />
+                      </div>
+                    </a>
+                  </Button>
                 )}
               </div>
               <div className="text-sm text-gray-400">

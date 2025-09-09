@@ -69,21 +69,19 @@ export function ProjectCard({ repo }: ProjectCardProps) {
       <p className="mb-2 mt-1 text-xs text-gray-400">
         <span className="font-bold">Last commit:</span> {formatDate(repo.pushed_at)}
       </p>
-      <div className="group relative mt-2 inline-block">
-        <Button
-          asChild
-          className="relative h-10 w-10 border border-white bg-transparent text-white transition-all duration-300 hover:w-32 hover:border-white hover:bg-white hover:text-black"
-        >
-          <Link href={`/projects/${repo.name}`}>
-            <div className="relative flex h-full w-full items-center justify-center">
-              <span className="absolute whitespace-nowrap text-black opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                View Details
-              </span>
-              <ArrowRight className="absolute h-5 w-5 transition-all duration-300 group-hover:translate-x-10 group-hover:opacity-0" />
-            </div>
-          </Link>
-        </Button>
-      </div>
+      <Button
+        asChild
+        className="group relative mt-2 h-10 w-10 overflow-hidden border border-white bg-transparent text-white transition-all duration-300 hover:w-32 hover:border-white hover:bg-white hover:text-black"
+      >
+        <Link href={`/projects/${repo.name}`}>
+          <div className="relative flex h-full w-full items-center justify-center">
+            <span className="absolute whitespace-nowrap text-black opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+              View Details
+            </span>
+            <ArrowRight className="absolute h-5 w-5 transition-all duration-300 group-hover:translate-x-10 group-hover:opacity-0" />
+          </div>
+        </Link>
+      </Button>
     </Card>
   );
 }

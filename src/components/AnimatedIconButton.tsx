@@ -21,25 +21,8 @@ export function AnimatedIconButton({
   disabled = false,
 }: AnimatedIconButtonProps) {
   const [isHovered, setIsHovered] = useState(false);
-if (external) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={buttonClassName}
-        style={{
-          width: isHovered ? '128px' : '40px',
-          backgroundColor: isHovered ? 'white' : 'transparent',
-          color: isHovered ? 'black' : 'white',
-        }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-      >
-        {buttonContent}
-      </a>
- "relativeinline-flexh-10w-10 items-center justify-center border border-gray-600 bg-transparent text-gray-300"<Icon className="h-5 w-5" />    );
-  }
+
+  const buttonClassName = "group relative inline-flex h-10 items-center justify-center overflow-hidden border border-white bg-transparent text-white transition-all duration-300 hover:bg-white hover:text-black";
 
   const buttonContent = (
     <>
@@ -50,27 +33,36 @@ if (external) {
     </>
   );
 
-"group relative inline-flex h-10 items-center justify-center overflow-hidden border border-white bg-transparent text-white transition-all duration-300 hover:bg-white hover:text-black"2.5remtransitionwidth0.3seasee{
-          e.currentTarget.style.width = '8rem';
-        }}e{
-          e.currentTarget.style.width = '2.5rem';
-        }}  return (
-    <a
+  const buttonStyle = {
+    width: isHovered ? '8rem' : '2.5rem',
+    transition: 'width 0.3s ease',
+  };
+
+  if (external) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={buttonClassName}
+        style={buttonStyle}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {buttonContent}
+      </a>
+    );
+  }
+
+  return (
+    <Link
       href={href}
       className={buttonClassName}
-      style={{
-        width: isHovered ? '128px' : '40px',
-        backgroundColor: isHovered ? 'white' : 'transparent',
-        color: isHovered ? 'black' : 'white',
-      }}
+      style={buttonStyle}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       {buttonContent}
-    </a>
-"group relative inline-flex h-10 items-center justify-center overflow-hidden border border-white bg-transparent text-white transition-all duration-300 hover:bg-white hover:text-black"2.5remtransitionwidth0.3seasee{
-        e.currentTarget.style.width = '8rem';
-      }}e{
-        e.currentTarget.style.width = '2.5rem';
-      }}  );
+    </Link>
+  );
 }
