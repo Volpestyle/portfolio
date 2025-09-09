@@ -6,6 +6,7 @@ export interface DocumentConfig {
 
 export interface PortfolioRepoConfig {
   name: string;
+  publicRepo?: string;
   isStarred?: boolean;
   isPrivate?: boolean;
   owner?: string;

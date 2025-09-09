@@ -21,7 +21,7 @@ export function ProjectsLoader() {
   }
 
   if (isLoading || !repoData) {
-    return <div className="animate-pulse">Loading projects...</div>;
+    return <div className="m-4 animate-pulse">Loading projects...</div>;
   }
 
   const repos = [...repoData.starred, ...repoData.normal];

@@ -46,18 +46,23 @@ export function useGithubImage(
       if (path.startsWith('/')) {
         return path;
       }
-      
+
       // If it's an external URL, return as-is
       if (path.startsWith('http://') || path.startsWith('https://')) {
         return path;
       }
-      
-      // For private repos, assume local path
+
+      // For private repos, use the public repo counterpart
       if (repoData?.private) {
-        // If it doesn't start with /, add it
-        return path.startsWith('/') ? path : `/${path}`;
+        // Determine the public repo name
+        const publicRepoName = await getPublicRepoName(owner, repo);
+        if (!repoData?.default_branch) throw new Error('Branch not available');
+        const url = getGithubRawUrl(publicRepoName, repoData.default_branch, path, owner);
+        const response = await fetch(url, { method: 'HEAD' });
+        if (!response.ok) throw new Error(`Image not found: ${url}`);
+        return url;
       }
-      
+
       // For public repos, fetch from GitHub
       if (!repoData?.default_branch) throw new Error('Branch not available');
       const url = getGithubRawUrl(repo, repoData.default_branch, path, owner);
@@ -68,6 +73,27 @@ export function useGithubImage(
     enabled: !!repoData,
     ...defaultQueryConfig,
   });
+}
+
+/**
+ * Gets the public repo name for a private repo from the portfolio config
+ * @param owner - The GitHub username or organization name
+ * @param repo - The repository name
+ * @returns The public repo name
+ */
+async function getPublicRepoName(owner: string, repo: string): Promise<string> {
+  try {
+    const response = await fetch(`/api/github/public-repo-name/${owner}/${repo}`);
+    if (!response.ok) {
+      // Default fallback: append 'public' to the repo name
+      return `${repo}public`;
+    }
+    const data = await response.json();
+    return data.publicRepoName;
+  } catch {
+    // Default fallback: append 'public' to the repo name
+    return `${repo}public`;
+  }
 }
 
 /**
@@ -180,7 +206,7 @@ export function useDocumentContent(repo: string, docPath: string, owner: string 
       const data = await response.json();
       return {
         content: data.content,
-        projectName: data.projectName
+        projectName: data.projectName,
       };
     },
     ...defaultQueryConfig,

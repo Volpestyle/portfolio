@@ -17,10 +17,7 @@
       "demoUrl": "https://demo.example-app.com",
       "createdAt": "2023-01-15T00:00:00Z",
       "updatedAt": "2024-12-20T00:00:00Z",
-      "screenshots": [
-        "/screenshots/app-dashboard.png",
-        "/screenshots/app-analytics.png"
-      ],
+      "screenshots": ["/screenshots/app-dashboard.png", "/screenshots/app-analytics.png"],
       "readme": "# Private App Example\n\n## Overview\n\nThis is a comprehensive enterprise application built with modern web technologies.\n\n## Features\n\n- **Real-time Analytics**: Live data visualization and monitoring\n- **User Management**: Advanced role-based access control\n- **API Integration**: Seamless third-party service integration\n- **Responsive Design**: Optimized for all devices\n\n## Tech Stack\n\n- **Frontend**: Next.js 14, TypeScript, Tailwind CSS\n- **Backend**: Node.js, Express\n- **Database**: PostgreSQL with Prisma ORM\n- **Authentication**: NextAuth.js\n- **Deployment**: Vercel\n\n## Architecture\n\nThe application follows a microservices architecture with:\n- Separate services for authentication, data processing, and analytics\n- Redis for caching\n- WebSocket connections for real-time updates\n\n## Performance\n\n- Lighthouse score: 98/100\n- Core Web Vitals: All green\n- Average load time: < 2 seconds\n\n## Security\n\n- End-to-end encryption\n- OWASP Top 10 compliance\n- Regular security audits\n\n## Screenshots\n\n### Dashboard\n![Dashboard](/screenshots/app-dashboard.png)\n\n### Analytics\n![Analytics](/screenshots/app-analytics.png)\n\n## Demo\n\nCheck out the live demo at [demo.example-app.com](https://demo.example-app.com)\n\n---\n\n*Note: This is a private repository. The source code is not publicly available.*"
     },
     {
@@ -54,6 +51,7 @@
       "isStarred": true,
       "owner": "volpestyle",
       "description": "Native mobile app for trying on different hairstyles via Gemini",
+      "publicRepo": "ilikeyacutpublic", // Optional: specify custom public repo name, defaults to '{name}public'
       "language": "Swift",
       "topics": ["swift", "ios", "go", "aws-lambda"],
       "techStack": ["Swift", "Go", "AWS Lambda", "SAM"],
