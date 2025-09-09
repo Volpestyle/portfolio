@@ -17,7 +17,7 @@ async function getPortfolioConfig(): Promise<PortfolioConfig> {
   });
 
   const portfolioFile = gistResponse.data.files?.[GITHUB_CONFIG.PORTFOLIO_CONFIG_FILENAME];
-  
+
   if (!portfolioFile || !portfolioFile.content) {
     throw new Error('Portfolio configuration not found');
   }
@@ -34,60 +34,98 @@ export async function GET(
     const octokit = new Octokit({
       auth: process.env.GITHUB_TOKEN,
     });
-    
+
     const docPath = path.join('/');
-    
-    if (!process.env.PORTFOLIO_GIST_ID) {
-      throw new Error('Portfolio gist ID not configured');
+
+    // Check if this is a private repo with a public counterpart
+    let publicRepoName: string | null = null;
+    let isPrivateRepo = false;
+    let repoConfig = null;
+
+    // Check portfolio config if available
+    if (process.env.PORTFOLIO_GIST_ID) {
+      try {
+        const portfolioConfig = await getPortfolioConfig();
+
+        // Find the repo in the config
+        repoConfig = portfolioConfig.repositories.find(
+          (r) => r.name === repo && (r.owner || GITHUB_CONFIG.USERNAME) === owner
+        );
+
+        if (repoConfig?.isPrivate) {
+          isPrivateRepo = true;
+          // If this repo has a publicRepo override, use that
+          if (repoConfig.publicRepo) {
+            publicRepoName = repoConfig.publicRepo;
+          } else {
+            // Default: append 'public' to the repo name
+            publicRepoName = `${repo}public`;
+          }
+        }
+
+        // First check if the document is configured in gist
+        if (repoConfig?.documents) {
+          const docConfig = repoConfig.documents.find((d) => d.path === docPath);
+
+          if (docConfig) {
+            // Fetch the document from its gist
+            const docGistResponse = await octokit.rest.gists.get({
+              gist_id: docConfig.gistId,
+            });
+
+            const files = docGistResponse.data.files;
+
+            if (files && Object.keys(files).length > 0) {
+              // Get the document content
+              let docFile;
+              if (docConfig.filename) {
+                docFile = files[docConfig.filename];
+              } else {
+                // Just get the first file in the gist
+                docFile = files[Object.keys(files)[0]];
+              }
+
+              if (docFile && docFile.content) {
+                return NextResponse.json({
+                  content: docFile.content,
+                  projectName: repoConfig.name,
+                });
+              }
+            }
+          }
+        }
+      } catch (configError) {
+        console.error('Error checking portfolio config:', configError);
+      }
     }
 
-    // Fetch the portfolio config from gist
-    const portfolioConfig = await getPortfolioConfig();
-    
-    // Find the repo in the config
-    const repoConfig = portfolioConfig.repositories.find(
-      (r) => r.name === repo && (r.owner || GITHUB_CONFIG.USERNAME) === owner
-    );
+    // If not found in gist config, try to fetch directly from GitHub
+    // For private repos, use the public repo name
+    const repoToFetch = isPrivateRepo && publicRepoName ? publicRepoName : repo;
 
-    if (!repoConfig || !repoConfig.documents) {
-      return NextResponse.json({ error: 'Document configuration not found' }, { status: 404 });
-    }
+    try {
+      // Try to fetch the document directly from GitHub
+      const response = await octokit.rest.repos.getContent({
+        owner,
+        repo: repoToFetch,
+        path: docPath,
+      });
 
-    // Find the document config for this path
-    const docConfig = repoConfig.documents.find((d) => d.path === docPath);
-    
-    if (!docConfig) {
+      // Check if the response is a file (not a directory)
+      if ('content' in response.data && response.data.type === 'file') {
+        const content = Buffer.from(response.data.content, 'base64').toString();
+
+        return NextResponse.json({
+          content,
+          projectName: repo,
+        });
+      } else {
+        return NextResponse.json({ error: 'Path is not a file' }, { status: 404 });
+      }
+    } catch (githubError) {
+      console.error('Error fetching document from GitHub:', githubError);
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     }
-
-    // Fetch the document from its gist
-    const docGistResponse = await octokit.rest.gists.get({
-      gist_id: docConfig.gistId,
-    });
-
-    const files = docGistResponse.data.files;
-    
-    if (!files || Object.keys(files).length === 0) {
-      return NextResponse.json({ error: 'No files found in document gist' }, { status: 404 });
-    }
-
-    // Get the document content
-    let docFile;
-    if (docConfig.filename) {
-      docFile = files[docConfig.filename];
-    } else {
-      // Just get the first file in the gist
-      docFile = files[Object.keys(files)[0]];
-    }
-    
-    if (!docFile || !docFile.content) {
-      return NextResponse.json({ error: 'Document content not found' }, { status: 404 });
-    }
-
-    return NextResponse.json({ 
-      content: docFile.content,
-      projectName: repoConfig.name
-    });
   } catch (error) {
     console.error('Error loading document:', error);
     return NextResponse.json(
