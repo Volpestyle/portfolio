@@ -7,17 +7,10 @@ import { StarIcon } from '@/lib/svgs';
 import { formatDate } from '@/lib/utils';
 import { ArrowRight, Code2, Sparkles, Rocket, Database, Globe, Palette, Server, Cpu, Zap, Shield, Cloud, Package, Terminal, GitBranch, Scissors } from 'lucide-react';
 import { useState } from 'react';
+import type { RepoData } from '@/lib/github-server';
 
 interface ProjectCardProps {
-  repo: {
-    id: number;
-    name: string;
-    description: string | null;
-    created_at: string;
-    pushed_at: string;
-    isStarred: boolean;
-    icon?: string;
-  };
+  repo: RepoData;
 }
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -66,9 +59,11 @@ export function ProjectCard({ repo }: ProjectCardProps) {
       <p className="mt-4 text-xs text-gray-400">
         <span className="font-bold">Created:</span> {formatDate(repo.created_at)}
       </p>
-      <p className="mb-2 mt-1 text-xs text-gray-400">
-        <span className="font-bold">Last commit:</span> {formatDate(repo.pushed_at)}
-      </p>
+      {repo.pushed_at && (
+        <p className="mb-2 mt-1 text-xs text-gray-400">
+          <span className="font-bold">Last commit:</span> {formatDate(repo.pushed_at)}
+        </p>
+      )}
       <Button
         asChild
         className="group relative mt-2 h-10 w-10 overflow-hidden border border-white bg-transparent text-white transition-all duration-300 hover:w-32 hover:border-white hover:bg-white hover:text-black"

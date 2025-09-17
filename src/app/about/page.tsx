@@ -1,10 +1,17 @@
-'use client';
-import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { siLinkedin, siGithub, siYoutube, siSpotify, siX } from 'simple-icons/icons';
-import { useState } from 'react';
-import ResumeModal from '@/components/ResumeModal';
-import { RESUME_CONFIG } from '@/lib/constants';
+import { AboutClient } from './AboutClient';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: "About - JCV's Portfolio",
+  description: "Learn more about James Volpe, a software engineer from Chicago, IL USA",
+  openGraph: {
+    title: "About James Volpe",
+    description: "Software engineer from Chicago, IL USA with passions in animation, graphic design, music, and full stack web development",
+    type: 'profile',
+  },
+};
 
 interface SocialLink {
   name: string;
@@ -22,7 +29,6 @@ const SocialIcon: React.FC<{ icon: { path: string; hex: string } }> = ({ icon })
 );
 
 export default function About() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const socialLinks: SocialLink[] = [
     {
@@ -86,17 +92,8 @@ export default function About() {
           🧑‍🎨.
         </p>
         <h2 className="mb-2 mt-4 text-2xl font-bold">my resume</h2>
-        <iframe src={`/resume/${RESUME_CONFIG.RESUME_FILENAME}`} className="mb-4 h-96 w-full"></iframe>
-        <Button className="mr-2 bg-white text-black hover:bg-gray-200">
-          <a href={`/resume/${RESUME_CONFIG.RESUME_FILENAME}`} download>
-            download resume
-          </a>
-        </Button>
-        <Button className="bg-white text-black hover:bg-gray-200" onClick={() => setIsModalOpen(true)}>
-          view full screen
-        </Button>
+        <AboutClient />
       </div>
-      <ResumeModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }

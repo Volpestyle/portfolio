@@ -8,8 +8,39 @@ import { Providers } from './providers';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const metadata: Metadata = {
-  title: "JCV's Portfolio",
-  description: "James Volpe's Portfolio",
+  title: {
+    default: "JCV's Portfolio",
+    template: '%s | JCV Portfolio'
+  },
+  description: "James Volpe's Portfolio - Software Engineer from Chicago, IL",
+  keywords: ['portfolio', 'software engineer', 'web development', 'James Volpe', 'Chicago', 'full stack'],
+  authors: [{ name: 'James Volpe' }],
+  creator: 'James Volpe',
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://jamesvolpe.com',
+    siteName: "JCV's Portfolio",
+    title: "JCV's Portfolio",
+    description: "James Volpe's Portfolio - Software Engineer from Chicago, IL",
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: "JCV's Portfolio",
+    description: "James Volpe's Portfolio - Software Engineer from Chicago, IL",
+    creator: '@c0wboyboopbop',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
