@@ -36,9 +36,9 @@ export function ProjectCard({ repo }: ProjectCardProps) {
   const Icon = repo.icon ? iconMap[repo.icon.toLowerCase()] || ArrowRight : ArrowRight;
 
   return (
-    <Card className="relative border-white bg-black bg-opacity-10 p-4 text-white">
+    <Card className="relative flex h-full flex-col border-white bg-black bg-opacity-10 p-4 text-white">
       <h2 className="mb-2 flex items-center justify-between text-xl font-bold">
-        <Link 
+        <Link
           href={`/projects/${repo.name}`}
           className="group relative inline-flex items-center gap-2 rounded transition-all duration-300 hover:bg-white hover:text-black"
           style={{
@@ -56,7 +56,7 @@ export function ProjectCard({ repo }: ProjectCardProps) {
         {repo.isStarred && <StarIcon />}
       </h2>
       <p className="mb-4 text-sm">{repo.description}</p>
-      <p className="mt-4 text-xs text-gray-400">
+      <p className="text-xs text-gray-400">
         <span className="font-bold">Created:</span> {formatDate(repo.created_at)}
       </p>
       {repo.pushed_at && (
@@ -66,7 +66,7 @@ export function ProjectCard({ repo }: ProjectCardProps) {
       )}
       <Button
         asChild
-        className="group relative mt-2 h-10 w-10 overflow-hidden border border-white bg-transparent text-white transition-all duration-300 hover:w-32 hover:border-white hover:bg-white hover:text-black"
+        className="group relative mt-auto h-10 w-10 overflow-hidden border border-white bg-transparent text-white transition-all duration-300 hover:w-32 hover:border-white hover:bg-white hover:text-black"
       >
         <Link href={`/projects/${repo.name}`}>
           <div className="relative flex h-full w-full items-center justify-center">
