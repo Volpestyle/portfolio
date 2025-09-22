@@ -62,18 +62,18 @@ export function findRepoConfig(
  */
 export async function getActualRepoName(owner: string, repo: string): Promise<string> {
   const portfolioConfig = await getPortfolioConfig();
-  
+
   if (!portfolioConfig) {
     return repo;
   }
 
   const repoConfig = findRepoConfig(portfolioConfig, owner, repo);
-  
+
   if (repoConfig?.isPrivate) {
     if (repoConfig.publicRepo) {
       return repoConfig.publicRepo;
     }
-    return `${repo}public`;
+    return `${repo}-public`;
   }
 
   return repo;

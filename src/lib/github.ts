@@ -48,27 +48,23 @@ export function useGithubImage(
         return path;
       }
 
-      // If it's an external URL, return as-is
+      // If it's an external URL (including GitHub raw URLs), return as-is
+      // The README API has already transformed these correctly
       if (path.startsWith('http://') || path.startsWith('https://')) {
         return path;
       }
 
+      // For relative paths that weren't transformed by the README API
+      // (this shouldn't happen in normal flow, but handle it just in case)
+      if (!repoData?.default_branch) throw new Error('Branch not available');
+
       // For private repos, use the public repo counterpart
+      let targetRepo = repo;
       if (repoData?.private) {
-        // Determine the public repo name
-        const publicRepoName = await getPublicRepoName(owner, repo);
-        if (!repoData?.default_branch) throw new Error('Branch not available');
-        const url = getGithubRawUrl(publicRepoName, repoData.default_branch, path, owner);
-        const response = await fetch(url, { method: 'HEAD' });
-        if (!response.ok) throw new Error(`Image not found: ${url}`);
-        return url;
+        targetRepo = await getPublicRepoName(owner, repo);
       }
 
-      // For public repos, fetch from GitHub
-      if (!repoData?.default_branch) throw new Error('Branch not available');
-      const url = getGithubRawUrl(repo, repoData.default_branch, path, owner);
-      const response = await fetch(url, { method: 'HEAD' });
-      if (!response.ok) throw new Error(`Image not found: ${url}`);
+      const url = getGithubRawUrl(targetRepo, repoData.default_branch, path, owner);
       return url;
     },
     enabled: !!repoData,
@@ -86,8 +82,8 @@ async function getPublicRepoName(owner: string, repo: string): Promise<string> {
   try {
     const response = await fetch(`/api/github/public-repo-name/${owner}/${repo}`);
     if (!response.ok) {
-      // Default fallback: append 'public' to the repo name
-      return `${repo}public`;
+      // Default fallback: append '-public' to the repo name
+      return `${repo}-public`;
     }
     const data = await response.json();
     return data.publicRepoName;
@@ -157,32 +153,6 @@ export function useRepoDetails(repo: string, owner: string = GITHUB_CONFIG.USERN
       }
       const data = await response.json();
       return data as RepoData;
-    },
-    ...defaultQueryConfig,
-  });
-}
-
-/**
- * Hook to fetch and parse the README content of a repository
- * @param owner - The GitHub username or organization name
- * @param repo - The repository name
- * @returns Query object containing the README content as a string
- */
-export function useRepoReadme(repo: string, owner: string = GITHUB_CONFIG.USERNAME) {
-  return useQuery({
-    queryKey: ['repoReadme', repo],
-    queryFn: async () => {
-      const response = await fetch(`/api/github/readme/${owner}/${repo}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch readme');
-      }
-      const { readme } = await response.json();
-
-      if (!readme) {
-        throw new Error('README content is missing from the response');
-      }
-
-      return readme;
     },
     ...defaultQueryConfig,
   });

@@ -2,6 +2,7 @@ import { GITHUB_CONFIG } from './constants';
 import { createOctokit, getPortfolioConfig } from './github-api';
 import { PortfolioRepoConfig, PrivateRepoData } from '@/types/portfolio';
 import { unstable_cache } from 'next/cache';
+import { convertRelativeToAbsoluteUrls } from './readme-utils';
 
 export type RepoData = {
   id?: number;
@@ -198,22 +199,31 @@ async function fetchRepoReadme(repo: string, owner: string = GITHUB_CONFIG.USERN
     const portfolioConfig = await getPortfolioConfig();
     const repoConfig = portfolioConfig?.repositories?.find(r => r.name === repo);
 
-    if (repoConfig?.isPrivate && repoConfig.readme) {
-      return repoConfig.readme;
+    // Determine the actual repo name to fetch from
+    let actualRepoName = repo;
+    if (repoConfig?.isPrivate) {
+      actualRepoName = repoConfig.publicRepo || `${repo}-public`;
     }
 
-    // For public repos or private repos with public counterpart
-    const publicRepoName = repoConfig?.publicRepo || repo;
+    // If we have inline README content for private repos
+    if (repoConfig?.isPrivate && repoConfig.readme) {
+      // Transform relative URLs to point to the public repo
+      return convertRelativeToAbsoluteUrls(repoConfig.readme, owner, actualRepoName);
+    }
 
+    // Fetch README from GitHub (public repo or public counterpart of private repo)
     const { data } = await octokit.rest.repos.getReadme({
       owner,
-      repo: publicRepoName,
+      repo: actualRepoName,
       headers: {
         accept: 'application/vnd.github.raw',
       },
     });
 
-    return data as unknown as string;
+    const readmeContent = data as any;
+
+    // Transform relative URLs to absolute URLs pointing to the correct repo
+    return convertRelativeToAbsoluteUrls(readmeContent, owner, actualRepoName);
   } catch (error) {
     console.error('Error fetching readme:', error);
     throw error;
