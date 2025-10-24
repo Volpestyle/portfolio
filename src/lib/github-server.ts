@@ -226,6 +226,11 @@ async function fetchRepoReadme(repo: string, owner: string = GITHUB_CONFIG.USERN
     return convertRelativeToAbsoluteUrls(readmeContent, owner, actualRepoName);
   } catch (error) {
     console.error('Error fetching readme:', error);
+
+    if (isGithubNotFoundError(error)) {
+      return buildMissingReadmeMessage(repo);
+    }
+
     throw error;
   }
 }
@@ -238,3 +243,159 @@ export const getRepoReadme = unstable_cache(
     tags: ['github-readme']
   }
 );
+
+/**
+ * Gets the GitHub raw URL for an image in a repository
+ * Handles both public and private repos (via their public counterparts)
+ * @param repo - The repository name
+ * @param imagePath - Path to the image file
+ * @param owner - GitHub username (defaults to GITHUB_CONFIG.USERNAME)
+ * @returns The raw GitHub URL for the image
+ */
+export async function getGithubImageUrl(
+  repo: string,
+  imagePath: string,
+  owner: string = GITHUB_CONFIG.USERNAME
+): Promise<string> {
+  // If path starts with /, it's a local public asset
+  if (imagePath.startsWith('/')) {
+    return imagePath;
+  }
+
+  // If it's an external URL, return as-is
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+
+  // Get repo details to determine if it's private and get the default branch
+  const repoDetails = await getRepoDetails(repo, owner);
+
+  // For private repos, use the public repo counterpart
+  let targetRepo = repo;
+  if (repoDetails.private) {
+    const portfolioConfig = await getPortfolioConfig();
+    const repoConfig = portfolioConfig?.repositories?.find(r => r.name === repo);
+    targetRepo = repoConfig?.publicRepo || `${repo}-public`;
+  }
+
+  const branch = repoDetails.default_branch || 'main';
+  const cleanPath = imagePath.replace(/^\.\//, '').replace(/\?raw=true$/, '');
+
+  return `https://raw.githubusercontent.com/${owner}/${targetRepo}/${branch}/${cleanPath}`;
+}
+
+/**
+ * Fetches document content from a repository
+ * @param repo - The repository name
+ * @param docPath - Path to the document
+ * @param owner - GitHub username (defaults to GITHUB_CONFIG.USERNAME)
+ * @returns Document content and project name
+ */
+async function fetchDocumentContent(
+  repo: string,
+  docPath: string,
+  owner: string = GITHUB_CONFIG.USERNAME
+): Promise<{ content: string; projectName: string }> {
+  const octokit = createOctokit();
+
+  try {
+    // Check portfolio config for private repos and document overrides
+    const portfolioConfig = await getPortfolioConfig();
+    const repoConfig = portfolioConfig?.repositories?.find(r => r.name === repo);
+
+    // Check if document is configured in gist
+    if (repoConfig?.documents) {
+      const docConfig = repoConfig.documents.find(d => d.path === docPath);
+
+      if (docConfig) {
+        // Fetch from gist
+        const docGistResponse = await octokit.rest.gists.get({
+          gist_id: docConfig.gistId,
+        });
+
+        const files = docGistResponse.data.files;
+        if (files && Object.keys(files).length > 0) {
+          let docFile;
+          if (docConfig.filename) {
+            docFile = files[docConfig.filename];
+          } else {
+            docFile = files[Object.keys(files)[0]];
+          }
+
+          if (docFile && docFile.content) {
+            return {
+              content: docFile.content,
+              projectName: repoConfig.name,
+            };
+          }
+        }
+      }
+    }
+
+    // For private repos, use public counterpart
+    let repoToFetch = repo;
+    if (repoConfig?.isPrivate) {
+      repoToFetch = repoConfig.publicRepo || `${repo}public`;
+    }
+
+    // Fetch from GitHub repository
+    const response = await octokit.rest.repos.getContent({
+      owner,
+      repo: repoToFetch,
+      path: docPath,
+    });
+
+    if ('content' in response.data && response.data.type === 'file') {
+      const content = Buffer.from(response.data.content, 'base64').toString();
+      return {
+        content,
+        projectName: repo,
+      };
+    }
+
+    throw new Error('Document not found');
+  } catch (error) {
+    console.error('Error fetching document content:', error);
+    throw error;
+  }
+}
+
+export const getDocumentContent = unstable_cache(
+  fetchDocumentContent,
+  ['document-content'],
+  {
+    revalidate: 3600,
+    tags: ['github-document']
+  }
+);
+
+type OctokitError = {
+  status?: number;
+  response?: {
+    status?: number;
+  };
+};
+
+function isGithubNotFoundError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const err = error as OctokitError;
+  return err.status === 404 || err.response?.status === 404;
+}
+
+function buildMissingReadmeMessage(repoName: string): string {
+  return [
+    '# README brewing...',
+    '',
+    `Thanks for peeking into **${repoName}**! The README is still being written, but the project is very much alive.`,
+    '',
+    'In the meantime:',
+    '- imagine friendly robots tidying up the docs',
+    '- expect shiny updates soon',
+    '- feel free to star the repo so you do not miss the reveal',
+    '',
+    '_Check back later for the full tour._',
+  ].join('\n');
+}

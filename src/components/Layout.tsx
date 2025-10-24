@@ -8,7 +8,6 @@ import { useHover } from '@/context/HoverContext';
 import { hoverMessages } from '@/constants/messages';
 import { useDeviceContext } from '@/context/DeviceContext';
 import { ErrorBoundary } from './ErrorBoundary';
-import { TanStackQueryDevtools } from './ReactQueryDevtools';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -76,7 +75,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </main>
         </div>
       </Card>
-      <TanStackQueryDevtools />
     </div>
   );
 };

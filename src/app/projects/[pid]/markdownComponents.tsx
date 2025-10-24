@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ImageRenderer } from '@/components/ImageRenderer';
+import { ServerImageRenderer } from '@/components/ServerImageRenderer';
 
 export const createMarkdownComponents = (
   pid: string,
@@ -28,10 +28,10 @@ export const createMarkdownComponents = (
   },
   img: ({ src, alt, ...props }: any) => {
     if (!src) return null;
+    // Images are already processed server-side with absolute URLs
     return (
       <span className="inline-block">
-        <ImageRenderer
-          pid={pid}
+        <ServerImageRenderer
           src={src}
           alt={alt || ''}
           onImageClick={handleImageClick}
@@ -41,12 +41,12 @@ export const createMarkdownComponents = (
       </span>
     );
   },
-  a: ({ href, children, ...props }: any) => {
+  a: ({ href, children, node, ...props }: any) => {
     // Handle internal document links
     if (href && (href.startsWith('docs/') || href.startsWith('./docs/'))) {
       const cleanPath = href.replace(/^\.\//, '');
       return (
-        <Link 
+        <Link
           href={`/projects/${pid}/doc/${cleanPath}`}
           className="text-blue-400 hover:text-blue-300 underline"
         >
@@ -56,12 +56,11 @@ export const createMarkdownComponents = (
     }
     // External links
     return (
-      <a 
-        href={href} 
-        target="_blank" 
+      <a
+        href={href}
+        target="_blank"
         rel="noopener noreferrer"
         className="text-blue-400 hover:text-blue-300 underline"
-        {...props}
       >
         {children}
       </a>

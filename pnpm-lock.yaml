@@ -17,9 +17,6 @@ importers:
       '@radix-ui/react-slot':
         specifier: ^1.1.0
         version: 1.2.3(@types/react@18.3.23)(react@19.1.0)
-      '@tanstack/react-query':
-        specifier: ^5.65.1
-        version: 5.79.0(react@19.1.0)
       class-variance-authority:
         specifier: ^0.7.0
         version: 0.7.1
@@ -60,9 +57,6 @@ importers:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@3.4.17)
     devDependencies:
-      '@tanstack/react-query-devtools':
-        specifier: ^5.65.1
-        version: 5.79.0(@tanstack/react-query@5.79.0(react@19.1.0))(react@19.1.0)
       '@types/node':
         specifier: ^20
         version: 20.17.57
@@ -749,23 +743,6 @@ packages:
 
   '@swc/helpers@0.5.15':
     resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
-
-  '@tanstack/query-core@5.79.0':
-    resolution: {integrity: sha512-s+epTqqLM0/TbJzMAK7OEhZIzh63P9sWz5HEFc5XHL4FvKQXQkcjI8F3nee+H/xVVn7mrP610nVXwOytTSYd0w==}
-
-  '@tanstack/query-devtools@5.76.0':
-    resolution: {integrity: sha512-1p92nqOBPYVqVDU0Ua5nzHenC6EGZNrLnB2OZphYw8CNA1exuvI97FVgIKON7Uug3uQqvH/QY8suUKpQo8qHNQ==}
-
-  '@tanstack/react-query-devtools@5.79.0':
-    resolution: {integrity: sha512-YVRWxjxsWycWChjKxvaIAPdNC5LX0zpiHoNyTB8teDZpQstM1b7mCuAp3x60cjX1MhLoO3vbaeY29EKst4D4ug==}
-    peerDependencies:
-      '@tanstack/react-query': ^5.79.0
-      react: ^18 || ^19
-
-  '@tanstack/react-query@5.79.0':
-    resolution: {integrity: sha512-DjC4JIYZnYzxaTzbg3osOU63VNLP67dOrWet2cZvXgmgwAXNxfS52AMq86M5++ILuzW+BqTUEVMTjhrZ7/XBuA==}
-    peerDependencies:
-      react: ^18 || ^19
 
   '@tybys/wasm-util@0.9.0':
     resolution: {integrity: sha512-6+7nlbMVX/PVDCwaIQ8nTOPveOcFLSt8GcXdx8hD0bt39uWxYT88uXzqTd4fTvqta7oeUJqudepapKNt2DYJFw==}
@@ -3629,21 +3606,6 @@ snapshots:
   '@swc/helpers@0.5.15':
     dependencies:
       tslib: 2.8.1
-
-  '@tanstack/query-core@5.79.0': {}
-
-  '@tanstack/query-devtools@5.76.0': {}
-
-  '@tanstack/react-query-devtools@5.79.0(@tanstack/react-query@5.79.0(react@19.1.0))(react@19.1.0)':
-    dependencies:
-      '@tanstack/query-devtools': 5.76.0
-      '@tanstack/react-query': 5.79.0(react@19.1.0)
-      react: 19.1.0
-
-  '@tanstack/react-query@5.79.0(react@19.1.0)':
-    dependencies:
-      '@tanstack/query-core': 5.79.0
-      react: 19.1.0
 
   '@tybys/wasm-util@0.9.0':
     dependencies:
