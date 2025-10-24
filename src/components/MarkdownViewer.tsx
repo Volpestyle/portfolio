@@ -6,7 +6,7 @@ import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
-import { ReactNode } from 'react';
+import { ReactNode, useMemo } from 'react';
 
 interface BreadcrumbItem {
   label: string;
@@ -19,7 +19,6 @@ interface MarkdownViewerProps {
   breadcrumbs: BreadcrumbItem[];
   children?: ReactNode;
   handleImageClick?: (src: string) => void;
-  handleImageLoad?: () => void;
   isLoading?: boolean;
 }
 
@@ -29,10 +28,28 @@ export function MarkdownViewer({
   breadcrumbs,
   children,
   handleImageClick,
-  handleImageLoad,
   isLoading = false,
 }: MarkdownViewerProps) {
-  const markdownComponents = createMarkdownComponents(pid, handleImageClick, handleImageLoad);
+  const markdownComponents = useMemo(
+    () => createMarkdownComponents(pid, handleImageClick),
+    [pid, handleImageClick]
+  );
+
+  const renderedMarkdown = useMemo(() => {
+    if (isLoading) {
+      return (
+        <div className="flex min-h-[400px] items-center justify-center">
+          <div className="animate-pulse text-gray-400">Loading document...</div>
+        </div>
+      );
+    }
+
+    return (
+      <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeHighlight]} components={markdownComponents}>
+        {content || ''}
+      </ReactMarkdown>
+    );
+  }, [content, isLoading, markdownComponents]);
 
   return (
     <div className="min-h-screen bg-black">
@@ -58,15 +75,7 @@ export function MarkdownViewer({
 
         {/* Document Content */}
         <div className="markdown-body preserve-case rounded-lg border border-gray-800 bg-gray-900/50 p-8">
-          {isLoading ? (
-            <div className="flex min-h-[400px] items-center justify-center">
-              <div className="animate-pulse text-gray-400">Loading document...</div>
-            </div>
-          ) : (
-            <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeHighlight]} components={markdownComponents}>
-              {content || ''}
-            </ReactMarkdown>
-          )}
+          {renderedMarkdown}
         </div>
       </div>
     </div>

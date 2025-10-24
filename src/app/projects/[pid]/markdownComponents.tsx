@@ -3,8 +3,7 @@ import { ServerImageRenderer } from '@/components/ServerImageRenderer';
 
 export const createMarkdownComponents = (
   pid: string,
-  handleImageClick?: (src: string) => void,
-  handleImageLoad?: () => void
+  handleImageClick?: (src: string) => void
 ) => ({
   p: ({ node, children, ...props }: any) => {
     // Check if paragraph contains only image and text nodes
@@ -35,7 +34,6 @@ export const createMarkdownComponents = (
           src={src}
           alt={alt || ''}
           onImageClick={handleImageClick}
-          onImageLoad={handleImageLoad}
           {...props}
         />
       </span>

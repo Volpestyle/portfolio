@@ -6,6 +6,23 @@
  * @param branch - The branch name (default: main)
  * @returns README content with absolute URLs
  */
+function sanitizeRelativePath(path: string): string {
+  let cleanPath = path.trim();
+
+  // Strip leading ./ segments
+  cleanPath = cleanPath.replace(/^(\.\/)+/, '');
+
+  // Remove single leading slash (repo root), but keep protocol-relative URLs (//example.com)
+  if (cleanPath.startsWith('/') && !cleanPath.startsWith('//')) {
+    cleanPath = cleanPath.replace(/^\/+/, '');
+  }
+
+  // Drop ?raw=true or similar query hints
+  cleanPath = cleanPath.replace(/\?raw=true$/, '');
+
+  return cleanPath;
+}
+
 export function convertRelativeToAbsoluteUrls(
   content: string,
   owner: string,
@@ -20,13 +37,17 @@ export function convertRelativeToAbsoluteUrls(
 
   return content
     .replace(relativeMarkdownImagePattern, (match, alt, path) => {
-      // Remove leading ./ if present
-      const cleanPath = path.startsWith('./') ? path.slice(2) : path;
+      if (path.startsWith('//')) {
+        return match;
+      }
+      const cleanPath = sanitizeRelativePath(path);
       return `![${alt}](https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${cleanPath})`;
     })
     .replace(relativeHtmlImagePattern, (match, before, path, after) => {
-      // Remove leading ./ if present
-      const cleanPath = path.startsWith('./') ? path.slice(2) : path;
+      if (path.startsWith('//')) {
+        return match;
+      }
+      const cleanPath = sanitizeRelativePath(path);
       return `<img${before}src="https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${cleanPath}"${after}>`;
     });
 }

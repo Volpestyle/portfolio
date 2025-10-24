@@ -17,8 +17,8 @@ interface ProjectContentProps {
 }
 
 export function ProjectContent({ pid, readme, repoInfo }: ProjectContentProps) {
-  const { allImages, carouselInitialIndex, isCarouselOpen, handleImageClick, handleImageLoad, closeCarousel } =
-    useImageCarousel({ fromDOM: true, enabled: false });
+  const { allImages, carouselInitialIndex, isCarouselOpen, handleImageClick, closeCarousel } =
+    useImageCarousel({ readme });
 
   const breadcrumbs = [{ label: 'Projects', href: '/projects' }, { label: pid }];
 
@@ -29,7 +29,6 @@ export function ProjectContent({ pid, readme, repoInfo }: ProjectContentProps) {
         pid={pid}
         breadcrumbs={breadcrumbs}
         handleImageClick={handleImageClick}
-        handleImageLoad={handleImageLoad}
       >
         {/* Project metadata and actions */}
         <div className="mb-6">

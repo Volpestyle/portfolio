@@ -215,15 +215,31 @@ async function fetchRepoReadme(repo: string, owner: string = GITHUB_CONFIG.USERN
     const { data } = await octokit.rest.repos.getReadme({
       owner,
       repo: actualRepoName,
-      headers: {
-        accept: 'application/vnd.github.raw',
-      },
     });
 
-    const readmeContent = data as any;
+    const readmeData = data as {
+      content?: string;
+      download_url?: string;
+    };
+
+    const readmeContent =
+      typeof readmeData === 'string'
+        ? readmeData
+        : readmeData?.content
+          ? Buffer.from(readmeData.content, 'base64').toString('utf-8')
+          : '';
+
+    const branchFromDownloadUrl = extractBranchFromDownloadUrl(
+      typeof readmeData === 'object' ? readmeData?.download_url : undefined
+    );
 
     // Transform relative URLs to absolute URLs pointing to the correct repo
-    return convertRelativeToAbsoluteUrls(readmeContent, owner, actualRepoName);
+    return convertRelativeToAbsoluteUrls(
+      readmeContent,
+      owner,
+      actualRepoName,
+      branchFromDownloadUrl
+    );
   } catch (error) {
     console.error('Error fetching readme:', error);
 
@@ -243,6 +259,25 @@ export const getRepoReadme = unstable_cache(
     tags: ['github-readme']
   }
 );
+
+function extractBranchFromDownloadUrl(url?: string | null): string | undefined {
+  if (!url) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(url);
+    const segments = parsed.pathname.split('/').filter(Boolean);
+    // Pathname format: /owner/repo/branch/path/to/file
+    if (segments.length >= 3) {
+      return segments[2];
+    }
+  } catch (error) {
+    console.warn('Failed to parse branch from README download URL:', error);
+  }
+
+  return undefined;
+}
 
 /**
  * Gets the GitHub raw URL for an image in a repository
@@ -279,7 +314,10 @@ export async function getGithubImageUrl(
   }
 
   const branch = repoDetails.default_branch || 'main';
-  const cleanPath = imagePath.replace(/^\.\//, '').replace(/\?raw=true$/, '');
+  const cleanPath = imagePath
+    .replace(/^(\.\/)+/, '')
+    .replace(/^\/+/, '')
+    .replace(/\?raw=true$/, '');
 
   return `https://raw.githubusercontent.com/${owner}/${targetRepo}/${branch}/${cleanPath}`;
 }
