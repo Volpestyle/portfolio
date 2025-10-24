@@ -18,7 +18,7 @@ interface ProjectContentProps {
 
 export function ProjectContent({ pid, readme, repoInfo }: ProjectContentProps) {
   const { allImages, carouselInitialIndex, isCarouselOpen, handleImageClick, handleImageLoad, closeCarousel } =
-    useImageCarousel({ pid, fromDOM: true, enabled: false });
+    useImageCarousel({ fromDOM: true, enabled: false });
 
   const breadcrumbs = [{ label: 'Projects', href: '/projects' }, { label: pid }];
 

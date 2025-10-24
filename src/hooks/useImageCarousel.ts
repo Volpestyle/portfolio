@@ -1,13 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 
 interface UseImageCarouselOptions {
-  pid?: string;
   readme?: string | undefined;
   enabled?: boolean;
   fromDOM?: boolean;
 }
 
-export function useImageCarousel({ pid, readme, enabled = false, fromDOM = false }: UseImageCarouselOptions) {
+export function useImageCarousel({ readme, enabled = false, fromDOM = false }: UseImageCarouselOptions) {
   const [carouselInitialIndex, setCarouselInitialIndex] = useState(0);
   const [isCarouselOpen, setIsCarouselOpen] = useState(false);
   const [allImages, setAllImages] = useState<string[]>([]);
