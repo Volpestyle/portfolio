@@ -1,6 +1,19 @@
 import { getDoc, getReadme, listProjects, navigate } from './github-tools';
 
-export const tools = [
+type FunctionTool = {
+  type: 'function';
+  name: string;
+  description: string;
+  parameters: {
+    type: 'object';
+    properties: Record<string, unknown>;
+    required: readonly string[];
+    additionalProperties: boolean;
+  };
+  strict: boolean;
+};
+
+export const tools: FunctionTool[] = [
   {
     type: 'function',
     name: 'listProjects',
@@ -21,7 +34,7 @@ export const tools = [
           },
         },
       },
-      required: ['filters'],
+      required: [],
       additionalProperties: false,
     },
     strict: true,
@@ -58,7 +71,7 @@ export const tools = [
   {
     type: 'function',
     name: 'navigate',
-    description: 'Suggest a section of the portfolio to open.',
+    description: 'Create a navigation link to a portfolio section. IMPORTANT: Always provide explanatory text before calling this tool (e.g., "You can find more details on my about page!").',
     parameters: {
       type: 'object',
       properties: {
@@ -69,7 +82,7 @@ export const tools = [
     },
     strict: true,
   },
-] as const;
+];
 
 type ToolCall = {
   name: string;

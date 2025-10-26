@@ -3,11 +3,12 @@ import { getRepoDetails } from '@/lib/github-server';
 
 export async function GET(
   _request: Request,
-  context: { params: { owner: string; repo: string } }
+  context: { params: Promise<{ owner: string; repo: string }> }
 ) {
   try {
-    const owner = decodeURIComponent(context.params.owner);
-    const repo = decodeURIComponent(context.params.repo);
+    const params = await context.params;
+    const owner = decodeURIComponent(params.owner);
+    const repo = decodeURIComponent(params.repo);
     const details = await getRepoDetails(repo, owner);
     return NextResponse.json(details, {
       headers: {
