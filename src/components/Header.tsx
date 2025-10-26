@@ -11,16 +11,17 @@ import { hoverMessages } from '@/constants/messages';
 import { motion } from 'framer-motion';
 
 const NAV_ITEMS = [
-  { href: '/', icon: MessageSquare, label: 'Home', message: '' },
-  { href: '/about', icon: User, label: 'About', message: hoverMessages.about },
-  { href: '/projects', icon: Rocket, label: 'Projects', message: hoverMessages.projects },
-  { href: '/contact', icon: Mail, label: 'Contact', message: hoverMessages.contact },
+  { href: '/', icon: MessageSquare, label: 'Chat', message: '', expandedWidth: '4.5rem' },
+  { href: '/about', icon: User, label: 'About', message: hoverMessages.about, expandedWidth: '5rem' },
+  { href: '/projects', icon: Rocket, label: 'Projects', message: hoverMessages.projects, expandedWidth: '6.5rem' },
+  { href: '/contact', icon: Mail, label: 'Contact', message: hoverMessages.contact, expandedWidth: '6rem' },
 ] as const;
 
 export function Header() {
   const { setHoverText } = useHover();
   const pathname = usePathname();
   const [headerHoverText, setHeaderHoverText] = useState('');
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   useEffect(() => {
     setHeaderHoverText('');
@@ -29,6 +30,7 @@ export function Header() {
   const clearHoverStates = () => {
     setHoverText('');
     setHeaderHoverText('');
+    setHoveredIndex(null);
   };
 
   return (
@@ -41,33 +43,70 @@ export function Header() {
         </div>
 
         <nav className="flex items-center gap-2">
-          {NAV_ITEMS.map(({ href, icon: Icon, label, message }) => {
+          {NAV_ITEMS.map(({ href, icon: Icon, label, message, expandedWidth }, index) => {
             const isActive = pathname === href;
             const headerCopy = resolveHeaderBaseText(href);
+            const isHovered = hoveredIndex === index;
 
             const setHoverStates = () => {
               setHoverText(message);
               setHeaderHoverText(headerCopy);
+              setHoveredIndex(index);
             };
 
             return (
-              <Link
+              <motion.div
                 key={href}
-                href={href}
-                aria-label={label}
-                className={cn(
-                  'rounded-full border px-2 py-2 transition',
-                  isActive
-                    ? 'border-white bg-white text-black'
-                    : 'border-white/20 text-white hover:border-white hover:bg-white hover:text-black'
-                )}
-                onMouseEnter={setHoverStates}
-                onMouseLeave={clearHoverStates}
-                onFocus={setHoverStates}
-                onBlur={clearHoverStates}
+                animate={{
+                  width: isHovered ? expandedWidth : '2.5rem',
+                }}
+                transition={{
+                  type: 'spring',
+                  stiffness: 300,
+                  damping: 25,
+                }}
               >
-                <Icon className="h-5 w-5" />
-              </Link>
+                <Link
+                  href={href}
+                  aria-label={label}
+                  className={cn(
+                    'group relative inline-flex h-10 w-full items-center justify-center overflow-hidden rounded-full border',
+                    isActive
+                      ? 'border-white bg-white text-black'
+                      : 'border-white/20 text-white hover:border-white hover:bg-white hover:text-black'
+                  )}
+                  onMouseEnter={setHoverStates}
+                  onMouseLeave={clearHoverStates}
+                  onFocus={setHoverStates}
+                  onBlur={clearHoverStates}
+                >
+                  <motion.div
+                    animate={{
+                      x: isHovered ? 32 : 0,
+                      opacity: isHovered ? 0 : 1,
+                    }}
+                    transition={{
+                      type: 'spring',
+                      stiffness: 300,
+                      damping: 20,
+                    }}
+                    className="absolute"
+                  >
+                    <Icon className={cn('h-5 w-5', isActive ? 'text-black' : '')} />
+                  </motion.div>
+                  <motion.span
+                    animate={{
+                      opacity: isHovered ? 1 : 0,
+                    }}
+                    transition={{
+                      duration: 0.2,
+                    }}
+                    className={cn('whitespace-nowrap text-sm font-medium', isActive ? 'text-black' : '')}
+                  >
+                    {label}
+                  </motion.span>
+                </Link>
+              </motion.div>
             );
           })}
         </nav>
