@@ -7,6 +7,7 @@ import type { RepoData } from '@/lib/github-server';
 import { MarkdownViewer } from '@/components/MarkdownViewer';
 import { cn, formatDate } from '@/lib/utils';
 import { useImageCarousel } from '@/hooks/useImageCarousel';
+import { AnimatedExpandButton } from '@/components/ui/AnimatedExpandButton';
 
 interface ProjectContentProps {
   pid: string;
@@ -55,22 +56,14 @@ export function ProjectContent({
                 Private Repo
               </Button>
             ) : (
-              <Button
-                asChild
-                className={cn(
-                  'group relative overflow-hidden border border-white bg-transparent text-white transition-all duration-300 hover:border-white hover:bg-white hover:text-black',
-                  isChat ? 'h-9 w-28 text-xs' : 'h-10 w-10'
-                )}
-              >
-                <a href={repoInfo.html_url} target="_blank" rel="noopener noreferrer">
-                  <div className="relative flex h-full w-full items-center justify-center">
-                    <span className="absolute whitespace-nowrap text-black opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                      View on GitHub
-                    </span>
-                    <ExternalLinkIcon className="absolute h-5 w-5 transition-all duration-300 group-hover:translate-x-10 group-hover:opacity-0" />
-                  </div>
-                </a>
-              </Button>
+              <AnimatedExpandButton
+                icon={<ExternalLinkIcon className="h-5 w-5" />}
+                text="View on GitHub"
+                expandedWidth={isChat ? '8rem' : '9rem'}
+                href={repoInfo.html_url}
+                external
+                className={isChat ? 'h-9 text-xs' : 'h-10'}
+              />
             )}
           </div>
           <div className={cn('text-gray-400', isChat ? 'text-[11px]' : 'text-sm')}>
