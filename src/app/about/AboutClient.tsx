@@ -22,7 +22,7 @@ export function AboutClient() {
             <Button
               variant="onBlack"
               size="icon"
-              className="rounded-full border border-white/20 transition hover:border-white"
+              className="rounded-full border border-white/20 transition hover:border-white active:border-white active:bg-white active:text-black"
               asChild
             >
               <a href={`/resume/${RESUME_CONFIG.RESUME_FILENAME}`} download aria-label="Download resume">
@@ -34,7 +34,7 @@ export function AboutClient() {
             <Button
               variant="onBlack"
               size="icon"
-              className="rounded-full border border-white/20 transition hover:border-white"
+              className="rounded-full border border-white/20 transition hover:border-white active:border-white active:bg-white active:text-black"
               onClick={() => setIsModalOpen(true)}
               aria-label="View full screen"
             >
