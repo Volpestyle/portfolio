@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useAssetPrefetch } from './useAssetPrefetch';
 
 interface UseImageCarouselOptions {
   readme?: string | undefined;
@@ -56,12 +57,23 @@ function extractImagesFromReadme(content: string): string[] {
 export function useImageCarousel({ readme, enabled = true }: UseImageCarouselOptions = {}) {
   const [carouselInitialIndex, setCarouselInitialIndex] = useState(0);
   const [isCarouselOpen, setIsCarouselOpen] = useState(false);
+  const { prefetchAsset } = useAssetPrefetch();
   const allImages = useMemo(() => {
     if (!enabled || !readme) {
       return [];
     }
     return extractImagesFromReadme(readme);
   }, [enabled, readme]);
+
+  useEffect(() => {
+    if (!enabled || !allImages.length) {
+      return;
+    }
+
+    allImages.slice(0, 6).forEach((src) => {
+      prefetchAsset(src);
+    });
+  }, [allImages, enabled, prefetchAsset]);
 
   const handleImageClick = useCallback(
     (clickedSrc: string) => {
