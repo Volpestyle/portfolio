@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { motion } from 'framer-motion';
 
 export const ROUTE_BASE_TEXT = [
   { match: (pathname: string) => pathname === '/', text: 'JCV' },
@@ -29,6 +30,7 @@ export function HeaderTypewriter({ hoverText }: HeaderTypewriterProps) {
   const baseText = useMemo(() => resolveHeaderBaseText(pathname), [pathname]);
   const targetText = pathname === '/' || !hoverText?.length ? baseText : hoverText;
   const [displayText, setDisplayText] = useState('');
+  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     if (displayText === targetText) return;
@@ -52,10 +54,21 @@ export function HeaderTypewriter({ hoverText }: HeaderTypewriterProps) {
   }, [displayText, targetText]);
 
   return (
-    <div className="font-mono text-2xl font-semibold text-white">
+    <motion.div
+      className="font-mono text-2xl font-semibold text-white"
+      onHoverStart={() => setIsHovered(true)}
+      onHoverEnd={() => setIsHovered(false)}
+      animate={{
+        letterSpacing: isHovered ? '0.15em' : '0em',
+      }}
+      transition={{
+        duration: 0.4,
+        ease: [0.4, 0, 0.2, 1],
+      }}
+    >
       {displayText}
       {displayText !== targetText && <span className="ml-1 animate-[blink_1s_infinite]">▋</span>}
-    </div>
+    </motion.div>
   );
 }
 
