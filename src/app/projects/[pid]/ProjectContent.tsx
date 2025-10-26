@@ -17,19 +17,15 @@ interface ProjectContentProps {
 }
 
 export function ProjectContent({ pid, readme, repoInfo }: ProjectContentProps) {
-  const { allImages, carouselInitialIndex, isCarouselOpen, handleImageClick, closeCarousel } =
-    useImageCarousel({ readme });
+  const { allImages, carouselInitialIndex, isCarouselOpen, handleImageClick, closeCarousel } = useImageCarousel({
+    readme,
+  });
 
   const breadcrumbs = [{ label: 'Projects', href: '/projects' }, { label: pid }];
 
   return (
-    <>
-      <MarkdownViewer
-        content={readme}
-        pid={pid}
-        breadcrumbs={breadcrumbs}
-        handleImageClick={handleImageClick}
-      >
+    <div className="-mx-8 -my-8 bg-black/10 backdrop-blur-sm">
+      <MarkdownViewer content={readme} pid={pid} breadcrumbs={breadcrumbs} handleImageClick={handleImageClick}>
         {/* Project metadata and actions */}
         <div className="mb-6">
           <div className="mb-4 flex items-center">
@@ -73,6 +69,6 @@ export function ProjectContent({ pid, readme, repoInfo }: ProjectContentProps) {
           onClose={closeCarousel}
         />
       )}
-    </>
+    </div>
   );
 }
