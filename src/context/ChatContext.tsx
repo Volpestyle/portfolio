@@ -1,19 +1,13 @@
 'use client';
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import type {
   BannerState,
   ChatAttachment,
+  ChatAttachmentPart,
   ChatMessage,
   ChatRequestMessage,
+  ChatTextPart,
 } from '@/types/chat';
 
 interface ChatContextValue {
@@ -23,8 +17,6 @@ interface ChatContextValue {
   bannerState: BannerState;
   error?: string | null;
   send: (text: string) => Promise<void>;
-  openProjectInline: (repoName: string) => Promise<void>;
-  openDocInline: (repo: string, path: string, title?: string) => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -101,7 +93,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         let assistantMessage: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
-          parts: [{ kind: 'text', text: '' }],
+          parts: [],
           createdAt: new Date().toISOString(),
           animated: true,
         };
@@ -112,16 +104,74 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         const decoder = new TextDecoder();
         let buffer = '';
         let finished = false;
+        const itemOrder: string[] = [];
 
         const applyAssistantChange = (mutator: (message: ChatMessage) => void) => {
           mutator(assistantMessage);
           assistantMessage = {
             ...assistantMessage,
-            parts: assistantMessage.parts.map((part) =>
-              part.kind === 'text' ? { ...part } : part
-            ),
+            parts: assistantMessage.parts.map((part) => (part.kind === 'text' ? { ...part } : part)),
           };
           replaceMessage(assistantMessage);
+        };
+
+        const registerItem = (itemId?: string) => {
+          if (!itemId || itemOrder.includes(itemId)) {
+            return;
+          }
+          itemOrder.push(itemId);
+        };
+
+        const findInsertIndex = (message: ChatMessage, itemId?: string) => {
+          if (!itemId) {
+            return message.parts.length;
+          }
+
+          let targetIndex = itemOrder.indexOf(itemId);
+          if (targetIndex === -1) {
+            itemOrder.push(itemId);
+            targetIndex = itemOrder.length - 1;
+          }
+
+          for (let idx = 0; idx < message.parts.length; idx += 1) {
+            const partItemId = message.parts[idx].itemId;
+            if (!partItemId) {
+              continue;
+            }
+            const partOrderIndex = itemOrder.indexOf(partItemId);
+            if (partOrderIndex !== -1 && partOrderIndex > targetIndex) {
+              return idx;
+            }
+          }
+
+          return message.parts.length;
+        };
+
+        const ensureTextPart = (message: ChatMessage, itemId?: string): ChatTextPart => {
+          if (itemId) {
+            const existingPart = message.parts.find((part) => part.kind === 'text' && part.itemId === itemId) as
+              | ChatTextPart
+              | undefined;
+            if (existingPart) {
+              return existingPart;
+            }
+
+            const insertIndex = findInsertIndex(message, itemId);
+            const nextPart: ChatTextPart = { kind: 'text', text: '', itemId };
+            message.parts.splice(insertIndex, 0, nextPart);
+            return nextPart;
+          }
+
+          const fallback =
+            (message.parts.find((part) => part.kind === 'text') as ChatTextPart | undefined) ?? undefined;
+
+          if (fallback) {
+            return fallback;
+          }
+
+          const nextPart: ChatTextPart = { kind: 'text', text: '' };
+          message.parts.push(nextPart);
+          return nextPart;
         };
 
         while (!finished) {
@@ -152,21 +202,41 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               continue;
             }
 
+            if (event.type === 'item' && typeof event.itemId === 'string') {
+              registerItem(event.itemId as string);
+              continue;
+            }
+
             if (event.type === 'token' && typeof event.delta === 'string') {
+              const itemId = typeof event.itemId === 'string' ? (event.itemId as string) : undefined;
+              registerItem(itemId);
               applyAssistantChange((message) => {
-                const textPart = message.parts.find((part) => part.kind === 'text');
-                if (textPart) {
-                  textPart.text += event.delta as string;
-                } else {
-                  message.parts.unshift({ kind: 'text', text: event.delta as string });
-                }
+                const textPart = ensureTextPart(message, itemId);
+                textPart.text += event.delta as string;
               });
               continue;
             }
 
             if (event.type === 'attachment' && event.attachment) {
+              const itemId = typeof event.itemId === 'string' ? (event.itemId as string) : undefined;
+              registerItem(itemId);
               applyAssistantChange((message) => {
-                message.parts.push({ kind: 'attachment', attachment: event.attachment as ChatAttachment });
+                const attachmentPart: ChatAttachmentPart = {
+                  kind: 'attachment',
+                  attachment: event.attachment as ChatAttachment,
+                  itemId,
+                };
+
+                if (itemId) {
+                  const existingIndex = message.parts.findIndex((part) => part.itemId === itemId);
+                  if (existingIndex !== -1) {
+                    message.parts[existingIndex] = attachmentPart;
+                    return;
+                  }
+                }
+
+                const insertIndex = findInsertIndex(message, itemId);
+                message.parts.splice(insertIndex, 0, attachmentPart);
               });
               continue;
             }
@@ -181,7 +251,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             }
           }
         }
-
       } catch (err) {
         console.error('Chat error', err);
         setError('Something went wrong. Mind trying again?');
@@ -193,16 +262,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [chatStarted, commitMessages, isBusy, pushMessage, replaceMessage]
   );
 
-  const openProjectInline = useCallback(
-    (repoName: string) => send(`/open repo ${repoName}`),
-    [send]
-  );
-
-  const openDocInline = useCallback(
-    (repo: string, path: string, _title?: string) => send(`/open doc ${repo} ${path}`),
-    [send]
-  );
-
   const value = useMemo<ChatContextValue>(
     () => ({
       messages,
@@ -211,10 +270,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       bannerState,
       error,
       send,
-      openProjectInline,
-      openDocInline,
     }),
-    [messages, isBusy, chatStarted, bannerState, error, send, openProjectInline, openDocInline]
+    [messages, isBusy, chatStarted, bannerState, error, send]
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
@@ -229,11 +286,14 @@ export function useChat() {
 }
 
 function flatten(ms: ChatMessage[]): ChatRequestMessage[] {
-  return ms.slice(-12).map((message) => ({
-    role: message.role,
-    content: message.parts
-      .map((part) => (part.kind === 'text' ? part.text : '[attachment]'))
-      .join('\n\n')
-      .trim(),
-  })).filter((entry) => entry.content.length > 0);
+  return ms
+    .slice(-12)
+    .map((message) => ({
+      role: message.role,
+      content: message.parts
+        .map((part) => (part.kind === 'text' ? part.text : '[attachment]'))
+        .join('\n\n')
+        .trim(),
+    }))
+    .filter((entry) => entry.content.length > 0);
 }

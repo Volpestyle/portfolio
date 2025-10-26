@@ -14,6 +14,7 @@ export type BannerState =
 export type ChatTextPart = {
   kind: 'text';
   text: string;
+  itemId?: string;
 };
 
 export type ProjectCardsAttachment = {
@@ -58,6 +59,7 @@ export type ChatAttachment =
 export type ChatAttachmentPart = {
   kind: 'attachment';
   attachment: ChatAttachment;
+  itemId?: string;
 };
 
 export type ChatMessagePart = ChatTextPart | ChatAttachmentPart;

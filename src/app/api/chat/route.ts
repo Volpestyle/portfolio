@@ -3,12 +3,30 @@ import { NextRequest } from 'next/server';
 import { buildSystemPrompt } from '@/server/prompt/buildSystemPrompt';
 import { tools, toolRouter } from '@/server/tools';
 import type { ChatRequestMessage } from '@/types/chat';
+import { enforceChatRateLimit } from '@/lib/rate-limit';
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(req: NextRequest) {
   if (!process.env.OPENAI_API_KEY) {
     return new Response('Chat is not configured. Missing OPENAI_API_KEY.', { status: 500 });
+  }
+
+  const rateLimit = await enforceChatRateLimit(req);
+  if (!rateLimit.success) {
+    const retryAfterSeconds =
+      typeof rateLimit.reset === 'number'
+        ? Math.max(0, rateLimit.reset - Math.floor(Date.now() / 1000))
+        : 60;
+    return new Response('Too many requests. Please slow down.', {
+      status: 429,
+      headers: {
+        'Retry-After': retryAfterSeconds.toString(),
+        'X-RateLimit-Limit': String(rateLimit.limit ?? ''),
+        'X-RateLimit-Remaining': String(rateLimit.remaining ?? 0),
+        'X-RateLimit-Reset': String(rateLimit.reset ?? ''),
+      },
+    });
   }
 
   let body: { messages?: ChatRequestMessage[] };
@@ -48,18 +66,39 @@ export async function POST(req: NextRequest) {
             ) {
               toolNameByItemId.set(item.id, item.name);
             }
+
+            if (item?.id) {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: 'item',
+                    itemId: item.id,
+                    itemType: item.type,
+                  })}\n\n`
+                )
+              );
+            }
             continue;
           }
 
           if (event.type === 'response.output_text.delta') {
             controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: 'token', delta: event.delta })}\n\n`)
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: 'token',
+                  delta: event.delta,
+                  itemId: (event as any).item_id,
+                })}\n\n`
+              )
             );
             continue;
           }
 
           if (event.type === 'response.function_call_arguments.done') {
-            const itemId = typeof (event as any).item_id === 'string' ? ((event as any).item_id as string) : undefined;
+            const itemId =
+              typeof (event as any).item_id === 'string'
+                ? ((event as any).item_id as string)
+                : undefined;
             const resolvedName =
               (event as any).name ??
               (event as any).call_name ??
@@ -80,7 +119,13 @@ export async function POST(req: NextRequest) {
                 arguments: typeof (event as any).arguments === 'string' ? (event as any).arguments : undefined,
               });
               controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ type: 'attachment', attachment })}\n\n`)
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: 'attachment',
+                    attachment,
+                    itemId,
+                  })}\n\n`
+                )
               );
               if (itemId) {
                 toolNameByItemId.delete(itemId);
@@ -99,14 +144,6 @@ export async function POST(req: NextRequest) {
             completed = true;
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
             continue;
-          }
-
-          if (event.type === 'response.error') {
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({ type: 'error', error: (event.error as Error)?.message || 'error' })}\n\n`
-              )
-            );
           }
         }
       } catch (error) {
