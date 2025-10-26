@@ -1,4 +1,4 @@
-import { getDoc, getReadme, listProjects, navigate } from './github-tools';
+import { getDoc, getReadme, listProjects } from './github-tools';
 
 type FunctionTool = {
   type: 'function';
@@ -17,7 +17,7 @@ export const tools: FunctionTool[] = [
   {
     type: 'function',
     name: 'listProjects',
-    description: 'List James’s repositories with optional language/topic filters.',
+    description: "List James's repositories with optional language/topic filters.",
     parameters: {
       type: 'object',
       properties: {
@@ -37,7 +37,7 @@ export const tools: FunctionTool[] = [
       required: [],
       additionalProperties: false,
     },
-    strict: true,
+    strict: false,
   },
   {
     type: 'function',
@@ -64,20 +64,6 @@ export const tools: FunctionTool[] = [
         path: { type: 'string' },
       },
       required: ['repo', 'path'],
-      additionalProperties: false,
-    },
-    strict: true,
-  },
-  {
-    type: 'function',
-    name: 'navigate',
-    description: 'Create a navigation link to a portfolio section. IMPORTANT: Always provide explanatory text before calling this tool (e.g., "You can find more details on my about page!").',
-    parameters: {
-      type: 'object',
-      properties: {
-        section: { type: 'string', enum: ['about', 'projects', 'contact'] },
-      },
-      required: ['section'],
       additionalProperties: false,
     },
     strict: true,
@@ -110,10 +96,6 @@ export async function toolRouter(call: ToolCall) {
         path: result.path,
         content: result.content,
       } as const;
-    }
-    case 'navigate': {
-      const link = navigate(args);
-      return { type: 'link', url: link.url } as const;
     }
     default:
       throw new Error(`Unknown tool: ${call.name}`);

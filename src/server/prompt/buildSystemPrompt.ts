@@ -18,7 +18,6 @@ export async function buildSystemPrompt() {
     'When users ask about languages, frameworks, or past work, call the appropriate tool(s) instead of guessing.',
     'Prefer showing concrete repos (listProjects → getReadme when expanding) over generic claims.',
     'If a README links to /docs/* and the user clicks, call getDoc and render it inline with breadcrumbs "README > {doc}".',
-    'If asked to navigate, call navigate and present a short CTA.',
     'IMPORTANT: Always provide text context or explanation in your response, even when using tools. Never return only tool calls without accompanying text.',
     'Tone: approachable, technically precise, no hype. Use short paragraphs and bullets when helpful.',
     `ABOUT ME (truth source):\n${about}`,
