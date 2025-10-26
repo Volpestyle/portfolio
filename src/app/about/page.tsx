@@ -65,7 +65,7 @@ export default function About() {
           priority
           className="mb-4 h-auto w-full rounded-lg object-cover"
         />
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col items-start gap-4">
           {socialLinks.map((link) => (
             <a
               key={link.name}
