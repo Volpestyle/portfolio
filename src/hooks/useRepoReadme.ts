@@ -1,9 +1,8 @@
 'use client';
 
 import { useCallback } from 'react';
-import { useQueryClient, type QueryKey } from '@tanstack/react-query';
-
-const buildCacheKey = (owner: string, repo: string): QueryKey => ['repo-readme', owner, repo];
+import { useQueryClient } from '@tanstack/react-query';
+import { readmeQueryKey } from '@/lib/query-keys';
 
 async function fetchRepoReadme(owner: string, repo: string) {
   const response = await fetch(`/api/github/readme/${owner}/${repo}`);
@@ -19,7 +18,7 @@ export function useRepoReadme() {
 
   const getCachedReadme = useCallback(
     (owner: string, repo: string) => {
-      return queryClient.getQueryData<string>(buildCacheKey(owner, repo));
+      return queryClient.getQueryData<string>(readmeQueryKey(owner, repo));
     },
     [queryClient]
   );
@@ -31,7 +30,7 @@ export function useRepoReadme() {
       }
 
       return queryClient.ensureQueryData({
-        queryKey: buildCacheKey(owner, repo),
+        queryKey: readmeQueryKey(owner, repo),
         queryFn: () => fetchRepoReadme(owner, repo),
       });
     },
@@ -43,7 +42,7 @@ export function useRepoReadme() {
       if (!owner || !repo) {
         return;
       }
-      queryClient.setQueryData(buildCacheKey(owner, repo), readme);
+      queryClient.setQueryData(readmeQueryKey(owner, repo), readme);
     },
     [queryClient]
   );

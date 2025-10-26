@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback } from 'react';
-import { type QueryKey, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { documentQueryKey } from '@/lib/query-keys';
 
 export type RepoDocumentData = {
   owner: string;
@@ -10,8 +11,6 @@ export type RepoDocumentData = {
   content: string;
   projectName?: string;
 };
-
-const buildDocumentKey = (owner: string, repo: string, path: string): QueryKey => ['repo-document', owner, repo, path];
 
 function encodePath(path: string) {
   return path
@@ -53,7 +52,7 @@ export function useRepoDocument() {
       if (!owner || !repo || !path) {
         return undefined;
       }
-      return queryClient.getQueryData<RepoDocumentData>(buildDocumentKey(owner, repo, path));
+      return queryClient.getQueryData<RepoDocumentData>(documentQueryKey(owner, repo, path));
     },
     [queryClient]
   );
@@ -61,7 +60,7 @@ export function useRepoDocument() {
   const ensureDocument = useCallback(
     async (owner: string, repo: string, path: string) => {
       return queryClient.ensureQueryData({
-        queryKey: buildDocumentKey(owner, repo, path),
+        queryKey: documentQueryKey(owner, repo, path),
         queryFn: () => fetchRepoDocument(owner, repo, path),
         staleTime: 1000 * 60 * 10,
         gcTime: 1000 * 60 * 30,
@@ -75,7 +74,7 @@ export function useRepoDocument() {
       if (!owner || !repo || !path) {
         return;
       }
-      queryClient.setQueryData(buildDocumentKey(owner, repo, path), document);
+      queryClient.setQueryData(documentQueryKey(owner, repo, path), document);
     },
     [queryClient]
   );

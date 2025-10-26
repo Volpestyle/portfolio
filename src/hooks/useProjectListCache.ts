@@ -1,10 +1,9 @@
 'use client';
 
 import { useCallback } from 'react';
-import { useQueryClient, type QueryKey } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import type { PortfolioReposResponse, RepoData } from '@/lib/github-server';
-
-const projectListKey: QueryKey = ['project-list', 'all'];
+import { PROJECT_LIST_QUERY_KEY } from '@/lib/query-keys';
 
 async function fetchProjectList(): Promise<RepoData[]> {
   const response = await fetch('/api/github/portfolio-repos');
@@ -19,12 +18,12 @@ export function useProjectListCache() {
   const queryClient = useQueryClient();
 
   const getCachedProjectList = useCallback(() => {
-    return queryClient.getQueryData<RepoData[]>(projectListKey);
+    return queryClient.getQueryData<RepoData[]>(PROJECT_LIST_QUERY_KEY);
   }, [queryClient]);
 
   const ensureProjectList = useCallback(async () => {
     return queryClient.ensureQueryData({
-      queryKey: projectListKey,
+      queryKey: PROJECT_LIST_QUERY_KEY,
       queryFn: fetchProjectList,
     });
   }, [queryClient]);
@@ -35,12 +34,12 @@ export function useProjectListCache() {
         return;
       }
 
-      const existing = queryClient.getQueryData<RepoData[]>(projectListKey);
+      const existing = queryClient.getQueryData<RepoData[]>(PROJECT_LIST_QUERY_KEY);
       if (existing && existing.length >= repos.length) {
         return;
       }
 
-      queryClient.setQueryData(projectListKey, repos);
+      queryClient.setQueryData(PROJECT_LIST_QUERY_KEY, repos);
     },
     [queryClient]
   );
