@@ -1,16 +1,18 @@
 import './globals.css';
 import { ReactNode } from 'react';
 import AnimatedBackground from '@/components/AnimatedBackground';
-import Layout from '@/components/Layout';
-import { jetbrainsMono, sourceCodePro, firaCode, spaceMono, ibmPlexMono, robotoMono } from './fonts';
+import { Header } from '@/components/Header';
+import { jetbrainsMono, sourceCodePro, firaCode, spaceMono, ibmPlexMono, geistMono } from './fonts';
 import { Metadata } from 'next';
 import { Providers } from './providers';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { AnimatedLayout } from '@/components/AnimatedLayout';
+import { LoadingOverlay } from '@/components/LoadingOverlay';
 
 export const metadata: Metadata = {
   title: {
     default: "JCV's Portfolio",
-    template: '%s | JCV Portfolio'
+    template: '%s | JCV Portfolio',
   },
   description: "James Volpe's Portfolio - Software Engineer from Chicago, IL",
   keywords: ['portfolio', 'software engineer', 'web development', 'James Volpe', 'Chicago', 'full stack'],
@@ -47,13 +49,20 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      className={` ${jetbrainsMono.variable} ${sourceCodePro.variable} ${firaCode.variable} ${spaceMono.variable} ${ibmPlexMono.variable} ${robotoMono.variable} `}
+      className={` ${jetbrainsMono.variable} ${sourceCodePro.variable} ${firaCode.variable} ${spaceMono.variable} ${ibmPlexMono.variable} ${geistMono.variable} `}
     >
-      <body className="font-roboto-mono">
+      <body className="bg-black font-geist-mono text-white">
         <ErrorBoundary>
           <AnimatedBackground />
           <Providers>
-            <Layout>{children}</Layout>
+            <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
+              <AnimatedLayout>
+                <Header />
+                <LoadingOverlay spinnerVariant="ring">
+                  <main className="px-4 py-8 sm:px-8">{children}</main>
+                </LoadingOverlay>
+              </AnimatedLayout>
+            </div>
           </Providers>
         </ErrorBoundary>
       </body>
