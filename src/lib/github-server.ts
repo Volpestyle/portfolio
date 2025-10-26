@@ -373,7 +373,7 @@ async function fetchDocumentContent(
     // For private repos, use public counterpart
     let repoToFetch = repo;
     if (repoConfig?.isPrivate) {
-      repoToFetch = repoConfig.publicRepo || `${repo}public`;
+      repoToFetch = repoConfig.publicRepo || `${repo}-public`;
     }
 
     // Fetch from GitHub repository
