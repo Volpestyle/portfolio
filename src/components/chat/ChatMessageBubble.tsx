@@ -58,13 +58,24 @@ export function ChatMessageBubble({ message, isLastAssistantMessage = false }: C
             }
 
             const isLastTextPart = index === lastTextPartIndex;
+
+            // Only use typewriter effect for the last assistant message
+            if (isLastAssistantMessage) {
+              return (
+                <TypewriterMessage
+                  key={`${message.id}-text-${index}`}
+                  text={part.text}
+                  className="text-sm leading-relaxed"
+                  showCursor={isLastTextPart}
+                />
+              );
+            }
+
+            // All other assistant messages just display normally
             return (
-              <TypewriterMessage
-                key={`${message.id}-text-${index}`}
-                text={part.text}
-                className="text-sm leading-relaxed"
-                showCursor={isLastAssistantMessage && isLastTextPart}
-              />
+              <p key={`${message.id}-text-${index}`} className="text-sm leading-relaxed">
+                {part.text}
+              </p>
             );
           }
 

@@ -1,13 +1,14 @@
 'use client';
 
 import { type ReactNode, useState } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { HydrationBoundary, QueryClient, QueryClientProvider, type DehydratedState } from '@tanstack/react-query';
 
 interface ChatQueryProviderProps {
   children: ReactNode;
+  initialState?: DehydratedState;
 }
 
-export function ChatQueryProvider({ children }: ChatQueryProviderProps) {
+export function ChatQueryProvider({ children, initialState }: ChatQueryProviderProps) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -21,5 +22,9 @@ export function ChatQueryProvider({ children }: ChatQueryProviderProps) {
       })
   );
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <HydrationBoundary state={initialState}>{children}</HydrationBoundary>
+    </QueryClientProvider>
+  );
 }

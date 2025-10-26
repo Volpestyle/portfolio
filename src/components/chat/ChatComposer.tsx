@@ -2,9 +2,8 @@
 
 import { FormEvent, useCallback, useState, useRef, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import { SendHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AnimatedSendButton } from '@/components/ui/AnimatedSendButton';
 
 interface ChatComposerProps {
   isBusy: boolean;
@@ -15,15 +14,7 @@ interface ChatComposerProps {
 export function ChatComposer({ isBusy, hasMessages, onSend }: ChatComposerProps) {
   const [value, setValue] = useState('');
   const [textareaHeight, setTextareaHeight] = useState(40);
-  const [isDesktop, setIsDesktop] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    const checkIsDesktop = () => setIsDesktop(window.innerWidth >= 640);
-    checkIsDesktop();
-    window.addEventListener('resize', checkIsDesktop);
-    return () => window.removeEventListener('resize', checkIsDesktop);
-  }, []);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -66,15 +57,7 @@ export function ChatComposer({ isBusy, hasMessages, onSend }: ChatComposerProps)
           }}
           style={{ resize: 'none' }}
         />
-        <Button
-          type="submit"
-          disabled={isSendDisabled}
-          className="h-10 w-full rounded-lg sm:w-auto"
-          style={isDesktop ? { height: `${textareaHeight}px` } : {}}
-        >
-          <SendHorizontal className="h-5 w-5" />
-          <span className="sr-only">Send</span>
-        </Button>
+        <AnimatedSendButton disabled={isSendDisabled} height={textareaHeight} />
       </div>
     </form>
   );
