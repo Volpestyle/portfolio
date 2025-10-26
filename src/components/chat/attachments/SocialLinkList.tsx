@@ -5,6 +5,14 @@ type Props = {
 };
 
 export function SocialLinkList({ links }: Props) {
+  if (!links || links.length === 0) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
+        <p className="text-sm text-white/60">No social links available.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-3">
       {links.map((link) => (
@@ -28,4 +36,3 @@ export function SocialLinkList({ links }: Props) {
     </div>
   );
 }
-

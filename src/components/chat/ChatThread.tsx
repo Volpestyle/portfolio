@@ -1,30 +1,44 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import type { ChatMessage } from '@/types/chat';
 import { ChatMessageBubble } from '@/components/chat/ChatMessageBubble';
+import { Spinner } from '@/components/ui/spinner';
 
 interface ChatThreadProps {
   messages: ChatMessage[];
   isBusy: boolean;
 }
 
-export function ChatThread({ messages, isBusy }: ChatThreadProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+function ThinkingSpinner() {
+  return (
+    <div className="flex w-full justify-start">
+      <div className="flex items-center gap-3 px-4 py-2">
+        <div className="relative h-4 w-4">
+          <div className="absolute inset-0 animate-spin rounded-full border-2 border-white/10 border-t-white/60" />
+        </div>
+        <span className="text-xs text-white/40">Thinking...</span>
+      </div>
+    </div>
+  );
+}
 
-  useEffect(() => {
-    const node = scrollRef.current;
-    if (!node) return;
-    node.scrollTop = node.scrollHeight;
-  }, [messages, isBusy]);
+export function ChatThread({ messages, isBusy }: ChatThreadProps) {
+  // Find the last assistant message
+  const lastAssistantMessageId = messages
+    .slice()
+    .reverse()
+    .find((msg) => msg.role === 'assistant')?.id;
 
   return (
-    <div ref={scrollRef} className="max-h-[60vh] overflow-y-auto pr-2" aria-live="polite">
-      <div className="flex flex-col gap-3">
-        {messages.map((message) => (
-          <ChatMessageBubble key={message.id} message={message} />
-        ))}
-      </div>
+    <div className="flex flex-col gap-3" aria-live="polite">
+      {messages.map((message) => (
+        <ChatMessageBubble
+          key={message.id}
+          message={message}
+          isLastAssistantMessage={message.id === lastAssistantMessageId}
+        />
+      ))}
+      {isBusy && <ThinkingSpinner />}
     </div>
   );
 }

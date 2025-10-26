@@ -8,6 +8,7 @@ type TypewriterMessageProps = {
   speed?: number;
   backspaceSpeed?: number;
   className?: string;
+  showCursor?: boolean;
 };
 
 export function TypewriterMessage({
@@ -15,6 +16,7 @@ export function TypewriterMessage({
   speed = 16,
   backspaceSpeed = 25,
   className,
+  showCursor = false,
 }: TypewriterMessageProps) {
   const [display, setDisplay] = useState('');
 
@@ -26,14 +28,17 @@ export function TypewriterMessage({
     const common = commonPrefix(display, text).length;
     const isDeleting = display.length > common;
 
-    const timeout = setTimeout(() => {
-      setDisplay((current) => {
-        if (isDeleting) {
-          return current.slice(0, -1);
-        }
-        return text.slice(0, current.length + 1);
-      });
-    }, isDeleting ? backspaceSpeed : speed);
+    const timeout = setTimeout(
+      () => {
+        setDisplay((current) => {
+          if (isDeleting) {
+            return current.slice(0, -1);
+          }
+          return text.slice(0, current.length + 1);
+        });
+      },
+      isDeleting ? backspaceSpeed : speed
+    );
 
     return () => clearTimeout(timeout);
   }, [display, text, speed, backspaceSpeed]);
@@ -41,7 +46,7 @@ export function TypewriterMessage({
   return (
     <div className={cn('font-mono text-sm leading-6 text-gray-100', className)}>
       {display}
-      <span className="ml-1 inline-block animate-[blink_1s_infinite] text-gray-400">▋</span>
+      {showCursor && <span className="ml-1 inline-block animate-[blink_1s_infinite] text-gray-400">▋</span>}
     </div>
   );
 }
@@ -53,4 +58,3 @@ function commonPrefix(a: string, b: string) {
   }
   return a.slice(0, i);
 }
-

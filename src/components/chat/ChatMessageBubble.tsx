@@ -11,20 +11,44 @@ import Link from 'next/link';
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
+  isLastAssistantMessage?: boolean;
 }
 
-export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
+export function ChatMessageBubble({ message, isLastAssistantMessage = false }: ChatMessageBubbleProps) {
   const isUser = message.role === 'user';
 
   const wrapperClass = isUser
     ? 'w-full max-w-[85%] rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm text-white shadow-xl'
     : 'w-full max-w-[85%] space-y-3 text-sm text-white';
 
+  // Find the index of the last text part
+  const lastTextPartIndex = message.parts
+    .map((part, idx) => (part.kind === 'text' ? idx : -1))
+    .filter((idx) => idx !== -1)
+    .pop();
+
+  // Check if message has any content
+  const hasContent = message.parts.some((part) => {
+    if (part.kind === 'text') return part.text.trim().length > 0;
+    if (part.kind === 'attachment') return true;
+    return false;
+  });
+
+  // Don't render completely empty messages
+  if (!hasContent) {
+    return null;
+  }
+
   return (
     <div className={cn('flex w-full', isUser ? 'justify-end' : 'justify-start')}>
       <div className={wrapperClass}>
         {message.parts.map((part, index) => {
           if (part.kind === 'text') {
+            // Skip empty text parts
+            if (!part.text.trim()) {
+              return null;
+            }
+
             if (isUser) {
               return (
                 <p key={`${message.id}-text-${index}`} className="text-sm leading-relaxed">
@@ -33,21 +57,19 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
               );
             }
 
+            const isLastTextPart = index === lastTextPartIndex;
             return (
               <TypewriterMessage
                 key={`${message.id}-text-${index}`}
                 text={part.text}
                 className="text-sm leading-relaxed"
+                showCursor={isLastAssistantMessage && isLastTextPart}
               />
             );
           }
 
           if (part.kind === 'attachment') {
-            return (
-              <div key={`${message.id}-attachment-${index}`}>
-                {renderAttachment(part.attachment)}
-              </div>
-            );
+            return <div key={`${message.id}-attachment-${index}`}>{renderAttachment(part.attachment)}</div>;
           }
 
           return null;
