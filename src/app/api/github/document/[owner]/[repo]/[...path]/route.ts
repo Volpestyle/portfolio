@@ -3,12 +3,13 @@ import { getDocumentContent } from '@/lib/github-server';
 
 export async function GET(
   _request: Request,
-  context: { params: { owner: string; repo: string; path: string[] } }
+  context: { params: Promise<{ owner: string; repo: string; path: string[] }> }
 ) {
   try {
-    const owner = decodeURIComponent(context.params.owner);
-    const repo = decodeURIComponent(context.params.repo);
-    const pathSegments = context.params.path ?? [];
+    const params = await context.params;
+    const owner = decodeURIComponent(params.owner);
+    const repo = decodeURIComponent(params.repo);
+    const pathSegments = params.path ?? [];
     const docPath = pathSegments.map(decodeURIComponent).join('/');
 
     if (!docPath) {
