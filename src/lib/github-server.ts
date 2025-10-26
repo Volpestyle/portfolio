@@ -407,6 +407,28 @@ export const getDocumentContent = unstable_cache(
   }
 );
 
+export async function getRepos(): Promise<RepoData[]> {
+  const { starred, normal } = await getPortfolioRepos();
+  return [...starred, ...normal];
+}
+
+export async function getRepoByName(name: string): Promise<RepoData> {
+  const repos = await getRepos();
+  const match = repos.find((repo) => repo.name.toLowerCase() === name.toLowerCase());
+  if (match) {
+    return match;
+  }
+  return getRepoDetails(name);
+}
+
+export async function getReadmeForRepo(repo: string, owner?: string) {
+  return getRepoReadme(repo, owner);
+}
+
+export async function getRawDoc(repo: string, path: string, owner?: string) {
+  return getDocumentContent(repo, path, owner);
+}
+
 type OctokitError = {
   status?: number;
   response?: {
