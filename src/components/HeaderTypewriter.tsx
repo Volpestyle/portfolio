@@ -28,7 +28,7 @@ type HeaderTypewriterProps = {
 export function HeaderTypewriter({ hoverText }: HeaderTypewriterProps) {
   const pathname = usePathname();
   const baseText = useMemo(() => resolveHeaderBaseText(pathname), [pathname]);
-  const targetText = pathname === '/' || !hoverText?.length ? baseText : hoverText;
+  const targetText = !hoverText?.length ? baseText : hoverText;
   const [displayText, setDisplayText] = useState('');
   const [isHovered, setIsHovered] = useState(false);
 
@@ -59,7 +59,7 @@ export function HeaderTypewriter({ hoverText }: HeaderTypewriterProps) {
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       animate={{
-        letterSpacing: isHovered ? '0.15em' : '0em',
+        letterSpacing: isHovered ? '0.2em' : '0.05em',
       }}
       transition={{
         duration: 0.4,

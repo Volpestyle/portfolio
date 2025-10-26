@@ -9,6 +9,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { hoverMessages } from '@/constants/messages';
 import { motion } from 'framer-motion';
+import { springAnimations } from '@/lib/animations';
 
 const NAV_ITEMS = [
   { href: '/', icon: MessageSquare, label: 'Chat', message: '', expandedWidth: '4.5rem' },
@@ -54,26 +55,26 @@ export function Header() {
               setHoveredIndex(index);
             };
 
+            const isOtherHovered = hoveredIndex !== null && hoveredIndex !== index;
+            const shouldDimActive = isActive && isOtherHovered;
+
             return (
               <motion.div
                 key={href}
                 animate={{
                   width: isHovered ? expandedWidth : '2.5rem',
                 }}
-                transition={{
-                  type: 'spring',
-                  stiffness: 300,
-                  damping: 25,
-                }}
+                transition={springAnimations.width}
               >
                 <Link
                   href={href}
                   aria-label={label}
                   className={cn(
-                    'group relative inline-flex h-10 w-full items-center justify-center overflow-hidden rounded-full border',
+                    'group relative inline-flex h-10 w-full items-center justify-center overflow-hidden rounded-full border transition-opacity duration-200',
                     isActive
                       ? 'border-white bg-white text-black'
-                      : 'border-white/20 text-white hover:border-white hover:bg-white hover:text-black'
+                      : 'border-white/20 text-white hover:border-white hover:bg-white hover:text-black active:border-white active:bg-white active:text-black',
+                    shouldDimActive && 'opacity-50'
                   )}
                   onMouseEnter={setHoverStates}
                   onMouseLeave={clearHoverStates}
@@ -85,11 +86,7 @@ export function Header() {
                       x: isHovered ? 32 : 0,
                       opacity: isHovered ? 0 : 1,
                     }}
-                    transition={{
-                      type: 'spring',
-                      stiffness: 300,
-                      damping: 20,
-                    }}
+                    transition={springAnimations.iconText}
                     className="absolute"
                   >
                     <Icon className={cn('h-5 w-5', isActive ? 'text-black' : '')} />
@@ -98,9 +95,7 @@ export function Header() {
                     animate={{
                       opacity: isHovered ? 1 : 0,
                     }}
-                    transition={{
-                      duration: 0.2,
-                    }}
+                    transition={springAnimations.fade}
                     className={cn('whitespace-nowrap text-sm font-medium', isActive ? 'text-black' : '')}
                   >
                     {label}
