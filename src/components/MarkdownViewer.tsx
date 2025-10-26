@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 interface BreadcrumbItem {
   label: string;
   href?: string;
+  onClick?: () => void;
 }
 
 type MarkdownVariant = 'page' | 'chat';
@@ -60,7 +61,9 @@ export function MarkdownViewer({
   }, [content, isLoading, markdownComponents]);
 
   const containerClass = isChat ? 'mx-auto max-w-3xl space-y-4' : 'container mx-auto max-w-4xl px-4 py-8';
-  const wrapperClass = isChat ? 'max-h-[60vh] overflow-y-auto px-4 py-4 text-sm' : 'min-h-screen';
+  const wrapperClass = isChat
+    ? 'max-h-[60vh] overflow-y-auto px-4 py-4 text-sm bg-black/10 backdrop-blur-sm'
+    : 'min-h-screen';
   const navClass = isChat
     ? 'flex items-center gap-2 text-xs text-white/60'
     : 'mb-8 flex items-center space-x-2 text-sm';
@@ -80,6 +83,13 @@ export function MarkdownViewer({
                 <Link href={crumb.href} className="text-gray-400 transition-colors hover:text-white">
                   {crumb.label}
                 </Link>
+              ) : crumb.onClick ? (
+                <button
+                  onClick={crumb.onClick}
+                  className="cursor-pointer text-gray-400 transition-colors hover:text-white"
+                >
+                  {crumb.label}
+                </button>
               ) : (
                 <span className="text-white">{crumb.label}</span>
               )}
