@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { RESUME_CONFIG } from '@/lib/constants';
 import Modal from './ui/modal';
+import { motion } from 'framer-motion';
 
 interface ResumeModalProps {
   isOpen: boolean;
@@ -19,9 +20,17 @@ const ResumeModal: React.FC<ResumeModalProps> = ({ isOpen, onClose }) => {
         <div className="flex h-full max-h-[90vh] w-full max-w-6xl flex-col rounded-lg border border-white p-4">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-2xl font-bold text-white">My Resume</h2>
-            <Button onClick={onClose} variant="ghost" className="text-white hover:bg-gray-800">
-              <X size={24} />
-            </Button>
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                onClick={onClose}
+                variant="onBlack"
+                size="icon"
+                className="rounded-full border border-white/20 transition hover:border-white"
+                aria-label="Close modal"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </motion.div>
           </div>
           <iframe src={`/resume/${RESUME_CONFIG.RESUME_FILENAME}`} className="w-full grow bg-white" title="Resume" />
         </div>

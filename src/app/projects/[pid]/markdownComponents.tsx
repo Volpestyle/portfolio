@@ -1,9 +1,15 @@
 import Link from 'next/link';
 import { ServerImageRenderer } from '@/components/ServerImageRenderer';
 
+type MarkdownComponentOptions = {
+  handleImageClick?: (src: string) => void;
+  variant?: 'page' | 'chat';
+  onDocLinkClick?: (path: string, label?: string) => void;
+};
+
 export const createMarkdownComponents = (
   pid: string,
-  handleImageClick?: (src: string) => void
+  { handleImageClick, onDocLinkClick }: MarkdownComponentOptions = {}
 ) => ({
   p: ({ node, children, ...props }: any) => {
     // Check if paragraph contains only image and text nodes
@@ -39,14 +45,29 @@ export const createMarkdownComponents = (
       </span>
     );
   },
-  a: ({ href, children, node, ...props }: any) => {
-    // Handle internal document links
-    if (href && (href.startsWith('docs/') || href.startsWith('./docs/'))) {
-      const cleanPath = href.replace(/^\.\//, '');
+  a: ({ href, children }: any) => {
+    if (href && isDocsLink(href)) {
+      const cleanPath = normalizeDocPath(href);
+
+      if (onDocLinkClick) {
+        return (
+          <a
+            href={href}
+            onClick={(event) => {
+              event.preventDefault();
+              onDocLinkClick(cleanPath, extractText(children));
+            }}
+            className="text-blue-400 underline hover:text-blue-300"
+          >
+            {children}
+          </a>
+        );
+      }
+
       return (
         <Link
           href={`/projects/${pid}/doc/${cleanPath}`}
-          className="text-blue-400 hover:text-blue-300 underline"
+          className="text-blue-400 underline hover:text-blue-300"
         >
           {children}
         </Link>
@@ -65,3 +86,29 @@ export const createMarkdownComponents = (
     );
   },
 });
+
+function isDocsLink(href: string) {
+  return href.startsWith('docs/') || href.startsWith('./docs/') || href.startsWith('/docs/');
+}
+
+function normalizeDocPath(href: string) {
+  const cleaned = href.replace(/^\.\//, '').replace(/^\/+/, '');
+  return cleaned;
+}
+
+function extractText(children: any): string | undefined {
+  if (typeof children === 'string') {
+    return children;
+  }
+
+  if (Array.isArray(children)) {
+    const text = children.map((child) => extractText(child)).filter(Boolean).join(' ').trim();
+    return text || undefined;
+  }
+
+  if (typeof children === 'object' && children?.props?.children) {
+    return extractText(children.props.children);
+  }
+
+  return undefined;
+}
