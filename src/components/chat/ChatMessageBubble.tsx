@@ -7,6 +7,7 @@ import { ProjectInlineDetails } from './attachments/ProjectInlineDetails';
 import { DocumentInlinePanel } from './attachments/DocumentInlinePanel';
 import { SocialLinkList } from './attachments/SocialLinkList';
 import { TypewriterMessage } from './TypewriterMessage';
+import { ChatMarkdown } from './ChatMarkdown';
 import Link from 'next/link';
 
 interface ChatMessageBubbleProps {
@@ -51,7 +52,7 @@ export function ChatMessageBubble({ message, isLastAssistantMessage = false }: C
 
             if (isUser) {
               return (
-                <p key={`${message.id}-text-${index}`} className="text-sm leading-relaxed">
+                <p key={`${message.id}-text-${index}`} className="whitespace-pre-wrap text-sm leading-relaxed">
                   {part.text}
                 </p>
               );
@@ -67,16 +68,13 @@ export function ChatMessageBubble({ message, isLastAssistantMessage = false }: C
                   text={part.text}
                   className="text-sm leading-relaxed"
                   showCursor={isLastTextPart}
+                  markdown
                 />
               );
             }
 
-            // All other assistant messages just display normally
-            return (
-              <p key={`${message.id}-text-${index}`} className="text-sm leading-relaxed">
-                {part.text}
-              </p>
-            );
+            // All other assistant messages just display normally (with Markdown)
+            return <ChatMarkdown key={`${message.id}-text-${index}`} text={part.text} />;
           }
 
           if (part.kind === 'attachment') {

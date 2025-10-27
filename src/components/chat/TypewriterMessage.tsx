@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { ChatMarkdown } from './ChatMarkdown';
 
 type TypewriterMessageProps = {
   text: string;
@@ -9,6 +10,7 @@ type TypewriterMessageProps = {
   backspaceSpeed?: number;
   className?: string;
   showCursor?: boolean;
+  markdown?: boolean;
 };
 
 export function TypewriterMessage({
@@ -17,6 +19,7 @@ export function TypewriterMessage({
   backspaceSpeed = 25,
   className,
   showCursor = false,
+  markdown = false,
 }: TypewriterMessageProps) {
   const [display, setDisplay] = useState('');
 
@@ -43,10 +46,11 @@ export function TypewriterMessage({
     return () => clearTimeout(timeout);
   }, [display, text, speed, backspaceSpeed]);
 
+  const baseClass = markdown ? 'text-sm leading-relaxed text-white' : 'font-mono text-sm leading-6 text-gray-100';
+
   return (
-    <div className={cn('font-mono text-sm leading-6 text-gray-100', className)}>
-      {display}
-      {showCursor && <span className="ml-1 inline-block animate-[blink_1s_infinite] text-gray-400">▋</span>}
+    <div className={cn(baseClass, className)}>
+      {markdown ? <ChatMarkdown text={display} showCursor={showCursor} /> : display}
     </div>
   );
 }
