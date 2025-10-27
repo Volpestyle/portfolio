@@ -40,7 +40,7 @@ export function MarkdownViewer({
 }: MarkdownViewerProps) {
   const isChat = variant === 'chat';
   const markdownComponents = useMemo(
-    () => createMarkdownComponents(pid, { handleImageClick, variant, onDocLinkClick }),
+    () => createMarkdownComponents(pid, { handleImageClick, onDocLinkClick, variant }),
     [pid, handleImageClick, variant, onDocLinkClick]
   );
 
@@ -60,16 +60,14 @@ export function MarkdownViewer({
     );
   }, [content, isLoading, markdownComponents]);
 
-  const containerClass = isChat ? 'mx-auto max-w-3xl space-y-4' : 'container mx-auto max-w-4xl px-4 py-8';
-  const wrapperClass = isChat
-    ? 'max-h-[60vh] overflow-y-auto px-4 py-4 text-sm bg-black/10 backdrop-blur-sm'
-    : 'min-h-screen';
+  const containerClass = isChat ? 'mx-auto max-w-3xl' : 'container mx-auto max-w-4xl px-4 py-8';
+  const wrapperClass = isChat ? 'max-h-[60vh] overflow-y-auto px-4 py-4 bg-black/10 backdrop-blur-sm' : 'min-h-screen';
   const navClass = isChat
-    ? 'flex items-center gap-2 text-xs text-white/60'
+    ? 'flex items-center gap-2 text-xs text-white/60 mb-3'
     : 'mb-8 flex items-center space-x-2 text-sm';
   const iconClass = isChat ? 'h-3 w-3 text-white/50' : 'h-4 w-4 text-gray-600';
   const markdownClass = isChat
-    ? 'markdown-body preserve-case text-sm leading-relaxed'
+    ? 'markdown-body chat-variant preserve-case'
     : 'markdown-body preserve-case rounded-lg border border-gray-800 bg-gray-900/50 p-8';
 
   return (

@@ -1,5 +1,3 @@
-import 'highlight.js/styles/github-dark.css';
-import '@/styles/markdown.css';
 import { ProjectContent } from '@/components/ProjectContent';
 import { getRepoDetails, getRepoReadme, getPortfolioRepos } from '@/lib/github-server';
 import type { Metadata } from 'next';

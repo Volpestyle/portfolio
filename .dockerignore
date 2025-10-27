@@ -1,0 +1,10 @@
+node_modules
+infra/cdk/node_modules
+infra/cdk/dist
+infra/cdk/cdk.out
+.next
+.git
+.gitignore
+cdk.out
+*.tsbuildinfo
+.env*

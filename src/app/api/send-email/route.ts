@@ -1,18 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { headers } from 'next/headers';
-const awsRegion = process.env.REGION;
-const awsAccessKeyId = process.env.ACCESS_KEY_ID ?? '';
-const awsSecretAccessKey = process.env.SECRET_ACCESS_KEY ?? '';
+import { resolveSecretValue } from '@/lib/secrets/manager';
 
-// Initialize SES with explicit region and credentials
-const ses = new SESClient({
-  region: awsRegion,
-  credentials: {
-    accessKeyId: awsAccessKeyId,
-    secretAccessKey: awsSecretAccessKey,
-  },
-});
+let cachedSes: SESClient | undefined;
+
+async function getSesClient(): Promise<SESClient> {
+  if (!cachedSes) {
+    const region = process.env.AWS_REGION ?? process.env.REGION ?? 'us-east-1';
+    const accessKeyId = await resolveSecretValue('ACCESS_KEY_ID', {
+      scope: 'env',
+      fallbackEnvVar: 'AWS_ACCESS_KEY_ID',
+    });
+    const secretAccessKey = await resolveSecretValue('SECRET_ACCESS_KEY', {
+      scope: 'env',
+      fallbackEnvVar: 'AWS_SECRET_ACCESS_KEY',
+    });
+
+    cachedSes = new SESClient({
+      region,
+      credentials:
+        accessKeyId && secretAccessKey
+          ? {
+              accessKeyId,
+              secretAccessKey,
+            }
+          : undefined,
+    });
+  }
+
+  return cachedSes;
+}
 
 function withCors(response: NextResponse) {
   response.headers.set('Access-Control-Allow-Origin', '*');
@@ -41,14 +59,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    console.log('[Email API] AWS Config:', {
-      region: awsRegion,
-      accessKeyIdLength: awsAccessKeyId.length,
-      secretKeyLength: awsSecretAccessKey.length,
-      accessKeyPrefix: awsAccessKeyId.slice(0, 4),
-      secretKeyPrefix: awsSecretAccessKey.slice(0, 4),
-    });
-
     const body = await request.json();
     const { name, email, message } = body;
 
@@ -91,6 +101,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     };
 
     console.log('[Email API] Sending email to:', params.Destination.ToAddresses);
+    const ses = await getSesClient();
     const command = new SendEmailCommand(params);
     const response = await ses.send(command);
     console.log('[Email API] Email sent successfully:', response.MessageId);

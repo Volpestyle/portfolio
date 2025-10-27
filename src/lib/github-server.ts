@@ -1,4 +1,4 @@
-import { GITHUB_CONFIG } from './constants';
+import { GH_CONFIG } from './constants';
 import { createOctokit, getPortfolioConfig, resolveGitHubToken } from './github-api';
 import { PortfolioRepoConfig, PrivateRepoData } from '@/types/portfolio';
 import { unstable_cache } from 'next/cache';
@@ -55,7 +55,7 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
     }
 
     const repos = await octokit.rest.repos.listForUser({
-      username: GITHUB_CONFIG.USERNAME,
+      username: GH_CONFIG.USERNAME,
       per_page: 100,
     });
 
@@ -89,10 +89,10 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
       } else if (repoConfig.isPrivate) {
         const privateRepoData: RepoData = {
           name: repoConfig.name,
-          full_name: `${repoConfig.owner || GITHUB_CONFIG.USERNAME}/${repoConfig.name}`,
+          full_name: `${repoConfig.owner || GH_CONFIG.USERNAME}/${repoConfig.name}`,
           private: true,
           owner: {
-            login: repoConfig.owner || GITHUB_CONFIG.USERNAME,
+            login: repoConfig.owner || GH_CONFIG.USERNAME,
           },
           description: repoConfig.description || null,
           homepage: repoConfig.homepage || repoConfig.demoUrl || null,
@@ -126,7 +126,7 @@ export const getPortfolioRepos = unstable_cache(
   }
 );
 
-export async function fetchRepoDetails(repo: string, owner: string = GITHUB_CONFIG.USERNAME): Promise<RepoData> {
+export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.USERNAME): Promise<RepoData> {
   const octokit = createOctokit();
 
   try {
@@ -193,7 +193,7 @@ export const getRepoDetails = unstable_cache(
   }
 );
 
-export async function fetchRepoReadme(repo: string, owner: string = GITHUB_CONFIG.USERNAME): Promise<string> {
+export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.USERNAME): Promise<string> {
   const octokit = createOctokit();
 
   try {
@@ -286,13 +286,13 @@ function extractBranchFromDownloadUrl(url?: string | null): string | undefined {
  * Handles both public and private repos (via their public counterparts)
  * @param repo - The repository name
  * @param imagePath - Path to the image file
- * @param owner - GitHub username (defaults to GITHUB_CONFIG.USERNAME)
+ * @param owner - GitHub username (defaults to GH_CONFIG.USERNAME)
  * @returns The raw GitHub URL for the image
  */
 export async function getGithubImageUrl(
   repo: string,
   imagePath: string,
-  owner: string = GITHUB_CONFIG.USERNAME
+  owner: string = GH_CONFIG.USERNAME
 ): Promise<string> {
   // If path starts with /, it's a local public asset
   if (imagePath.startsWith('/')) {
@@ -328,13 +328,13 @@ export async function getGithubImageUrl(
  * Fetches document content from a repository
  * @param repo - The repository name
  * @param docPath - Path to the document
- * @param owner - GitHub username (defaults to GITHUB_CONFIG.USERNAME)
+ * @param owner - GitHub username (defaults to GH_CONFIG.USERNAME)
  * @returns Document content and project name
  */
 export async function fetchDocumentContent(
   repo: string,
   docPath: string,
-  owner: string = GITHUB_CONFIG.USERNAME
+  owner: string = GH_CONFIG.USERNAME
 ): Promise<{ content: string; projectName: string }> {
   const octokit = createOctokit();
 

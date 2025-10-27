@@ -1,5 +1,6 @@
-import type { RepoData } from '@/lib/github-server';
 import OpenAI from 'openai';
+import type { RepoData } from '@/lib/github-server';
+import { resolveSecretValue } from '@/lib/secrets/manager';
 import repoSummaries from '../../generated/repo-summaries.json';
 import repoEmbeddings from '../../generated/repo-embeddings.json';
 
@@ -23,6 +24,15 @@ type RepoEmbeddingRecord = {
 
 const summaryRecords: RepoSummaryRecord[] = repoSummaries as RepoSummaryRecord[];
 const embeddingRecords: RepoEmbeddingRecord[] = repoEmbeddings as RepoEmbeddingRecord[];
+let cachedOpenAI: OpenAI | undefined;
+
+async function getOpenAI(): Promise<OpenAI> {
+  if (!cachedOpenAI) {
+    const apiKey = await resolveSecretValue('OPENAI_API_KEY', { scope: 'env', required: true });
+    cachedOpenAI = new OpenAI({ apiKey });
+  }
+  return cachedOpenAI;
+}
 
 function normalizeTags(rawTags?: string[]): string[] {
   const normalized = new Set<string>();
@@ -117,11 +127,14 @@ export async function searchRepoKnowledge(query: string, limit: number = 5) {
     return [] as Array<{ name: string; summary?: string; tags?: string[]; score: number }>;
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is required for semantic search');
+  let client: OpenAI;
+  try {
+    client = await getOpenAI();
+  } catch (error) {
+    console.error('[ProjectKnowledge] Missing OPENAI_API_KEY secret', error);
+    return [];
   }
-  const client = new OpenAI({ apiKey });
+
   const response = await client.embeddings.create({
     model: 'text-embedding-3-small',
     input: query,
