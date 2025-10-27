@@ -462,27 +462,10 @@ const main = async () => {
         process.exit(1);
     }
 
-    const getValueFromSections = (key: string, sections: Array<keyof ParsedEnv>) => {
-        for (const section of sections) {
-            const sectionValues = parsedEnv[section] as Record<string, string | undefined>;
-            const value = sectionValues[key];
-            if (value !== undefined && value !== '') {
-                return value;
-            }
-        }
-        return undefined;
-    };
-
-    // Read config from environment or .env file
-    const token =
-        process.env.GH_TOKEN ??
-        getValueFromSections('GH_TOKEN', ['envSecrets', 'repoSecrets', 'envVars', 'repoVars']);
-    const owner =
-        process.env.GH_OWNER ??
-        getValueFromSections('GH_OWNER', ['repoVars', 'envVars', 'repoSecrets', 'envSecrets']);
-    const repo =
-        process.env.GH_REPO ??
-        getValueFromSections('GH_REPO', ['repoVars', 'envVars', 'repoSecrets', 'envSecrets']);
+    // Read config strictly from process.env to avoid leaking credentials contained in the synced file
+    const token = process.env.GH_TOKEN;
+    const owner = process.env.GH_OWNER;
+    const repo = process.env.GH_REPO;
 
     if (!token || !owner || !repo) {
         log.error('Missing required environment variables:');

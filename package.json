@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "pnpm run build:web && pnpm --filter @portfolio/cdk run build",
+    "build:web": "next build",
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
