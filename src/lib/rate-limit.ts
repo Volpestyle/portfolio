@@ -3,7 +3,6 @@
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import type { NextRequest } from 'next/server';
-
 type RateLimitResult =
   | ({
       success: true;

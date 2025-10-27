@@ -117,11 +117,11 @@ export async function searchRepoKnowledge(query: string, limit: number = 5) {
     return [] as Array<{ name: string; summary?: string; tags?: string[]; score: number }>;
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
     throw new Error('OPENAI_API_KEY is required for semantic search');
   }
-
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const client = new OpenAI({ apiKey });
   const response = await client.embeddings.create({
     model: 'text-embedding-3-small',
     input: query,

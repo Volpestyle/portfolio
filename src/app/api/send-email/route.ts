@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { headers } from 'next/headers';
+const awsRegion = process.env.REGION;
+const awsAccessKeyId = process.env.ACCESS_KEY_ID ?? '';
+const awsSecretAccessKey = process.env.SECRET_ACCESS_KEY ?? '';
 
 // Initialize SES with explicit region and credentials
 const ses = new SESClient({
-  region: process.env.REGION,
+  region: awsRegion,
   credentials: {
-    accessKeyId: process.env.ACCESS_KEY_ID ?? '',
-    secretAccessKey: process.env.SECRET_ACCESS_KEY ?? '',
+    accessKeyId: awsAccessKeyId,
+    secretAccessKey: awsSecretAccessKey,
   },
 });
 
@@ -39,11 +42,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     console.log('[Email API] AWS Config:', {
-      region: process.env.REGION,
-      accessKeyIdLength: process.env.ACCESS_KEY_ID?.length,
-      secretKeyLength: process.env.SECRET_ACCESS_KEY?.length,
-      accessKeyPrefix: process.env.ACCESS_KEY_ID?.slice(0, 4),
-      secretKeyPrefix: process.env.SECRET_ACCESS_KEY?.slice(0, 4),
+      region: awsRegion,
+      accessKeyIdLength: awsAccessKeyId.length,
+      secretKeyLength: awsSecretAccessKey.length,
+      accessKeyPrefix: awsAccessKeyId.slice(0, 4),
+      secretKeyPrefix: awsSecretAccessKey.slice(0, 4),
     });
 
     const body = await request.json();

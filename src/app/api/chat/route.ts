@@ -1,21 +1,13 @@
+export const runtime = 'nodejs';
+
 import OpenAI from 'openai';
 import { NextRequest } from 'next/server';
 import { buildSystemPrompt } from '@/server/prompt/buildSystemPrompt';
 import { tools, toolRouter } from '@/server/tools';
 import type { ChatRequestMessage } from '@/types/chat';
 import { enforceChatRateLimit } from '@/lib/rate-limit';
-
-function resolveOpenAIKey() {
-  return (
-    process.env.OPENAI_API_KEY ||
-    process.env.OPENAI_API_SECRET ||
-    process.env.NEXT_PRIVATE_OPENAI_API_KEY ||
-    null
-  );
-}
-
 export async function POST(req: NextRequest) {
-  const apiKey = resolveOpenAIKey();
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return new Response('Chat is not configured. Missing OPENAI API credentials.', { status: 500 });
   }

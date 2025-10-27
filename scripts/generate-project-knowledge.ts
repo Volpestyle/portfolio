@@ -58,10 +58,12 @@ function loadEnvFiles() {
   }
 }
 
-function ensureEnv(name: string) {
-  if (!process.env[name]) {
-    throw new Error(`Missing required environment variable: ${name}`);
+function requireEnv(key: string, errorMessage?: string): string {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(errorMessage ?? `${key} is required`);
   }
+  return value;
 }
 
 function truncateReadme(content: string): string {
@@ -327,11 +329,11 @@ async function buildEmbedding(client: OpenAI, repoName: string, text: string): P
 
 async function main() {
   loadEnvFiles();
-  ensureEnv('GITHUB_TOKEN');
-  ensureEnv('PORTFOLIO_GIST_ID');
-  ensureEnv('OPENAI_API_KEY');
+  requireEnv('GITHUB_TOKEN');
+  requireEnv('PORTFOLIO_GIST_ID');
+  const openAiKey = requireEnv('OPENAI_API_KEY');
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const client = new OpenAI({ apiKey: openAiKey });
   const { starred, normal } = await fetchPortfolioRepos();
   const repos = [...starred, ...normal];
   if (!repos.length) {

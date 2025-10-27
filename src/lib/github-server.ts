@@ -1,5 +1,5 @@
 import { GITHUB_CONFIG } from './constants';
-import { createOctokit, getPortfolioConfig } from './github-api';
+import { createOctokit, getPortfolioConfig, resolveGitHubToken } from './github-api';
 import { PortfolioRepoConfig, PrivateRepoData } from '@/types/portfolio';
 import { unstable_cache } from 'next/cache';
 import { convertRelativeToAbsoluteUrls } from './readme-utils';
@@ -33,7 +33,7 @@ export type PortfolioReposResponse = {
 };
 
 export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
-  if (!process.env.GITHUB_TOKEN) {
+  if (!resolveGitHubToken()) {
     throw new Error('GitHub token is not configured');
   }
 

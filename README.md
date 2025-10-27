@@ -34,6 +34,10 @@ This script fetches the latest READMEs, asks OpenAI for short summaries/tags, bu
 
 Commit those files so Amplify can ship them without extra infra. Re-run whenever you update repos or READMEs.
 
+## Environment variables
+
+The build (especially `/projects/[pid]` static params) calls GitHub during `next build`, so `GITHUB_TOKEN` and `PORTFOLIO_GIST_ID` must be provided as real environment variables that exist in the build container (e.g., Amplify’s *Environment variables* setting). Secrets that are only injected at runtime are not visible during the build and will cause it to fail. Other sensitive values (`OPENAI_API_KEY`, `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`, `REGION`, `UPSTASH_REDIS_REST_TOKEN`, etc.) are consumed at runtime only, so they can stay in Amplify Secrets or server-only `.env.local`.
+
 ## Documentation
 
 - [Ask My Portfolio — implementation guide](docs/ask-my-portfolio.md)

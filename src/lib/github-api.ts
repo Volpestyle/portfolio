@@ -4,13 +4,22 @@ import { PortfolioConfig, PortfolioRepoConfig } from '@/types/portfolio';
 
 let octokitInstance: Octokit | null = null;
 
+export function resolveGitHubToken() {
+  return process.env.GITHUB_TOKEN ?? null;
+}
+
 /**
  * Creates or returns a singleton Octokit instance
  */
 export function createOctokit(): Octokit {
+  const token = resolveGitHubToken();
+  if (!token) {
+    throw new Error('GitHub token is not configured');
+  }
+
   if (!octokitInstance) {
     octokitInstance = new Octokit({
-      auth: process.env.GITHUB_TOKEN,
+      auth: token,
     });
   }
   return octokitInstance;
@@ -20,7 +29,8 @@ export function createOctokit(): Octokit {
  * Fetches the portfolio configuration from the configured gist
  */
 export async function getPortfolioConfig(): Promise<PortfolioConfig | null> {
-  if (!process.env.PORTFOLIO_GIST_ID) {
+  const gistId = process.env.PORTFOLIO_GIST_ID;
+  if (!gistId) {
     console.error('Portfolio gist ID not configured');
     return null;
   }
@@ -28,7 +38,7 @@ export async function getPortfolioConfig(): Promise<PortfolioConfig | null> {
   try {
     const octokit = createOctokit();
     const gistResponse = await octokit.rest.gists.get({
-      gist_id: process.env.PORTFOLIO_GIST_ID,
+      gist_id: gistId,
     });
 
     const portfolioFile = gistResponse.data.files?.[GITHUB_CONFIG.PORTFOLIO_CONFIG_FILENAME];
