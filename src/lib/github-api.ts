@@ -1,11 +1,11 @@
 import { Octokit } from '@octokit/rest';
-import { GITHUB_CONFIG } from '@/lib/constants';
+import { GH_CONFIG } from '@/lib/constants';
 import { PortfolioConfig, PortfolioRepoConfig } from '@/types/portfolio';
 
 let octokitInstance: Octokit | null = null;
 
 export function resolveGitHubToken() {
-  return process.env.GITHUB_TOKEN ?? null;
+  return process.env.GH_TOKEN ?? null;
 }
 
 /**
@@ -41,7 +41,7 @@ export async function getPortfolioConfig(): Promise<PortfolioConfig | null> {
       gist_id: gistId,
     });
 
-    const portfolioFile = gistResponse.data.files?.[GITHUB_CONFIG.PORTFOLIO_CONFIG_FILENAME];
+    const portfolioFile = gistResponse.data.files?.[GH_CONFIG.PORTFOLIO_CONFIG_FILENAME];
 
     if (!portfolioFile || !portfolioFile.content) {
       return null;
@@ -63,7 +63,7 @@ export function findRepoConfig(
   repo: string
 ): PortfolioRepoConfig | undefined {
   return portfolioConfig.repositories.find(
-    (r) => r.name === repo && (r.owner || GITHUB_CONFIG.USERNAME) === owner
+    (r) => r.name === repo && (r.owner || GH_CONFIG.USERNAME) === owner
   );
 }
 

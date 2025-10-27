@@ -236,9 +236,8 @@ async function generateRepoFacts(
         },
         {
           role: 'user',
-          content: `Repository: ${repo.name}\nDescription: ${
-            repo.description ?? 'n/a'
-          }\n\nREADME:\n${truncateReadme(readme)}`,
+          content: `Repository: ${repo.name}\nDescription: ${repo.description ?? 'n/a'
+            }\n\nREADME:\n${truncateReadme(readme)}`,
         },
       ],
     });
@@ -295,9 +294,8 @@ async function summarizeRepo(
       },
       {
         role: 'user',
-        content: `Repository: ${repo.name}\nDescription: ${
-          repo.description ?? 'n/a'
-        }\n\nExtracted facts:\n${formatFactsForPrompt(facts)}\n\nREADME:\n${truncateReadme(readme)}`,
+        content: `Repository: ${repo.name}\nDescription: ${repo.description ?? 'n/a'
+          }\n\nExtracted facts:\n${formatFactsForPrompt(facts)}\n\nREADME:\n${truncateReadme(readme)}`,
       },
     ],
   });
@@ -329,7 +327,7 @@ async function buildEmbedding(client: OpenAI, repoName: string, text: string): P
 
 async function main() {
   loadEnvFiles();
-  requireEnv('GITHUB_TOKEN');
+  requireEnv('GH_TOKEN');
   requireEnv('PORTFOLIO_GIST_ID');
   const openAiKey = requireEnv('OPENAI_API_KEY');
 

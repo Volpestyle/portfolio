@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
-    "generate:projects": "tsx scripts/generate-project-knowledge.ts"
+    "generate:projects": "tsx scripts/generate-project-knowledge.ts",
+    "sync:local": "tsx scripts/sync-env-to-github.ts --env=.env.local --environment=dev",
+    "sync:dev": "tsx scripts/sync-env-to-github.ts --env=.env.development --environment=dev",
+    "sync:staging": "tsx scripts/sync-env-to-github.ts --env=.env.staging --environment=staging",
+    "sync:prod": "tsx scripts/sync-env-to-github.ts --env=.env.production --environment=production"
   },
   "dependencies": {
     "@aws-sdk/client-ses": "^3.637.0",
@@ -35,12 +39,14 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@types/libsodium-wrappers": "^0.7.14",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.19.0",
     "eslint-config-next": "^15.1.6",
+    "libsodium-wrappers": "^0.7.15",
     "postcss": "^8.4.41",
     "prettier": "^3.4.2",
     "prettier-plugin-tailwindcss": "^0.6.11",
