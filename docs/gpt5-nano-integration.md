@@ -10,7 +10,7 @@
 - `src/server/prompt/buildSystemPrompt.ts` pulls `getAboutMarkdown()` + `getRepos()` (which itself reads the gist config plus GitHub data) and enriches each repo with the cached summary/tags.
 - The system prompt includes:
   - Tone + conversational guidelines.
-  - Tool usage expectations (“don’t call tools unless needed”, “explain before calling”).
+  - Tool usage expectations (always fetch project data via tools even though the inventory appears in the prompt, explain before calling).
   - Explicit reminders that starred repos are personal highlights.
   - A full “Repo Inventory” list and a “Project Summaries” section so GPT-5 starts each turn with fresh context.
 
