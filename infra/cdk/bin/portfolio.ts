@@ -8,6 +8,15 @@ import { PortfolioStack } from '../lib/portfolio-stack';
 
 const app = new App();
 
+const account = process.env.CDK_DEFAULT_ACCOUNT;
+const region = process.env.CDK_DEFAULT_REGION ?? 'us-east-1';
+
+if (region !== 'us-east-1') {
+  throw new Error(
+    "This stack uses Lambda@Edge and must be deployed in 'us-east-1'. Set CDK_DEFAULT_REGION=us-east-1 (or pass --profile configured for us-east-1)."
+  );
+}
+
 const envFileFromCli = process.env.CDK_ENV_FILE;
 const defaultEnvFile = path.resolve(process.cwd(), '..', '..', '.env.cdk');
 const envFileToUse = envFileFromCli && fs.existsSync(envFileFromCli) ? envFileFromCli : defaultEnvFile;
@@ -18,26 +27,30 @@ if (fs.existsSync(envFileToUse)) {
 const inferredAppDirectory = path.resolve(process.cwd(), '..', '..');
 const appDirectory = process.env.NEXT_APP_PATH ?? inferredAppDirectory;
 
-const numberOrUndefined = (value?: string) => {
-  if (!value) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-};
-
 const stringList = (value?: string) =>
   value
     ? value
-        .split(',')
-        .map((entry) => entry.trim())
-        .filter(Boolean)
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
     : [];
 
-const collectContainerEnv = () => {
-  const prefixes = (process.env.APP_ENV_PREFIXES ?? 'NEXT_,OPENAI_,UPSTASH_,PORTFOLIO_,GH_,ACCESS_,SECRET_,REGION')
+const collectLambdaEnv = () => {
+  const prefixes = (
+    process.env.APP_ENV_PREFIXES ??
+    'NEXT_,UPSTASH_,PORTFOLIO_,GH_,SECRETS_,AWS_ENV_,AWS_REPO_,AWS_SECRETS_,AWS_REGION'
+  )
     .split(',')
     .map((v) => v.trim())
     .filter(Boolean);
   const explicitKeys = (process.env.APP_ENV_VARS ?? '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+  const blockedKeys = (
+    process.env.APP_ENV_BLOCKLIST ??
+    'OPENAI_API_KEY,SECRET_ACCESS_KEY,AWS_SECRET_ACCESS_KEY,ACCESS_KEY_ID,AWS_ACCESS_KEY_ID,GH_TOKEN,UPSTASH_REDIS_REST_TOKEN'
+  )
     .split(',')
     .map((v) => v.trim())
     .filter(Boolean);
@@ -55,21 +68,27 @@ const collectContainerEnv = () => {
       result[key] = value;
     }
   }
+
+  for (const key of blockedKeys) {
+    delete result[key];
+  }
+
   return result;
 };
 
+const openNextPath = path.resolve(process.cwd(), '..', '..', '.open-next');
+const inferredOpenNextPath = fs.existsSync(openNextPath) ? openNextPath : undefined;
+
 new PortfolioStack(app, 'PortfolioStack', {
   env: {
-    account: process.env.CDK_DEFAULT_ACCOUNT,
-    region: process.env.CDK_DEFAULT_REGION ?? 'us-east-1',
+    account,
+    region: 'us-east-1',
   },
   domainName: process.env.APP_DOMAIN_NAME,
   hostedZoneDomain: process.env.APP_HOSTED_ZONE_DOMAIN,
   certificateArn: process.env.APP_CERTIFICATE_ARN,
   alternateDomainNames: stringList(process.env.APP_ALTERNATE_DOMAINS),
-  desiredCount: numberOrUndefined(process.env.APP_DESIRED_COUNT),
-  cpu: numberOrUndefined(process.env.APP_TASK_CPU),
-  memoryMiB: numberOrUndefined(process.env.APP_TASK_MEMORY),
-  containerEnvironment: collectContainerEnv(),
   appDirectory,
+  openNextPath: inferredOpenNextPath,
+  environment: collectLambdaEnv(),
 });

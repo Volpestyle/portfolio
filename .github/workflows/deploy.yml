@@ -21,7 +21,7 @@ jobs:
     env:
       PORTFOLIO_GIST_ID: ${{ vars.PORTFOLIO_GIST_ID }}
       ACCESS_KEY_ID: ${{ vars.ACCESS_KEY_ID }}
-      REGION: ${{ vars.REGION }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
       UPSTASH_REDIS_REST_URL: ${{ vars.UPSTASH_REDIS_REST_URL }}
       SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS_KEY }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -71,7 +71,7 @@ jobs:
     env:
       PORTFOLIO_GIST_ID: ${{ vars.PORTFOLIO_GIST_ID }}
       ACCESS_KEY_ID: ${{ vars.ACCESS_KEY_ID }}
-      REGION: ${{ vars.REGION }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
       UPSTASH_REDIS_REST_URL: ${{ vars.UPSTASH_REDIS_REST_URL }}
       SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS_KEY }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -95,7 +95,6 @@ jobs:
           cache: pnpm
 
       - name: Install CDK dependencies
-        working-directory: infra/cdk
         run: pnpm install --frozen-lockfile
 
       - name: Configure AWS credentials
@@ -104,12 +103,12 @@ jobs:
           role-to-assume: ${{ secrets.CDK_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
 
+      - name: Build OpenNext artifacts
+        run: pnpm run build:web
+
       - name: Deploy CDK stack
         working-directory: infra/cdk
         env:
-          APP_DESIRED_COUNT: ${{ vars.APP_DESIRED_COUNT || '1' }}
-          APP_TASK_CPU: ${{ vars.APP_TASK_CPU || '512' }}
-          APP_TASK_MEMORY: ${{ vars.APP_TASK_MEMORY || '1024' }}
           APP_DOMAIN_NAME: ${{ vars.APP_DOMAIN_NAME }}
           APP_HOSTED_ZONE_DOMAIN: ${{ vars.APP_HOSTED_ZONE_DOMAIN }}
           APP_ALTERNATE_DOMAINS: ${{ vars.APP_ALTERNATE_DOMAINS }}

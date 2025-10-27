@@ -1,54 +1,45 @@
 import { App } from 'aws-cdk-lib';
+import path from 'node:path';
 import { Template, Match } from 'aws-cdk-lib/assertions';
-import * as ecs from 'aws-cdk-lib/aws-ecs';
 import { PortfolioStack } from '../lib/portfolio-stack';
 
 function validateStack() {
   const app = new App();
   const stack = new PortfolioStack(app, 'ValidationStack', {
-    // Use a public image during validation to avoid Docker builds from source
-    containerImage: ecs.ContainerImage.fromRegistry('public.ecr.aws/docker/library/node:20'),
-    containerEnvironment: {
+    openNextPath: path.resolve(__dirname, '../__fixtures__/open-next'),
+    environment: {
       NEXT_PUBLIC_SITE_URL: 'https://example.com',
     },
   });
 
   const template = Template.fromStack(stack);
 
-  template.resourceCountIs('AWS::EC2::VPC', 1);
-  template.resourceCountIs('AWS::ECS::Cluster', 1);
-  template.resourceCountIs('AWS::ECS::Service', 1);
-  template.resourceCountIs('AWS::ElasticLoadBalancingV2::LoadBalancer', 1);
+  template.resourceCountIs('AWS::CloudFront::Distribution', 1);
 
-  template.hasResourceProperties('AWS::ElasticLoadBalancingV2::LoadBalancer', {
-    Type: 'application',
-    Scheme: 'internet-facing',
-  });
+  const lambdaResources = template.findResources('AWS::Lambda::Function');
+  if (Object.keys(lambdaResources).length < 2) {
+    throw new Error('Expected at least two Lambda functions in the stack');
+  }
 
-  template.hasResourceProperties('AWS::ECS::TaskDefinition', {
-    Cpu: '512',
-    Memory: '1024',
-    ContainerDefinitions: Match.arrayWith([
-      Match.objectLike({
-        Name: 'portfolio-web',
-        Image: Match.anyValue(),
-        PortMappings: Match.arrayWith([
-          Match.objectLike({
-            ContainerPort: 3000,
-          }),
-        ]),
-        Environment: Match.arrayWith([
-          Match.objectLike({ Name: 'NODE_ENV', Value: 'production' }),
-          Match.objectLike({ Name: 'PORT', Value: '3000' }),
-          Match.objectLike({ Name: 'NEXT_PUBLIC_SITE_URL', Value: 'https://example.com' }),
-        ]),
+  const bucketResources = template.findResources('AWS::S3::Bucket');
+  if (Object.keys(bucketResources).length < 1) {
+    throw new Error('Expected at least one S3 bucket in the stack');
+  }
+
+  template.hasResourceProperties('AWS::Lambda::Function', {
+    Environment: {
+      Variables: Match.objectLike({
+        NODE_ENV: 'production',
+        NEXT_PUBLIC_SITE_URL: 'https://example.com',
       }),
-    ]),
+    },
+    Runtime: Match.stringLikeRegexp('nodejs'),
   });
 
-  template.hasResourceProperties('AWS::ApplicationAutoScaling::ScalableTarget', {
-    MinCapacity: 1,
-    MaxCapacity: 2,
+  template.hasResourceProperties('AWS::S3::Bucket', {
+    VersioningConfiguration: Match.objectLike({
+      Status: 'Enabled',
+    }),
   });
 
   console.log('CDK stack validated successfully.');
