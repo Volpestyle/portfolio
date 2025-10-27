@@ -42,9 +42,16 @@ export async function POST(req: NextRequest) {
 
   const instructions = await buildSystemPrompt();
   const stream = await client.responses.create({
-    model: 'o4-mini',
-    instructions,
-    input: body.messages.map((message) => ({ role: message.role, content: message.content })),
+    model: 'gpt-5-nano-2025-08-07',
+    input: [
+      {
+        role: 'system',
+        content: `${instructions}
+
+When you need to look something up or fetch information, naturally explain what you're checking before using tools. Keep things conversational and friendly throughout - no need for rigid structure, just be transparent about your thought process.`,
+      },
+      ...body.messages.map((message) => ({ role: message.role, content: message.content })),
+    ],
     tools,
     stream: true,
   });
