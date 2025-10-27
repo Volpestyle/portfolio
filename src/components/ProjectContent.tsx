@@ -33,7 +33,7 @@ export function ProjectContent({
 
   const breadcrumbs = breadcrumbsOverride ?? [{ label: 'Projects', href: '/projects' }, { label: pid }];
 
-  const enableCarousel = !isChat && allImages.length > 0;
+  const enableCarousel = allImages.length > 0;
 
   return (
     <div className="">
@@ -41,7 +41,7 @@ export function ProjectContent({
         content={readme}
         pid={pid}
         breadcrumbs={breadcrumbs}
-        handleImageClick={isChat ? undefined : handleImageClick}
+        handleImageClick={enableCarousel ? handleImageClick : undefined}
         variant={variant}
         onDocLinkClick={onDocLinkClick}
       >
