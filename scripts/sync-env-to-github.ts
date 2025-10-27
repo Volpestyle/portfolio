@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 
 import { Octokit } from '@octokit/rest';
-import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { parseEnvFile, ParsedEnv } from './env-parser';
 
 // Color codes for console output
 const colors = {
@@ -26,73 +26,12 @@ const log = {
     detail: (msg: string) => console.log(`  ${colors.dim}${msg}${colors.reset}`),
 };
 
-interface ParsedEnv {
-    envVars: Record<string, string>;
-    envSecrets: Record<string, string>;
-    repoVars: Record<string, string>;
-    repoSecrets: Record<string, string>;
-}
-
 interface Config {
     envFile: string;
     environment: string;
     owner: string;
     repo: string;
     token: string;
-}
-
-/**
- * Parse .env file with special headers
- */
-function parseEnvFile(filePath: string): ParsedEnv {
-    const content = readFileSync(filePath, 'utf-8');
-    const lines = content.split('\n');
-
-    const result: ParsedEnv = {
-        envVars: {},
-        envSecrets: {},
-        repoVars: {},
-        repoSecrets: {},
-    };
-
-    let currentSection: keyof ParsedEnv | null = null;
-
-    for (const line of lines) {
-        const trimmed = line.trim();
-
-        // Skip empty lines and regular comments
-        if (!trimmed || (trimmed.startsWith('#') && !trimmed.startsWith('# ENV') && !trimmed.startsWith('# REPO'))) {
-            continue;
-        }
-
-        // Detect section headers
-        if (trimmed === '# ENV VARS') {
-            currentSection = 'envVars';
-            continue;
-        } else if (trimmed === '# ENV SECRETS') {
-            currentSection = 'envSecrets';
-            continue;
-        } else if (trimmed === '# REPO VARS') {
-            currentSection = 'repoVars';
-            continue;
-        } else if (trimmed === '# REPO SECRETS') {
-            currentSection = 'repoSecrets';
-            continue;
-        }
-
-        // Parse key=value pairs
-        if (currentSection && trimmed.includes('=')) {
-            const [key, ...valueParts] = trimmed.split('=');
-            const value = valueParts.join('=').trim();
-
-            // Remove quotes if present
-            const cleanValue = value.replace(/^["']|["']$/g, '');
-
-            result[currentSection][key.trim()] = cleanValue;
-        }
-    }
-
-    return result;
 }
 
 /**
@@ -462,14 +401,30 @@ const main = async () => {
         process.exit(1);
     }
 
-    // Read config strictly from process.env to avoid leaking credentials contained in the synced file
-    const token = process.env.GH_TOKEN;
-    const owner = process.env.GH_OWNER;
-    const repo = process.env.GH_REPO;
+    const token =
+        process.env.GH_TOKEN ??
+        parsedEnv.repoSecrets.GH_TOKEN ??
+        parsedEnv.envSecrets.GH_TOKEN ??
+        parsedEnv.repoVars.GH_TOKEN ??
+        parsedEnv.envVars.GH_TOKEN;
+
+    const owner =
+        process.env.GH_OWNER ??
+        parsedEnv.repoVars.GH_OWNER ??
+        parsedEnv.envVars.GH_OWNER ??
+        parsedEnv.repoSecrets.GH_OWNER ??
+        parsedEnv.envSecrets.GH_OWNER;
+
+    const repo =
+        process.env.GH_REPO ??
+        parsedEnv.repoVars.GH_REPO ??
+        parsedEnv.envVars.GH_REPO ??
+        parsedEnv.repoSecrets.GH_REPO ??
+        parsedEnv.envSecrets.GH_REPO;
 
     if (!token || !owner || !repo) {
-        log.error('Missing required environment variables:');
-        if (!token) log.error('  GH_TOKEN - Your GitHub personal access token');
+        log.error('Missing GitHub configuration. Set the env vars or add the values to your .env file (REPO VARS/SECRETS).');
+        if (!token) log.error('  GH_TOKEN - GitHub personal access token');
         if (!owner) log.error('  GH_OWNER - Repository owner (user or org)');
         if (!repo) log.error('  GH_REPO - Repository name');
         process.exit(1);

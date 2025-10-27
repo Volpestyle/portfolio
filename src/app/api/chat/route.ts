@@ -1,18 +1,31 @@
-export const runtime = 'nodejs';
-
 import OpenAI from 'openai';
 import { NextRequest } from 'next/server';
 import { buildSystemPrompt } from '@/server/prompt/buildSystemPrompt';
 import { tools, toolRouter } from '@/server/tools';
 import type { ChatRequestMessage } from '@/types/chat';
 import { enforceChatRateLimit } from '@/lib/rate-limit';
+import { resolveSecretValue } from '@/lib/secrets/manager';
+
+export const runtime = 'nodejs';
+
+let cachedClient: OpenAI | undefined;
+
+async function getOpenAIClient(): Promise<OpenAI> {
+  if (!cachedClient) {
+    const apiKey = await resolveSecretValue('OPENAI_API_KEY', { scope: 'env', required: true });
+    cachedClient = new OpenAI({ apiKey });
+  }
+  return cachedClient;
+}
+
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+  let client: OpenAI;
+  try {
+    client = await getOpenAIClient();
+  } catch (error) {
+    console.error('[Chat API] Failed to initialize OpenAI client', error);
     return new Response('Chat is not configured. Missing OPENAI API credentials.', { status: 500 });
   }
-
-  const client = new OpenAI({ apiKey });
 
   const rateLimit = await enforceChatRateLimit(req);
   if (!rateLimit.success) {

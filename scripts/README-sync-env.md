@@ -1,18 +1,19 @@
-# GitHub Environment Sync Script
+# Environment Sync Scripts
 
-A color-coded script to deploy environment variables from `.env` files to GitHub environments and repository variables/secrets.
+Two color-coded helpers keep GitHub environments and AWS Secrets Manager aligned with the annotated `.env.*` files in this repo.
 
 ## Features
 
 - ✨ Color-coded output for better readability
-- 🔐 Automatic encryption of secrets
-- 🧹 Clears and overwrites variables/secrets for full alignment
-- 📦 Supports both environment and repository scope
+- 🔐 Automatic encryption of GitHub secrets
+- 🧹 Clears and overwrites GitHub variables/secrets for full alignment
+- 📦 Supports both environment and repository scope in GitHub
+- ☁️ Publishes ENV/REPO secrets to AWS Secrets Manager as JSON payloads
 - 🎯 Environment-specific deployments
 
 ## Setup
 
-### 1. Install Dependencies
+### 1. Install dependencies
 
 Dependencies are already installed in the project. If needed:
 
@@ -20,14 +21,14 @@ Dependencies are already installed in the project. If needed:
 pnpm install
 ```
 
-### 2. Set Up GitHub Token
+### 2. Configure GitHub access
 
 Create a GitHub Personal Access Token (classic) with the following permissions:
 
-- `repo` (Full control of private repositories)
-- `workflow` (Update GitHub Actions workflows)
+- `repo` (full control of private repositories)
+- `workflow` (update GitHub Actions workflows)
 
-Then export your GitHub credentials:
+Then export your GitHub credentials (or place them in the appropriate `.env.*` file under `REPO VARS` or `REPO SECRETS`):
 
 ```bash
 export GH_TOKEN="your_personal_access_token"
@@ -35,9 +36,32 @@ export GH_OWNER="your-github-username-or-org"
 export GH_REPO="your-repo-name"
 ```
 
-> **Tip**: Add these to your `~/.zshrc` or `~/.bashrc` to persist them across sessions.
+> **Tip:** Persist these values in your shell profile (`~/.zshrc`, `~/.bashrc`, etc.), or store them in the `.env.*` file you sync—`GH_TOKEN` is typically a `REPO SECRET`, while `GH_OWNER`/`GH_REPO` can live under `REPO VARS`.
 
-### 3. Structure Your .env Files
+### 3. Configure AWS access
+
+The AWS sync script uses the default credential/config resolution chain. At a minimum set:
+
+```bash
+export AWS_ACCESS_KEY_ID="..."
+export AWS_SECRET_ACCESS_KEY="..."
+export AWS_REGION="us-east-1" # or your preferred region
+```
+
+Optional overrides:
+
+- `AWS_SECRET_PREFIX` – base path for generated secret names (default `portfolio`)
+- `AWS_ENV_SECRET_NAME` / `AWS_ENV_SECRET_NAME_<ENV>` – explicit secret name for `ENV SECRETS`
+- `AWS_REPO_SECRET_NAME` / `AWS_REPO_SECRET_NAME_<ENV>` – explicit secret name for `REPO SECRETS`
+
+If `AWS_REGION`/`AWS_DEFAULT_REGION` are not present in your shell, the script falls back to `AWS_REGION` defined in the `.env.*` file you are syncing.
+
+When no explicit names are provided the script writes to:
+
+- Environment secrets → `${AWS_SECRET_PREFIX}/${environment}/env`
+- Repository secrets → `${AWS_SECRET_PREFIX}/repository`
+
+### 4. Structure your .env files
 
 Use the special headers to categorize your variables:
 
@@ -63,74 +87,66 @@ See `env.template` for a complete example.
 
 ## Usage
 
-### Quick Start
+### Quick start
 
 ```bash
-# Sync local environment (.env.local → dev environment)
+# Sync local environment (.env.local → GitHub dev environment)
 pnpm sync:local
 
-# Sync development environment (.env.development → dev environment)
+# Sync development environment (.env.development → GitHub dev environment)
 pnpm sync:dev
 
-# Sync staging environment (.env.staging → staging environment)
+# Sync staging environment (.env.staging → GitHub staging environment)
 pnpm sync:staging
 
-# Sync production environment (.env.production → production environment)
+# Sync production environment (.env.production → GitHub + AWS)
 pnpm sync:prod
 ```
 
-### Custom Usage
+`pnpm sync:prod` runs the GitHub sync first and then pushes secrets to AWS Secrets Manager. Use `pnpm sync:prod:github` or `pnpm sync:prod:aws` if you need one side only.
+
+### Custom usage
 
 ```bash
+# GitHub only
 tsx scripts/sync-env-to-github.ts --env=.env.custom --environment=custom-env
+
+# AWS only (with optional overrides)
+AWS_REGION=us-east-1 tsx scripts/sync-env-to-aws.ts \
+  --env=.env.custom \
+  --environment=custom-env \
+  --secret-prefix=portfolio
 ```
 
-## How It Works
+## How it works
 
-### Variable Types
+### GitHub sync (`scripts/sync-env-to-github.ts`)
 
-1. **ENV VARS** → GitHub Environment Variables
+1. **Parse** – reads the `.env` file and categorizes variables by section
+2. **Clear** – removes existing GitHub variables/secrets in the target scope
+3. **Encrypt** – encrypts secrets using the repo/environment public key (libsodium)
+4. **Deploy** – recreates variables/secrets so GitHub matches the local file exactly
 
-   - Public, environment-specific
-   - Visible in GitHub UI
-   - Accessible only in the specified environment
+### AWS sync (`scripts/sync-env-to-aws.ts`)
 
-2. **ENV SECRETS** → GitHub Environment Secrets
+1. **Parse** – reuses the same parser to isolate secret sections
+2. **Bundle** – builds JSON payloads for `ENV SECRETS` and `REPO SECRETS`
+3. **Upsert** – creates the target secrets when missing or writes a new version with `PutSecretValue`
 
-   - Private, environment-specific
-   - Encrypted and hidden in GitHub UI
-   - Accessible only in the specified environment
+Environment secrets and repository secrets are stored separately so they can be consumed by different services. The script never logs secret values—only the keys being updated.
 
-3. **REPO VARS** → GitHub Repository Variables
+## Output colors
 
-   - Public, repository-wide
-   - Visible in GitHub UI
-   - Accessible in all environments
+- 🟢 **Green (✓)** – Successful operations
+- 🔴 **Red (✗)** – Errors
+- 🔵 **Blue (ℹ)** – Information
+- 🟡 **Yellow (⚠)** – Warnings
+- 🔷 **Cyan (section headers)** – Progress sections
+- ⚫ **Gray (details)** – Additional details
 
-4. **REPO SECRETS** → GitHub Repository Secrets
-   - Private, repository-wide
-   - Encrypted and hidden in GitHub UI
-   - Accessible in all environments
+## Example output
 
-### Sync Process
-
-1. **Parse** - Reads the specified `.env` file and categorizes variables
-2. **Clear** - Removes all existing variables/secrets in the target scope
-3. **Encrypt** - Encrypts secrets using GitHub's public key (via libsodium)
-4. **Deploy** - Creates/updates all variables/secrets in GitHub
-
-This ensures complete alignment between your `.env` files and GitHub.
-
-## Output Colors
-
-- 🟢 **Green (✓)** - Successful operations
-- 🔴 **Red (✗)** - Errors
-- 🔵 **Blue (ℹ)** - Information
-- 🟡 **Yellow (⚠)** - Warnings
-- 🔷 **Cyan (Section headers)** - Progress sections
-- ⚫ **Gray (Details)** - Additional details
-
-## Example Output
+GitHub sync (excerpt):
 
 ```
 🚀 Starting sync from .env.local to dev environment
@@ -145,29 +161,21 @@ This ensures complete alignment between your `.env` files and GitHub.
   Deleted repo variable: BUILD_VERSION
 ✓ Set repo variable: BUILD_VERSION
 ✓ Set repo variable: REPO_NAME
-
-🔐 Syncing Repository Secrets
-  Deleted repo secret: AWS_ACCESS_KEY_ID
-✓ Set repo secret: AWS_ACCESS_KEY_ID
-✓ Set repo secret: AWS_SECRET_ACCESS_KEY
-
-🌍 Syncing Environment Variables (dev)
-  Environment 'dev' exists
-  Deleted env variable: NEXT_PUBLIC_APP_URL
-✓ Set env variable: NEXT_PUBLIC_APP_URL
-✓ Set env variable: NEXT_PUBLIC_API_URL
-
-🔒 Syncing Environment Secrets (dev)
-  Deleted env secret: DATABASE_URL
-✓ Set env secret: DATABASE_URL
-✓ Set env secret: API_KEY
-
-✨ Sync completed successfully!
 ```
 
-## Common Use Cases
+AWS sync logs the target secret names plus the keys being updated, for example:
 
-### Development Workflow
+```
+🔑 Syncing secrets to AWS Secrets Manager (production)
+  ENV SECRET NAME: portfolio/production/env
+  REPO SECRET NAME: portfolio/repository
+🌍 Environment secrets → portfolio/production/env
+  Keys:
+    - DATABASE_URL
+    - OPENAI_API_KEY
+```
+
+## Common use cases
 
 ```bash
 # Work on feature with local env
@@ -179,22 +187,24 @@ pnpm sync:dev
 # Deploy to staging
 pnpm sync:staging
 
-# Production release
+# Production release (updates GitHub + AWS)
 pnpm sync:prod
 ```
 
-### CI/CD Integration
+## CI/CD integration
 
-You can also use this script in GitHub Actions:
+If you only need the GitHub portion inside CI, call the narrower command:
 
 ```yaml
 - name: Sync environment variables
   env:
-    GH_TOKEN: ${{ secrets.GH__TOKEN }}
+    GH_TOKEN: ${{ secrets.GH_TOKEN }}
     GH_OWNER: ${{ github.repository_owner }}
     GH_REPO: ${{ github.event.repository.name }}
-  run: pnpm sync:prod
+  run: pnpm sync:prod:github
 ```
+
+Running `pnpm sync:prod` inside CI additionally requires AWS credentials with permission to `secretsmanager:CreateSecret`, `secretsmanager:PutSecretValue`, and `secretsmanager:DescribeSecret`.
 
 ## Troubleshooting
 
