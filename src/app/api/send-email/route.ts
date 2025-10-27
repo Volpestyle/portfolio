@@ -8,13 +8,11 @@ let cachedSes: SESClient | undefined;
 async function getSesClient(): Promise<SESClient> {
   if (!cachedSes) {
     const region = process.env.AWS_REGION ?? process.env.REGION ?? 'us-east-1';
-    const accessKeyId = await resolveSecretValue('ACCESS_KEY_ID', {
+    const accessKeyId = await resolveSecretValue('AWS_ACCESS_KEY_ID', {
       scope: 'env',
-      fallbackEnvVar: 'AWS_ACCESS_KEY_ID',
     });
-    const secretAccessKey = await resolveSecretValue('SECRET_ACCESS_KEY', {
+    const secretAccessKey = await resolveSecretValue('AWS_SECRET_ACCESS_KEY', {
       scope: 'env',
-      fallbackEnvVar: 'AWS_SECRET_ACCESS_KEY',
     });
 
     cachedSes = new SESClient({
@@ -22,9 +20,9 @@ async function getSesClient(): Promise<SESClient> {
       credentials:
         accessKeyId && secretAccessKey
           ? {
-              accessKeyId,
-              secretAccessKey,
-            }
+            accessKeyId,
+            secretAccessKey,
+          }
           : undefined,
     });
   }

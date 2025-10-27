@@ -62,15 +62,18 @@ export function DocumentInlinePanel({ repo, title, path, content, breadcrumbsOve
     setCurrentDoc({ content, title, path });
   }, [content, path, title]);
 
-  const displayTitle = currentDoc.title || currentDoc.path.split('/').pop() || 'Doc';
-
+  // Use breadcrumbsOverride if provided, otherwise create consistent breadcrumbs
+  const isViewingOriginal = currentDoc.path === path;
   const breadcrumbs = breadcrumbsOverride ?? [
-    { label: repo },
     {
-      label: 'README',
-      onClick: handleBackToOriginal,
+      label: 'Projects',
+      onClick: !isViewingOriginal ? handleBackToOriginal : undefined,
     },
-    { label: displayTitle },
+    {
+      label: repoName,
+      onClick: !isViewingOriginal ? handleBackToOriginal : undefined,
+    },
+    { label: currentDoc.path },
   ];
 
   if (!currentDoc.content || !currentDoc.content.trim()) {

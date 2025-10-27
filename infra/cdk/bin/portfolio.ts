@@ -49,7 +49,7 @@ const collectLambdaEnv = () => {
     .filter(Boolean);
   const blockedKeys = (
     process.env.APP_ENV_BLOCKLIST ??
-    'OPENAI_API_KEY,SECRET_ACCESS_KEY,AWS_SECRET_ACCESS_KEY,ACCESS_KEY_ID,AWS_ACCESS_KEY_ID,GH_TOKEN,UPSTASH_REDIS_REST_TOKEN'
+    'OPENAI_API_KEY,AWS_SECRET_ACCESS_KEY,AWS_ACCESS_KEY_ID,GH_TOKEN,UPSTASH_REDIS_REST_TOKEN'
   )
     .split(',')
     .map((v) => v.trim())

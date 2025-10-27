@@ -36,7 +36,7 @@ Commit those files so the deploy target can ship them without extra infra. Re-ru
 
 ## Environment variables
 
-The build (especially `/projects/[pid]` static params) calls GitHub during `next build`, so `GH_TOKEN` and `PORTFOLIO_GIST_ID` must be provided as real environment variables that exist in whatever container/runner executes the build (local dev, GitHub Actions, etc.). Secrets that are only injected at runtime are not visible during the build and will cause it to fail. Other sensitive values (`OPENAI_API_KEY`, `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`, `AWS_REGION`, `UPSTASH_REDIS_REST_TOKEN`, etc.) are consumed at runtime only, so they can stay in secrets managers or server-only `.env.local`.
+The build (especially `/projects/[pid]` static params) calls GitHub during `next build`, so `GH_TOKEN` and `PORTFOLIO_GIST_ID` must be provided as real environment variables that exist in whatever container/runner executes the build (local dev, GitHub Actions, etc.). Secrets that are only injected at runtime are not visible during the build and will cause it to fail. Other sensitive values (`OPENAI_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `UPSTASH_REDIS_REST_TOKEN`, etc.) are consumed at runtime only, so they can stay in secrets managers or server-only `.env.local`.
 
 ## Infrastructure & deployments
 
@@ -77,7 +77,7 @@ Key env knobs (can live in `.env.cdk`, your shell, or CI):
 - `APP_ALTERNATE_DOMAINS` – comma-separated SANs (e.g., `www.jcvolpe.me`) for the ACM certificate
 - `APP_ENV_VARS` – comma-separated list of **non-secret** env var names that should be forwarded into each Lambda (e.g., `APP_ENV_VARS=NEXT_PUBLIC_SITE_URL,PORTFOLIO_FEATURE_FLAG`)
 - `APP_ENV_PREFIXES` – optional prefixes auto-forwarded to the Lambda environment (defaults to `NEXT_,UPSTASH_,PORTFOLIO_,GH_,SECRETS_,AWS_ENV_,AWS_REPO_,AWS_SECRETS_,AWS_REGION`)
-- `APP_ENV_BLOCKLIST` – comma-separated env var names that must never be injected (defaults to `OPENAI_API_KEY,SECRET_ACCESS_KEY,AWS_SECRET_ACCESS_KEY,ACCESS_KEY_ID,AWS_ACCESS_KEY_ID,GH_TOKEN,UPSTASH_REDIS_REST_TOKEN`)
+- `APP_ENV_BLOCKLIST` – comma-separated env var names that must never be injected (defaults to `OPENAI_API_KEY,AWS_SECRET_ACCESS_KEY,AWS_ACCESS_KEY_ID,GH_TOKEN,UPSTASH_REDIS_REST_TOKEN`)
 
 **Edge runtime note:** Keep any Secrets Manager access in regional Lambda handlers (function URLs or API routes). The Lambda@Edge SSR function runs without secrets and must not call Secrets Manager directly.
 
@@ -92,26 +92,26 @@ The workflow at `.github/workflows/deploy.yml` builds, validates, and deploys th
 
 Configure the workflow with:
 
-| Type     | Name                       | Description                                                            |
-| -------- | -------------------------- | ---------------------------------------------------------------------- |
-| Secret   | `CDK_DEPLOY_ROLE_ARN`      | IAM role arn with permissions to deploy S3/CloudFront/Lambda resources |
-| Secret   | `OPENAI_API_KEY`           | Stored in Secrets Manager, resolved at runtime                         |
-| Secret   | `SECRET_ACCESS_KEY`        | Consumed at runtime; keep paired with `ACCESS_KEY_ID`                  |
-| Secret   | `GH_TOKEN`                 | Personal access token used during `open-next build` and runtime        |
-| Secret   | `UPSTASH_REDIS_REST_TOKEN` | Runtime auth token for Upstash REST                                    |
-| Variable | `CDK_DEFAULT_REGION`       | **Must be** `us-east-1` for Lambda@Edge                                |
-| Variable | `APP_DOMAIN_NAME`          | Optional custom domain (must match ACM cert + hosted zone)             |
-| Variable | `APP_HOSTED_ZONE_DOMAIN`   | Hosted zone lookup name (e.g., `jcvolpe.me`)                           |
-| Variable | `APP_CERTIFICATE_ARN`      | (Optional) supply an existing ACM cert instead of auto-issuing one     |
-| Variable | `APP_ALTERNATE_DOMAINS`    | CSV of SANs (e.g., `www.jcvolpe.me`) to add to the certificate         |
-| Variable | `APP_ENV_VARS`             | Comma-separated env var names to inject (non-secret only)              |
-| Variable | `APP_ENV_PREFIXES`         | Optional prefixes for automatic env injection                          |
-| Variable | `APP_ENV_BLOCKLIST`        | Optional blocklist for env injection (defaults to `OPENAI_API_KEY,SECRET_ACCESS_KEY,AWS_SECRET_ACCESS_KEY,ACCESS_KEY_ID,AWS_ACCESS_KEY_ID,GH_TOKEN,UPSTASH_REDIS_REST_TOKEN`) |
-| Variable | `NEXT_PUBLIC_SITE_URL`     | Example of a public runtime env var forwarded to Lambda                |
-| Variable | `PORTFOLIO_GIST_ID`        | Required during `open-next build` to fetch project data                |
-| Variable | `ACCESS_KEY_ID`            | Forwarded to Lambda (paired with `SECRET_ACCESS_KEY`)                  |
-| Variable | `AWS_REGION`               | Runtime AWS region consumed by the app                                 |
-| Variable | `UPSTASH_REDIS_REST_URL`   | REST endpoint used by the chat rate limiter/cache                      |
+| Type     | Name                       | Description                                                                                                                                   |
+| -------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Secret   | `CDK_DEPLOY_ROLE_ARN`      | IAM role arn with permissions to deploy S3/CloudFront/Lambda resources                                                                        |
+| Secret   | `OPENAI_API_KEY`           | Stored in Secrets Manager, resolved at runtime                                                                                                |
+| Secret   | `AWS_SECRET_ACCESS_KEY`    | AWS secret key consumed at runtime                                                                                                            |
+| Secret   | `GH_TOKEN`                 | Personal access token used during `open-next build` and runtime                                                                               |
+| Secret   | `UPSTASH_REDIS_REST_TOKEN` | Runtime auth token for Upstash REST                                                                                                           |
+| Variable | `CDK_DEFAULT_REGION`       | **Must be** `us-east-1` for Lambda@Edge                                                                                                       |
+| Variable | `APP_DOMAIN_NAME`          | Optional custom domain (must match ACM cert + hosted zone)                                                                                    |
+| Variable | `APP_HOSTED_ZONE_DOMAIN`   | Hosted zone lookup name (e.g., `jcvolpe.me`)                                                                                                  |
+| Variable | `APP_CERTIFICATE_ARN`      | (Optional) supply an existing ACM cert instead of auto-issuing one                                                                            |
+| Variable | `APP_ALTERNATE_DOMAINS`    | CSV of SANs (e.g., `www.jcvolpe.me`) to add to the certificate                                                                                |
+| Variable | `APP_ENV_VARS`             | Comma-separated env var names to inject (non-secret only)                                                                                     |
+| Variable | `APP_ENV_PREFIXES`         | Optional prefixes for automatic env injection                                                                                                 |
+| Variable | `APP_ENV_BLOCKLIST`        | Optional blocklist for env injection (defaults to `OPENAI_API_KEY,AWS_SECRET_ACCESS_KEY,AWS_ACCESS_KEY_ID,GH_TOKEN,UPSTASH_REDIS_REST_TOKEN`) |
+| Variable | `NEXT_PUBLIC_SITE_URL`     | Example of a public runtime env var forwarded to Lambda                                                                                       |
+| Variable | `PORTFOLIO_GIST_ID`        | Required during `open-next build` to fetch project data                                                                                       |
+| Variable | `AWS_ACCESS_KEY_ID`        | AWS access key forwarded to Lambda for runtime AWS API calls                                                                                  |
+| Variable | `AWS_REGION`               | Runtime AWS region consumed by the app                                                                                                        |
+| Variable | `UPSTASH_REDIS_REST_URL`   | REST endpoint used by the chat rate limiter/cache                                                                                             |
 
 Secrets should be stored in AWS Secrets Manager (mirrored via the `pnpm sync:*` scripts). The Lambda runtime resolves values with `resolveSecretValue`, falling back to env vars only for local development, so `APP_ENV_VARS` should contain configuration data only.
 
