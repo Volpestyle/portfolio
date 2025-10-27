@@ -32,7 +32,10 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({ images, initialIndex, isO
     return null;
   }
 
-  const currentImage = images[currentIndex];
+  const currentImage = images[currentIndex] ?? images[0];
+  if (!currentImage) {
+    return null;
+  }
 
   return (
     <Modal
@@ -65,18 +68,15 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({ images, initialIndex, isO
         />
 
         <div className="max-h-[85vh] max-w-[90vw]">
-          {currentImage?.startsWith('/') ? (
-            <img src={currentImage} alt={`Image ${currentIndex + 1}`} className="max-h-full max-w-full object-contain" />
-          ) : (
-            <Image
-              src={currentImage}
-              alt={`Image ${currentIndex + 1}`}
-              width={1920}
-              height={1080}
-              className="max-h-full max-w-full object-contain"
-              priority
-            />
-          )}
+          <Image
+            src={currentImage}
+            alt={`Image ${currentIndex + 1}`}
+            width={1920}
+            height={1080}
+            className="max-h-full max-w-full object-contain"
+            priority
+            sizes="(max-width: 768px) 90vw, (max-width: 1200px) 80vw, 70vw"
+          />
           <div className="mt-4 text-center text-sm text-white/70">
             {currentIndex + 1} / {images.length}
           </div>

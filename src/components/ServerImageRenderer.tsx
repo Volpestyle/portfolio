@@ -19,35 +19,23 @@ export function ServerImageRenderer({
   alt,
   onImageClick,
   onImageLoad,
-  className
+  className,
 }: ServerImageRendererProps) {
-  // For local paths (starting with /), use img tag
-  if (src.startsWith('/')) {
-    return (
-      <div className="py-4">
-        <img
-          src={src}
-          alt={alt}
-          className={`h-auto w-auto max-w-full cursor-pointer ${className || ''}`}
-          onClick={() => onImageClick?.(src)}
-          onLoad={() => onImageLoad?.()}
-        />
-      </div>
-    );
-  }
+  const isLocalImage = src.startsWith('/');
 
-  // For external URLs, use Next/Image with unoptimized flag
   return (
     <div className="py-4">
       <Image
         src={src}
         alt={alt}
-        width={800}
-        height={600}
-        unoptimized
+        width={isLocalImage ? 1200 : 800}
+        height={isLocalImage ? 900 : 600}
         className={`h-auto w-auto max-w-full cursor-pointer ${className || ''}`}
         onClick={() => onImageClick?.(src)}
         onLoad={() => onImageLoad?.()}
+        unoptimized={!isLocalImage}
+        sizes="(max-width: 768px) 90vw, 50vw"
+        priority={isLocalImage}
       />
     </div>
   );

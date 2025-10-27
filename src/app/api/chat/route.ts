@@ -5,12 +5,22 @@ import { tools, toolRouter } from '@/server/tools';
 import type { ChatRequestMessage } from '@/types/chat';
 import { enforceChatRateLimit } from '@/lib/rate-limit';
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function resolveOpenAIKey() {
+  return (
+    process.env.OPENAI_API_KEY ||
+    process.env.OPENAI_API_SECRET ||
+    process.env.NEXT_PRIVATE_OPENAI_API_KEY ||
+    null
+  );
+}
 
 export async function POST(req: NextRequest) {
-  if (!process.env.OPENAI_API_KEY) {
-    return new Response('Chat is not configured. Missing OPENAI_API_KEY.', { status: 500 });
+  const apiKey = resolveOpenAIKey();
+  if (!apiKey) {
+    return new Response('Chat is not configured. Missing OPENAI API credentials.', { status: 500 });
   }
+
+  const client = new OpenAI({ apiKey });
 
   const rateLimit = await enforceChatRateLimit(req);
   if (!rateLimit.success) {
