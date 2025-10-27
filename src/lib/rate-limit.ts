@@ -47,12 +47,30 @@ function getRateLimiter() {
   }
 }
 
+function getClientIp(req: NextRequest) {
+  const reqWithIp = req as NextRequest & { ip?: string | null };
+  if (reqWithIp.ip) {
+    return reqWithIp.ip;
+  }
+
+  const forwardedFor = req.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    const firstForwardedIp = forwardedFor.split(',')[0]?.trim();
+    if (firstForwardedIp) {
+      return firstForwardedIp;
+    }
+  }
+
+  const realIp = req.headers.get('x-real-ip') || req.headers.get('cf-connecting-ip');
+  if (realIp) {
+    return realIp;
+  }
+
+  return 'unknown';
+}
+
 function getClientIdentifier(req: NextRequest) {
-  const ip =
-    req.ip ||
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    req.headers.get('x-real-ip') ||
-    'unknown';
+  const ip = getClientIp(req);
   const userAgent = req.headers.get('user-agent') || 'unknown';
   return `${ip}:${userAgent}`;
 }

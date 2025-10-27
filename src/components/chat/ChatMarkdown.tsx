@@ -140,8 +140,10 @@ export function ChatMarkdown({ text, className, showCursor }: ChatMarkdownProps)
         next.set(text, currentElementIndexRef.current);
         // Limit cache size to prevent memory leaks
         if (next.size > 50) {
-          const firstKey = next.keys().next().value;
-          next.delete(firstKey);
+          const { value: firstKey, done } = next.keys().next();
+          if (!done && firstKey !== undefined) {
+            next.delete(firstKey);
+          }
         }
         return next;
       });
