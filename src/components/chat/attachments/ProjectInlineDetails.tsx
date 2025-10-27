@@ -55,12 +55,15 @@ export function ProjectInlineDetails({ repo, readme, breadcrumbsOverride }: Proj
   // If showing a document, render it with breadcrumbs
   if (docView) {
     const breadcrumbs = [
-      { label: repo.name },
       {
-        label: 'README',
-        onClick: () => setDocView(null), // Make README clickable to go back
+        label: 'Projects',
+        onClick: () => setDocView(null), // Make Projects clickable to go back to README
       },
-      { label: docView.title },
+      {
+        label: repo.name,
+        onClick: () => setDocView(null), // Make repo name clickable to go back to README
+      },
+      { label: docView.path },
     ];
 
     return (
@@ -86,6 +89,9 @@ export function ProjectInlineDetails({ repo, readme, breadcrumbsOverride }: Proj
     );
   }
 
+  // Use breadcrumbsOverride if provided, otherwise create default breadcrumbs
+  const defaultBreadcrumbs = [{ label: 'Projects' }, { label: repo.name }];
+
   return (
     <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
       <ProjectContent
@@ -93,7 +99,7 @@ export function ProjectInlineDetails({ repo, readme, breadcrumbsOverride }: Proj
         readme={readme}
         repoInfo={repo}
         variant="chat"
-        breadcrumbsOverride={breadcrumbsOverride}
+        breadcrumbsOverride={breadcrumbsOverride ?? defaultBreadcrumbs}
         onDocLinkClick={handleDocLinkClick}
       />
     </div>
