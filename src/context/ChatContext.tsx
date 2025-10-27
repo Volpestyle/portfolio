@@ -251,6 +251,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             }
           }
         }
+
       } catch (err) {
         console.error('Chat error', err);
         setError('Something went wrong. Mind trying again?');
