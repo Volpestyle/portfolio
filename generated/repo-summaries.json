@@ -1,0 +1,176 @@
+[
+  {
+    "name": "improview",
+    "summary": "improview is an early-stage project themed around LeetCode. The README hints at upcoming updates and a playful robots motif tidying the docs, but no technical stack, frameworks, or runtimes are specified.",
+    "tags": [
+      "LeetCode",
+      "Documentation",
+      "Readme",
+      "Early Stage",
+      "Robots",
+      "Project Timeline"
+    ]
+  },
+  {
+    "name": "ilikeyacut",
+    "summary": "ilikeyacut is a native mobile app monorepo that enables hairstyle try-ons using Gemini's nano-banana integration, with a Swift-based iOS frontend and a Go-based AWS Lambda serverless backend deployed via AWS SAM templates. It ships with Flash Image 2.5 assets and a comprehensive docs suite (Design Document, API Contract, iOS Token Lifecycle, Rate Limiting) plus demo timelapse video and GIF assets.",
+    "tags": [
+      "Swift",
+      "iOS",
+      "Go",
+      "Golang",
+      "AWS Lambda",
+      "Lambda",
+      "AWS SAM",
+      "SAM",
+      "Serverless",
+      "Serverless Application Model",
+      "Monorepo",
+      "Native Mobile App”“Hairstyle Try-On”"
+    ]
+  },
+  {
+    "name": "wallcrawler",
+    "summary": "Wallcrawler is a self-hosted, AWS-backed remote browser platform that combines Stagehand-powered LLM browsing with Browserbase API compatibility, implemented as a TypeScript/Node.js SDK and a Go backend in a unified monorepo.",
+    "tags": [
+      "Go",
+      "TypeScript",
+      "Node.js",
+      "pnpm",
+      "Docker",
+      "Multi-Arch Docker",
+      "AWS",
+      "AWS CDK",
+      "CDK Toolkit",
+      "Stagehand",
+      "Stagehand Fork",
+      "Browserbase\",\"Browserbase APIs\",\"LLM\",\"LLM Browsing\",\"API Gateway\",\"ECS/Fargate\",\"Lambda\",\"AWS Lambda\",\"EventBridge\",\"DynamoDB\",\"Redis\",\"S3\",\"Chrome\",\"Chrome Contexts\",\"BrowserViewport\",\"UI\",\"SDK Node\",\"Wallcrawler\",\"CloudWatch\",\"CloudWatch Logging Best Practices"
+    ]
+  },
+  {
+    "name": "portfolio",
+    "summary": "A Next.js 15 portfolio website with TailwindCSS integration, using npm as the package manager; live at jcvolpe.me.",
+    "tags": [
+      "Next.js",
+      "NextJS",
+      "TailwindCSS",
+      "Tailwind CSS",
+      "Tailwind",
+      "npm",
+      "Node Package Manager"
+    ]
+  },
+  {
+    "name": "jobseek",
+    "summary": "Jobseek is a Node.js-based, Next.js 15 application that automates job searching across boards using Wallcrawler for headless browser automation and session management. It is organized as a pnpm workspace with AWS CDK-driven infrastructure, exposing API routes and Server-Sent Events (SSE) to start searches, stream progress, and manage sessions, while leveraging Stagehand for automated browsing and extraction.",
+    "tags": [
+      "Next.js",
+      "Next.js 15",
+      "Next 15",
+      "App Router",
+      "AWS CDK",
+      "Cloud Development Kit",
+      "CDK",
+      "Wallcrawler",
+      "wallcrawler",
+      "Stagehand",
+      "Wallcrawler SDK",
+      "SDK\",\"pnpm\",\"pnpm Workspaces\",\"API Routes\",\"Server-Sent Events\",\"SSE\",\"Node.js\",\"Node\""
+    ]
+  },
+  {
+    "name": "rubiks-cube",
+    "summary": "Rubiks Cube State Management is a Next.js-powered React app written in TypeScript with TailwindCSS that renders a 2D, flattened Rubik's cube with labeled faces (U, L, F, R, B, D) and preserves per-face coordinates to aid debugging during rotations.",
+    "tags": [
+      "TypeScript",
+      "TS",
+      "React",
+      "ReactJS",
+      "Next.js",
+      "Next",
+      "TailwindCSS",
+      "Tailwind",
+      "JAMstack",
+      "Jest",
+      "Npm",
+      "Yarn\",\"Pnpm\",\"Bun\",\"Create Next App\",\"Rubiks Cube State Management\",\"Puzzle UI\",\"State Visualization\",\"Debugging Tool\",\"Cube Rotation Modeling\",\"2D Visualization\",\"Initial State Generation\",\"Per-Face Rotation Logic\""
+    ]
+  },
+  {
+    "name": "AWS-IAM-Projects",
+    "summary": "TypeScript-based React UI mock of the AWS Identity and Access Management (IAM) Console, built with the Polaris internal UI framework and wired to AWS IAM APIs to prototype a Users entity UX. This repository documents the frontend concepts and UI patterns used for an IAM console redesign within AWS.",
+    "tags": [
+      "TypeScript",
+      "TS",
+      "React",
+      "ReactJS",
+      "Polaris",
+      "AWS",
+      "Amazon Web Services",
+      "IAM",
+      "Identity and Access Management",
+      "AWS IAM APIs"
+    ]
+  },
+  {
+    "name": "slash-siege",
+    "summary": "slash-siege is a multiplayer stick-figure fighter project intended for browser-based online play. It uses Trello for planning and is hosted on GitHub Pages, with a test page at volpestyle.github.io/slash-siege/.",
+    "tags": [
+      "Trello",
+      "GitHub Pages",
+      "Multiplayer Games",
+      "Gaming"
+    ]
+  },
+  {
+    "name": "AED-Sheets",
+    "summary": "AED-Sheets is a MEAN stack-based log search and incident-tracking tool built for NPR internal tooling, leveraging MongoDB, Express, Angular, and Node.js with Confluence-hosted documentation. It enables automatic NPR-employee account creation, log creation and searching across multiple criteria, personal subscriptions that notify users via email or text when a log matches, global subscriptions for shared access, automatic IT ticket creation, and administrative user roles.",
+    "tags": [
+      "MEAN",
+      "MEAN Stack",
+      "MongoDB",
+      "Express JS",
+      "ExpressJS",
+      "Express",
+      "Angular",
+      "AngularJS",
+      "Node JS",
+      "Node.js",
+      "NodeJS",
+      "Confluence"
+    ]
+  },
+  {
+    "name": "personal-website-v1",
+    "summary": "personal-website-v1 is a personal website / portfolio hosted as a static site on AWS S3 with CloudFront. It is accessible via the volpestyle.github.io and github.io domains as GitHub Pages aliases, with hosting provided by an AWS S3 bucket and CloudFront.",
+    "tags": [
+      "AWS S3",
+      "Amazon CloudFront",
+      "S3",
+      "CloudFront",
+      "AWS",
+      "Amazon Web Services",
+      "Volpestyle.github.io",
+      "Github.io",
+      "GitHub Pages"
+    ]
+  },
+  {
+    "name": "Parse-Tree-Calculator",
+    "summary": "Parse-Tree-Calculator is a web-based scientific calculator built with HTML, SASS, and Vanilla JavaScript, designed to run in a web browser for mathematical computations. Using a parse-tree-based evaluation with tokenization, it supports parentheses, decimals, basic trig, and explicit rules like implied multiplication between opening parentheses and no implicit multiplication with trig functions; invalid inputs yield NaN and certain errors are logged to the console.",
+    "tags": [
+      "Parse-Tree-Calculator",
+      "PTC",
+      "HTML",
+      "HyperText Markup Language",
+      "SASS",
+      "SCSS",
+      "Vanilla JavaScript",
+      "VanillaJS",
+      "JavaScript",
+      "JSX",
+      "JS",
+      "Syntactically Awesome Style Sheets?"
+    ]
+  }
+]

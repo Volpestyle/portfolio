@@ -1,4 +1,5 @@
-import { JetBrains_Mono, Fira_Code, Source_Code_Pro, Space_Mono, IBM_Plex_Mono, Roboto_Mono } from 'next/font/google';
+import { JetBrains_Mono, Fira_Code, Source_Code_Pro, Space_Mono, IBM_Plex_Mono } from 'next/font/google';
+import { GeistMono as GeistMonoFont } from 'geist/font/mono';
 
 export const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
@@ -32,8 +33,4 @@ export const ibmPlexMono = IBM_Plex_Mono({
   variable: '--font-ibm-plex',
 });
 
-export const robotoMono = Roboto_Mono({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-roboto-mono',
-});
+export const geistMono = GeistMonoFont;

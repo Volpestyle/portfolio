@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 
 type TypeWriterProps = {
   baseText: string;
@@ -8,6 +9,9 @@ type TypeWriterProps = {
   backspaceSpeed?: number;
   onBaseComplete?: () => void;
   onHoverTextComplete?: (isComplete: boolean) => void;
+  className?: string;
+  cursorClassName?: string;
+  hideCursorOnComplete?: boolean;
 };
 
 export function TypeWriter({
@@ -17,6 +21,9 @@ export function TypeWriter({
   backspaceSpeed = 50,
   onBaseComplete,
   onHoverTextComplete,
+  className,
+  cursorClassName,
+  hideCursorOnComplete = false,
 }: TypeWriterProps) {
   const [displayText, setDisplayText] = useState('');
   const [index, setIndex] = useState(0);
@@ -24,6 +31,7 @@ export function TypeWriter({
   const [isBackspacing, setIsBackspacing] = useState(false);
   const [previousHoverText, setPreviousHoverText] = useState<string | undefined>(undefined);
   const [backspacingText, setBackspacingText] = useState<string | undefined>(undefined);
+  const [isHoverTextComplete, setIsHoverTextComplete] = useState(false);
 
   // Reset animation when component unmounts or route changes
   useEffect(() => {
@@ -44,6 +52,7 @@ export function TypeWriter({
           setIsBackspacing(true);
           setBackspacingText(previousHoverText);
           onHoverTextComplete?.(false);
+          setIsHoverTextComplete(false);
         }
       }
 
@@ -91,6 +100,7 @@ export function TypeWriter({
           // state change: the full text is typed
           if (displayText.length + 1 === fullText.length) {
             onHoverTextComplete?.(true);
+            setIsHoverTextComplete(true);
           }
         }, speed);
         return timer;
@@ -132,10 +142,13 @@ export function TypeWriter({
     onHoverTextComplete,
   ]);
 
+  const shouldShowCursor =
+    isBackspacing || !(hideCursorOnComplete && ((isBaseTextComplete && !hoverText) || isHoverTextComplete));
+
   return (
-    <div className="whitespace-pre-line font-mono text-lg sm:text-xl md:text-2xl">
+    <div className={cn('whitespace-pre-line font-mono', className)}>
       {displayText}
-      <span className="ml-1 animate-[blink_1s_infinite]">▋</span>
+      {shouldShowCursor ? <span className={cn('ml-1 animate-[blink_1s_infinite]', cursorClassName)}>▋</span> : null}
     </div>
   );
 }

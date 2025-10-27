@@ -11,12 +11,7 @@ export default async function Projects() {
   const repoData = await getPortfolioRepos();
   const repos = [...repoData.starred, ...repoData.normal];
 
-  return (
-    <div className="m-4">
-      <h1 className="mb-6 text-3xl font-bold">My Work</h1>
-      <ProjectsGrid repos={repos} />
-    </div>
-  );
+  return <ProjectsGrid repos={repos} />;
 }
 
 export const revalidate = 3600; // Revalidate every hour

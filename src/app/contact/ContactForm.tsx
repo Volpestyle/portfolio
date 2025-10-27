@@ -1,28 +1,28 @@
 'use client';
-import React, { useReducer, useTransition, useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useReducer, useTransition, useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { AnimatedSendButton } from '@/components/ui/AnimatedSendButton';
 import { FormFieldId, InputType, State, SubmitStatus, initialState, reducer, type FormFieldConfig } from './types';
 
 const formFields: FormFieldConfig[] = [
   {
     id: FormFieldId.Name,
-    label: 'Name',
     type: InputType.Text,
     Component: Input,
+    placeholder: 'your name...',
   },
   {
     id: FormFieldId.Email,
-    label: 'Email Address',
     type: InputType.Email,
     Component: Input,
+    placeholder: 'email...',
   },
   {
     id: FormFieldId.Message,
-    label: 'Message',
     Component: Textarea,
+    placeholder: 'your message...',
   },
 ];
 
@@ -34,6 +34,8 @@ export function ContactForm() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [isPending, startTransition] = useTransition();
   const [isVisible, setIsVisible] = useState(false);
+  const [messageHeight, setMessageHeight] = useState(120);
+  const messageRef = useRef<HTMLTextAreaElement>(null);
   const {
     [FormFieldId.Name]: name,
     [FormFieldId.Email]: email,
@@ -49,6 +51,16 @@ export function ContactForm() {
       });
     }
   }, [submitStatus]);
+
+  useEffect(() => {
+    const textarea = messageRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      const newHeight = Math.max(120, textarea.scrollHeight);
+      textarea.style.height = `${newHeight}px`;
+      setMessageHeight(newHeight);
+    }
+  }, [message]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -108,39 +120,41 @@ export function ContactForm() {
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-4">
-        {formFields.map(({ id, label, type, Component }) => (
-          <div key={id}>
-            <label htmlFor={id} className="mb-2 block text-white">
-              {label}
-            </label>
-            <Component
-              id={id}
-              name={id}
-              type={type}
-              value={getFormFieldValue(state, id as FormFieldId)}
-              onChange={(e) =>
-                dispatch({
-                  type: 'SET_FIELD',
-                  field: id as FormFieldId,
-                  value: e.target.value,
-                })
-              }
-              required
-              className="bg-white text-black"
-            />
-          </div>
-        ))}
+        {formFields.map(({ id, label, type, Component, placeholder }) => {
+          const isMessage = id === FormFieldId.Message;
+          const baseProps = {
+            id,
+            name: id,
+            type,
+            value: getFormFieldValue(state, id as FormFieldId),
+            onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+              dispatch({
+                type: 'SET_FIELD',
+                field: id as FormFieldId,
+                value: e.target.value,
+              }),
+            required: true,
+            disabled: isPending,
+            className: isMessage
+              ? 'min-h-[120px] max-h-[300px] overflow-y-auto rounded-lg border-gray-700 bg-black/50 text-white backdrop-blur-sm transition-all duration-200 placeholder:text-gray-500 hover:border-gray-600 focus:outline-none disabled:opacity-50'
+              : 'h-10 rounded-lg border-gray-700 bg-black/50 text-white backdrop-blur-sm transition-all duration-200 placeholder:text-gray-500 hover:border-gray-600 focus:outline-none disabled:opacity-50',
+            style: isMessage ? { resize: 'none' as const } : undefined,
+            placeholder,
+          };
 
-        <Button type="submit" className="bg-white text-black hover:bg-gray-200" disabled={isPending}>
-          {isPending ? (
-            <>
-              <Loader className="mr-2 h-4 w-4 animate-spin" />
-              Sending...
-            </>
-          ) : (
-            'Send'
-          )}
-        </Button>
+          return (
+            <div key={id}>
+              <label htmlFor={id} className="mb-2 block text-sm text-white/80">
+                {label}
+              </label>
+              {isMessage ? <Textarea {...baseProps} ref={messageRef} /> : <Component {...baseProps} />}
+            </div>
+          );
+        })}
+
+        <div className="flex items-end justify-end">
+          <AnimatedSendButton disabled={isPending} height={40} />
+        </div>
       </form>
 
       {submitStatus && (

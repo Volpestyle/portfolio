@@ -12,10 +12,9 @@ export const metadata: Metadata = {
 };
 
 export default function Contact() {
-
   return (
     <div className="m-4">
-      <h1 className="mb-6 text-3xl font-bold">Contact Me</h1>
+      <h1 className="mb-6 text-3xl font-bold">Chat with me (the real one)</h1>
       <ContactForm />
     </div>
   );

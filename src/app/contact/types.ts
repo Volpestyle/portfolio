@@ -34,8 +34,9 @@ export type Action =
 
 export type FormFieldConfig = {
   id: FormFieldId;
-  label: string;
+  label?: string;
   type?: InputType;
+  placeholder?: string;
   Component: typeof Input | typeof Textarea;
 };
 

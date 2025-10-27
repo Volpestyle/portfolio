@@ -12,7 +12,7 @@ module.exports = {
     },
     extend: {
       fontFamily: {
-        mono: ['monospace'],
+        mono: ['var(--font-geist-mono)', 'monospace'],
         sans: ['sans-serif'],
         serif: ['serif'],
         'source-code': ['var(--font-source-code)'],
@@ -20,7 +20,7 @@ module.exports = {
         'jetbrains-mono': ['var(--font-jetbrains)'],
         'space-mono': ['var(--font-space)'],
         'ibm-plex-mono': ['var(--font-ibm-plex)'],
-        'roboto-mono': ['var(--font-roboto-mono)'],
+        'geist-mono': ['var(--font-geist-mono)'],
       },
       colors: {
         border: 'hsl(var(--border))',

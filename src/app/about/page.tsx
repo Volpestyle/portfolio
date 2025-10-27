@@ -5,10 +5,11 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: "About - JCV's Portfolio",
-  description: "Learn more about James Volpe, a software engineer from Chicago, IL USA",
+  description: 'Learn more about James Volpe, a software engineer from Chicago, IL USA',
   openGraph: {
-    title: "About James Volpe",
-    description: "Software engineer from Chicago, IL USA with passions in animation, graphic design, music, and full stack web development",
+    title: 'About James Volpe',
+    description:
+      'Software engineer from Chicago, IL USA with passions in animation, graphic design, music, and full stack web development',
     type: 'profile',
   },
 };
@@ -29,7 +30,6 @@ const SocialIcon: React.FC<{ icon: { path: string; hex: string } }> = ({ icon })
 );
 
 export default function About() {
-
   const socialLinks: SocialLink[] = [
     {
       name: 'Twitter (x)',
@@ -55,7 +55,7 @@ export default function About() {
   ];
 
   return (
-    <div className="m-4 flex flex-col gap-6 md:flex-row">
+    <div className="flex flex-col gap-6 md:flex-row">
       <div className="md:w-1/2">
         <Image
           src="/images/skateboard.jpg"
@@ -65,7 +65,7 @@ export default function About() {
           priority
           className="mb-4 h-auto w-full rounded-lg object-cover"
         />
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col items-start gap-4">
           {socialLinks.map((link) => (
             <a
               key={link.name}
@@ -84,7 +84,6 @@ export default function About() {
         </div>
       </div>
       <div className="md:w-1/2">
-        <h1 className="mb-4 text-3xl font-bold">About Me</h1>
         <p className="preserve-case mb-4">
           I&apos;m a software engineer from Chicago, IL USA. I graduated from Iowa State University in May 2021, with a
           B.S. in Software Engineering 📚. Over the years I&apos;ve found many passions, from animation, graphic design,

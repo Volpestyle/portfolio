@@ -1,6 +1,6 @@
 import 'highlight.js/styles/github-dark.css';
 import '@/styles/markdown.css';
-import { ProjectContent } from './ProjectContent';
+import { ProjectContent } from '@/components/ProjectContent';
 import { getRepoDetails, getRepoReadme, getPortfolioRepos } from '@/lib/github-server';
 import type { Metadata } from 'next';
 
@@ -30,12 +30,13 @@ export async function generateStaticParams() {
 
 export default async function ProjectDetail({ params }: { params: Promise<{ pid: string }> }) {
   const { pid } = await params;
-  const [repoInfo, readme] = await Promise.all([
-    getRepoDetails(pid),
-    getRepoReadme(pid),
-  ]);
+  const [repoInfo, readme] = await Promise.all([getRepoDetails(pid), getRepoReadme(pid)]);
 
-  return <ProjectContent pid={pid} repoInfo={repoInfo} readme={readme} />;
+  return (
+    <div className="-mx-8 -my-8 bg-black/10 backdrop-blur-sm">
+      <ProjectContent pid={pid} repoInfo={repoInfo} readme={readme} />
+    </div>
+  );
 }
 
 export const revalidate = 3600; // Revalidate every hour

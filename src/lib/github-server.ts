@@ -23,6 +23,8 @@ export type RepoData = {
   homepage?: string | null;
   language?: string | null;
   topics?: string[];
+  summary?: string;
+  tags?: string[];
 };
 
 export type PortfolioReposResponse = {
@@ -30,7 +32,7 @@ export type PortfolioReposResponse = {
   normal: RepoData[]
 };
 
-async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
+export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
   if (!process.env.GITHUB_TOKEN) {
     throw new Error('GitHub token is not configured');
   }
@@ -124,7 +126,7 @@ export const getPortfolioRepos = unstable_cache(
   }
 );
 
-async function fetchRepoDetails(repo: string, owner: string = GITHUB_CONFIG.USERNAME): Promise<RepoData> {
+export async function fetchRepoDetails(repo: string, owner: string = GITHUB_CONFIG.USERNAME): Promise<RepoData> {
   const octokit = createOctokit();
 
   try {
@@ -191,7 +193,7 @@ export const getRepoDetails = unstable_cache(
   }
 );
 
-async function fetchRepoReadme(repo: string, owner: string = GITHUB_CONFIG.USERNAME): Promise<string> {
+export async function fetchRepoReadme(repo: string, owner: string = GITHUB_CONFIG.USERNAME): Promise<string> {
   const octokit = createOctokit();
 
   try {
@@ -329,7 +331,7 @@ export async function getGithubImageUrl(
  * @param owner - GitHub username (defaults to GITHUB_CONFIG.USERNAME)
  * @returns Document content and project name
  */
-async function fetchDocumentContent(
+export async function fetchDocumentContent(
   repo: string,
   docPath: string,
   owner: string = GITHUB_CONFIG.USERNAME
@@ -373,7 +375,7 @@ async function fetchDocumentContent(
     // For private repos, use public counterpart
     let repoToFetch = repo;
     if (repoConfig?.isPrivate) {
-      repoToFetch = repoConfig.publicRepo || `${repo}public`;
+      repoToFetch = repoConfig.publicRepo || `${repo}-public`;
     }
 
     // Fetch from GitHub repository
@@ -406,6 +408,28 @@ export const getDocumentContent = unstable_cache(
     tags: ['github-document']
   }
 );
+
+export async function getRepos(): Promise<RepoData[]> {
+  const { starred, normal } = await getPortfolioRepos();
+  return [...starred, ...normal];
+}
+
+export async function getRepoByName(name: string): Promise<RepoData> {
+  const repos = await getRepos();
+  const match = repos.find((repo) => repo.name.toLowerCase() === name.toLowerCase());
+  if (match) {
+    return match;
+  }
+  return getRepoDetails(name);
+}
+
+export async function getReadmeForRepo(repo: string, owner?: string) {
+  return getRepoReadme(repo, owner);
+}
+
+export async function getRawDoc(repo: string, path: string, owner?: string) {
+  return getDocumentContent(repo, path, owner);
+}
 
 type OctokitError = {
   status?: number;
