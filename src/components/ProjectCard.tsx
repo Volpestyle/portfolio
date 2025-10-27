@@ -110,7 +110,7 @@ export function ProjectCard({ repo, variant = 'default', onOpen }: ProjectCardPr
 
         <AnimatedExpandButton
           icon={<ArrowRight className="h-5 w-5" />}
-          text="View Details"
+          text="view details"
           wrapperClassName="mt-auto"
           disabled={!onOpen}
           onClick={(event) => {
@@ -161,7 +161,7 @@ export function ProjectCard({ repo, variant = 'default', onOpen }: ProjectCardPr
       )}
       <AnimatedExpandButton
         icon={<ArrowRight className="h-5 w-5" />}
-        text="View Details"
+        text="view details"
         wrapperClassName="mt-auto"
         href={`/projects/${repo.name}`}
       />

@@ -86,6 +86,8 @@ export function AnimatedExpandButton({
   return (
     <motion.div
       className={wrapperClassName}
+      style={{ width: collapsedWidth }}
+      initial={{ width: collapsedWidth }}
       animate={{
         width: isHovered ? expandedWidth : collapsedWidth,
       }}
