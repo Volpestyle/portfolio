@@ -23,6 +23,8 @@ export type RepoData = {
   homepage?: string | null;
   language?: string | null;
   topics?: string[];
+  summary?: string;
+  tags?: string[];
 };
 
 export type PortfolioReposResponse = {
@@ -30,7 +32,7 @@ export type PortfolioReposResponse = {
   normal: RepoData[]
 };
 
-async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
+export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
   if (!process.env.GITHUB_TOKEN) {
     throw new Error('GitHub token is not configured');
   }
@@ -124,7 +126,7 @@ export const getPortfolioRepos = unstable_cache(
   }
 );
 
-async function fetchRepoDetails(repo: string, owner: string = GITHUB_CONFIG.USERNAME): Promise<RepoData> {
+export async function fetchRepoDetails(repo: string, owner: string = GITHUB_CONFIG.USERNAME): Promise<RepoData> {
   const octokit = createOctokit();
 
   try {
@@ -191,7 +193,7 @@ export const getRepoDetails = unstable_cache(
   }
 );
 
-async function fetchRepoReadme(repo: string, owner: string = GITHUB_CONFIG.USERNAME): Promise<string> {
+export async function fetchRepoReadme(repo: string, owner: string = GITHUB_CONFIG.USERNAME): Promise<string> {
   const octokit = createOctokit();
 
   try {
@@ -329,7 +331,7 @@ export async function getGithubImageUrl(
  * @param owner - GitHub username (defaults to GITHUB_CONFIG.USERNAME)
  * @returns Document content and project name
  */
-async function fetchDocumentContent(
+export async function fetchDocumentContent(
   repo: string,
   docPath: string,
   owner: string = GITHUB_CONFIG.USERNAME
