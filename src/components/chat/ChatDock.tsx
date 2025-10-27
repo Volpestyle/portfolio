@@ -4,18 +4,13 @@ import { ChatThread } from '@/components/chat/ChatThread';
 import { ChatComposer } from './ChatComposer';
 import { useChat } from '@/hooks/useChat';
 import { ChatQueryProvider } from './ChatQueryProvider';
-import type { DehydratedState } from '@tanstack/react-query';
 
-type ChatDockProps = {
-  initialQueryState?: DehydratedState;
-};
-
-export default function ChatDock({ initialQueryState }: ChatDockProps) {
+export default function ChatDock() {
   const { messages, isBusy, send, error } = useChat();
   const hasMessages = messages.length > 0;
 
   return (
-    <ChatQueryProvider initialState={initialQueryState}>
+    <ChatQueryProvider>
       <div className="w-full max-w-3xl rounded-2xl shadow-2xl">
         <ChatThread messages={messages} isBusy={isBusy} />
         <ChatComposer hasMessages={hasMessages} onSend={send} isBusy={isBusy} />
