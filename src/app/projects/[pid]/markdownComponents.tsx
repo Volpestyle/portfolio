@@ -9,8 +9,14 @@ type MarkdownComponentOptions = {
 
 export const createMarkdownComponents = (
   pid: string,
-  { handleImageClick, onDocLinkClick }: MarkdownComponentOptions = {}
+  { handleImageClick, onDocLinkClick, variant }: MarkdownComponentOptions = {}
 ) => ({
+  h1: ({ children, ...props }: any) => <h1 {...props}>{children}</h1>,
+  h2: ({ children, ...props }: any) => <h2 {...props}>{children}</h2>,
+  h3: ({ children, ...props }: any) => <h3 {...props}>{children}</h3>,
+  h4: ({ children, ...props }: any) => <h4 {...props}>{children}</h4>,
+  h5: ({ children, ...props }: any) => <h5 {...props}>{children}</h5>,
+  h6: ({ children, ...props }: any) => <h6 {...props}>{children}</h6>,
   p: ({ node, children, ...props }: any) => {
     // Check if paragraph contains only image and text nodes
     const containsOnlyImageAndText = node?.children?.every(
@@ -36,12 +42,7 @@ export const createMarkdownComponents = (
     // Images are already processed server-side with absolute URLs
     return (
       <span className="inline-block">
-        <ServerImageRenderer
-          src={src}
-          alt={alt || ''}
-          onImageClick={handleImageClick}
-          {...props}
-        />
+        <ServerImageRenderer src={src} alt={alt || ''} onImageClick={handleImageClick} {...props} />
       </span>
     );
   },
@@ -65,22 +66,14 @@ export const createMarkdownComponents = (
       }
 
       return (
-        <Link
-          href={`/projects/${pid}/doc/${cleanPath}`}
-          className="text-blue-400 underline hover:text-blue-300"
-        >
+        <Link href={`/projects/${pid}/doc/${cleanPath}`} className="text-blue-400 underline hover:text-blue-300">
           {children}
         </Link>
       );
     }
     // External links
     return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-blue-400 hover:text-blue-300 underline"
-      >
+      <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300">
         {children}
       </a>
     );
@@ -102,7 +95,11 @@ function extractText(children: any): string | undefined {
   }
 
   if (Array.isArray(children)) {
-    const text = children.map((child) => extractText(child)).filter(Boolean).join(' ').trim();
+    const text = children
+      .map((child) => extractText(child))
+      .filter(Boolean)
+      .join(' ')
+      .trim();
     return text || undefined;
   }
 

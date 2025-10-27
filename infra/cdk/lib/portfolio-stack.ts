@@ -454,9 +454,14 @@ export class PortfolioStack extends Stack {
     this.revalidationTable.grantReadWriteData(initFn);
     this.grantSecretAccess(initFn);
 
+    const providerLogGroup = new logs.LogGroup(this, 'CacheInitializationProviderLogs', {
+      retention: logs.RetentionDays.ONE_DAY,
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+
     const provider = new Provider(this, 'CacheInitializationProvider', {
       onEventHandler: initFn,
-      logRetention: logs.RetentionDays.ONE_DAY,
+      logGroup: providerLogGroup,
     });
 
     new CustomResource(this, 'CacheInitializationResource', {

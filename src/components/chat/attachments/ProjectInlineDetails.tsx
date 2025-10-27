@@ -37,9 +37,10 @@ export function ProjectInlineDetails({ repo, readme, breadcrumbsOverride }: Proj
       setIsLoading(true);
       try {
         const document = await ensureDocument(owner, repo.name, path);
+        const filename = document.path.split('/').pop() || 'Document';
         setDocView({
           content: document.content,
-          title: label || document.path.split('/').pop() || 'Document',
+          title: label || filename,
           path: document.path,
         });
       } catch (error) {

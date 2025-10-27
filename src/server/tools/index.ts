@@ -18,7 +18,7 @@ export const tools: FunctionTool[] = [
     type: 'function',
     name: 'listProjects',
     description:
-      "List James's projects/repositories. PRIMARY TOOL for showing projects. Use filters to group by language (e.g., 'TypeScript', 'Python') or topic/subject (e.g., 'ai', 'web', 'data', 'fullstack'). Combine filters to narrow results. Use limit to show 1 project or a curated subset. Sort by 'recent' for latest work, 'starred' for highlights, or 'alphabetical'. Returns project cards that display inline in the chat.",
+      "List James's projects/repositories. PRIMARY TOOL for showing projects. Use filters to group by language (e.g., 'TypeScript', 'Python') or topic/subject (e.g., 'ai', 'web', 'data', 'fullstack'). Combine filters to narrow results. CRITICAL: When user asks for ONE specific project by name, ALWAYS set limit=1. For general browsing, use 3-5. Sort by 'recent' for latest work, 'starred' for highlights, or 'alphabetical'. Returns project cards that display inline in the chat.",
     parameters: {
       type: 'object',
       properties: {
@@ -58,7 +58,7 @@ export const tools: FunctionTool[] = [
     type: 'function',
     name: 'searchProjects',
     description:
-      'Semantic project lookup. Use when a user asks for themes (e.g., "AWS work", "AED sheets", "data pipelines") that may not match exact tags. Returns the most relevant project cards ranked by similarity.',
+      'Semantic project lookup. Use when a user asks for themes (e.g., "AWS work", "AED sheets", "data pipelines") or specific project names (e.g., "improview", "ilikeyacut"). CRITICAL: When user asks for ONE specific project, ALWAYS set limit=1. For thematic searches, use 3-5. Returns the most relevant project cards ranked by similarity.',
     parameters: {
       type: 'object',
       properties: {

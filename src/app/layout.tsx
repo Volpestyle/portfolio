@@ -1,4 +1,6 @@
 import './globals.css';
+import 'highlight.js/styles/github-dark.css';
+import '@/styles/markdown.css';
 import { ReactNode } from 'react';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import { Header } from '@/components/Header';

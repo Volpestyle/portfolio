@@ -247,3 +247,172 @@
 .markdown-body a:hover {
   text-decoration: underline;
 }
+
+/* Enhanced chat variant styling for better hierarchy */
+.markdown-body.chat-variant {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.markdown-body.chat-variant h1 {
+  font-size: 1.75em;
+  font-weight: 700;
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.markdown-body.chat-variant h1:first-child,
+.markdown-body.chat-variant h2:first-child,
+.markdown-body.chat-variant h3:first-child {
+  margin-top: 0.5em;
+}
+
+.markdown-body.chat-variant h2 {
+  font-size: 1.45em;
+  font-weight: 700;
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+  color: #f0f0f0;
+  letter-spacing: -0.01em;
+}
+
+.markdown-body.chat-variant h3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+  color: #e8e8e8;
+}
+
+.markdown-body.chat-variant h4 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  color: #e0e0e0;
+}
+
+.markdown-body.chat-variant h5 {
+  font-size: 1em;
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  color: #d8d8d8;
+}
+
+.markdown-body.chat-variant h6 {
+  font-size: 0.95em;
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  color: #d0d0d0;
+}
+
+.markdown-body.chat-variant p {
+  margin-bottom: 1em;
+  color: #c9d1d9;
+}
+
+.markdown-body.chat-variant ul,
+.markdown-body.chat-variant ol {
+  margin-bottom: 1em;
+  padding-left: 1.75em;
+}
+
+.markdown-body.chat-variant li {
+  margin-bottom: 0.4em;
+  line-height: 1.6;
+  color: #c9d1d9;
+}
+
+.markdown-body.chat-variant ul ul,
+.markdown-body.chat-variant ul ol,
+.markdown-body.chat-variant ol ul,
+.markdown-body.chat-variant ol ol {
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+}
+
+.markdown-body.chat-variant code {
+  font-size: 0.9em;
+  padding: 0.2em 0.4em;
+  background-color: rgba(110, 118, 129, 0.2);
+  border-radius: 4px;
+  color: #e6edf3;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+.markdown-body.chat-variant pre {
+  margin-bottom: 1em;
+  padding: 12px;
+  background-color: rgba(22, 27, 34, 0.6);
+  border-radius: 8px;
+  overflow-x: auto;
+  border: 1px solid rgba(48, 54, 61, 0.5);
+}
+
+.markdown-body.chat-variant pre code {
+  background-color: transparent;
+  padding: 0;
+  font-size: 0.85em;
+  line-height: 1.5;
+  color: inherit;
+}
+
+/* Syntax highlighting support for chat variant */
+.markdown-body.chat-variant .hljs {
+  background-color: transparent;
+  color: #e6edf3;
+}
+
+.markdown-body.chat-variant pre code.hljs {
+  padding: 0;
+}
+
+/* Ensure syntax highlighting tokens inherit proper styling */
+.markdown-body.chat-variant .hljs-keyword,
+.markdown-body.chat-variant .hljs-selector-tag,
+.markdown-body.chat-variant .hljs-literal,
+.markdown-body.chat-variant .hljs-section,
+.markdown-body.chat-variant .hljs-link {
+  font-weight: inherit;
+}
+
+.markdown-body.chat-variant blockquote {
+  margin-bottom: 1em;
+  padding: 0.5em 1em;
+  border-left: 3px solid #58a6ff;
+  background-color: rgba(88, 166, 255, 0.05);
+  border-radius: 0 4px 4px 0;
+  color: #8b949e;
+  font-style: italic;
+}
+
+.markdown-body.chat-variant table {
+  margin-bottom: 1em;
+  font-size: 0.9em;
+}
+
+.markdown-body.chat-variant table th {
+  font-weight: 600;
+  background-color: rgba(48, 54, 61, 0.3);
+  color: #e6edf3;
+}
+
+.markdown-body.chat-variant hr {
+  margin: 1.5em 0;
+  border: 0;
+  border-top: 1px solid #30363d;
+}
+
+.markdown-body.chat-variant strong {
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.markdown-body.chat-variant em {
+  font-style: italic;
+  color: #c9d1d9;
+}
