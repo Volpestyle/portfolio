@@ -33,9 +33,9 @@ export function ServerImageRenderer({
         className={`h-auto w-auto max-w-full cursor-pointer ${className || ''}`}
         onClick={() => onImageClick?.(src)}
         onLoad={() => onImageLoad?.()}
-        unoptimized={!isLocalImage}
-        sizes="(max-width: 768px) 90vw, 50vw"
+        sizes="(max-width: 640px) 90vw, (max-width: 1024px) 75vw, 50vw"
         priority={isLocalImage}
+        loading={isLocalImage ? 'eager' : 'lazy'}
       />
     </div>
   );

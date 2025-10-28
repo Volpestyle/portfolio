@@ -200,6 +200,7 @@ export class PortfolioStack extends Stack {
     }
 
     const serverCachePolicy = this.createServerCachePolicy();
+    const imageCachePolicy = this.createImageCachePolicy();
     const staticCachePolicy = cloudfront.CachePolicy.CACHING_OPTIMIZED;
     const responseHeadersPolicy = cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS;
 
@@ -246,6 +247,7 @@ export class PortfolioStack extends Stack {
       },
       additionalBehaviors: this.buildAdditionalBehaviors({
         serverCachePolicy,
+        imageCachePolicy,
         staticCachePolicy,
         serverEdgeFunction,
         originMap,
@@ -684,8 +686,24 @@ export class PortfolioStack extends Stack {
     });
   }
 
+  private createImageCachePolicy(): cloudfront.CachePolicy {
+    return new cloudfront.CachePolicy(this, 'ImageCachePolicy', {
+      cachePolicyName: `${Stack.of(this).stackName}-Image`,
+      comment: 'Cache policy for Next.js image optimization (/_next/image)',
+      defaultTtl: Duration.days(30),
+      maxTtl: Duration.days(365),
+      minTtl: Duration.seconds(0),
+      queryStringBehavior: cloudfront.CacheQueryStringBehavior.all(), // url, w, q
+      headerBehavior: cloudfront.CacheHeaderBehavior.allowList('accept'), // webp/avif variants
+      cookieBehavior: cloudfront.CacheCookieBehavior.none(),
+      enableAcceptEncodingBrotli: true,
+      enableAcceptEncodingGzip: true,
+    });
+  }
+
   private buildAdditionalBehaviors(options: {
     serverCachePolicy: cloudfront.ICachePolicy;
+    imageCachePolicy: cloudfront.ICachePolicy;
     staticCachePolicy: cloudfront.ICachePolicy;
     serverEdgeFunction: cloudfrontExperimental.EdgeFunction;
     originMap: Record<string, cloudfront.IOrigin>;
@@ -693,6 +711,7 @@ export class PortfolioStack extends Stack {
   }): Record<string, cloudfront.BehaviorOptions> {
     const {
       serverCachePolicy,
+      imageCachePolicy,
       staticCachePolicy,
       serverEdgeFunction,
       originMap,
@@ -716,7 +735,7 @@ export class PortfolioStack extends Stack {
       const isStatic = originKey === 's3';
       const isImageOptimizer = originKey === 'imageOptimizer';
       const cachePolicy = isImageOptimizer
-        ? cloudfront.CachePolicy.CACHING_DISABLED
+        ? imageCachePolicy
         : isStatic
           ? staticCachePolicy
           : serverCachePolicy;
