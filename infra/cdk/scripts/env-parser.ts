@@ -54,11 +54,11 @@ export function parseEnvFile(filePath: string): ParsedEnv {
             const [key, ...valueParts] = trimmed.split('=');
             const value = valueParts.join('=').trim();
             const cleanValue = value.replace(/^["']|["']$/g, '');
-
             result[currentSection][key.trim()] = cleanValue;
         }
     }
 
     return result;
 }
+
 

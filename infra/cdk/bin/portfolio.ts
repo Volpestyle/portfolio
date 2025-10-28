@@ -5,6 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import dotenv from 'dotenv';
 import { PortfolioStack } from '../lib/portfolio-stack';
+import { parseEnvFile } from '../scripts/env-parser';
 
 const app = new App();
 
@@ -18,9 +19,13 @@ if (region !== 'us-east-1') {
 }
 
 const envFileFromCli = process.env.CDK_ENV_FILE;
+const productionEnvFile = path.resolve(process.cwd(), '..', '..', '.env.production');
 const defaultEnvFile = path.resolve(process.cwd(), '..', '..', '.env.cdk');
-const envFileToUse = envFileFromCli && fs.existsSync(envFileFromCli) ? envFileFromCli : defaultEnvFile;
-if (fs.existsSync(envFileToUse)) {
+const envFileCandidates = [envFileFromCli, productionEnvFile, defaultEnvFile].filter(
+  (p): p is string => typeof p === 'string' && p.length > 0
+);
+const envFileToUse = envFileCandidates.find((p) => fs.existsSync(p));
+if (envFileToUse) {
   dotenv.config({ path: envFileToUse });
 }
 
@@ -35,71 +40,45 @@ const stringList = (value?: string) =>
       .filter(Boolean)
     : [];
 
-const collectLambdaEnv = () => {
-  const prefixes = (
-    process.env.APP_ENV_PREFIXES ??
-    'NEXT_,UPSTASH_,PORTFOLIO_,GH_,SECRETS_,AWS_ENV_,AWS_REPO_,AWS_SECRETS_,AWS_REGION'
-  )
-    .split(',')
-    .map((v) => v.trim())
-    .filter(Boolean);
-  const explicitKeys = (process.env.APP_ENV_VARS ?? '')
-    .split(',')
-    .map((v) => v.trim())
-    .filter(Boolean);
-  const blockedKeys = (
-    process.env.APP_ENV_BLOCKLIST ??
-    'OPENAI_API_KEY,AWS_SECRET_ACCESS_KEY,AWS_ACCESS_KEY_ID,GH_TOKEN,UPSTASH_REDIS_REST_TOKEN'
-  )
-    .split(',')
-    .map((v) => v.trim())
-    .filter(Boolean);
+const collectLambdaEnv = (parsedFileEnv?: { envVars: Record<string, string>; repoVars: Record<string, string> }): Record<string, string> => {
+  if (parsedFileEnv) {
+    const combined: Record<string, string> = { ...parsedFileEnv.envVars, ...parsedFileEnv.repoVars };
+    for (const key of Object.keys(combined)) {
+      const override = process.env[key];
+      if (typeof override === 'string' && override.length > 0) {
+        combined[key] = override;
+      } else if (combined[key] === undefined || combined[key] === null) {
+        delete combined[key];
+      }
+    }
+    for (const [key, value] of Object.entries(combined)) {
+      if (typeof value !== 'string' || value.trim().length === 0) {
+        delete combined[key];
+      } else {
+        combined[key] = value.trim();
+      }
+    }
+    return combined;
+  }
 
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
-    if (value === undefined) continue;
-    if (prefixes.some((prefix) => key.startsWith(prefix))) {
+    if (typeof value === 'string' && value.length > 0) {
       result[key] = value;
     }
   }
-  for (const key of explicitKeys) {
-    const value = process.env[key];
-    if (value !== undefined) {
-      result[key] = value;
-    }
-  }
-
-  for (const key of blockedKeys) {
-    delete result[key];
-  }
-
-  for (const key of [
-    'SECRETS_MANAGER_ENV_SECRET_ID',
-    'SECRETS_MANAGER_REPO_SECRET_ID',
-    'AWS_SECRETS_MANAGER_PRIMARY_REGION',
-    'AWS_SECRETS_MANAGER_FALLBACK_REGION',
-  ]) {
-    const value = process.env[key];
-    if (typeof value === 'string' && value.trim().length > 0) {
-      result[key] = value.trim();
-    }
-  }
-
   return result;
 };
 
 const openNextPath = path.resolve(process.cwd(), '..', '..', '.open-next');
 const inferredOpenNextPath = fs.existsSync(openNextPath) ? openNextPath : undefined;
 
-const lambdaEnvironment = collectLambdaEnv();
-const requiredLambdaKeys = ['SECRETS_MANAGER_REPO_SECRET_ID'];
-for (const key of requiredLambdaKeys) {
-  if (!lambdaEnvironment[key]) {
-    throw new Error(
-      `Missing required environment value '${key}'. Ensure it is set before running the CDK deploy (e.g. GitHub Actions repository variables or your shell environment).`
-    );
-  }
-}
+const parsedEnvFile = envFileToUse ? parseEnvFile(envFileToUse) : undefined;
+const lambdaEnvironment = collectLambdaEnv(
+  parsedEnvFile
+    ? { envVars: parsedEnvFile.envVars, repoVars: parsedEnvFile.repoVars }
+    : undefined
+);
 
 new PortfolioStack(app, 'PortfolioStack', {
   env: {

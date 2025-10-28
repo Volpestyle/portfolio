@@ -33,15 +33,15 @@ export type PortfolioReposResponse = {
 };
 
 export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
-  if (!resolveGitHubToken()) {
+  const token = await resolveGitHubToken();
+  if (!token) {
     throw new Error('GitHub token is not configured');
   }
-
   if (!process.env.PORTFOLIO_GIST_ID) {
     throw new Error('Portfolio gist ID is not configured');
   }
 
-  const octokit = createOctokit();
+  const octokit = createOctokit(token);
 
   try {
     const portfolioConfig = await getPortfolioConfig();
@@ -127,7 +127,9 @@ export const getPortfolioRepos = unstable_cache(
 );
 
 export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.USERNAME): Promise<RepoData> {
-  const octokit = createOctokit();
+  const token = await resolveGitHubToken();
+  if (!token) throw new Error('GitHub token is not configured');
+  const octokit = createOctokit(token);
 
   try {
     // First try to get from portfolio config for private repos
@@ -194,7 +196,9 @@ export const getRepoDetails = unstable_cache(
 );
 
 export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.USERNAME): Promise<string> {
-  const octokit = createOctokit();
+  const token = await resolveGitHubToken();
+  if (!token) throw new Error('GitHub token is not configured');
+  const octokit = createOctokit(token);
 
   try {
     // First check portfolio config for private repos
@@ -336,7 +340,9 @@ export async function fetchDocumentContent(
   docPath: string,
   owner: string = GH_CONFIG.USERNAME
 ): Promise<{ content: string; projectName: string }> {
-  const octokit = createOctokit();
+  const token = await resolveGitHubToken();
+  if (!token) throw new Error('GitHub token is not configured');
+  const octokit = createOctokit(token);
 
   try {
     // Check portfolio config for private repos and document overrides

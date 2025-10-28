@@ -236,12 +236,13 @@ export class PortfolioStack extends Stack {
         cachePolicy: serverCachePolicy,
         originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
         responseHeadersPolicy,
-        edgeLambdas: [
-          {
-            eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
-            functionVersion: serverEdgeFunction.currentVersion,
-          },
-        ],
+      edgeLambdas: [
+        {
+          eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
+          functionVersion: serverEdgeFunction.currentVersion,
+          includeBody: true,
+        },
+      ],
       },
       additionalBehaviors: this.buildAdditionalBehaviors({
         serverCachePolicy,
@@ -450,7 +451,11 @@ export class PortfolioStack extends Stack {
       code: lambda.Code.fromAsset(bundlePath),
       timeout: Duration.minutes(5),
       memorySize: 256,
-      environment: this.pickRuntimeEnv(baseEnv, ['CACHE_DYNAMO_TABLE']),
+      environment: this.pickRuntimeEnv(baseEnv, [
+        'CACHE_DYNAMO_TABLE',
+        'NODE_ENV',
+        'NEXT_PUBLIC_SITE_URL',
+      ]),
       logGroup: initLogGroup,
     });
 
@@ -498,7 +503,15 @@ export class PortfolioStack extends Stack {
       code: lambda.Code.fromAsset(bundlePath),
       timeout: Duration.seconds(30),
       memorySize: 512,
-      environment: this.filterReservedLambdaEnv(baseEnv),
+      environment: this.pickRuntimeEnv(baseEnv, [
+        'CACHE_DYNAMO_TABLE',
+        'REVALIDATION_QUEUE_URL',
+        'REVALIDATION_QUEUE_REGION',
+        'AWS_REGION',
+        'AWS_SECRETS_MANAGER_PRIMARY_REGION',
+        'NODE_ENV',
+        'NEXT_PUBLIC_SITE_URL',
+      ]),
       logGroup: workerLogGroup,
     });
 
@@ -710,7 +723,7 @@ export class PortfolioStack extends Stack {
           ? cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS
           : cloudfront.AllowedMethods.ALLOW_ALL;
       const originRequestPolicy = isImageOptimizer
-        ? cloudfront.OriginRequestPolicy.ALL_VIEWER
+        ? cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER
         : !isStatic
           ? cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER
           : undefined;
@@ -720,6 +733,7 @@ export class PortfolioStack extends Stack {
             {
               eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
               functionVersion: serverEdgeFunction.currentVersion,
+              includeBody: true,
             },
           ]
           : undefined;
@@ -817,10 +831,22 @@ export class PortfolioStack extends Stack {
   }
 
   private filterReservedLambdaEnv(env: Record<string, string>): Record<string, string> {
-    const reserved = new Set(['AWS_REGION', 'AWS_DEFAULT_REGION']);
+    const reserved = new Set([
+      'AWS_REGION',
+      'AWS_DEFAULT_REGION',
+      'AWS_ACCESS_KEY_ID',
+      'AWS_SECRET_ACCESS_KEY',
+      'AWS_SESSION_TOKEN',
+    ]);
+    const isValidLambdaEnvKey = (key: string): boolean => /^[A-Za-z][A-Za-z0-9_]*$/.test(key);
     const sanitized: Record<string, string> = {};
     for (const [key, value] of Object.entries(env)) {
       if (reserved.has(key)) {
+        continue;
+      }
+      // CloudFormation/Lambda require env var names to start with a letter and contain only letters, numbers, and underscores
+      // Common CI shells inject '_' which is invalid and must be filtered out
+      if (!isValidLambdaEnvKey(key)) {
         continue;
       }
       sanitized[key] = value;

@@ -1,136 +1,124 @@
-name: Deploy Next.js via CDK
+name: Deploy (production)
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub environment (defaults to production)
+        required: false
+        default: production
+        type: environment
+
+# OIDC for AWS + read access to repo
+permissions:
+  id-token: write
+  contents: read
 
 concurrency:
-  group: deploy-main
+  group: deploy-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # --- Paths (adjust if your layout differs) ---
+  # Root of your Next.js app that contains open-next.config.(ts|mjs|cjs)
+  APP_ROOT: ${{ vars.NEXT_APP_PATH || '.' }}
+  # CDK package directory (where package.json with "cdk" scripts lives)
+  CDK_WORKDIR: ${{ vars.CDK_WORKDIR || 'infra/cdk' }}
+
+  # --- Tooling versions ---
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+
+  # --- Required by your stack / code paths ---
+  # Region must be us-east-1 due to Lambda@Edge in your app code.
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+  # These map straight into process.env read by your CDK app
+  APP_DOMAIN_NAME: ${{ vars.APP_DOMAIN_NAME }}
+  APP_HOSTED_ZONE_DOMAIN: ${{ vars.APP_HOSTED_ZONE_DOMAIN }}
+  APP_CERTIFICATE_ARN: ${{ vars.APP_CERTIFICATE_ARN }}
+  APP_ALTERNATE_DOMAINS: ${{ vars.APP_ALTERNATE_DOMAINS }}
+
+  # Secrets Manager ids used by your stack to mount runtime secrets
+  SECRETS_MANAGER_ENV_SECRET_ID: ${{ vars.SECRETS_MANAGER_ENV_SECRET_ID }}
+  SECRETS_MANAGER_REPO_SECRET_ID: ${{ vars.SECRETS_MANAGER_REPO_SECRET_ID }}
+
+  # Optional repo variables you referenced
+  PORTFOLIO_GIST_ID: ${{ vars.PORTFOLIO_GIST_ID }}
+  UPSTASH_REDIS_REST_URL: ${{ vars.UPSTASH_REDIS_REST_URL }}
+
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    env:
-      PORTFOLIO_GIST_ID: ${{ vars.PORTFOLIO_GIST_ID }}
-      AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID  }}
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      UPSTASH_REDIS_REST_URL: ${{ vars.UPSTASH_REDIS_REST_URL }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
-      UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-    steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-
-      - uses: pnpm/action-setup@v4
-        with: { version: 9 }
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install root dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Lint
-        run: pnpm run lint
-
-      # If forked PRs fail due to missing secrets, gate this:
-      # if: github.event_name != 'pull_request'
-      - name: Build Next.js app
-        run: pnpm run build
-
-      - name: Install CDK dependencies
-        working-directory: infra/cdk
-        run: pnpm install --frozen-lockfile
-
-      - name: Validate CDK stack
-        working-directory: infra/cdk
-        run: pnpm run check
-
   deploy:
+    name: Build & CDK deploy (us-east-1)
     runs-on: ubuntu-latest
-    needs: validate
-    if: github.event_name != 'pull_request' && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main')
-    permissions:
-      id-token: write
-      contents: read
-    env:
-      PORTFOLIO_GIST_ID: ${{ vars.PORTFOLIO_GIST_ID }}
-      AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID }}
-      AWS_REGION: us-east-1 # force edge region
-      UPSTASH_REDIS_REST_URL: ${{ vars.UPSTASH_REDIS_REST_URL }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
-      UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
-      # Do NOT expose OPENAI_API_KEY here unless absolutely needed for build
+    environment:
+      name: ${{ inputs.environment || 'production' }}
+
     steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with: { version: 9 }
-
-      - uses: actions/setup-node@v4
+      - name: Enable pnpm
+        uses: pnpm/action-setup@v4
         with:
-          node-version: 20
-          cache: pnpm
+          version: ${{ env.PNPM_VERSION }}
+      - name: Setup Node and pnpm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
-      - name: Install root dependencies
+      # ----- Build your Next.js app with OpenNext (produces .open-next) -----
+      - name: Install app dependencies
+        working-directory: ${{ env.APP_ROOT }}
         run: pnpm install --frozen-lockfile
 
-      - name: Configure AWS credentials (us-east-1 for Lambda@Edge)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.CDK_DEPLOY_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - name: Set CDK env
-        run: |
-          echo "CDK_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
-          echo "CDK_DEFAULT_ACCOUNT=${{ secrets.CDK_DEFAULT_ACCOUNT }}" >> $GITHUB_ENV
-
-      - name: Build OpenNext artifacts
-        # include OPENAI_API_KEY only if your next build truly needs it
+      - name: Build Next.js with OpenNext
+        working-directory: ${{ env.APP_ROOT }}
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: pnpm run build:web
+          PORTFOLIO_GIST_ID: ${{ env.PORTFOLIO_GIST_ID }}
+        run: |
+          pnpm dlx @opennextjs/aws@latest build
+          test -f .open-next/open-next.output.json
 
-      - name: Install CDK dependencies
-        working-directory: infra/cdk
+      # ----- Prepare CDK workspace -----
+      - name: Install CDK workspace deps
+        working-directory: ${{ env.CDK_WORKDIR }}
         run: pnpm install --frozen-lockfile
 
-      - name: Validate Secrets Config
-        run: |
-          if [ -z "${SECRETS_MANAGER_REPO_SECRET_ID:-}" ]; then
-            echo "SECRETS_MANAGER_REPO_SECRET_ID is not configured. Set a repository variable before deploying." >&2
-            exit 1
-          fi
+      - name: Build CDK (TypeScript)
+        working-directory: ${{ env.CDK_WORKDIR }}
+        run: pnpm run build
 
-      - name: Debug Secrets Env
-        run: |
-          env | sort | grep -E 'SECRETS_MANAGER|OPENAI' || true
+      - name: Validate stack configuration
+        working-directory: ${{ env.CDK_WORKDIR }}
+        run: pnpm run validate
 
-      - name: Deploy CDK stack
-        working-directory: infra/cdk
+      # ----- Configure AWS credentials -----
+      # Prefer OIDC with a deploy role (recommended)
+      - name: Configure AWS credentials (OIDC)
+        if: ${{ vars.CDK_DEPLOY_ROLE_ARN != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.CDK_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      # ----- Deploy -----
+      - name: CDK deploy PortfolioStack
+        working-directory: ${{ env.CDK_WORKDIR }}
         env:
-          APP_DOMAIN_NAME: ${{ vars.APP_DOMAIN_NAME }}
-          APP_HOSTED_ZONE_DOMAIN: ${{ vars.APP_HOSTED_ZONE_DOMAIN }}
-          APP_ALTERNATE_DOMAINS: ${{ vars.APP_ALTERNATE_DOMAINS }}
-          APP_CERTIFICATE_ARN: ${{ vars.APP_CERTIFICATE_ARN }}
-          APP_ENV_VARS: ${{ vars.APP_ENV_VARS }}
-          APP_ENV_PREFIXES: ${{ vars.APP_ENV_PREFIXES }}
-          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
-          SECRETS_MANAGER_ENV_SECRET_ID: ${{ vars.SECRETS_MANAGER_ENV_SECRET_ID }}
-          SECRETS_MANAGER_REPO_SECRET_ID: ${{ vars.SECRETS_MANAGER_REPO_SECRET_ID }}
-          # keep secrets out of CDK env if you can
-        run: pnpm cdk deploy --require-approval never
+          # Surface runtime secrets/vars required by your code at synth time;
+          # your stack then passes them into Lambda env via collectLambdaEnv().
+          PORTFOLIO_GIST_ID: ${{ env.PORTFOLIO_GIST_ID }}
+          UPSTASH_REDIS_REST_URL: ${{ env.UPSTASH_REDIS_REST_URL }}
+          APP_DOMAIN_NAME: ${{ env.APP_DOMAIN_NAME }}
+          APP_HOSTED_ZONE_DOMAIN: ${{ env.APP_HOSTED_ZONE_DOMAIN }}
+          APP_CERTIFICATE_ARN: ${{ env.APP_CERTIFICATE_ARN }}
+          APP_ALTERNATE_DOMAINS: ${{ env.APP_ALTERNATE_DOMAINS }}
+          SECRETS_MANAGER_ENV_SECRET_ID: ${{ env.SECRETS_MANAGER_ENV_SECRET_ID }}
+          SECRETS_MANAGER_REPO_SECRET_ID: ${{ env.SECRETS_MANAGER_REPO_SECRET_ID }}
+        run: |
+          pnpm exec cdk deploy PortfolioStack --require-approval never --verbose

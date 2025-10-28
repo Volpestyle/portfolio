@@ -2,7 +2,7 @@
 
 import { Octokit } from '@octokit/rest';
 import { resolve } from 'path';
-import { parseEnvFile, ParsedEnv } from './env-parser';
+import { parseEnvFile, ParsedEnv } from '../infra/cdk/scripts/env-parser';
 import {
     log,
     firstNonEmpty,

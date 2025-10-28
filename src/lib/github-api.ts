@@ -1,28 +1,30 @@
 import { Octokit } from '@octokit/rest';
 import { GH_CONFIG } from '@/lib/constants';
 import { PortfolioConfig, PortfolioRepoConfig } from '@/types/portfolio';
+import { resolveSecretValue } from '@/lib/secrets/manager';
 
-let octokitInstance: Octokit | null = null;
+const octokitByToken = new Map<string, Octokit>();
 
-export function resolveGitHubToken() {
-  return process.env.GH_TOKEN ?? null;
+export async function resolveGitHubToken(): Promise<string | null> {
+  const envToken = process.env.GH_TOKEN ?? null;
+  if (envToken) return envToken;
+  try {
+    const fromSecret = await resolveSecretValue('GH_TOKEN', { scope: 'repo' });
+    return fromSecret ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Creates or returns a singleton Octokit instance
+ * Creates or returns a cached Octokit instance for the provided token.
  */
-export function createOctokit(): Octokit {
-  const token = resolveGitHubToken();
-  if (!token) {
-    throw new Error('GitHub token is not configured');
-  }
-
-  if (!octokitInstance) {
-    octokitInstance = new Octokit({
-      auth: token,
-    });
-  }
-  return octokitInstance;
+export function createOctokit(token: string): Octokit {
+  const existing = octokitByToken.get(token);
+  if (existing) return existing;
+  const client = new Octokit({ auth: token });
+  octokitByToken.set(token, client);
+  return client;
 }
 
 /**
@@ -36,7 +38,12 @@ export async function getPortfolioConfig(): Promise<PortfolioConfig | null> {
   }
 
   try {
-    const octokit = createOctokit();
+    const token = await resolveGitHubToken();
+    if (!token) {
+      console.error('GitHub token not configured');
+      return null;
+    }
+    const octokit = createOctokit(token);
     const gistResponse = await octokit.rest.gists.get({
       gist_id: gistId,
     });
@@ -108,7 +115,12 @@ export function serverErrorResponse(message: string = 'Internal server error'): 
  */
 export async function getReadmeFromGist(gistId: string): Promise<string | null> {
   try {
-    const octokit = createOctokit();
+    const token = await resolveGitHubToken();
+    if (!token) {
+      console.error('GitHub token not configured');
+      return null;
+    }
+    const octokit = createOctokit(token);
     const gistResponse = await octokit.rest.gists.get({
       gist_id: gistId,
     });

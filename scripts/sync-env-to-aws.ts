@@ -7,7 +7,7 @@ import {
   PutSecretValueCommand,
   DescribeSecretCommand,
 } from '@aws-sdk/client-secrets-manager';
-import { parseEnvFile, ParsedEnv } from './env-parser';
+import { parseEnvFile, ParsedEnv } from '../infra/cdk/scripts/env-parser';
 import {
   log,
   firstNonEmpty,
