@@ -16,7 +16,6 @@ const config: OpenNextConfig = {
   imageOptimization: {
     override: {
       wrapper: 'aws-lambda',
-      converter: 'aws-cloudfront',
     },
   },
   buildCommand: 'pnpm exec next build',

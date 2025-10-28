@@ -3,6 +3,7 @@
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import type { NextRequest } from 'next/server';
+import { resolveSecretValue } from '@/lib/secrets/manager';
 type RateLimitResult =
   | ({
       success: true;
@@ -24,26 +25,61 @@ type RateLimitResult =
     };
 
 let chatRateLimiter: Ratelimit | null | undefined;
+let chatRateLimiterPromise: Promise<Ratelimit | null> | null = null;
 
-function getRateLimiter() {
-  if (chatRateLimiter !== undefined) {
-    return chatRateLimiter;
-  }
-
+async function initRateLimiter(): Promise<Ratelimit | null> {
   try {
-    const redis = Redis.fromEnv();
-    chatRateLimiter = new Ratelimit({
+    const [url, token] = await Promise.all([
+      resolveSecretValue('UPSTASH_REDIS_REST_URL', { scope: 'repo' }),
+      resolveSecretValue('UPSTASH_REDIS_REST_TOKEN', { scope: 'repo' }),
+    ]);
+
+    if (!url || !token) {
+      console.warn('Rate limiting disabled (Upstash credentials missing).');
+      return null;
+    }
+
+    const redis = new Redis({
+      url,
+      token,
+    });
+
+    return new Ratelimit({
       redis,
       prefix: 'ratelimit:chat',
       limiter: Ratelimit.slidingWindow(10, '1 m'),
       analytics: true,
     });
-    return chatRateLimiter;
   } catch (error) {
-    console.warn('Rate limiting disabled (Upstash env vars missing or invalid).', error);
-    chatRateLimiter = null;
+    console.warn('Rate limiting disabled (failed to initialize Upstash client).', error);
+    return null;
+  }
+}
+
+async function getRateLimiter(): Promise<Ratelimit | null> {
+  if (chatRateLimiter !== undefined) {
     return chatRateLimiter;
   }
+
+  if (!chatRateLimiterPromise) {
+    chatRateLimiterPromise = initRateLimiter().finally(() => {
+      chatRateLimiterPromise = null;
+    });
+  }
+
+  chatRateLimiter = await chatRateLimiterPromise;
+  return chatRateLimiter;
+}
+
+function buildFailureResult(reason: string): RateLimitResult {
+  const reset = Math.floor(Date.now() / 1000) + 60;
+  return {
+    success: false,
+    limit: 0,
+    remaining: 0,
+    reset,
+    reason,
+  };
 }
 
 function getClientIp(req: NextRequest) {
@@ -75,9 +111,9 @@ function getClientIdentifier(req: NextRequest) {
 }
 
 export async function enforceChatRateLimit(req: NextRequest): Promise<RateLimitResult> {
-  const limiter = getRateLimiter();
+  const limiter = await getRateLimiter();
   if (!limiter) {
-    return { success: true };
+    return buildFailureResult('Rate limiter unavailable');
   }
 
   const identifier = getClientIdentifier(req);
@@ -85,6 +121,6 @@ export async function enforceChatRateLimit(req: NextRequest): Promise<RateLimitR
     return await limiter.limit(identifier);
   } catch (error) {
     console.error('Failed to execute rate limit check:', error);
-    return { success: true };
+    return buildFailureResult('Failed to execute rate limit check');
   }
 }

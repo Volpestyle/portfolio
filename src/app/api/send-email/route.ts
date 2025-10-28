@@ -1,29 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { headers } from 'next/headers';
-import { resolveSecretValue } from '@/lib/secrets/manager';
-
 let cachedSes: SESClient | undefined;
 
 async function getSesClient(): Promise<SESClient> {
   if (!cachedSes) {
     const region = process.env.AWS_REGION ?? process.env.REGION ?? 'us-east-1';
-    const accessKeyId = await resolveSecretValue('AWS_ACCESS_KEY_ID', {
-      scope: 'repo',
-    });
-    const secretAccessKey = await resolveSecretValue('AWS_SECRET_ACCESS_KEY', {
-      scope: 'repo',
-    });
 
     cachedSes = new SESClient({
       region,
-      credentials:
-        accessKeyId && secretAccessKey
-          ? {
-            accessKeyId,
-            secretAccessKey,
-          }
-          : undefined,
     });
   }
 

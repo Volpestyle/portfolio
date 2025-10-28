@@ -236,13 +236,13 @@ export class PortfolioStack extends Stack {
         cachePolicy: serverCachePolicy,
         originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
         responseHeadersPolicy,
-      edgeLambdas: [
-        {
-          eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
-          functionVersion: serverEdgeFunction.currentVersion,
-          includeBody: true,
-        },
-      ],
+        edgeLambdas: [
+          {
+            eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
+            functionVersion: serverEdgeFunction.currentVersion,
+            includeBody: true,
+          },
+        ],
       },
       additionalBehaviors: this.buildAdditionalBehaviors({
         serverCachePolicy,
@@ -420,7 +420,9 @@ export class PortfolioStack extends Stack {
     env['REVALIDATION_QUEUE_URL'] = this.revalidationQueue.queueUrl;
     env['REVALIDATION_QUEUE_REGION'] = region;
     env['BUCKET_NAME'] = env['BUCKET_NAME'] ?? this.assetsBucket.bucketName;
-    env['BUCKET_KEY_PREFIX'] = env['BUCKET_KEY_PREFIX'] ?? '_assets';
+
+    const s3OriginPath = this.openNextOutput.origins.s3.originPath ?? '/';
+    env['BUCKET_KEY_PREFIX'] = s3OriginPath.replace(/^\//, ''); // '' if originPath is '/'
 
     if (!env['AWS_SECRETS_MANAGER_PRIMARY_REGION']) {
       env['AWS_SECRETS_MANAGER_PRIMARY_REGION'] = region;
@@ -900,6 +902,9 @@ export class PortfolioStack extends Stack {
           conditions: {
             ArnLike: {
               'aws:SourceArn': distribution.distributionArn,
+            },
+            StringEquals: {
+              'aws:SourceAccount': Stack.of(this).account,
             },
           },
         })
