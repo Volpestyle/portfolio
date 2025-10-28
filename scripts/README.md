@@ -38,6 +38,8 @@ export GH_REPO="your-repo-name"
 
 > **Tip:** Persist these values in your shell profile (`~/.zshrc`, `~/.bashrc`, etc.), or store them in the `.env.*` file you sync—`GH_TOKEN` is typically a `REPO SECRET`, while `GH_OWNER`/`GH_REPO` can live under `REPO VARS`.
 
+If `GH_OWNER` / `GH_REPO` are missing, the scripts will try to auto-detect them from `git remote get-url origin`, but keeping them in the `.env.*` file avoids surprises.
+
 ### 3. Configure AWS access
 
 The AWS sync script uses the default credential/config resolution chain. At a minimum set:
@@ -48,18 +50,9 @@ export AWS_SECRET_ACCESS_KEY="..."
 export AWS_REGION="us-east-1" # or your preferred region
 ```
 
-Optional overrides:
+If `AWS_REGION` is not exported in your shell, the AWS sync script reads it from the `.env.*` file you provide.
 
-- `AWS_SECRET_PREFIX` – base path for generated secret names (default `portfolio`)
-- `AWS_ENV_SECRET_NAME` / `AWS_ENV_SECRET_NAME_<ENV>` – explicit secret name for `ENV SECRETS`
-- `AWS_REPO_SECRET_NAME` / `AWS_REPO_SECRET_NAME_<ENV>` – explicit secret name for `REPO SECRETS`
-
-If `AWS_REGION`/`AWS_DEFAULT_REGION` are not present in your shell, the script falls back to `AWS_REGION` defined in the `.env.*` file you are syncing.
-
-When no explicit names are provided the script writes to:
-
-- Environment secrets → `${AWS_SECRET_PREFIX}/${environment}/env`
-- Repository secrets → `${AWS_SECRET_PREFIX}/repository`
+If the `.env.*` file does not specify `SECRETS_MANAGER_ENV_SECRET_ID` / `SECRETS_MANAGER_REPO_SECRET_ID`, the scripts derive them automatically using `<repo-name>/<environment>/env` and `<repo-name>/repository` (based on the detected repository). Add explicit values if you need a different naming scheme.
 
 ### 4. Structure your .env files
 
@@ -111,11 +104,10 @@ pnpm sync:prod
 # GitHub only
 tsx scripts/sync-env-to-github.ts --env=.env.custom --environment=custom-env
 
-# AWS only (with optional overrides)
+# AWS only
 AWS_REGION=us-east-1 tsx scripts/sync-env-to-aws.ts \
   --env=.env.custom \
-  --environment=custom-env \
-  --secret-prefix=portfolio
+  --environment=custom-env
 ```
 
 ## How it works
@@ -134,15 +126,6 @@ AWS_REGION=us-east-1 tsx scripts/sync-env-to-aws.ts \
 3. **Upsert** – creates the target secrets when missing or writes a new version with `PutSecretValue`
 
 Environment secrets and repository secrets are stored separately so they can be consumed by different services. The script never logs secret values—only the keys being updated.
-
-## Output colors
-
-- 🟢 **Green (✓)** – Successful operations
-- 🔴 **Red (✗)** – Errors
-- 🔵 **Blue (ℹ)** – Information
-- 🟡 **Yellow (⚠)** – Warnings
-- 🔷 **Cyan (section headers)** – Progress sections
-- ⚫ **Gray (details)** – Additional details
 
 ## Example output
 

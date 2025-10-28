@@ -3,28 +3,12 @@
 import { Octokit } from '@octokit/rest';
 import { resolve } from 'path';
 import { parseEnvFile, ParsedEnv } from './env-parser';
-
-// Color codes for console output
-const colors = {
-    reset: '\x1b[0m',
-    bright: '\x1b[1m',
-    dim: '\x1b[2m',
-    red: '\x1b[31m',
-    green: '\x1b[32m',
-    yellow: '\x1b[33m',
-    blue: '\x1b[34m',
-    magenta: '\x1b[35m',
-    cyan: '\x1b[36m',
-};
-
-const log = {
-    success: (msg: string) => console.log(`${colors.green}✓${colors.reset} ${msg}`),
-    error: (msg: string) => console.log(`${colors.red}✗${colors.reset} ${msg}`),
-    info: (msg: string) => console.log(`${colors.blue}ℹ${colors.reset} ${msg}`),
-    warn: (msg: string) => console.log(`${colors.yellow}⚠${colors.reset} ${msg}`),
-    section: (msg: string) => console.log(`\n${colors.cyan}${colors.bright}${msg}${colors.reset}`),
-    detail: (msg: string) => console.log(`  ${colors.dim}${msg}${colors.reset}`),
-};
+import {
+    log,
+    firstNonEmpty,
+    deriveSecretIds,
+    resolveOwnerRepo,
+} from './shared';
 
 interface Config {
     envFile: string;
@@ -80,17 +64,6 @@ async function getEnvPublicKey(
         environment_name: environmentName,
     });
     return data;
-}
-
-/**
- * Get repository ID
- */
-async function getRepoId(octokit: Octokit, owner: string, repo: string): Promise<number> {
-    const { data } = await octokit.rest.repos.get({
-        owner,
-        repo,
-    });
-    return data.id;
 }
 
 /**
@@ -383,10 +356,17 @@ const main = async () => {
     const args = process.argv.slice(2);
     const envFileArg = args.find((arg) => arg.startsWith('--env='));
     const environmentArg = args.find((arg) => arg.startsWith('--environment='));
+    const secretPrefixArg = args.find((arg) => arg.startsWith('--secret-prefix='));
+    const envSecretArg = args.find((arg) => arg.startsWith('--env-secret='));
+    const repoSecretArg = args.find((arg) => arg.startsWith('--repo-secret='));
 
     if (!envFileArg || !environmentArg) {
         log.error('Usage: tsx sync-env-to-github.ts --env=.env.local --environment=dev');
         process.exit(1);
+    }
+
+    if (secretPrefixArg) {
+        log.warn('--secret-prefix is no longer supported; define explicit secret ids in your .env file.');
     }
 
     const envFile = envFileArg.split('=')[1];
@@ -401,41 +381,84 @@ const main = async () => {
         process.exit(1);
     }
 
+    const envSecretOverrideArg = envSecretArg ? envSecretArg.split('=')[1] : undefined;
+    const repoSecretOverrideArg = repoSecretArg ? repoSecretArg.split('=')[1] : undefined;
+
     const token =
-        process.env.GH_TOKEN ??
-        parsedEnv.repoSecrets.GH_TOKEN ??
-        parsedEnv.envSecrets.GH_TOKEN ??
-        parsedEnv.repoVars.GH_TOKEN ??
-        parsedEnv.envVars.GH_TOKEN;
+        firstNonEmpty(
+            parsedEnv.repoSecrets.GH_TOKEN,
+            parsedEnv.envSecrets.GH_TOKEN,
+            parsedEnv.repoVars.GH_TOKEN,
+            parsedEnv.envVars.GH_TOKEN
+        ) ?? '';
 
-    const owner =
-        process.env.GH_OWNER ??
-        parsedEnv.repoVars.GH_OWNER ??
-        parsedEnv.envVars.GH_OWNER ??
-        parsedEnv.repoSecrets.GH_OWNER ??
-        parsedEnv.envSecrets.GH_OWNER;
+    const resolved = resolveOwnerRepo({
+        envVars: parsedEnv.envVars,
+        envSecrets: parsedEnv.envSecrets,
+        repoVars: parsedEnv.repoVars,
+        repoSecrets: parsedEnv.repoSecrets,
+    });
+    const owner = (resolved.owner ?? '').trim();
+    const repo = (resolved.repo ?? '').trim();
+    if (owner && repo) {
+        log.info(`Using repository: ${owner}/${repo}`);
+    }
 
-    const repo =
-        process.env.GH_REPO ??
-        parsedEnv.repoVars.GH_REPO ??
-        parsedEnv.envVars.GH_REPO ??
-        parsedEnv.repoSecrets.GH_REPO ??
-        parsedEnv.envSecrets.GH_REPO;
-
-    if (!token || !owner || !repo) {
-        log.error('Missing GitHub configuration. Set the env vars or add the values to your .env file (REPO VARS/SECRETS).');
-        if (!token) log.error('  GH_TOKEN - GitHub personal access token');
+    const tokenValue = token.trim();
+    if (!tokenValue || !owner || !repo) {
+        log.error('Missing GitHub configuration. Add GH_TOKEN, GH_OWNER, and GH_REPO to your .env file.');
+        if (!tokenValue) log.error('  GH_TOKEN - GitHub personal access token');
         if (!owner) log.error('  GH_OWNER - Repository owner (user or org)');
         if (!repo) log.error('  GH_REPO - Repository name');
         process.exit(1);
     }
+
+    const derivedSecrets = deriveSecretIds(repo, environment);
+
+    const existingEnvSecret = firstNonEmpty(
+        envSecretOverrideArg,
+        parsedEnv.envVars.SECRETS_MANAGER_ENV_SECRET_ID,
+        parsedEnv.repoVars.SECRETS_MANAGER_ENV_SECRET_ID,
+        parsedEnv.envSecrets.SECRETS_MANAGER_ENV_SECRET_ID,
+        parsedEnv.repoSecrets.SECRETS_MANAGER_ENV_SECRET_ID
+    );
+    const envSecretName = existingEnvSecret ?? derivedSecrets.envSecretId;
+
+    const existingRepoSecret = firstNonEmpty(
+        repoSecretOverrideArg,
+        parsedEnv.envVars.SECRETS_MANAGER_REPO_SECRET_ID,
+        parsedEnv.repoVars.SECRETS_MANAGER_REPO_SECRET_ID,
+        parsedEnv.envSecrets.SECRETS_MANAGER_REPO_SECRET_ID,
+        parsedEnv.repoSecrets.SECRETS_MANAGER_REPO_SECRET_ID
+    );
+    const repoSecretName = existingRepoSecret ?? derivedSecrets.repoSecretId;
+
+    if (!envSecretName) {
+        log.error('Missing SECRETS_MANAGER_ENV_SECRET_ID. Provide a value via --env-secret or in your .env file.');
+        process.exit(1);
+    }
+
+    if (!repoSecretName) {
+        log.error('Missing SECRETS_MANAGER_REPO_SECRET_ID. Provide a value via --repo-secret or in your .env file.');
+        process.exit(1);
+    }
+
+    if (!existingEnvSecret) {
+        log.info(`Derived SECRETS_MANAGER_ENV_SECRET_ID=${envSecretName}`);
+    }
+    if (!existingRepoSecret) {
+        log.info(`Derived SECRETS_MANAGER_REPO_SECRET_ID=${repoSecretName}`);
+    }
+
+    parsedEnv.envVars.SECRETS_MANAGER_ENV_SECRET_ID = envSecretName;
+    parsedEnv.repoVars.SECRETS_MANAGER_REPO_SECRET_ID = repoSecretName;
 
     const config: Config = {
         envFile,
         environment,
         owner,
         repo,
-        token,
+        token: tokenValue,
     };
 
     try {
