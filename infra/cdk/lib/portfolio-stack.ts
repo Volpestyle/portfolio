@@ -187,7 +187,7 @@ export class PortfolioStack extends Stack {
 
     const imageResources = this.createImageOptimizationResources(baseEnv);
     if (imageResources) {
-      this.grantRuntimeAccess(imageResources.function, { allowCacheWrite: false });
+      this.grantRuntimeAccess(imageResources.function);
       this.grantSecretAccess(imageResources.function);
     }
 
@@ -281,14 +281,6 @@ export class PortfolioStack extends Stack {
       NODE_ENV: 'production',
       ...environment,
     };
-
-    if (env['AWS_ENV_SECRET_NAME'] && !env['SECRETS_MANAGER_ENV_SECRET_ID']) {
-      env['SECRETS_MANAGER_ENV_SECRET_ID'] = env['AWS_ENV_SECRET_NAME'];
-    }
-
-    if (env['AWS_REPO_SECRET_NAME'] && !env['SECRETS_MANAGER_REPO_SECRET_ID']) {
-      env['SECRETS_MANAGER_REPO_SECRET_ID'] = env['AWS_REPO_SECRET_NAME'];
-    }
 
     if (!env['AWS_SECRETS_MANAGER_PRIMARY_REGION'] && env['AWS_REGION']) {
       env['AWS_SECRETS_MANAGER_PRIMARY_REGION'] = env['AWS_REGION'];
@@ -926,7 +918,21 @@ export class PortfolioStack extends Stack {
     const configuredPrefixes = splitList(this.runtimeEnvironment['EDGE_RUNTIME_ENV_PREFIXES']);
     const prefixes = Array.from(new Set([...defaultPrefixes, ...configuredPrefixes]));
 
-    const defaultExplicitKeys = ['NODE_ENV', 'APP_ENV', 'APP_STAGE', 'APP_HOST'];
+    const defaultExplicitKeys = [
+      'NODE_ENV',
+      'APP_ENV',
+      'APP_STAGE',
+      'APP_HOST',
+      'AWS_REGION',
+      'CACHE_BUCKET_NAME',
+      'CACHE_BUCKET_KEY_PREFIX',
+      'CACHE_BUCKET_REGION',
+      'CACHE_DYNAMO_TABLE',
+      'REVALIDATION_QUEUE_URL',
+      'REVALIDATION_QUEUE_REGION',
+      'BUCKET_NAME',
+      'BUCKET_KEY_PREFIX',
+    ];
     const configuredKeys = splitList(this.runtimeEnvironment['EDGE_RUNTIME_ENV_KEYS']);
     const explicitKeys = new Set<string>([...defaultExplicitKeys, ...configuredKeys]);
 
@@ -938,13 +944,10 @@ export class PortfolioStack extends Stack {
       'SECRETS_MANAGER_REPO_SECRET_ID',
       'AWS_SECRETS_MANAGER_PRIMARY_REGION',
       'AWS_SECRETS_MANAGER_FALLBACK_REGION',
-      'AWS_SECRETS_MANAGER_SECONDARY_REGION',
       'OPENAI_API_KEY',
       'GH_TOKEN',
       'DATABASE_URL',
       'API_KEY',
-      'AWS_ENV_SECRET_NAME',
-      'AWS_REPO_SECRET_NAME',
     ]);
     for (const key of splitList(this.runtimeEnvironment['EDGE_RUNTIME_ENV_BLOCKLIST'])) {
       blocklist.add(key);
@@ -1016,9 +1019,7 @@ export class PortfolioStack extends Stack {
       headers[this.edgeSecretsRegionHeaderName] = primaryRegion;
     }
 
-    const fallbackRegion =
-      this.runtimeEnvironment['AWS_SECRETS_MANAGER_FALLBACK_REGION'] ??
-      this.runtimeEnvironment['AWS_SECRETS_MANAGER_SECONDARY_REGION'];
+    const fallbackRegion = this.runtimeEnvironment['AWS_SECRETS_MANAGER_FALLBACK_REGION'];
     if (fallbackRegion && fallbackRegion !== primaryRegion) {
       headers[this.edgeSecretsFallbackRegionHeaderName] = fallbackRegion;
     }

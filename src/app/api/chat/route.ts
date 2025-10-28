@@ -12,7 +12,7 @@ let cachedClient: OpenAI | undefined;
 
 async function getOpenAIClient(): Promise<OpenAI> {
   if (!cachedClient) {
-    const apiKey = await resolveSecretValue('OPENAI_API_KEY', { scope: 'env', required: true });
+    const apiKey = await resolveSecretValue('OPENAI_API_KEY', { scope: 'repo', required: true });
     cachedClient = new OpenAI({ apiKey });
   }
   return cachedClient;

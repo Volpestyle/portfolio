@@ -57,8 +57,8 @@ interface ResolveSecretValueOptions {
 
 const DEFAULT_TTL_MS = 1000 * 60 * 60 * 4; // 4 hours
 const SCOPE_ENV_FALLBACKS: Record<SecretScope, string[]> = {
-  env: ['SECRETS_MANAGER_ENV_SECRET_ID', 'AWS_ENV_SECRET_NAME'],
-  repo: ['SECRETS_MANAGER_REPO_SECRET_ID', 'AWS_REPO_SECRET_NAME'],
+  env: ['SECRETS_MANAGER_ENV_SECRET_ID'],
+  repo: ['SECRETS_MANAGER_REPO_SECRET_ID'],
 };
 
 export class SecretsManagerCache {
@@ -77,11 +77,7 @@ export class SecretsManagerCache {
       process.env.AWS_REGION ??
       'us-east-1';
 
-    const fallback =
-      options.fallbackRegion ??
-      process.env.AWS_SECRETS_MANAGER_FALLBACK_REGION ??
-      process.env.AWS_SECRETS_MANAGER_SECONDARY_REGION ??
-      process.env.AWS_SECONDARY_REGION;
+    const fallback = options.fallbackRegion ?? process.env.AWS_SECRETS_MANAGER_FALLBACK_REGION;
 
     this.fallbackRegion = fallback && fallback !== this.primaryRegion ? fallback : undefined;
 

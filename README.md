@@ -127,3 +127,4 @@ Secrets should be stored in AWS Secrets Manager (mirrored via the `pnpm sync:*` 
 - [Ask My Portfolio — implementation guide](docs/ask-my-portfolio.md)
 - [GPT-5 Nano integration overview](docs/gpt5-nano-integration.md)
 - [Chat vs. SSR data caching](docs/chat-data-caching.md)
+- [OpenNext on AWS — architecture and operations](docs/reference/opennext-aws.md)

@@ -11,7 +11,7 @@ const formFields: FormFieldConfig[] = [
     id: FormFieldId.Name,
     type: InputType.Text,
     Component: Input,
-    placeholder: 'your name...',
+    placeholder: 'name...',
   },
   {
     id: FormFieldId.Email,
@@ -22,7 +22,7 @@ const formFields: FormFieldConfig[] = [
   {
     id: FormFieldId.Message,
     Component: Textarea,
-    placeholder: 'your message...',
+    placeholder: 'message...',
   },
 ];
 

@@ -21,7 +21,6 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID  }}
       AWS_REGION: ${{ vars.AWS_REGION }}
       UPSTASH_REDIS_REST_URL: ${{ vars.UPSTASH_REDIS_REST_URL }}
-      SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
@@ -70,7 +69,6 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID || vars.ACCESS_KEY_ID }}
       AWS_REGION: us-east-1 # force edge region
       UPSTASH_REDIS_REST_URL: ${{ vars.UPSTASH_REDIS_REST_URL }}
-      SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY || secrets.SECRET_ACCESS_KEY }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY || secrets.SECRET_ACCESS_KEY }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
@@ -122,5 +120,7 @@ jobs:
           APP_ENV_VARS: ${{ vars.APP_ENV_VARS }}
           APP_ENV_PREFIXES: ${{ vars.APP_ENV_PREFIXES }}
           NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          SECRETS_MANAGER_ENV_SECRET_ID: ${{ vars.SECRETS_MANAGER_ENV_SECRET_ID }}
+          SECRETS_MANAGER_REPO_SECRET_ID: ${{ vars.SECRETS_MANAGER_REPO_SECRET_ID }}
           # keep secrets out of CDK env if you can
         run: pnpm cdk deploy --require-approval never
