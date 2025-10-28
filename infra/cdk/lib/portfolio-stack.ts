@@ -6,6 +6,7 @@ import {
   Duration,
   Fn,
   RemovalPolicy,
+  Size,
   Stack,
   StackProps,
 } from 'aws-cdk-lib';
@@ -136,13 +137,12 @@ export class PortfolioStack extends Stack {
       domainName && certificateArn
         ? acm.Certificate.fromCertificateArn(this, 'PortfolioCertificate', certificateArn)
         : domainName && hostedZone
-        ? new acm.DnsValidatedCertificate(this, 'PortfolioCertificate', {
+          ? new acm.Certificate(this, 'PortfolioCertificate', {
             domainName,
-            hostedZone,
+            validation: acm.CertificateValidation.fromDns(hostedZone),
             subjectAlternativeNames: alternateDomainNames,
-            region: 'us-east-1',
           })
-        : undefined;
+          : undefined;
 
     this.runtimeEnvironment = this.enrichRuntimeEnvironment(environment);
     this.openNextDir = this.resolveOpenNextDirectory(openNextPath, appDirectory);
@@ -158,7 +158,6 @@ export class PortfolioStack extends Stack {
     );
 
     this.assetsBucket = this.createAssetsBucket();
-    this.deployStaticAssets(this.openNextOutput.origins.s3);
 
     this.revalidationTable = this.createRevalidationTable();
     this.revalidationQueue = this.createRevalidationQueue();
@@ -174,6 +173,14 @@ export class PortfolioStack extends Stack {
     }
 
     const serverEdgeFunction = this.createServerEdgeFunction(baseEnv);
+    const serverEdgeFunctionResource = serverEdgeFunction.node.defaultChild as lambda.CfnFunction | undefined;
+    if (serverEdgeFunctionResource) {
+      serverEdgeFunctionResource.applyRemovalPolicy(RemovalPolicy.RETAIN);
+    }
+    const serverEdgeFunctionVersion = serverEdgeFunction.currentVersion.node.defaultChild as lambda.CfnVersion | undefined;
+    if (serverEdgeFunctionVersion) {
+      serverEdgeFunctionVersion.applyRemovalPolicy(RemovalPolicy.RETAIN);
+    }
     this.grantRuntimeAccess(serverEdgeFunction);
     this.attachSesPermissions(serverEdgeFunction);
     this.grantSecretAccess(serverEdgeFunction);
@@ -192,7 +199,6 @@ export class PortfolioStack extends Stack {
       }
     }
 
-    const viewerRequestFunction = this.createViewerRequestFunction();
     const serverCachePolicy = this.createServerCachePolicy();
     const staticCachePolicy = cloudfront.CachePolicy.CACHING_OPTIMIZED;
     const responseHeadersPolicy = cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS;
@@ -230,30 +236,27 @@ export class PortfolioStack extends Stack {
         cachePolicy: serverCachePolicy,
         originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
         responseHeadersPolicy,
-        functionAssociations: [
-          {
-            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
-            function: viewerRequestFunction,
-          },
-        ],
         edgeLambdas: [
           {
             eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
-                functionVersion: serverEdgeFunction.currentVersion,
+            functionVersion: serverEdgeFunction.currentVersion,
           },
         ],
       },
       additionalBehaviors: this.buildAdditionalBehaviors({
-        viewerRequestFunction,
         serverCachePolicy,
         staticCachePolicy,
         serverEdgeFunction,
         originMap,
         responseHeadersPolicy,
       }),
+      httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
+      priceClass: cloudfront.PriceClass.PRICE_CLASS_200,
       ...(domainConfig?.domainNames ? { domainNames: domainConfig.domainNames } : {}),
       ...(domainConfig?.certificate ? { certificate: domainConfig.certificate } : {}),
     });
+
+    this.deployStaticAssets(this.openNextOutput.origins.s3, distribution);
 
     this.restrictFunctionUrlAccess(distribution);
     if (hostedZone && domainConfig?.domainNames?.length) {
@@ -342,7 +345,7 @@ export class PortfolioStack extends Stack {
     });
   }
 
-  private deployStaticAssets(config: OpenNextS3Origin) {
+  private deployStaticAssets(config: OpenNextS3Origin, distribution: cloudfront.IDistribution) {
     config.copy.forEach((copy, index) => {
       const sourcePath = this.resolveBundlePath(copy.from);
       if (!fs.existsSync(sourcePath)) {
@@ -350,16 +353,24 @@ export class PortfolioStack extends Stack {
       }
 
       new s3deploy.BucketDeployment(this, `AssetsDeployment${index}`, {
-        sources: [s3deploy.Source.asset(sourcePath)],
+        sources: [
+          s3deploy.Source.asset(sourcePath, {
+            exclude: ['**/*.map', '**/.DS_Store'],
+          }),
+        ],
         destinationBucket: this.assetsBucket,
         destinationKeyPrefix: copy.to.replace(/^\//, ''),
         prune: false,
+        distribution,
+        distributionPaths: ['/*'],
+        memoryLimit: 2048,
+        ephemeralStorageSize: Size.gibibytes(4),
         cacheControl: copy.cached
           ? [
-              s3deploy.CacheControl.setPublic(),
-              s3deploy.CacheControl.immutable(),
-              s3deploy.CacheControl.maxAge(Duration.days(365)),
-            ]
+            s3deploy.CacheControl.setPublic(),
+            s3deploy.CacheControl.immutable(),
+            s3deploy.CacheControl.maxAge(Duration.days(365)),
+          ]
           : [s3deploy.CacheControl.setPublic(), s3deploy.CacheControl.noCache()],
       });
     });
@@ -644,22 +655,6 @@ export class PortfolioStack extends Stack {
     return result;
   }
 
-  private createViewerRequestFunction(): cloudfront.Function {
-    return new cloudfront.Function(this, 'ForwardHostHeaderFn', {
-      code: cloudfront.FunctionCode.fromInline(`
-        function handler(event) {
-          var req = event.request;
-          if (req.headers && req.headers.host && req.headers.host.value) {
-            req.headers['x-forwarded-host'] = { value: req.headers.host.value };
-          }
-          req.headers['x-forwarded-proto'] = { value: 'https' };
-          req.headers['x-forwarded-port'] = { value: '443' };
-          return req;
-        }
-      `),
-    });
-  }
-
   private createServerCachePolicy(): cloudfront.CachePolicy {
     return new cloudfront.CachePolicy(this, 'ServerCachePolicy', {
       cachePolicyName: `${Stack.of(this).stackName}-Server`,
@@ -670,7 +665,6 @@ export class PortfolioStack extends Stack {
       queryStringBehavior: cloudfront.CacheQueryStringBehavior.all(),
       headerBehavior: cloudfront.CacheHeaderBehavior.allowList(
         'accept',
-        'accept-encoding',
         'rsc',
         'next-router-prefetch',
         'next-router-state-tree',
@@ -678,11 +672,12 @@ export class PortfolioStack extends Stack {
         'x-prerender-revalidate'
       ),
       cookieBehavior: cloudfront.CacheCookieBehavior.none(),
+      enableAcceptEncodingGzip: true,
+      enableAcceptEncodingBrotli: true,
     });
   }
 
   private buildAdditionalBehaviors(options: {
-    viewerRequestFunction: cloudfront.Function;
     serverCachePolicy: cloudfront.ICachePolicy;
     staticCachePolicy: cloudfront.ICachePolicy;
     serverEdgeFunction: cloudfrontExperimental.EdgeFunction;
@@ -690,7 +685,6 @@ export class PortfolioStack extends Stack {
     responseHeadersPolicy: cloudfront.IResponseHeadersPolicy;
   }): Record<string, cloudfront.BehaviorOptions> {
     const {
-      viewerRequestFunction,
       serverCachePolicy,
       staticCachePolicy,
       serverEdgeFunction,
@@ -717,8 +711,8 @@ export class PortfolioStack extends Stack {
       const cachePolicy = isImageOptimizer
         ? cloudfront.CachePolicy.CACHING_DISABLED
         : isStatic
-        ? staticCachePolicy
-        : serverCachePolicy;
+          ? staticCachePolicy
+          : serverCachePolicy;
       const allowedMethods =
         isImageOptimizer || isStatic
           ? cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS
@@ -726,16 +720,16 @@ export class PortfolioStack extends Stack {
       const originRequestPolicy = isImageOptimizer
         ? cloudfront.OriginRequestPolicy.ALL_VIEWER
         : !isStatic
-        ? cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER
-        : undefined;
+          ? cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER
+          : undefined;
       const edgeLambdas =
         !isStatic && !isImageOptimizer
           ? [
-              {
-                eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
-                functionVersion: serverEdgeFunction.currentVersion,
-              },
-            ]
+            {
+              eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
+              functionVersion: serverEdgeFunction.currentVersion,
+            },
+          ]
           : undefined;
 
       const behaviorOptions: cloudfront.BehaviorOptions = {
@@ -745,12 +739,6 @@ export class PortfolioStack extends Stack {
         cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
         cachePolicy,
         responseHeadersPolicy,
-        functionAssociations: [
-          {
-            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
-            function: viewerRequestFunction,
-          },
-        ],
         ...(originRequestPolicy ? { originRequestPolicy } : {}),
         ...(edgeLambdas ? { edgeLambdas } : {}),
       };
@@ -767,9 +755,9 @@ export class PortfolioStack extends Stack {
     certificate?: acm.ICertificate
   ):
     | {
-        domainNames: string[];
-        certificate: acm.ICertificate;
-      }
+      domainNames: string[];
+      certificate: acm.ICertificate;
+    }
     | undefined {
     if (!domainName) {
       return undefined;
@@ -929,9 +917,9 @@ export class PortfolioStack extends Stack {
     const splitList = (value?: string) =>
       value
         ? value
-            .split(',')
-            .map((entry) => entry.trim())
-            .filter(Boolean)
+          .split(',')
+          .map((entry) => entry.trim())
+          .filter(Boolean)
         : [];
 
     const defaultPrefixes = ['NEXT_PUBLIC_'];

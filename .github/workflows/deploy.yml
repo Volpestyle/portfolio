@@ -2,11 +2,9 @@ name: Deploy Next.js via CDK
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -20,26 +18,22 @@ jobs:
       contents: read
     env:
       PORTFOLIO_GIST_ID: ${{ vars.PORTFOLIO_GIST_ID }}
-      AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID }}
+      AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID  }}
       AWS_REGION: ${{ vars.AWS_REGION }}
       UPSTASH_REDIS_REST_URL: ${{ vars.UPSTASH_REDIS_REST_URL }}
+      SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
@@ -50,6 +44,8 @@ jobs:
       - name: Lint
         run: pnpm run lint
 
+      # If forked PRs fail due to missing secrets, gate this:
+      # if: github.event_name != 'pull_request'
       - name: Build Next.js app
         run: pnpm run build
 
@@ -70,41 +66,51 @@ jobs:
       contents: read
     env:
       PORTFOLIO_GIST_ID: ${{ vars.PORTFOLIO_GIST_ID }}
-      AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID }}
-      AWS_REGION: ${{ vars.AWS_REGION }}
+      ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID || vars.ACCESS_KEY_ID }}
+      AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID || vars.ACCESS_KEY_ID }}
+      AWS_REGION: us-east-1 # force edge region
       UPSTASH_REDIS_REST_URL: ${{ vars.UPSTASH_REDIS_REST_URL }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY || secrets.SECRET_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY || secrets.SECRET_ACCESS_KEY }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # Do NOT expose OPENAI_API_KEY here unless absolutely needed for build
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
-      - name: Install CDK dependencies
+      - name: Install root dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (us-east-1 for Lambda@Edge)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.CDK_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          aws-region: us-east-1
+
+      - name: Set CDK env
+        run: |
+          echo "CDK_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
+          echo "CDK_DEFAULT_ACCOUNT=${{ secrets.CDK_DEFAULT_ACCOUNT }}" >> $GITHUB_ENV
 
       - name: Build OpenNext artifacts
+        # include OPENAI_API_KEY only if your next build truly needs it
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: pnpm run build:web
+
+      - name: Install CDK dependencies
+        working-directory: infra/cdk
+        run: pnpm install --frozen-lockfile
 
       - name: Deploy CDK stack
         working-directory: infra/cdk
@@ -116,5 +122,5 @@ jobs:
           APP_ENV_VARS: ${{ vars.APP_ENV_VARS }}
           APP_ENV_PREFIXES: ${{ vars.APP_ENV_PREFIXES }}
           NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # keep secrets out of CDK env if you can
         run: pnpm cdk deploy --require-approval never

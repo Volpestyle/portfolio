@@ -4,14 +4,21 @@ Live at [jcvolpe.me](https://jcvolpe.me).
 
 ## About
 
-A [Next.js](https://nextjs.org/) 15 project using [TailwindCSS](https://tailwindcss.com/)
+This portfolio is a full-stack [Next.js](https://nextjs.org/) 15 App Router project. It leans on streaming server components, a typed server/client boundary, and a modern component library composed with [TailwindCSS](https://tailwindcss.com/).
+
+Highlights:
+
+- Projects data is sourced from GitHub, summarized offline, and delivered through API routes backed by a lightweight caching layer so the `/projects` experience stays fast.
+- An OpenAI-powered chat assistant (“Ask My Portfolio”) can answer questions using the precomputed repo knowledge stored under `generated/`, with graceful fallbacks for live GitHub queries.
+- Contact forms, project detail pages, and the landing hero are all built as composable React Server Components with client-side islands where interactivity matters.
+- The production deployment targets AWS via the `infra/cdk` stack, packaging the app with OpenNext so static assets, ISR, and Lambda@Edge SSR stay in sync.
 
 ## Running Locally
 
 First, run the development server:
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
