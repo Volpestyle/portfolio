@@ -73,11 +73,33 @@ const collectLambdaEnv = () => {
     delete result[key];
   }
 
+  for (const key of [
+    'SECRETS_MANAGER_ENV_SECRET_ID',
+    'SECRETS_MANAGER_REPO_SECRET_ID',
+    'AWS_SECRETS_MANAGER_PRIMARY_REGION',
+    'AWS_SECRETS_MANAGER_FALLBACK_REGION',
+  ]) {
+    const value = process.env[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      result[key] = value.trim();
+    }
+  }
+
   return result;
 };
 
 const openNextPath = path.resolve(process.cwd(), '..', '..', '.open-next');
 const inferredOpenNextPath = fs.existsSync(openNextPath) ? openNextPath : undefined;
+
+const lambdaEnvironment = collectLambdaEnv();
+const requiredLambdaKeys = ['SECRETS_MANAGER_REPO_SECRET_ID'];
+for (const key of requiredLambdaKeys) {
+  if (!lambdaEnvironment[key]) {
+    throw new Error(
+      `Missing required environment value '${key}'. Ensure it is set before running the CDK deploy (e.g. GitHub Actions repository variables or your shell environment).`
+    );
+  }
+}
 
 new PortfolioStack(app, 'PortfolioStack', {
   env: {
@@ -90,5 +112,5 @@ new PortfolioStack(app, 'PortfolioStack', {
   alternateDomainNames: stringList(process.env.APP_ALTERNATE_DOMAINS),
   appDirectory,
   openNextPath: inferredOpenNextPath,
-  environment: collectLambdaEnv(),
+  environment: lambdaEnvironment,
 });

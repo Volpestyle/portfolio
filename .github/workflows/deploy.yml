@@ -65,11 +65,10 @@ jobs:
       contents: read
     env:
       PORTFOLIO_GIST_ID: ${{ vars.PORTFOLIO_GIST_ID }}
-      ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID || vars.ACCESS_KEY_ID }}
-      AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID || vars.ACCESS_KEY_ID }}
+      AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID }}
       AWS_REGION: us-east-1 # force edge region
       UPSTASH_REDIS_REST_URL: ${{ vars.UPSTASH_REDIS_REST_URL }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY || secrets.SECRET_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
       # Do NOT expose OPENAI_API_KEY here unless absolutely needed for build
@@ -109,6 +108,17 @@ jobs:
       - name: Install CDK dependencies
         working-directory: infra/cdk
         run: pnpm install --frozen-lockfile
+
+      - name: Validate Secrets Config
+        run: |
+          if [ -z "${SECRETS_MANAGER_REPO_SECRET_ID:-}" ]; then
+            echo "SECRETS_MANAGER_REPO_SECRET_ID is not configured. Set a repository variable before deploying." >&2
+            exit 1
+          fi
+
+      - name: Debug Secrets Env
+        run: |
+          env | sort | grep -E 'SECRETS_MANAGER|OPENAI' || true
 
       - name: Deploy CDK stack
         working-directory: infra/cdk
