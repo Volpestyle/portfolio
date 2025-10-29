@@ -93,6 +93,6 @@
   }
 
   .animate-background {
-    animation: background-slide 60s linear infinite;
+    animation: background-slide 120s linear infinite;
   }
 }
