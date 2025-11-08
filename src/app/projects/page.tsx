@@ -1,5 +1,6 @@
 import { ProjectsGrid } from './ProjectsGrid';
 import { getPortfolioRepos } from '@/lib/github-server';
+import { augmentRepoWithKnowledge } from '@/server/project-knowledge';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
 
 export default async function Projects() {
   const repoData = await getPortfolioRepos();
-  const repos = [...repoData.starred, ...repoData.normal];
+  const repos = [...repoData.starred, ...repoData.normal].map(augmentRepoWithKnowledge);
 
   return <ProjectsGrid repos={repos} />;
 }

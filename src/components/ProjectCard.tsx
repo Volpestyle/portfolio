@@ -108,6 +108,19 @@ export function ProjectCard({ repo, variant = 'default', onOpen }: ProjectCardPr
           </p>
         )}
 
+        {repo.tags && repo.tags.length > 0 && (
+          <div className="mb-4 mt-3 flex flex-wrap gap-2">
+            {repo.tags.slice(0, 6).map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+
         <AnimatedExpandButton
           icon={<ArrowRight className="h-5 w-5" />}
           text="view details"
@@ -158,6 +171,18 @@ export function ProjectCard({ repo, variant = 'default', onOpen }: ProjectCardPr
         <p className="mb-2 mt-1 text-xs text-gray-400">
           <span className="font-bold">Last commit:</span> {formatDate(repo.pushed_at)}
         </p>
+      )}
+      {repo.tags && repo.tags.length > 0 && (
+        <div className="mb-4 mt-3 flex flex-wrap gap-2">
+          {repo.tags.slice(0, 6).map((tag) => (
+            <span
+              key={tag}
+              className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
       )}
       <AnimatedExpandButton
         icon={<ArrowRight className="h-5 w-5" />}
