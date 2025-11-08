@@ -258,6 +258,16 @@ async function summarizeRepo(
   readme: string,
   facts: RepoFacts
 ): Promise<{ summary: string; tags: string[] }> {
+  // Derive technical tags from structured facts
+  const derivedTags = [
+    ...facts.languages,
+    ...facts.frameworks,
+    ...facts.platforms,
+    ...facts.tooling,
+    ...facts.domains.slice(0, 3), // limit domains to avoid bloat
+    ...facts.aliases.slice(0, 2), // include a few key aliases
+  ].filter(Boolean);
+
   const response = await client.responses.create({
     model: 'gpt-5-nano-2025-08-07',
     text: {
@@ -277,9 +287,9 @@ async function summarizeRepo(
             tags: {
               type: 'array',
               description:
-                'Searchable keywords covering languages, frameworks, platforms, infrastructure, domains, and notable aliases.',
-              minItems: 4,
-              maxItems: 12,
+                'Additional technical keywords not captured in the structured facts: specialized tools, specific versions, architectural patterns, or domain-specific terms. Only include concrete technical terms.',
+              minItems: 0,
+              maxItems: 6,
               items: { type: 'string' },
             },
           },
@@ -290,7 +300,7 @@ async function summarizeRepo(
       {
         role: 'system',
         content:
-          'You write short, factual repo summaries grounded in provided facts. Mention languages, frameworks, runtimes, and domains whenever possible. Tags must enumerate every distinct technology or alias so downstream filters succeed. Use Title Case or standard capitalization for each tag.',
+          'You write short, factual repo summaries grounded in provided facts. Mention languages, frameworks, runtimes, and domains whenever possible. For tags, only add technical keywords that are NOT already captured in the structured facts (languages, frameworks, platforms, tooling, domains). Focus on specific tools, versions, or architectural patterns that add value.',
       },
       {
         role: 'user',
@@ -304,15 +314,31 @@ async function summarizeRepo(
   try {
     const cleanJson = extractFirstJsonObject(raw);
     const parsed = JSON.parse(cleanJson);
+    
+    // Merge derived tags (priority) with AI-suggested tags
+    const aiTags = Array.isArray(parsed.tags) ? (parsed.tags as string[]) : [];
+    const allTags = [...derivedTags, ...aiTags];
+    
+    // Deduplicate while preserving order (case-insensitive)
+    const seen = new Set<string>();
+    const uniqueTags = allTags.filter(tag => {
+      const normalized = tag.toLowerCase();
+      if (seen.has(normalized)) {
+        return false;
+      }
+      seen.add(normalized);
+      return true;
+    });
+    
     return {
       summary: parsed.summary as string,
-      tags: Array.isArray(parsed.tags) ? (parsed.tags as string[]) : [],
+      tags: uniqueTags.slice(0, 12), // cap at 12 tags total
     };
   } catch (error) {
     console.warn(`Failed to parse summary for ${repo.name}. Falling back to plain text.`, error);
     return {
       summary: raw || repo.description || 'Summary unavailable.',
-      tags: [],
+      tags: derivedTags.slice(0, 12),
     };
   }
 }
