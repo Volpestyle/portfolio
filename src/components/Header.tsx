@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Mail, MessageSquare, Rocket, User } from 'lucide-react';
+import { BookOpen, Mail, MessageSquare, Rocket, User } from 'lucide-react';
 import { HeaderTypewriter, resolveHeaderBaseText } from '@/components/HeaderTypewriter';
 import { useHover } from '@/context/HoverContext';
 import { usePathname } from 'next/navigation';
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: '/', icon: MessageSquare, label: 'Chat', message: '', expandedWidth: '4.5rem' },
   { href: '/about', icon: User, label: 'About', message: hoverMessages.about, expandedWidth: '5rem' },
   { href: '/projects', icon: Rocket, label: 'Projects', message: hoverMessages.projects, expandedWidth: '6.5rem' },
+  { href: '/blog', icon: BookOpen, label: 'Blog', message: hoverMessages.blog, expandedWidth: '4.5rem' },
   { href: '/contact', icon: Mail, label: 'Contact', message: hoverMessages.contact, expandedWidth: '6rem' },
 ] as const;
 

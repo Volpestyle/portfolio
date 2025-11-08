@@ -8,6 +8,7 @@ export const ROUTE_BASE_TEXT = [
   { match: (pathname: string) => pathname === '/', text: 'JCV' },
   { match: (pathname: string) => pathname.startsWith('/projects'), text: 'my work' },
   { match: (pathname: string) => pathname.startsWith('/about'), text: 'about me' },
+  { match: (pathname: string) => pathname.startsWith('/blog'), text: 'my thoughts' },
   { match: (pathname: string) => pathname.startsWith('/contact'), text: 'contact me' },
 ] as const;
 

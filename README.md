@@ -9,7 +9,8 @@ This portfolio is a full-stack [Next.js](https://nextjs.org/) 15 App Router proj
 Highlights:
 
 - Projects data is sourced from GitHub, summarized offline, and delivered through API routes backed by a lightweight caching layer so the `/projects` experience stays fast.
-- An OpenAI-powered chat assistant (“Ask My Portfolio”) can answer questions using the precomputed repo knowledge stored under `generated/`, with graceful fallbacks for live GitHub queries.
+- An OpenAI-powered chat assistant ("Ask My Portfolio") can answer questions using the precomputed repo knowledge stored under `generated/`, with graceful fallbacks for live GitHub queries.
+- A built-in blog at `/blog` for publishing markdown articles with frontmatter support, syntax highlighting, and custom styling optimized for long-form reading.
 - Contact forms, project detail pages, and the landing hero are all built as composable React Server Components with client-side islands where interactivity matters.
 - The production deployment targets AWS via the `infra/cdk` stack, packaging the app with OpenNext so static assets, ISR, and Lambda@Edge SSR stay in sync.
 
@@ -40,6 +41,29 @@ This script fetches the latest READMEs, asks OpenAI for short summaries/tags, bu
 - `generated/repo-embeddings.json`
 
 Commit those files so the deploy target can ship them without extra infra. Re-run whenever you update repos or READMEs.
+
+## Blog
+
+The site includes a blog feature at `/blog` where you can publish articles in markdown format.
+
+To add a new blog post:
+
+1. Create a `.md` file in `content/blog/` (e.g., `my-new-post.md`)
+2. Add frontmatter at the top:
+
+```markdown
+---
+title: "Your Post Title"
+date: "2025-11-07"
+description: "A brief description"
+tags: ["tag1", "tag2"]
+readTime: "5 min read"
+---
+
+# Your content here...
+```
+
+Blog posts are statically generated at build time and revalidated hourly. See `content/blog/README.md` for more details.
 
 ## Environment variables
 
@@ -125,6 +149,7 @@ Secrets should be stored in AWS Secrets Manager (mirrored via the `pnpm sync:*` 
 ## Documentation
 
 - [Ask My Portfolio — implementation guide](docs/ask-my-portfolio.md)
+- [Blog Feature — implementation guide](docs/blog-feature.md)
 - [GPT-5 Nano integration overview](docs/gpt5-nano-integration.md)
 - [Chat vs. SSR data caching](docs/chat-data-caching.md)
 - [OpenNext on AWS — architecture and operations](docs/reference/opennext-aws.md)
