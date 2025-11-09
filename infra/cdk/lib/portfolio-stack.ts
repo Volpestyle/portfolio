@@ -113,6 +113,13 @@ export class PortfolioStack extends Stack {
   private readonly edgeSecretsFallbackRegionHeaderName = 'x-opn-secrets-fallback-region';
   private edgeRuntimeHeaderValues?: Record<string, string>;
   private readonly protectedFunctionUrls: lambda.IFunctionUrl[] = [];
+  private readonly postsTable: dynamodb.Table;
+  private readonly blogContentBucket: s3.Bucket;
+  private readonly blogMediaBucket: s3.Bucket;
+  private readonly blogPublishFunction: lambda.Function;
+  private readonly blogSchedulerRole: iam.Role;
+  private readonly alternateDomains: string[] = [];
+  private readonly primaryDomainName?: string;
 
   constructor(scope: Construct, id: string, props: PortfolioStackProps = {}) {
     super(scope, id, props);
@@ -126,6 +133,9 @@ export class PortfolioStack extends Stack {
       appDirectory = path.resolve(process.cwd(), '..', '..'),
       openNextPath,
     } = props;
+
+    this.primaryDomainName = domainName;
+    this.alternateDomains = alternateDomainNames;
 
     this.appDirectoryPath = appDirectory;
     const hostedZone =
@@ -158,6 +168,11 @@ export class PortfolioStack extends Stack {
     );
 
     this.assetsBucket = this.createAssetsBucket();
+    this.postsTable = this.createBlogPostsTable();
+    this.blogContentBucket = this.createBlogContentBucket();
+    this.blogMediaBucket = this.createBlogMediaBucket();
+    this.blogPublishFunction = this.createBlogPublishFunction();
+    this.blogSchedulerRole = this.createBlogSchedulerRole(this.blogPublishFunction);
 
     this.revalidationTable = this.createRevalidationTable();
     this.revalidationQueue = this.createRevalidationQueue();
@@ -182,6 +197,8 @@ export class PortfolioStack extends Stack {
       serverEdgeFunctionVersion.applyRemovalPolicy(RemovalPolicy.RETAIN);
     }
     this.grantRuntimeAccess(serverEdgeFunction);
+    this.grantBlogDataAccess(serverEdgeFunction);
+    this.attachSchedulerPermissions(serverEdgeFunction);
     this.attachSesPermissions(serverEdgeFunction);
     this.grantSecretAccess(serverEdgeFunction);
 
@@ -259,6 +276,9 @@ export class PortfolioStack extends Stack {
       ...(domainConfig?.certificate ? { certificate: domainConfig.certificate } : {}),
     });
 
+    serverEdgeFunction.addEnvironment('CLOUDFRONT_DISTRIBUTION_ID', distribution.distributionId);
+    this.attachCloudFrontInvalidationPermission(serverEdgeFunction, distribution);
+
     this.deployStaticAssets(this.openNextOutput.origins.s3, distribution);
 
     this.restrictFunctionUrlAccess(distribution);
@@ -276,6 +296,18 @@ export class PortfolioStack extends Stack {
 
     new CfnOutput(this, 'AssetBucketName', {
       value: this.assetsBucket.bucketName,
+    });
+
+    new CfnOutput(this, 'BlogPostsTableName', {
+      value: this.postsTable.tableName,
+    });
+
+    new CfnOutput(this, 'BlogContentBucketName', {
+      value: this.blogContentBucket.bucketName,
+    });
+
+    new CfnOutput(this, 'BlogMediaBucketName', {
+      value: this.blogMediaBucket.bucketName,
     });
   }
 
@@ -338,6 +370,130 @@ export class PortfolioStack extends Stack {
       removalPolicy: RemovalPolicy.RETAIN,
       autoDeleteObjects: false,
     });
+  }
+
+  private createBlogPostsTable(): dynamodb.Table {
+    const tableName = `${Stack.of(this).stackName}-BlogPosts`;
+    const table = new dynamodb.Table(this, 'BlogPostsTable', {
+      partitionKey: { name: 'slug', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: RemovalPolicy.RETAIN,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
+      tableName,
+    });
+
+    table.addGlobalSecondaryIndex({
+      indexName: 'byStatusPublishedAt',
+      partitionKey: { name: 'status', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'publishedAt', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    return table;
+  }
+
+  private createBlogContentBucket(): s3.Bucket {
+    return new s3.Bucket(this, 'BlogContentBucket', {
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      versioned: true,
+      removalPolicy: RemovalPolicy.RETAIN,
+      autoDeleteObjects: false,
+    });
+  }
+
+  private resolveMediaCorsOrigins(): string[] {
+    const origins = new Set<string>(['http://localhost:3000', 'https://localhost:3000']);
+    const siteUrl = this.runtimeEnvironment['NEXT_PUBLIC_SITE_URL'];
+    if (siteUrl) {
+      origins.add(siteUrl.replace(/\/$/, ''));
+    }
+    if (this.primaryDomainName) {
+      origins.add(`https://${this.primaryDomainName}`);
+    }
+    for (const domain of this.alternateDomains ?? []) {
+      if (domain) {
+        origins.add(`https://${domain}`);
+      }
+    }
+    return Array.from(origins);
+  }
+
+  private createBlogMediaBucket(): s3.Bucket {
+    return new s3.Bucket(this, 'BlogMediaBucket', {
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      versioned: true,
+      removalPolicy: RemovalPolicy.RETAIN,
+      autoDeleteObjects: false,
+      cors: [
+        {
+          allowedHeaders: ['*'],
+          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.PUT, s3.HttpMethods.HEAD],
+          allowedOrigins: this.resolveMediaCorsOrigins(),
+          maxAge: 3000,
+        },
+      ],
+    });
+  }
+
+  private resolveSiteUrl(): string {
+    const fromEnv = this.runtimeEnvironment['NEXT_PUBLIC_SITE_URL'];
+    if (fromEnv) {
+      return fromEnv.replace(/\/$/, '');
+    }
+    if (this.primaryDomainName) {
+      return `https://${this.primaryDomainName}`;
+    }
+    throw new Error(
+      'NEXT_PUBLIC_SITE_URL or domainName must be set to configure blog publishing. Provide NEXT_PUBLIC_SITE_URL in your env file.'
+    );
+  }
+
+  private createBlogPublishFunction(): lambda.Function {
+    const revalidateSecret = this.runtimeEnvironment['REVALIDATE_SECRET'];
+    if (!revalidateSecret) {
+      throw new Error('REVALIDATE_SECRET is required to enable blog publishing.');
+    }
+
+    const assetPath = path.resolve(__dirname, '..', '..', 'functions', 'blog-publisher');
+    if (!fs.existsSync(assetPath)) {
+      throw new Error(`Blog publisher function assets missing at ${assetPath}`);
+    }
+
+    const fn = new lambda.Function(this, 'BlogPublishFunction', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset(assetPath),
+      timeout: Duration.seconds(30),
+      memorySize: 256,
+      description: 'Publishes scheduled blog posts and triggers cache revalidation',
+      environment: {
+        POSTS_TABLE: this.postsTable.tableName,
+        REVALIDATE_ENDPOINT: `${this.resolveSiteUrl()}/api/revalidate`,
+        REVALIDATE_SECRET: revalidateSecret,
+      },
+    });
+
+    this.postsTable.grantReadWriteData(fn);
+    return fn;
+  }
+
+  private createBlogSchedulerRole(target: lambda.Function): iam.Role {
+    const role = new iam.Role(this, 'BlogSchedulerRole', {
+      assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com'),
+    });
+
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ['lambda:InvokeFunction'],
+        resources: [target.functionArn],
+      })
+    );
+
+    return role;
   }
 
   private deployStaticAssets(config: OpenNextS3Origin, distribution: cloudfront.IDistribution) {
@@ -422,6 +578,12 @@ export class PortfolioStack extends Stack {
     env['REVALIDATION_QUEUE_URL'] = this.revalidationQueue.queueUrl;
     env['REVALIDATION_QUEUE_REGION'] = region;
     env['BUCKET_NAME'] = env['BUCKET_NAME'] ?? this.assetsBucket.bucketName;
+    env['POSTS_TABLE'] = this.postsTable.tableName;
+    env['POSTS_STATUS_INDEX'] = 'byStatusPublishedAt';
+    env['CONTENT_BUCKET'] = this.blogContentBucket.bucketName;
+    env['MEDIA_BUCKET'] = this.blogMediaBucket.bucketName;
+    env['BLOG_PUBLISH_FUNCTION_ARN'] = this.blogPublishFunction.functionArn;
+    env['SCHEDULER_ROLE_ARN'] = this.blogSchedulerRole.roleArn;
 
     const s3OriginPath = this.openNextOutput.origins.s3.originPath ?? '/';
     env['BUCKET_KEY_PREFIX'] = s3OriginPath.replace(/^\//, ''); // '' if originPath is '/'
@@ -892,6 +1054,51 @@ export class PortfolioStack extends Stack {
     }
   }
 
+  private grantBlogDataAccess(grantable: iam.IGrantable) {
+    this.postsTable.grantReadWriteData(grantable);
+    this.blogContentBucket.grantReadWrite(grantable);
+    this.blogMediaBucket.grantReadWrite(grantable);
+  }
+
+  private attachSchedulerPermissions(grantable: iam.IGrantable) {
+    if (!this.blogSchedulerRole?.roleArn || !grantable.grantPrincipal) {
+      return;
+    }
+
+    grantable.grantPrincipal.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        actions: ['scheduler:CreateSchedule', 'scheduler:UpdateSchedule', 'scheduler:DeleteSchedule'],
+        resources: ['*'],
+      })
+    );
+
+    grantable.grantPrincipal.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        actions: ['iam:PassRole'],
+        resources: [this.blogSchedulerRole.roleArn],
+        conditions: {
+          StringEquals: {
+            'iam:PassedToService': 'scheduler.amazonaws.com',
+          },
+        },
+      })
+    );
+  }
+
+  private attachCloudFrontInvalidationPermission(
+    fn: cloudfrontExperimental.EdgeFunction,
+    distribution: cloudfront.Distribution
+  ) {
+    fn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['cloudfront:CreateInvalidation'],
+        resources: [
+          `arn:aws:cloudfront::${Stack.of(this).account}:distribution/${distribution.distributionId}`,
+        ],
+      })
+    );
+  }
+
   private attachSesPermissions(fn: cloudfrontExperimental.EdgeFunction) {
     fn.addToRolePolicy(
       new iam.PolicyStatement({
@@ -982,6 +1189,14 @@ export class PortfolioStack extends Stack {
       'REVALIDATION_QUEUE_REGION',
       'BUCKET_NAME',
       'BUCKET_KEY_PREFIX',
+      'POSTS_TABLE',
+      'POSTS_STATUS_INDEX',
+      'CONTENT_BUCKET',
+      'MEDIA_BUCKET',
+      'BLOG_PUBLISH_FUNCTION_ARN',
+      'SCHEDULER_ROLE_ARN',
+      'CLOUDFRONT_DISTRIBUTION_ID',
+      'REVALIDATE_SECRET',
     ];
     const configuredKeys = splitList(this.runtimeEnvironment['EDGE_RUNTIME_ENV_KEYS']);
     const explicitKeys = new Set<string>([...defaultExplicitKeys, ...configuredKeys]);

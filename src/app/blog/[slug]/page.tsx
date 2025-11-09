@@ -1,14 +1,14 @@
-import { getBlogPost, getAllBlogPosts } from '@/lib/blog';
 import { BlogMarkdown } from '@/components/BlogMarkdown';
 import { formatDate } from '@/lib/utils';
+import { getPostWithContent, listPublishedPosts } from '@/server/blog/store';
+import { draftMode } from 'next/headers';
 import { Calendar, Clock, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 
-export async function generateMetadata({ params }: { params: Promise<{ articleId: string }> }): Promise<Metadata> {
-  const { articleId } = await params;
-  const post = getBlogPost(articleId);
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  const post = await getPostWithContent(params.slug).catch(() => null);
 
   if (!post) {
     return {
@@ -18,31 +18,37 @@ export async function generateMetadata({ params }: { params: Promise<{ articleId
 
   return {
     title: `${post.title} - JCV's Blog`,
-    description: post.description,
+    description: post.summary,
     openGraph: {
       title: post.title,
-      description: post.description,
+      description: post.summary,
       type: 'article',
-      publishedTime: post.date,
+      publishedTime: post.publishedAt,
     },
   };
 }
 
 export async function generateStaticParams() {
-  const posts = getAllBlogPosts();
-
-  return posts.map((post) => ({
-    articleId: post.id,
-  }));
+  try {
+    const posts = await listPublishedPosts();
+    return posts.map((post) => ({
+      slug: post.slug,
+    }));
+  } catch (error) {
+    console.error('[blog] Failed to pre-generate params', error);
+    return [];
+  }
 }
 
-export default async function BlogPostPage({ params }: { params: Promise<{ articleId: string }> }) {
-  const { articleId } = await params;
-  const post = getBlogPost(articleId);
+export default async function BlogPostPage({ params }: { params: { slug: string } }) {
+  const { isEnabled } = await draftMode();
+  const postRecord = await getPostWithContent(params.slug, { includeDraft: isEnabled });
 
-  if (!post) {
+  if (!postRecord) {
     notFound();
   }
+
+  const post = postRecord;
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
@@ -60,17 +66,17 @@ export default async function BlogPostPage({ params }: { params: Promise<{ artic
         <header className="mb-8 border-b border-white/20 pb-8">
           <h1 className="mb-4 text-4xl font-bold text-white md:text-5xl">{post.title}</h1>
 
-          {post.description && <p className="mb-6 text-xl text-gray-400">{post.description}</p>}
+          {post.summary && <p className="mb-6 text-xl text-gray-400">{post.summary}</p>}
 
           <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
-              <time dateTime={post.date}>{formatDate(post.date)}</time>
+              <time dateTime={post.publishedAt ?? post.updatedAt}>{formatDate(post.publishedAt ?? post.updatedAt)}</time>
             </div>
-            {post.readTime && (
+            {post.readTimeLabel && (
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                <span>{post.readTime}</span>
+                <span>{post.readTimeLabel}</span>
               </div>
             )}
           </div>
@@ -108,4 +114,3 @@ export default async function BlogPostPage({ params }: { params: Promise<{ artic
 }
 
 export const revalidate = 3600; // Revalidate every hour
-

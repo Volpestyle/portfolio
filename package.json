@@ -18,8 +18,14 @@
     "sync:prod:aws": "tsx scripts/sync-env-to-aws.ts --env=.env.production --environment=production"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudfront": "^3.927.0",
+    "@aws-sdk/client-dynamodb": "^3.927.0",
     "@aws-sdk/client-secrets-manager": "^3.637.0",
+    "@aws-sdk/client-s3": "^3.927.0",
+    "@aws-sdk/client-scheduler": "^3.927.0",
     "@aws-sdk/client-ses": "^3.637.0",
+    "@aws-sdk/lib-dynamodb": "^3.927.0",
+    "@aws-sdk/s3-request-presigner": "^3.927.0",
     "@octokit/rest": "^21.1.0",
     "@radix-ui/react-slot": "^1.1.0",
     "@smithy/node-http-handler": "^4.4.3",
@@ -34,6 +40,7 @@
     "highlight.js": "^11.10.0",
     "lucide-react": "^0.428.0",
     "next": "^15.1.6",
+    "next-auth": "^5.0.0-beta.30",
     "openai": "^6.7.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -43,7 +50,8 @@
     "simple-icons": "^13.6.0",
     "styled-jsx": "^5.1.7",
     "tailwind-merge": "^2.5.2",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@opennextjs/aws": "^3.8.5",

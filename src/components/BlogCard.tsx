@@ -8,10 +8,10 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { springAnimations } from '@/lib/animations';
 import { AnimatedExpandButton } from '@/components/ui/AnimatedExpandButton';
-import type { BlogPost } from '@/types/blog';
+import type { BlogPostSummary } from '@/types/blog';
 
 interface BlogCardProps {
-  post: BlogPost;
+  post: BlogPostSummary;
 }
 
 export function BlogCard({ post }: BlogCardProps) {
@@ -21,7 +21,7 @@ export function BlogCard({ post }: BlogCardProps) {
     <Card className="relative flex h-full flex-col border-white bg-black/5 p-6 text-white backdrop-blur-sm transition-all duration-300 hover:border-white/60 hover:bg-black/10">
       <h2 className="mb-3 flex items-center justify-between text-2xl font-bold">
         <Link
-          href={`/blog/${post.id}`}
+          href={`/blog/${post.slug}`}
           className="group relative inline-flex items-center gap-2 rounded transition-all duration-300 hover:bg-white hover:text-black active:bg-white active:text-black"
           style={{
             paddingLeft: isTitleHovered ? '12px' : '0px',
@@ -45,17 +45,17 @@ export function BlogCard({ post }: BlogCardProps) {
         </Link>
       </h2>
 
-      {post.description && <p className="mb-4 text-sm leading-relaxed opacity-90">{post.description}</p>}
+      {post.summary && <p className="mb-4 text-sm leading-relaxed opacity-90">{post.summary}</p>}
 
       <div className="mb-4 flex flex-wrap items-center gap-4 text-xs text-gray-400">
         <div className="flex items-center gap-1.5">
           <Calendar className="h-3.5 w-3.5" />
-          <span>{formatDate(post.date)}</span>
+          <span>{formatDate(post.publishedAt ?? post.updatedAt)}</span>
         </div>
-        {post.readTime && (
+        {post.readTimeLabel && (
           <div className="flex items-center gap-1.5">
             <Clock className="h-3.5 w-3.5" />
-            <span>{post.readTime}</span>
+            <span>{post.readTimeLabel}</span>
           </div>
         )}
       </div>
@@ -77,9 +77,8 @@ export function BlogCard({ post }: BlogCardProps) {
         icon={<ArrowRight className="h-5 w-5" />}
         text="read article"
         wrapperClassName="mt-auto"
-        href={`/blog/${post.id}`}
+        href={`/blog/${post.slug}`}
       />
     </Card>
   );
 }
-

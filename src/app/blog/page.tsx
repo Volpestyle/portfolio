@@ -1,5 +1,5 @@
 import { BlogCard } from '@/components/BlogCard';
-import { getAllBlogPosts } from '@/lib/blog';
+import { listPublishedPosts } from '@/server/blog/store';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -7,8 +7,13 @@ export const metadata: Metadata = {
   description: 'Thoughts, insights, and technical writings from James Volpe',
 };
 
-export default function BlogPage() {
-  const posts = getAllBlogPosts();
+export default async function BlogPage() {
+  let posts: Awaited<ReturnType<typeof listPublishedPosts>> = [];
+  try {
+    posts = await listPublishedPosts();
+  } catch (error) {
+    console.error('[blog] Failed to load posts', error);
+  }
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
@@ -33,4 +38,3 @@ export default function BlogPage() {
 }
 
 export const revalidate = 3600; // Revalidate every hour
-

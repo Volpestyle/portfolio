@@ -1,13 +1,27 @@
-export interface BlogPost {
-  id: string;
+export type BlogPostStatus = 'draft' | 'scheduled' | 'published' | 'archived';
+
+export interface BlogPostSummary {
+  slug: string;
   title: string;
-  date: string;
-  description: string;
-  tags?: string[];
-  readTime?: string;
+  summary: string;
+  status: BlogPostStatus;
+  publishedAt?: string;
+  updatedAt: string;
+  tags: string[];
+  heroImageKey?: string;
+  readTimeMinutes?: number;
+  readTimeLabel?: string;
 }
 
-export interface BlogPostWithContent extends BlogPost {
+export interface BlogPostRecord extends BlogPostSummary {
+  currentRevisionKey?: string;
+  version: number;
+  scheduledFor?: string;
+  activeScheduleArn?: string;
+  activeScheduleName?: string;
+}
+
+export interface BlogPostWithContent extends BlogPostSummary {
   content: string;
+  currentRevisionKey?: string;
 }
-

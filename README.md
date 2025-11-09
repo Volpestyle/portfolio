@@ -44,26 +44,14 @@ Commit those files so the deploy target can ship them without extra infra. Re-ru
 
 ## Blog
 
-The site includes a blog feature at `/blog` where you can publish articles in markdown format.
+The `/blog` section now runs on the same AWS-native stack as the rest of the site. Post metadata lives in DynamoDB (`POSTS_TABLE`), markdown revisions are versioned in S3 (`CONTENT_BUCKET`), and media uploads land in a dedicated bucket (`MEDIA_BUCKET`). Authenticated admins (via Auth.js + OAuth at `/admin`) trigger server actions in `src/server/blog/actions.ts` to create drafts, upload revisions, schedule/publish posts, and request cache purges through `/api/revalidate` (which also invalidates CloudFront). See [`docs/blog.md`](docs/blog.md) for the full architecture outline.
 
-To add a new blog post:
+Key runtime env vars:
 
-1. Create a `.md` file in `content/blog/` (e.g., `my-new-post.md`)
-2. Add frontmatter at the top:
-
-```markdown
----
-title: "Your Post Title"
-date: "2025-11-07"
-description: "A brief description"
-tags: ["tag1", "tag2"]
-readTime: "5 min read"
----
-
-# Your content here...
-```
-
-Blog posts are statically generated at build time and revalidated hourly. See `content/blog/README.md` for more details.
+- `NEXT_PUBLIC_SITE_URL` / `NEXTAUTH_URL` – canonical origin so Auth.js + revalidation can call back into the app.
+- `ADMIN_EMAILS`, `NEXTAUTH_SECRET`, and the relevant OAuth client IDs/secrets (Google/GitHub) for locked-down admin access.
+- `REVALIDATE_SECRET` – shared between the on-demand revalidation API and the scheduler Lambda.
+- `POSTS_TABLE`, `POSTS_STATUS_INDEX`, `CONTENT_BUCKET`, `MEDIA_BUCKET`, `BLOG_PUBLISH_FUNCTION_ARN`, `SCHEDULER_ROLE_ARN` – auto-populated by the CDK stack for production; set them manually in `.env.local` if you want to point a local dev server at your AWS data plane.
 
 ## Environment variables
 
@@ -149,7 +137,7 @@ Secrets should be stored in AWS Secrets Manager (mirrored via the `pnpm sync:*` 
 ## Documentation
 
 - [Ask My Portfolio — implementation guide](docs/ask-my-portfolio.md)
-- [Blog Feature — implementation guide](docs/blog-feature.md)
+- [Blog CMS design + infra](docs/blog.md)
 - [GPT-5 Nano integration overview](docs/gpt5-nano-integration.md)
 - [Chat vs. SSR data caching](docs/chat-data-caching.md)
 - [OpenNext on AWS — architecture and operations](docs/reference/opennext-aws.md)
