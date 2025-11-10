@@ -1,6 +1,7 @@
-import { BlogCard } from '@/components/BlogCard';
+import { BlogList } from '@/components/BlogList';
 import { listPublishedPosts } from '@/server/blog/store';
 import type { Metadata } from 'next';
+import type { BlogPostSummary } from '@/types/blog';
 
 export const metadata: Metadata = {
   title: "Blog - JCV's Portfolio",
@@ -8,30 +9,27 @@ export const metadata: Metadata = {
 };
 
 export default async function BlogPage() {
-  let posts: Awaited<ReturnType<typeof listPublishedPosts>> = [];
+  let posts: BlogPostSummary[] = [];
+  let nextCursor: string | undefined;
+  let hasMore = false;
+
   try {
-    posts = await listPublishedPosts();
+    const result = await listPublishedPosts(20);
+    posts = result.posts;
+    nextCursor = result.nextCursor;
+    hasMore = result.hasMore;
   } catch (error) {
     console.error('[blog] Failed to load posts', error);
   }
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-8">
-        <h1 className="mb-3 text-4xl font-bold text-white">Blog</h1>
-        <p className="text-lg text-gray-400">Thoughts, insights, and technical writings</p>
-      </div>
-
       {posts.length === 0 ? (
         <div className="flex min-h-[400px] items-center justify-center">
           <p className="text-gray-400">No blog posts yet. Check back soon!</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-6">
-          {posts.map((post) => (
-            <BlogCard key={post.id} post={post} />
-          ))}
-        </div>
+        <BlogList initialPosts={posts} initialCursor={nextCursor} initialHasMore={hasMore} />
       )}
     </div>
   );

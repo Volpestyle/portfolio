@@ -1,19 +1,24 @@
-import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
-  GetCommand,
-  PutCommand,
-  QueryCommand,
-  UpdateCommand,
-  DeleteCommand,
-} from '@aws-sdk/lib-dynamodb';
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  ListObjectsV2Command,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { GetCommand, PutCommand, QueryCommand, UpdateCommand, DeleteCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'node:crypto';
 import { blogConfig } from '@/server/blog/config';
+import * as mockStore from '@/server/blog/mock-store';
 import { getDocumentClient, getS3Client } from '@/server/blog/clients';
 import type { BlogPostRecord, BlogPostStatus, BlogPostSummary, BlogPostWithContent } from '@/types/blog';
+import { isMockBlogStore } from '@/lib/blog-store-mode';
 
+const useMockStore = isMockBlogStore;
 const docClient = getDocumentClient();
 const s3Client = getS3Client();
+const MAX_REVISIONS_PER_POST = 5;
+const REVISION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function buildReadTimeLabel(minutes?: number): string | undefined {
   if (!minutes || minutes <= 0) {
@@ -58,6 +63,13 @@ function toRecord(item?: Record<string, any>): BlogPostRecord | null {
   return record;
 }
 
+export class InvalidBlogCursorError extends Error {
+  constructor() {
+    super('Invalid pagination cursor');
+    this.name = 'InvalidBlogCursorError';
+  }
+}
+
 async function fetchRevisionContent(key?: string): Promise<string> {
   if (!key) {
     return '';
@@ -83,7 +95,130 @@ function buildRevisionKey(slug: string, extension: string = 'md') {
   return `posts/${slug}/rev-${Date.now()}.${extension}`;
 }
 
-export async function listPublishedPosts(limit: number = 100): Promise<BlogPostSummary[]> {
+async function deleteAllRevisions(slug: string) {
+  const bucket = blogConfig.contentBucket;
+  const prefix = `posts/${slug}/`;
+  let continuationToken: string | undefined;
+
+  do {
+    const response = await s3Client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    );
+
+    const keys = (response.Contents ?? [])
+      .map((object) => object.Key)
+      .filter((key): key is string => Boolean(key));
+
+    if (keys.length > 0) {
+      await s3Client.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: {
+            Objects: keys.map((Key) => ({ Key })),
+            Quiet: true,
+          },
+        })
+      );
+    }
+
+    continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+  } while (continuationToken);
+}
+
+async function pruneRevisions(slug: string, latestKey: string) {
+  if (useMockStore) {
+    return;
+  }
+  const bucket = blogConfig.contentBucket;
+  const prefix = `posts/${slug}/`;
+  let continuationToken: string | undefined;
+  const revisions: { key: string; lastModified: number }[] = [];
+
+  do {
+    const response = await s3Client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    );
+
+    for (const object of response.Contents ?? []) {
+      if (!object.Key || object.Key === latestKey) {
+        continue;
+      }
+      revisions.push({
+        key: object.Key,
+        lastModified: object.LastModified ? object.LastModified.getTime() : 0,
+      });
+    }
+
+    continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  if (!revisions.length) {
+    return;
+  }
+
+  const now = Date.now();
+  const keepBudget = Math.max(0, MAX_REVISIONS_PER_POST - 1);
+  const sorted = revisions.sort((a, b) => b.lastModified - a.lastModified);
+
+  const keysToDelete = sorted
+    .map((revision, index) => {
+      const tooMany = index >= keepBudget;
+      const tooOld = revision.lastModified === 0 || now - revision.lastModified > REVISION_TTL_MS;
+      return tooMany || tooOld ? revision.key : null;
+    })
+    .filter((key): key is string => Boolean(key));
+
+  if (!keysToDelete.length) {
+    return;
+  }
+
+  for (let i = 0; i < keysToDelete.length; i += 1000) {
+    const chunk = keysToDelete.slice(i, i + 1000);
+    await s3Client.send(
+      new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: {
+          Objects: chunk.map((Key) => ({ Key })),
+          Quiet: true,
+        },
+      })
+    );
+  }
+}
+
+export interface PaginatedPosts {
+  posts: BlogPostSummary[];
+  nextCursor?: string;
+  hasMore: boolean;
+}
+
+export async function listPublishedPosts(
+  limit: number = 20,
+  cursor?: string
+): Promise<PaginatedPosts> {
+  if (useMockStore) {
+    const { posts, hasMore, nextCursor } = await mockStore.listPublishedPosts(limit);
+    return { posts, hasMore, nextCursor };
+  }
+
+  let exclusiveStartKey;
+  if (cursor) {
+    try {
+      const decoded = Buffer.from(cursor, 'base64').toString('utf-8');
+      exclusiveStartKey = JSON.parse(decoded);
+    } catch {
+      throw new InvalidBlogCursorError();
+    }
+  }
+
   const response = await docClient.send(
     new QueryCommand({
       TableName: blogConfig.tableName,
@@ -97,10 +232,11 @@ export async function listPublishedPosts(limit: number = 100): Promise<BlogPostS
       },
       ScanIndexForward: false,
       Limit: limit,
+      ExclusiveStartKey: exclusiveStartKey,
     })
   );
 
-  return (response.Items ?? [])
+  const posts = (response.Items ?? [])
     .map((item) => toRecord(item))
     .filter((record): record is BlogPostRecord => Boolean(record))
     .map((record) => ({
@@ -115,12 +251,61 @@ export async function listPublishedPosts(limit: number = 100): Promise<BlogPostS
       readTimeMinutes: record.readTimeMinutes,
       readTimeLabel: record.readTimeLabel,
     }));
+
+  const nextCursor = response.LastEvaluatedKey
+    ? Buffer.from(JSON.stringify(response.LastEvaluatedKey)).toString('base64')
+    : undefined;
+
+  return {
+    posts,
+    nextCursor,
+    hasMore: !!response.LastEvaluatedKey,
+  };
+}
+
+export async function listPosts(options: { status?: BlogPostStatus; search?: string } = {}): Promise<BlogPostRecord[]> {
+  if (useMockStore) {
+    return mockStore.listPosts(options);
+  }
+
+  const response = await docClient.send(
+    new ScanCommand({
+      TableName: blogConfig.tableName,
+    })
+  );
+
+  const searchValue = options.search?.toLowerCase().trim();
+
+  return (response.Items ?? [])
+    .map((item) => toRecord(item))
+    .filter((record): record is BlogPostRecord => Boolean(record))
+    .filter((record) => {
+      if (options.status && record.status !== options.status) {
+        return false;
+      }
+      if (searchValue) {
+        return (
+          record.title.toLowerCase().includes(searchValue) ||
+          record.slug.toLowerCase().includes(searchValue)
+        );
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      const aDate = new Date(a.updatedAt).getTime();
+      const bDate = new Date(b.updatedAt).getTime();
+      return bDate - aDate;
+    });
 }
 
 export async function getPostWithContent(
   slug: string,
   options: { includeDraft?: boolean } = {}
 ): Promise<BlogPostWithContent | null> {
+  if (useMockStore) {
+    return mockStore.getPostWithContent(slug, options);
+  }
+
   const response = await docClient.send(
     new GetCommand({
       TableName: blogConfig.tableName,
@@ -138,6 +323,10 @@ export async function getPostWithContent(
   }
 
   const content = await fetchRevisionContent(record.currentRevisionKey);
+  if (record.currentRevisionKey) {
+    await pruneRevisions(slug, record.currentRevisionKey);
+  }
+
   return {
     slug: record.slug,
     title: record.title,
@@ -151,6 +340,7 @@ export async function getPostWithContent(
     readTimeLabel: record.readTimeLabel,
     content,
     currentRevisionKey: record.currentRevisionKey,
+    version: record.version,
   };
 }
 
@@ -161,6 +351,10 @@ export async function createPostRecord(input: {
   tags?: string[];
   heroImageKey?: string;
 }): Promise<BlogPostRecord> {
+  if (useMockStore) {
+    return mockStore.createPostRecord(input);
+  }
+
   const now = new Date().toISOString();
   await docClient.send(
     new PutCommand({
@@ -203,6 +397,10 @@ export async function saveDraftRecord(input: {
   extension?: string;
   expectedVersion: number;
 }): Promise<BlogPostWithContent> {
+  if (useMockStore) {
+    return mockStore.saveDraftRecord(input);
+  }
+
   const key = buildRevisionKey(input.slug, input.extension);
   await s3Client.send(
     new PutObjectCommand({
@@ -290,6 +488,7 @@ export async function saveDraftRecord(input: {
     readTimeLabel: record.readTimeLabel,
     content: input.body,
     currentRevisionKey: record.currentRevisionKey,
+    version: record.version,
   };
 }
 
@@ -298,6 +497,10 @@ export async function publishPostRecord(input: {
   publishedAt?: string;
   expectedVersion: number;
 }): Promise<BlogPostRecord> {
+  if (useMockStore) {
+    return mockStore.publishPostRecord(input);
+  }
+
   const publishedAt = input.publishedAt ?? new Date().toISOString();
   const nextVersion = input.expectedVersion + 1;
 
@@ -335,6 +538,43 @@ export async function publishPostRecord(input: {
   return record;
 }
 
+export async function archivePostRecord(input: { slug: string; expectedVersion: number }): Promise<BlogPostRecord> {
+  if (useMockStore) {
+    return mockStore.archivePostRecord(input);
+  }
+
+  const response = await docClient.send(
+    new UpdateCommand({
+      TableName: blogConfig.tableName,
+      Key: { slug: input.slug },
+      UpdateExpression:
+        'SET #status = :status, #updatedAt = :updatedAt, #version = :nextVersion REMOVE #scheduledFor, #activeScheduleArn, #activeScheduleName',
+      ConditionExpression: '#version = :expectedVersion',
+      ExpressionAttributeNames: {
+        '#status': 'status',
+        '#updatedAt': 'updatedAt',
+        '#version': 'version',
+        '#scheduledFor': 'scheduledFor',
+        '#activeScheduleArn': 'activeScheduleArn',
+        '#activeScheduleName': 'activeScheduleName',
+      },
+      ExpressionAttributeValues: {
+        ':status': 'archived',
+        ':updatedAt': new Date().toISOString(),
+        ':nextVersion': input.expectedVersion + 1,
+        ':expectedVersion': input.expectedVersion,
+      },
+      ReturnValues: 'ALL_NEW',
+    })
+  );
+
+  const record = toRecord(response.Attributes);
+  if (!record) {
+    throw new Error('Unable to archive blog post');
+  }
+  return record;
+}
+
 export async function markScheduledRecord(input: {
   slug: string;
   scheduledFor: string;
@@ -342,6 +582,10 @@ export async function markScheduledRecord(input: {
   scheduleName: string;
   expectedVersion: number;
 }): Promise<BlogPostRecord> {
+  if (useMockStore) {
+    return mockStore.markScheduledRecord(input);
+  }
+
   const response = await docClient.send(
     new UpdateCommand({
       TableName: blogConfig.tableName,
@@ -379,7 +623,52 @@ export async function markScheduledRecord(input: {
   return record;
 }
 
+export async function unmarkScheduledRecord(input: {
+  slug: string;
+  expectedVersion: number;
+}): Promise<BlogPostRecord> {
+  if (useMockStore) {
+    return mockStore.unmarkScheduledRecord(input);
+  }
+
+  const response = await docClient.send(
+    new UpdateCommand({
+      TableName: blogConfig.tableName,
+      Key: { slug: input.slug },
+      UpdateExpression:
+        'SET #status = :status, #updatedAt = :updatedAt, #version = :nextVersion REMOVE #scheduledFor, #publishedAt, #activeScheduleArn, #activeScheduleName',
+      ConditionExpression: '#version = :expectedVersion',
+      ExpressionAttributeNames: {
+        '#status': 'status',
+        '#updatedAt': 'updatedAt',
+        '#version': 'version',
+        '#scheduledFor': 'scheduledFor',
+        '#publishedAt': 'publishedAt',
+        '#activeScheduleArn': 'activeScheduleArn',
+        '#activeScheduleName': 'activeScheduleName',
+      },
+      ExpressionAttributeValues: {
+        ':status': 'draft',
+        ':updatedAt': new Date().toISOString(),
+        ':nextVersion': input.expectedVersion + 1,
+        ':expectedVersion': input.expectedVersion,
+      },
+      ReturnValues: 'ALL_NEW',
+    })
+  );
+
+  const record = toRecord(response.Attributes);
+  if (!record) {
+    throw new Error('Unable to unschedule blog post');
+  }
+  return record;
+}
+
 export async function deletePostRecord(slug: string): Promise<void> {
+  if (useMockStore) {
+    return mockStore.deletePostRecord(slug);
+  }
+
   const existing = await docClient.send(
     new GetCommand({
       TableName: blogConfig.tableName,
@@ -399,17 +688,14 @@ export async function deletePostRecord(slug: string): Promise<void> {
     })
   );
 
-  if (record.currentRevisionKey) {
-    await s3Client.send(
-      new DeleteObjectCommand({
-        Bucket: blogConfig.contentBucket,
-        Key: record.currentRevisionKey,
-      })
-    );
-  }
+  await deleteAllRevisions(slug);
 }
 
 export async function getPostRecord(slug: string): Promise<BlogPostRecord | null> {
+  if (useMockStore) {
+    return mockStore.getPostRecord(slug);
+  }
+
   const response = await docClient.send(
     new GetCommand({
       TableName: blogConfig.tableName,
@@ -423,6 +709,10 @@ export async function generateMediaUploadUrl(input: {
   contentType: string;
   extension?: string;
 }): Promise<{ uploadUrl: string; key: string }> {
+  if (useMockStore) {
+    return mockStore.generateMediaUploadUrl(input);
+  }
+
   const now = new Date();
   const year = now.getUTCFullYear();
   const month = String(now.getUTCMonth() + 1).padStart(2, '0');

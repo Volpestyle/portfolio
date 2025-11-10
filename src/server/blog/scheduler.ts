@@ -36,8 +36,8 @@ export async function upsertPublishSchedule(slug: string, scheduledFor: string):
   try {
     const response = await scheduler.send(new UpdateScheduleCommand({ ...baseInput }));
     return { arn: response.ScheduleArn ?? `arn:aws:scheduler:::schedule/default/${scheduleName}`, name: scheduleName };
-  } catch (error: any) {
-    if (error?.name !== 'ResourceNotFoundException') {
+  } catch (error: unknown) {
+    if (!isResourceNotFound(error)) {
       throw error;
     }
   }
@@ -59,10 +59,18 @@ export async function deletePublishSchedule(name?: string) {
         Name: name,
       })
     );
-  } catch (error: any) {
-    if (error?.name === 'ResourceNotFoundException') {
+  } catch (error: unknown) {
+    if (isResourceNotFound(error)) {
       return;
     }
     throw error;
   }
+}
+
+function isResourceNotFound(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const name = (error as { name?: unknown }).name;
+  return name === 'ResourceNotFoundException';
 }

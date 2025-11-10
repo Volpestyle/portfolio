@@ -72,7 +72,7 @@ S3
 5. Rendering, caching & going live
    • Pages fetch meta from DynamoDB + body from S3.
    • After create/update/publish: call revalidateTag('post:'+slug) and a list tag like 'posts', or revalidatePath('/blog/[slug]') & /blog. ￼
-   • Because you’re on OpenNext, also kick a CloudFront invalidation for affected paths (/blog/[slug], /blog, /sitemap.xml, /rss.xml). OpenNext provides an Automatic CDN Invalidation hook specifically for on-demand revalidation. ￼
+   • Because you’re on OpenNext, also kick a CloudFront invalidation for affected paths (/blog/[slug], /blog, /sitemap.xml). OpenNext provides an Automatic CDN Invalidation hook specifically for on-demand revalidation. ￼
 
 Draft preview: enable Draft Mode for your admin session and render latest draft without publishing. ￼
 
@@ -232,7 +232,7 @@ revalidatePath/revalidateTag semantics + OpenNext’s CDN invalidation requireme
     5.  Draft Mode preview flow. ￼
     6.  Scheduling via EventBridge → publish Lambda.
     7.  Presigned uploads for media.
-    8.  Sitemap/RSS + invalidate on publish.
+    8.  Sitemap + invalidate on publish.
 
 ⸻
 

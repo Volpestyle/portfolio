@@ -3,7 +3,7 @@ import { z } from 'zod';
 const slug = z
   .string()
   .min(3)
-  .max(64)
+  .max(48)
   .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with dashes');
 
 const tags = z.array(z.string().trim().min(1).max(32)).max(16);
@@ -43,6 +43,16 @@ export const deletePostSchema = z.object({
   slug,
 });
 
+export const archivePostSchema = z.object({
+  slug,
+  version: z.number().int().nonnegative(),
+});
+
+export const unschedulePostSchema = z.object({
+  slug,
+  version: z.number().int().nonnegative(),
+});
+
 export const presignedUploadSchema = z.object({
   contentType: z.string().min(3),
   extension: z.string().regex(/^[a-z0-9]+$/i).optional(),
@@ -54,3 +64,5 @@ export type PublishPostInput = z.infer<typeof publishPostSchema>;
 export type SchedulePostInput = z.infer<typeof schedulePostSchema>;
 export type DeletePostInput = z.infer<typeof deletePostSchema>;
 export type PresignedUploadInput = z.infer<typeof presignedUploadSchema>;
+export type ArchivePostInput = z.infer<typeof archivePostSchema>;
+export type UnschedulePostInput = z.infer<typeof unschedulePostSchema>;

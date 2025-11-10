@@ -213,6 +213,7 @@ export class PortfolioStack extends Stack {
       if (resource.function) {
         this.grantRuntimeAccess(resource.function);
         this.grantSecretAccess(resource.function);
+        this.attachSesPermissions(resource.function);
       }
     }
 
@@ -276,7 +277,8 @@ export class PortfolioStack extends Stack {
       ...(domainConfig?.certificate ? { certificate: domainConfig.certificate } : {}),
     });
 
-    serverEdgeFunction.addEnvironment('CLOUDFRONT_DISTRIBUTION_ID', distribution.distributionId);
+    const edgeFunction = serverEdgeFunction.lambda as lambda.Function;
+    edgeFunction.addEnvironment('CLOUDFRONT_DISTRIBUTION_ID', distribution.distributionId);
     this.attachCloudFrontInvalidationPermission(serverEdgeFunction, distribution);
 
     this.deployStaticAssets(this.openNextOutput.origins.s3, distribution);
@@ -400,6 +402,18 @@ export class PortfolioStack extends Stack {
       versioned: true,
       removalPolicy: RemovalPolicy.RETAIN,
       autoDeleteObjects: false,
+      lifecycleRules: [
+        {
+          enabled: true,
+          noncurrentVersionExpiration: Duration.days(30),
+          abortIncompleteMultipartUploadAfter: Duration.days(7),
+        },
+        {
+          enabled: true,
+          expiration: Duration.days(90),
+          prefix: 'posts/',
+        },
+      ],
     });
   }
 
@@ -428,6 +442,13 @@ export class PortfolioStack extends Stack {
       versioned: true,
       removalPolicy: RemovalPolicy.RETAIN,
       autoDeleteObjects: false,
+      lifecycleRules: [
+        {
+          enabled: true,
+          noncurrentVersionExpiration: Duration.days(30),
+          abortIncompleteMultipartUploadAfter: Duration.days(7),
+        },
+      ],
       cors: [
         {
           allowedHeaders: ['*'],
@@ -1099,8 +1120,8 @@ export class PortfolioStack extends Stack {
     );
   }
 
-  private attachSesPermissions(fn: cloudfrontExperimental.EdgeFunction) {
-    fn.addToRolePolicy(
+  private attachSesPermissions(grantable: iam.IGrantable) {
+    grantable.grantPrincipal.addToPrincipalPolicy(
       new iam.PolicyStatement({
         actions: ['ses:SendEmail', 'ses:SendRawEmail'],
         resources: ['*'],

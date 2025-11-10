@@ -21,7 +21,6 @@ export interface BlogPostRecord extends BlogPostSummary {
   activeScheduleName?: string;
 }
 
-export interface BlogPostWithContent extends BlogPostSummary {
+export interface BlogPostWithContent extends BlogPostRecord {
   content: string;
-  currentRevisionKey?: string;
 }

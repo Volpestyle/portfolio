@@ -73,7 +73,7 @@ async function triggerRevalidate(slug) {
 
   const payload = {
     tags: [`post:${slug}`, 'posts'],
-    paths: [`/blog/${slug}`, '/blog', '/sitemap.xml', '/rss.xml'],
+    paths: [`/blog/${slug}`, '/blog', '/sitemap.xml'],
   };
 
   try {

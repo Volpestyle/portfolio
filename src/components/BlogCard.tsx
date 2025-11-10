@@ -1,13 +1,7 @@
-'use client';
-
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
-import { cn, formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import { ArrowRight, BookOpen, Clock, Calendar } from 'lucide-react';
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { springAnimations } from '@/lib/animations';
-import { AnimatedExpandButton } from '@/components/ui/AnimatedExpandButton';
 import type { BlogPostSummary } from '@/types/blog';
 
 interface BlogCardProps {
@@ -15,33 +9,15 @@ interface BlogCardProps {
 }
 
 export function BlogCard({ post }: BlogCardProps) {
-  const [isTitleHovered, setIsTitleHovered] = useState(false);
-
   return (
-    <Card className="relative flex h-full flex-col border-white bg-black/5 p-6 text-white backdrop-blur-sm transition-all duration-300 hover:border-white/60 hover:bg-black/10">
+    <Card className="group relative flex h-full flex-col border-white bg-black/5 p-6 text-white backdrop-blur-sm transition-colors duration-300 hover:border-white/60 hover:bg-black/10">
       <h2 className="mb-3 flex items-center justify-between text-2xl font-bold">
         <Link
           href={`/blog/${post.slug}`}
-          className="group relative inline-flex items-center gap-2 rounded transition-all duration-300 hover:bg-white hover:text-black active:bg-white active:text-black"
-          style={{
-            paddingLeft: isTitleHovered ? '12px' : '0px',
-            paddingRight: isTitleHovered ? '12px' : '0px',
-            paddingTop: '8px',
-            paddingBottom: '8px',
-          }}
-          onMouseEnter={() => setIsTitleHovered(true)}
-          onMouseLeave={() => setIsTitleHovered(false)}
+          className="inline-flex items-center gap-2 rounded px-3 py-2 transition-all duration-300 hover:bg-white hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
-          {post.title}
-          <motion.div
-            animate={{
-              x: isTitleHovered ? 0 : -8,
-              opacity: isTitleHovered ? 1 : 0,
-            }}
-            transition={springAnimations.iconText}
-          >
-            <BookOpen className="h-5 w-5" />
-          </motion.div>
+          <span>{post.title}</span>
+          <BookOpen className="h-5 w-5 -translate-x-1 opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100" />
         </Link>
       </h2>
 
@@ -73,12 +49,15 @@ export function BlogCard({ post }: BlogCardProps) {
         </div>
       )}
 
-      <AnimatedExpandButton
-        icon={<ArrowRight className="h-5 w-5" />}
-        text="read article"
-        wrapperClassName="mt-auto"
-        href={`/blog/${post.slug}`}
-      />
+      <div className="mt-auto pt-2">
+        <Link
+          href={`/blog/${post.slug}`}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-white transition-colors duration-300 hover:text-blue-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300"
+        >
+          Read article
+          <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+        </Link>
+      </div>
     </Card>
   );
 }

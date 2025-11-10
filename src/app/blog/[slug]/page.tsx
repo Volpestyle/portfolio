@@ -1,4 +1,4 @@
-import { BlogMarkdown } from '@/components/BlogMarkdown';
+import { Markdown } from '@/components/Markdown';
 import { formatDate } from '@/lib/utils';
 import { getPostWithContent, listPublishedPosts } from '@/server/blog/store';
 import { draftMode } from 'next/headers';
@@ -7,8 +7,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const post = await getPostWithContent(params.slug).catch(() => null);
+type PageContext = {
+  params: Promise<{ slug: string }>;
+};
+
+export async function generateMetadata({ params }: PageContext): Promise<Metadata> {
+  const { slug } = await params;
+  const post = await getPostWithContent(slug).catch(() => null);
 
   if (!post) {
     return {
@@ -30,7 +35,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
 export async function generateStaticParams() {
   try {
-    const posts = await listPublishedPosts();
+    const { posts } = await listPublishedPosts();
     return posts.map((post) => ({
       slug: post.slug,
     }));
@@ -40,9 +45,10 @@ export async function generateStaticParams() {
   }
 }
 
-export default async function BlogPostPage({ params }: { params: { slug: string } }) {
+export default async function BlogPostPage({ params }: PageContext) {
+  const { slug } = await params;
   const { isEnabled } = await draftMode();
-  const postRecord = await getPostWithContent(params.slug, { includeDraft: isEnabled });
+  const postRecord = await getPostWithContent(slug, { includeDraft: isEnabled });
 
   if (!postRecord) {
     notFound();
@@ -71,7 +77,9 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
-              <time dateTime={post.publishedAt ?? post.updatedAt}>{formatDate(post.publishedAt ?? post.updatedAt)}</time>
+              <time dateTime={post.publishedAt ?? post.updatedAt}>
+                {formatDate(post.publishedAt ?? post.updatedAt)}
+              </time>
             </div>
             {post.readTimeLabel && (
               <div className="flex items-center gap-2">
@@ -97,15 +105,12 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
 
         {/* Article content */}
         <div className="rounded-lg border border-white/20 bg-black/20 p-8 backdrop-blur-sm md:p-12">
-          <BlogMarkdown content={post.content} />
+          <Markdown content={post.content} />
         </div>
       </article>
 
       {/* Back to blog link at bottom */}
-      <Link
-        href="/blog"
-        className="inline-flex items-center gap-2 text-gray-400 transition-colors hover:text-white"
-      >
+      <Link href="/blog" className="inline-flex items-center gap-2 text-gray-400 transition-colors hover:text-white">
         <ArrowLeft className="h-4 w-4" />
         <span>Back to blog</span>
       </Link>
