@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getDocumentContent } from '@/lib/github-server';
+import { isE2ETestMode } from '@/lib/test-mode';
+import { TEST_DOC_CONTENT, TEST_REPO } from '@/lib/test-fixtures';
 
-export async function GET(
-  _request: Request,
-  context: { params: Promise<{ owner: string; repo: string; path: string[] }> }
-) {
+type RouteParams = {
+  owner: string;
+  repo: string;
+  path?: string[];
+};
+
+export async function GET(request: Request, context: { params: Promise<RouteParams> }) {
   try {
     const params = await context.params;
     const owner = decodeURIComponent(params.owner);
@@ -14,6 +19,23 @@ export async function GET(
 
     if (!docPath) {
       return NextResponse.json({ error: 'Document path is required' }, { status: 400 });
+    }
+
+    if (isE2ETestMode(request.headers)) {
+      return NextResponse.json(
+        {
+          repo,
+          owner,
+          path: docPath,
+          content: TEST_DOC_CONTENT,
+          projectName: TEST_REPO.name,
+        },
+        {
+          headers: {
+            'Cache-Control': 'no-store',
+          },
+        }
+      );
     }
 
     const document = await getDocumentContent(repo, docPath, owner);
@@ -35,4 +57,3 @@ export async function GET(
     return NextResponse.json({ error: 'Unable to load document' }, { status: 500 });
   }
 }
-

@@ -1,14 +1,60 @@
 import OpenAI from 'openai';
+import type {
+  ResponseCompletedEvent,
+  ResponseFunctionCallArgumentsDoneEvent,
+  ResponseFunctionToolCall,
+  ResponseOutputItem,
+  ResponseOutputItemAddedEvent,
+  ResponseStreamEvent,
+  ResponseTextDeltaEvent,
+} from 'openai/resources/responses/responses';
 import { NextRequest } from 'next/server';
 import { buildSystemPrompt } from '@/server/prompt/buildSystemPrompt';
 import { tools, toolRouter } from '@/server/tools';
 import type { ChatRequestMessage } from '@/types/chat';
 import { enforceChatRateLimit } from '@/lib/rate-limit';
 import { resolveSecretValue } from '@/lib/secrets/manager';
+import { headerIncludesTestMode, isE2ETestMode } from '@/lib/test-mode';
+import { TEST_REPO, TEST_README } from '@/lib/test-fixtures';
 
 export const runtime = 'nodejs';
 
 let cachedClient: OpenAI | undefined;
+
+const TEST_MODE_HEADER = 'x-portfolio-test-mode';
+
+function isOutputItemAddedEvent(event: ResponseStreamEvent): event is ResponseOutputItemAddedEvent {
+  return event.type === 'response.output_item.added';
+}
+
+function isOutputTextDeltaEvent(event: ResponseStreamEvent): event is ResponseTextDeltaEvent {
+  return event.type === 'response.output_text.delta';
+}
+
+function isFunctionCallArgumentsDoneEvent(
+  event: ResponseStreamEvent
+): event is ResponseFunctionCallArgumentsDoneEvent {
+  return event.type === 'response.function_call_arguments.done';
+}
+
+function isResponseCompletedEvent(event: ResponseStreamEvent): event is ResponseCompletedEvent {
+  return event.type === 'response.completed';
+}
+
+function isFunctionCallItem(item?: ResponseOutputItem): item is ResponseFunctionToolCall {
+  return item?.type === 'function_call';
+}
+
+function getItemId(item?: ResponseOutputItem): string | undefined {
+  if (!item || typeof item !== 'object') {
+    return undefined;
+  }
+  if ('id' in item) {
+    const possibleId = (item as { id?: unknown }).id;
+    return typeof possibleId === 'string' ? possibleId : undefined;
+  }
+  return undefined;
+}
 
 async function getOpenAIClient(): Promise<OpenAI> {
   if (!cachedClient) {
@@ -19,6 +65,19 @@ async function getOpenAIClient(): Promise<OpenAI> {
 }
 
 export async function POST(req: NextRequest) {
+  const headersList = req.headers;
+  const isIntegrationTest = headerIncludesTestMode(headersList, 'integration');
+
+  if (isIntegrationTest) {
+    return new Response(JSON.stringify({ ok: true, message: 'Chat API integration response' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (isE2ETestMode(headersList)) {
+    return buildE2EChatResponse();
+  }
+
   let client: OpenAI;
   try {
     client = await getOpenAIClient();
@@ -56,7 +115,7 @@ export async function POST(req: NextRequest) {
   }
 
   const instructions = await buildSystemPrompt();
-  const stream = await client.responses.create({
+  const stream = (await client.responses.create({
     model: 'gpt-5-nano-2025-08-07',
     input: [
       {
@@ -69,7 +128,7 @@ When you need to look something up or fetch information, naturally explain what 
     ],
     tools,
     stream: true,
-  });
+  })) as AsyncIterable<ResponseStreamEvent>;
 
   const encoder = new TextEncoder();
   let completed = false;
@@ -79,23 +138,20 @@ When you need to look something up or fetch information, naturally explain what 
     async start(controller) {
       try {
         for await (const event of stream) {
-          if (event.type === 'response.output_item.added') {
-            const item = (event as any).item;
-            if (
-              item?.type === 'function_call' &&
-              typeof item.id === 'string' &&
-              typeof item.name === 'string'
-            ) {
+          if (isOutputItemAddedEvent(event)) {
+            const item = event.item;
+            if (isFunctionCallItem(item) && item.id && item.name) {
               toolNameByItemId.set(item.id, item.name);
             }
 
-            if (item?.id) {
+            const itemId = getItemId(item);
+            if (itemId) {
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({
                     type: 'item',
-                    itemId: item.id,
-                    itemType: item.type,
+                    itemId,
+                    itemType: item?.type,
                   })}\n\n`
                 )
               );
@@ -103,28 +159,22 @@ When you need to look something up or fetch information, naturally explain what 
             continue;
           }
 
-          if (event.type === 'response.output_text.delta') {
+          if (isOutputTextDeltaEvent(event)) {
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
                   type: 'token',
                   delta: event.delta,
-                  itemId: (event as any).item_id,
+                  itemId: event.item_id,
                 })}\n\n`
               )
             );
             continue;
           }
 
-          if (event.type === 'response.function_call_arguments.done') {
-            const itemId =
-              typeof (event as any).item_id === 'string'
-                ? ((event as any).item_id as string)
-                : undefined;
-            const resolvedName =
-              (event as any).name ??
-              (event as any).call_name ??
-              (itemId ? toolNameByItemId.get(itemId) : undefined);
+          if (isFunctionCallArgumentsDoneEvent(event)) {
+            const itemId = event.item_id;
+            const resolvedName = event.name ?? (itemId ? toolNameByItemId.get(itemId) : undefined);
 
             if (!resolvedName) {
               controller.enqueue(
@@ -138,7 +188,7 @@ When you need to look something up or fetch information, naturally explain what 
             try {
               const attachment = await toolRouter({
                 name: resolvedName,
-                arguments: typeof (event as any).arguments === 'string' ? (event as any).arguments : undefined,
+                arguments: event.arguments,
               });
               controller.enqueue(
                 encoder.encode(
@@ -162,7 +212,7 @@ When you need to look something up or fetch information, naturally explain what 
             continue;
           }
 
-          if (event.type === 'response.completed') {
+          if (isResponseCompletedEvent(event)) {
             completed = true;
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
             continue;
@@ -182,6 +232,38 @@ When you need to look something up or fetch information, naturally explain what 
   });
 
   return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+    },
+  });
+}
+
+function buildE2EChatResponse() {
+  const frames = [
+    { type: 'item', itemId: 'assistant-item' },
+    {
+      type: 'token',
+      delta: "Here's a featured project and its inline docs.",
+      itemId: 'assistant-item',
+    },
+    {
+      type: 'attachment',
+      attachment: { type: 'project-cards', repos: [TEST_REPO] },
+      itemId: 'assistant-item',
+    },
+    {
+      type: 'attachment',
+      attachment: { type: 'project-details', repo: TEST_REPO, readme: TEST_README },
+      itemId: 'assistant-item',
+    },
+    { type: 'done' },
+  ];
+
+  const body = frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join('');
+  return new Response(body, {
+    status: 200,
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',

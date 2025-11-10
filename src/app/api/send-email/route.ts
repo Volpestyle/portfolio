@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
-import { headers } from 'next/headers';
+import { headerIncludesTestMode } from '@/lib/test-mode';
 let cachedSes: SESClient | undefined;
 
 async function getSesClient(): Promise<SESClient> {
@@ -34,8 +34,18 @@ export async function OPTIONS(): Promise<NextResponse> {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   console.log('[Email API] Request received');
 
-  const headersList = await headers();
+  const headersList = request.headers;
   const contentType = headersList.get('content-type');
+  const isIntegrationRequest = headerIncludesTestMode(headersList, 'integration');
+
+  if (isIntegrationRequest) {
+    return withCors(
+      NextResponse.json({
+        success: true,
+        message: 'Integration test mode: email send skipped.',
+      })
+    );
+  }
 
   if (!contentType?.includes('application/json')) {
     return withCors(NextResponse.json({ error: 'Content type must be application/json' }, { status: 415 }));

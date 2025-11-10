@@ -3,12 +3,11 @@ import { getRepoDetails } from '@/lib/github-server';
 
 export async function GET(
   _request: Request,
-  context: { params: Promise<{ owner: string; repo: string }> }
+  context: { params: { owner: string; repo: string } }
 ) {
   try {
-    const params = await context.params;
-    const owner = decodeURIComponent(params.owner);
-    const repo = decodeURIComponent(params.repo);
+    const owner = decodeURIComponent(context.params.owner);
+    const repo = decodeURIComponent(context.params.repo);
     const details = await getRepoDetails(repo, owner);
     return NextResponse.json(details, {
       headers: {
@@ -20,4 +19,3 @@ export async function GET(
     return NextResponse.json({ error: 'Unable to load repository info' }, { status: 500 });
   }
 }
-
