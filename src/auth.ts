@@ -52,16 +52,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      if (token.email) {
-        session.user = { email: token.email as string };
+      if (typeof token.email === 'string') {
+        session.user = {
+          ...session.user,
+          email: token.email,
+        };
       }
       return session;
     },
     async signIn({ profile }) {
       return isAdminEmail(profile?.email ?? null);
-    },
-    async authorized({ auth: session }) {
-      return isAdminEmail(session?.user?.email ?? null);
     },
   },
 });
