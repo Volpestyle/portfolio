@@ -1,8 +1,16 @@
 import { GH_CONFIG } from './constants';
-import { createOctokit, getPortfolioConfig, resolveGitHubToken } from './github-api';
+import {
+  createOctokit,
+  getPortfolioConfig,
+  resolveGitHubToken,
+  fetchRepoLanguages,
+  calculateLanguagePercentages,
+} from './github-api';
 import { PortfolioRepoConfig, PrivateRepoData } from '@/types/portfolio';
 import { unstable_cache } from 'next/cache';
 import { convertRelativeToAbsoluteUrls } from './readme-utils';
+import { TEST_DOC_CONTENT, TEST_README, TEST_REPO } from '@/lib/test-fixtures';
+import { isMockBlogStore } from '@/lib/blog-store-mode';
 
 export type RepoData = {
   id?: number;
@@ -25,6 +33,8 @@ export type RepoData = {
   topics?: string[];
   summary?: string;
   tags?: string[];
+  languagesBreakdown?: Record<string, number>;
+  languagePercentages?: Array<{ name: string; percent: number }>;
 };
 
 export type PortfolioReposResponse = {
@@ -32,7 +42,31 @@ export type PortfolioReposResponse = {
   normal: RepoData[]
 };
 
+const isMockGithubData = isMockBlogStore;
+
+function cloneRepo(repo: RepoData, overrides: Partial<RepoData> = {}): RepoData {
+  return {
+    ...repo,
+    ...overrides,
+    owner: overrides.owner
+      ? { ...overrides.owner }
+      : repo.owner
+        ? { ...repo.owner }
+        : undefined,
+    tags: overrides.tags ?? (repo.tags ? [...repo.tags] : undefined),
+    languagePercentages:
+      overrides.languagePercentages ??
+      (repo.languagePercentages ? repo.languagePercentages.map((lang) => ({ ...lang })) : undefined),
+  };
+}
+
 export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
+  if (isMockGithubData) {
+    return {
+      starred: [cloneRepo(TEST_REPO)],
+      normal: [],
+    };
+  }
   const token = await resolveGitHubToken();
   if (!token) {
     throw new Error('GitHub token is not configured');
@@ -71,6 +105,13 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
       const publicRepo = publicRepoMap.get(repoConfig.name);
 
       if (publicRepo) {
+        // Fetch language data for public repos
+        const owner = publicRepo.owner?.login || GH_CONFIG.USERNAME;
+        const languagesBreakdown = await fetchRepoLanguages(owner, publicRepo.name);
+        const languagePercentages = languagesBreakdown
+          ? calculateLanguagePercentages(languagesBreakdown)
+          : undefined;
+
         processedRepos.push({
           id: publicRepo.id,
           name: publicRepo.name,
@@ -85,6 +126,8 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
           owner: publicRepo.owner,
           isStarred: repoConfig.isStarred || false,
           icon: repoConfig.icon,
+          languagesBreakdown: languagesBreakdown ?? undefined,
+          languagePercentages,
         });
       } else if (repoConfig.isPrivate) {
         const privateRepoData: RepoData = {
@@ -102,6 +145,7 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
           updated_at: repoConfig.updatedAt || new Date().toISOString(),
           isStarred: repoConfig.isStarred || false,
           icon: repoConfig.icon,
+          languagePercentages: repoConfig.languages,
         };
         processedRepos.push(privateRepoData);
       }
@@ -127,6 +171,12 @@ export const getPortfolioRepos = unstable_cache(
 );
 
 export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.USERNAME): Promise<RepoData> {
+  if (isMockGithubData) {
+    return cloneRepo(TEST_REPO, {
+      name: repo,
+      owner: { login: owner },
+    });
+  }
   const token = await resolveGitHubToken();
   if (!token) throw new Error('GitHub token is not configured');
   const octokit = createOctokit(token);
@@ -153,6 +203,7 @@ export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.U
         pushed_at: repoConfig.updatedAt || new Date().toISOString(),
         isStarred: repoConfig.isStarred || false,
         icon: repoConfig.icon,
+        languagePercentages: repoConfig.languages,
       };
     }
 
@@ -161,6 +212,12 @@ export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.U
       owner,
       repo,
     });
+
+    // Fetch language data
+    const languagesBreakdown = await fetchRepoLanguages(owner, repo);
+    const languagePercentages = languagesBreakdown
+      ? calculateLanguagePercentages(languagesBreakdown)
+      : undefined;
 
     return {
       id: data.id,
@@ -179,6 +236,8 @@ export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.U
       topics: data.topics,
       isStarred: repoConfig?.isStarred || false,
       icon: repoConfig?.icon,
+      languagesBreakdown: languagesBreakdown ?? undefined,
+      languagePercentages,
     };
   } catch (error) {
     console.error('Error fetching repo details:', error);
@@ -196,6 +255,9 @@ export const getRepoDetails = unstable_cache(
 );
 
 export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.USERNAME): Promise<string> {
+  if (isMockGithubData) {
+    return TEST_README;
+  }
   const token = await resolveGitHubToken();
   if (!token) throw new Error('GitHub token is not configured');
   const octokit = createOctokit(token);
@@ -228,16 +290,11 @@ export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.US
       download_url?: string;
     };
 
-    const readmeContent =
-      typeof readmeData === 'string'
-        ? readmeData
-        : readmeData?.content
-          ? Buffer.from(readmeData.content, 'base64').toString('utf-8')
-          : '';
+    const readmeContent = readmeData?.content
+      ? Buffer.from(readmeData.content, 'base64').toString('utf-8')
+      : '';
 
-    const branchFromDownloadUrl = extractBranchFromDownloadUrl(
-      typeof readmeData === 'object' ? readmeData?.download_url : undefined
-    );
+    const branchFromDownloadUrl = extractBranchFromDownloadUrl(readmeData?.download_url);
 
     // Transform relative URLs to absolute URLs pointing to the correct repo
     return convertRelativeToAbsoluteUrls(
@@ -340,6 +397,12 @@ export async function fetchDocumentContent(
   docPath: string,
   owner: string = GH_CONFIG.USERNAME
 ): Promise<{ content: string; projectName: string }> {
+  if (isMockGithubData) {
+    return {
+      content: TEST_DOC_CONTENT,
+      projectName: repo,
+    };
+  }
   const token = await resolveGitHubToken();
   if (!token) throw new Error('GitHub token is not configured');
   const octokit = createOctokit(token);

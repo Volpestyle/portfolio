@@ -30,6 +30,7 @@ import { motion } from 'framer-motion';
 import { springAnimations } from '@/lib/animations';
 import { AnimatedExpandButton } from '@/components/ui/AnimatedExpandButton';
 import type { RepoData } from '@/lib/github-server';
+import { LanguageBar } from '@/components/LanguageBar';
 
 interface ProjectCardProps {
   repo: RepoData;
@@ -108,6 +109,12 @@ export function ProjectCard({ repo, variant = 'default', onOpen }: ProjectCardPr
           </p>
         )}
 
+        {repo.languagePercentages && repo.languagePercentages.length > 0 && (
+          <div className="mb-3 mt-3">
+            <LanguageBar languages={repo.languagePercentages} maxLabels={3} />
+          </div>
+        )}
+
         {repo.tags && repo.tags.length > 0 && (
           <div className="mb-4 mt-3 flex flex-wrap gap-2">
             {repo.tags.slice(0, 6).map((tag) => (
@@ -172,13 +179,17 @@ export function ProjectCard({ repo, variant = 'default', onOpen }: ProjectCardPr
           <span className="font-bold">Last commit:</span> {formatDate(repo.pushed_at)}
         </p>
       )}
+
+      {repo.languagePercentages && repo.languagePercentages.length > 0 && (
+        <div className="mb-3 mt-3">
+          <LanguageBar languages={repo.languagePercentages} maxLabels={3} />
+        </div>
+      )}
+
       {repo.tags && repo.tags.length > 0 && (
         <div className="mb-4 mt-3 flex flex-wrap gap-2">
           {repo.tags.slice(0, 6).map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80"
-            >
+            <span key={tag} className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80">
               {tag}
             </span>
           ))}

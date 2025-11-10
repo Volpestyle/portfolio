@@ -8,12 +8,14 @@ type RepoSummaryRecord = {
   name: string;
   summary: string;
   tags?: string[];
+  languages?: Array<{ name: string; percent: number }>;
 };
 
 type KnowledgeRecord = {
   name: string;
   summary: string;
   tags: string[];
+  languages?: Array<{ name: string; percent: number }>;
   searchableText: string;
 };
 
@@ -59,11 +61,13 @@ function normalizeTags(rawTags?: string[]): string[] {
 
 const knowledgeRecords: KnowledgeRecord[] = summaryRecords.map((record) => {
   const tags = normalizeTags(record.tags);
-  const searchableText = `${record.summary ?? ''} ${tags.join(' ')}`.toLowerCase();
+  const languageNames = record.languages?.map(l => l.name).join(' ') ?? '';
+  const searchableText = `${record.summary ?? ''} ${tags.join(' ')} ${languageNames}`.toLowerCase();
   return {
     name: record.name,
     summary: record.summary,
     tags,
+    languages: record.languages,
     searchableText,
   };
 });
@@ -99,6 +103,8 @@ export function augmentRepoWithKnowledge<T extends RepoData>(repo: T): T {
     ...repo,
     summary: knowledge.summary,
     tags: knowledge.tags,
+    // Only use knowledge languages if repo doesn't have them (for backwards compatibility)
+    languagePercentages: repo.languagePercentages ?? knowledge.languages,
   } as T;
 }
 
@@ -124,7 +130,13 @@ function cosineSimilarity(a: number[], b: number[]): number {
 
 export async function searchRepoKnowledge(query: string, limit: number = 5) {
   if (!query?.trim() || !embeddingRecords.length) {
-    return [] as Array<{ name: string; summary?: string; tags?: string[]; score: number }>;
+    return [] as Array<{
+      name: string;
+      summary?: string;
+      tags?: string[];
+      languages?: Array<{ name: string; percent: number }>;
+      score: number;
+    }>;
   }
 
   let client: OpenAI;
@@ -153,6 +165,7 @@ export async function searchRepoKnowledge(query: string, limit: number = 5) {
         name: record.name,
         summary: summary?.summary,
         tags: summary?.tags,
+        languages: summary?.languages,
         score,
       };
     })

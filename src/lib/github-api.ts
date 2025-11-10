@@ -111,6 +111,53 @@ export function serverErrorResponse(message: string = 'Internal server error'): 
 }
 
 /**
+ * Fetches language breakdown for a repository
+ * Returns a map of language names to byte counts
+ */
+export async function fetchRepoLanguages(
+  owner: string,
+  repo: string
+): Promise<Record<string, number> | null> {
+  try {
+    const token = await resolveGitHubToken();
+    if (!token) {
+      console.error('GitHub token not configured');
+      return null;
+    }
+    const octokit = createOctokit(token);
+    const response = await octokit.rest.repos.listLanguages({
+      owner,
+      repo,
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching languages for ${owner}/${repo}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Converts language byte counts to percentages
+ */
+export function calculateLanguagePercentages(
+  languagesBreakdown: Record<string, number>
+): Array<{ name: string; percent: number }> {
+  const totalBytes = Object.values(languagesBreakdown).reduce((sum, bytes) => sum + bytes, 0);
+
+  if (totalBytes === 0) {
+    return [];
+  }
+
+  return Object.entries(languagesBreakdown)
+    .map(([name, bytes]) => ({
+      name,
+      percent: Math.round((bytes / totalBytes) * 100 * 100) / 100, // Round to 2 decimal places
+    }))
+    .sort((a, b) => b.percent - a.percent);
+}
+
+/**
  * Fetches README content from a gist
  */
 export async function getReadmeFromGist(gistId: string): Promise<string | null> {

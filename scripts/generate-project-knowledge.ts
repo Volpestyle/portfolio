@@ -9,6 +9,7 @@ type SummaryRecord = {
   name: string;
   summary: string;
   tags: string[];
+  languages?: Array<{ name: string; percent: number }>;
 };
 
 type EmbeddingRecord = {
@@ -232,7 +233,7 @@ async function generateRepoFacts(
         {
           role: 'system',
           content:
-            'Extract every explicit technology reference from the repo README. Capture languages, frameworks, runtimes, domains, tooling, and notable features. Include common acronyms or aliases so downstream filters can match multiple phrasings. Return empty arrays when information is missing.',
+            'Extract every explicit technology reference from the repo README. Capture frameworks, runtimes, domains, tooling, and notable features. DO NOT extract programming languages as they come from GitHub\'s deterministic language detection. Include common acronyms or aliases so downstream filters can match multiple phrasings. Return empty arrays when information is missing.',
         },
         {
           role: 'user',
@@ -258,9 +259,8 @@ async function summarizeRepo(
   readme: string,
   facts: RepoFacts
 ): Promise<{ summary: string; tags: string[] }> {
-  // Derive technical tags from structured facts
+  // Derive technical tags from structured facts (excluding languages since we get those from GitHub)
   const derivedTags = [
-    ...facts.languages,
     ...facts.frameworks,
     ...facts.platforms,
     ...facts.tooling,
@@ -300,7 +300,7 @@ async function summarizeRepo(
       {
         role: 'system',
         content:
-          'You write short, factual repo summaries grounded in provided facts. Mention languages, frameworks, runtimes, and domains whenever possible. For tags, only add technical keywords that are NOT already captured in the structured facts (languages, frameworks, platforms, tooling, domains). Focus on specific tools, versions, or architectural patterns that add value.',
+          'You write short, factual repo summaries grounded in provided facts. Mention frameworks, runtimes, and domains whenever possible. For tags, only add technical keywords that are NOT already captured in the structured facts (frameworks, platforms, tooling, domains). Focus on specific tools, versions, or architectural patterns that add value. DO NOT include programming languages in tags as they are detected separately by GitHub.',
       },
       {
         role: 'user',
@@ -314,11 +314,11 @@ async function summarizeRepo(
   try {
     const cleanJson = extractFirstJsonObject(raw);
     const parsed = JSON.parse(cleanJson);
-    
+
     // Merge derived tags (priority) with AI-suggested tags
     const aiTags = Array.isArray(parsed.tags) ? (parsed.tags as string[]) : [];
     const allTags = [...derivedTags, ...aiTags];
-    
+
     // Deduplicate while preserving order (case-insensitive)
     const seen = new Set<string>();
     const uniqueTags = allTags.filter(tag => {
@@ -329,7 +329,7 @@ async function summarizeRepo(
       seen.add(normalized);
       return true;
     });
-    
+
     return {
       summary: parsed.summary as string,
       tags: uniqueTags.slice(0, 12), // cap at 12 tags total
@@ -404,11 +404,17 @@ async function main() {
         name: repo.name,
         summary: summary.summary,
         tags: summary.tags,
+        languages: repo.languagePercentages,
       });
+
+      const languagesText = repo.languagePercentages
+        ? `Languages: ${repo.languagePercentages.map(l => `${l.name} ${l.percent}%`).join(', ')}`
+        : '';
 
       const embeddingPayload = [
         summary.summary,
         `Tags: ${summary.tags.join(', ')}`,
+        languagesText,
         formatFactsForEmbedding(facts),
       ]
         .filter(Boolean)

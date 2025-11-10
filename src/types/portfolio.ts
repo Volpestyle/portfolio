@@ -19,6 +19,7 @@ export interface PortfolioRepoConfig {
   screenshots?: string[];
   topics?: string[];
   language?: string;
+  languages?: Array<{ name: string; percent: number }>;
   createdAt?: string;
   updatedAt?: string;
   homepage?: string;
