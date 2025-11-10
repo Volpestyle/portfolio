@@ -40,7 +40,7 @@ importers:
         version: 1.2.3(@types/react@18.3.26)(react@19.2.0)
       '@smithy/node-http-handler':
         specifier: ^4.4.3
-        version: 4.4.3
+        version: 4.4.4
       '@tanstack/react-query':
         specifier: ^5.90.5
         version: 5.90.5(react@19.2.0)
@@ -61,10 +61,10 @@ importers:
         version: 12.23.24(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       geist:
         specifier: ^1.5.1
-        version: 1.5.1(next@15.5.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0))
-      gray-matter:
-        specifier: ^4.0.3
-        version: 4.0.3
+        version: 1.5.1(next@15.5.6(@playwright/test@1.56.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))
+      hast-util-sanitize:
+        specifier: ^5.0.2
+        version: 5.0.2
       highlight.js:
         specifier: ^11.10.0
         version: 11.11.1
@@ -73,10 +73,10 @@ importers:
         version: 0.428.0(react@19.2.0)
       next:
         specifier: ^15.1.6
-        version: 15.5.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+        version: 15.5.6(@playwright/test@1.56.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       next-auth:
         specifier: ^5.0.0-beta.30
-        version: 5.0.0-beta.30(next@15.5.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react@19.2.0)
+        version: 5.0.0-beta.30(next@15.5.6(@playwright/test@1.56.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react@19.2.0)
       openai:
         specifier: ^6.7.0
         version: 6.7.0(zod@3.25.76)
@@ -95,6 +95,9 @@ importers:
       rehype-raw:
         specifier: ^7.0.0
         version: 7.0.0
+      rehype-sanitize:
+        specifier: ^6.0.0
+        version: 6.0.0
       simple-icons:
         specifier: ^13.6.0
         version: 13.21.0
@@ -114,6 +117,12 @@ importers:
       '@opennextjs/aws':
         specifier: ^3.8.5
         version: 3.8.5
+      '@playwright/test':
+        specifier: ^1.49.0
+        version: 1.56.1
+      '@tailwindcss/typography':
+        specifier: ^0.5.19
+        version: 0.5.19(tailwindcss@3.4.18(tsx@4.20.6)(yaml@2.8.1))
       '@types/libsodium-wrappers':
         specifier: ^0.7.14
         version: 0.7.14
@@ -452,6 +461,7 @@ packages:
   '@aws-sdk/credential-provider-web-identity@3.917.0':
     resolution: {integrity: sha512-pZncQhFbwW04pB0jcD5OFv3x2gAddDYCVxyJVixgyhSw7bKCYxqu6ramfq1NxyVpmm+qsw+ijwi/3cCmhUHF/A==}
     engines: {node: '>=18.0.0'}
+    deprecated: This version contains a compilation TypeScript error https://github.com/aws/aws-sdk-js-v3/issues/7457 - please use @aws-sdk/credential-providers@3.918.0 or higher
 
   '@aws-sdk/credential-provider-web-identity@3.927.0':
     resolution: {integrity: sha512-Oh/aFYjZQsIiZ2PQEgTNvqEE/mmOYxZKZzXV86qrU3jBUfUUBvprUZc684nBqJbSKPwM5jCZtxiRYh+IrZDE7A==}
@@ -1500,6 +1510,11 @@ packages:
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
 
+  '@playwright/test@1.56.1':
+    resolution: {integrity: sha512-vSMYtL/zOcFpvJCW71Q/OEGQb7KYBPAdKh35WNSkaZA75JlAO8ED8UN6GUNTm3drWomcbcqRPFqQbLae8yBTdg==}
+    engines: {node: '>=18'}
+    hasBin: true
+
   '@radix-ui/react-compose-refs@1.1.2':
     resolution: {integrity: sha512-z4eqJvfiNnFMHIIvXP3CY57y2WJs5g2v3X0zm9mEJkrkNv4rDxu+sg9Jh8EkXyeqBkB7SOcboo9dMVqhyrACIg==}
     peerDependencies:
@@ -1749,10 +1764,6 @@ packages:
   '@smithy/node-http-handler@2.5.0':
     resolution: {integrity: sha512-mVGyPBzkkGQsPoxQUbxlEfRjrj6FPyA3u3u2VXGr9hT8wilsoQdZdvKpMBFMB8Crfhv5dNkKHIW0Yyuc7eABqA==}
     engines: {node: '>=14.0.0'}
-
-  '@smithy/node-http-handler@4.4.3':
-    resolution: {integrity: sha512-MAwltrDB0lZB/H6/2M5PIsISSwdI5yIh6DaBB9r0Flo9nx3y0dzl/qTMJPd7tJvPdsx6Ks/cwVzheGNYzXyNbQ==}
-    engines: {node: '>=18.0.0'}
 
   '@smithy/node-http-handler@4.4.4':
     resolution: {integrity: sha512-VXHGfzCXLZeKnFp6QXjAdy+U8JF9etfpUXD1FAbzY1GzsFJiDQRQIt2CnMUvUdz3/YaHNqT3RphVWMUpXTIODA==}
@@ -2030,6 +2041,11 @@ packages:
 
   '@swc/helpers@0.5.15':
     resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
+
+  '@tailwindcss/typography@0.5.19':
+    resolution: {integrity: sha512-w31dd8HOx3k9vPtcQh5QHP9GwKcgbMp87j58qi6xgiBnFFtKEAgCWnDw4qUT8aHwkCp8bKvb/KGKWWHedP0AAg==}
+    peerDependencies:
+      tailwindcss: '>=3.0.0 || insiders || >=4.0.0-alpha.20 || >=4.0.0-beta.1'
 
   '@tanstack/query-core@5.90.5':
     resolution: {integrity: sha512-wLamYp7FaDq6ZnNehypKI5fNvxHPfTYylE0m/ZpuuzJfJqhR5Pxg9gvGBHZx4n7J+V5Rg5mZxHHTlv25Zt5u+w==}
@@ -2322,9 +2338,6 @@ packages:
 
   arg@5.0.2:
     resolution: {integrity: sha512-PYjyFOLKQ9y57JvQ6QLo8dAgNqswh8M1RMJYdQduT6xbWSgK36P/Z/v+p888pM69jMMfS8Xd8F6I1kQ/I9HUGg==}
-
-  argparse@1.0.10:
-    resolution: {integrity: sha512-o5Roy6tNG4SL/FOkCAN6RzjiakZS25RLYFrcMttJqbdd8BWrnA+fGz57iN5Pb06pvBGvl5gQ0B48dJlslXvoTg==}
 
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
@@ -2857,11 +2870,6 @@ packages:
     resolution: {integrity: sha512-j6PAQ2uUr79PZhBjP5C5fhl8e39FmRnOjsD5lGnWrFU8i2G776tBK7+nP8KuQUTTyAZUwfQqXAgrVH5MbH9CYQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  esprima@4.0.1:
-    resolution: {integrity: sha512-eGuFFw7Upda+g4p+QHvnW0RyTX/SVeJBDM/gCtMARO0cLuT2HcEKnTPvhjV6aGeqrCB/sbNop0Kszm0jsaWU4A==}
-    engines: {node: '>=4'}
-    hasBin: true
-
   esquery@1.6.0:
     resolution: {integrity: sha512-ca9pw9fomFcKPvFLXhBKUK90ZvGibiGOvRJNbjljY7s7uq/5YO4BOzcYtJqExdx99rF6aAcnRxHmcUHcz6sQsg==}
     engines: {node: '>=0.10'}
@@ -2888,10 +2896,6 @@ packages:
   express@5.0.1:
     resolution: {integrity: sha512-ORF7g6qGnD+YtUG9yx4DFoqCShNMmUKiXuT5oWMHiOvt/4WFbHC6yCwQMTSBMno7AqntNCAzzcnnjowRkTL9eQ==}
     engines: {node: '>= 18'}
-
-  extend-shallow@2.0.1:
-    resolution: {integrity: sha512-zCnTtlxNoAiDc3gqY2aYAWFx7XWWiasuF2K8Me5WbN8otHKTUKBwjPtNpRs/rbUZm7KxWAaNj7P1a/p52GbVug==}
-    engines: {node: '>=0.10.0'}
 
   extend@3.0.2:
     resolution: {integrity: sha512-fjquC59cD7CyW6urNXK0FBufkZcoiGG80wTuPujX590cB5Ttln20E2UB4S/WARVqhXffZl2LNgS+gQdPIIim/g==}
@@ -3070,10 +3074,6 @@ packages:
   graphemer@1.4.0:
     resolution: {integrity: sha512-EtKwoO6kxCL9WO5xipiHTZlSzBm7WLT627TqC/uVRd0HKmq8NXyebnNYxDoBi7wt8eTWrUrKXCOVaFq9x1kgag==}
 
-  gray-matter@4.0.3:
-    resolution: {integrity: sha512-5v6yZd4JK3eMI3FqqCouswVqwugaA9r4dNZB1wwcmrD02QkV5H0y7XBQW8QwQqEaZY1pM9aqORSORhJRdNK44Q==}
-    engines: {node: '>=6.0'}
-
   gzip-size@6.0.0:
     resolution: {integrity: sha512-ax7ZYomf6jqPTQ4+XCpUGyXKHk5WweS+e05MBO4/y3WJ5RkmPXNKvX+bx1behVILVwr6JSQvZAku021CHPXG3Q==}
     engines: {node: '>=10'}
@@ -3116,6 +3116,9 @@ packages:
 
   hast-util-raw@9.1.0:
     resolution: {integrity: sha512-Y8/SBAHkZGoNkpzqqfCldijcuUKh7/su31kEBp67cFY09Wy0mTRgtsLYsiIxMJxlu0f6AA5SUTbDR8K0rxnbUw==}
+
+  hast-util-sanitize@5.0.2:
+    resolution: {integrity: sha512-3yTWghByc50aGS7JlGhk61SPenfE/p1oaFeNwkOOyrscaOkMGrcW9+Cy/QAIOBpZxP1yqDIzFMR0+Np0i0+usg==}
 
   hast-util-to-jsx-runtime@2.3.6:
     resolution: {integrity: sha512-zl6s8LwNyo1P9uw+XJGvZtdFF1GdAkOg8ujOw+4Pyb76874fLps4ueHXDhXWdk6YHQ6OgUtinliG7RsYvCbbBg==}
@@ -3232,10 +3235,6 @@ packages:
   is-decimal@2.0.1:
     resolution: {integrity: sha512-AAB9hiomQs5DXWcRB1rqsxGUstbRroFOPPVAomNk/3XHR5JyEZChOyTWe2oayKnsSsr/kcGqF+z6yuH6HHpN0A==}
 
-  is-extendable@0.1.1:
-    resolution: {integrity: sha512-5BMULNob1vgFX6EjQw5izWDxrecWK9AM72rugNr0TFldMOi0fj6Jk+zeKIt0xGj4cEfQIJth4w3OKWOJ4f+AFw==}
-    engines: {node: '>=0.10.0'}
-
   is-extglob@2.1.1:
     resolution: {integrity: sha512-SbKbANkN603Vi4jEZv49LeVJMn4yGwsbzZworEoyEiutsN3nJYdbO36zfhGJ6QEDpOZIFkDtnq5JRxmvl3jsoQ==}
     engines: {node: '>=0.10.0'}
@@ -3341,10 +3340,6 @@ packages:
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
-  js-yaml@3.14.1:
-    resolution: {integrity: sha512-okMH7OXXJ7YrN9Ok3/SXrnu4iX9yOk+25nqX4imS2npuvTYDmo/QEZoqwZkYaIDk3jVvBOTOIEgEhaLOynBS9g==}
-    hasBin: true
-
   js-yaml@4.1.0:
     resolution: {integrity: sha512-wpxZs9NoxZaJESJGIZTyDEaYpl0FKSA+FB9aJiyemKhMwkxQg63h4T1KJgUGHpTqPDNRcmmYLugrRjJlBtWvRA==}
     hasBin: true
@@ -3368,10 +3363,6 @@ packages:
 
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
-
-  kind-of@6.0.3:
-    resolution: {integrity: sha512-dcS1ul+9tmeD95T+x28/ehLgd9mENa3LsvDTtzm3vyBEO7RPptvAD+t44WVXaUjTBRcrpFeFlC8WCruUR456hw==}
-    engines: {node: '>=0.10.0'}
 
   language-subtag-registry@0.3.23:
     resolution: {integrity: sha512-0K65Lea881pHotoGEa5gDlMxt3pctLi2RplBb7Ezh4rRdLEOtgi7n4EwK9lamnUCkKBqaeKRVebTq6BAxSkpXQ==}
@@ -3788,6 +3779,16 @@ packages:
     resolution: {integrity: sha512-TfySrs/5nm8fQJDcBDuUng3VOUKsd7S+zqvbOTiGXHfxX4wK31ard+hoNuvkicM/2YFzlpDgABOevKSsB4G/FA==}
     engines: {node: '>= 6'}
 
+  playwright-core@1.56.1:
+    resolution: {integrity: sha512-hutraynyn31F+Bifme+Ps9Vq59hKuUCz7H1kDOcBs+2oGguKkWTU50bBWrtz34OUWmIwpBTWDxaRPXrIXkgvmQ==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  playwright@1.56.1:
+    resolution: {integrity: sha512-aFi5B0WovBHTEvpM3DzXTUaeN6eN0qWnTkKx4NQaH4Wvcmc153PdaY2UBdSYKaGYw+UyWXSVyxDUg5DoPEttjw==}
+    engines: {node: '>=18'}
+    hasBin: true
+
   possible-typed-array-names@1.1.0:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
     engines: {node: '>= 0.4'}
@@ -3827,6 +3828,10 @@ packages:
     engines: {node: '>=12.0'}
     peerDependencies:
       postcss: ^8.2.14
+
+  postcss-selector-parser@6.0.10:
+    resolution: {integrity: sha512-IQ7TZdoaqbT+LCpShg46jnZVlhWD2w6iQYAcYXfHARZ7X1t/UGhhceQDs5X0cGqKvYlHNOuv7Oa1xmb0oQuA3w==}
+    engines: {node: '>=4'}
 
   postcss-selector-parser@6.1.2:
     resolution: {integrity: sha512-Q8qQfPiZ+THO/3ZrOrO0cJJKfpYCagtMUkXbnEfmgUjwXg6z/WBeOyS9APBBPCTSiDV+s4SwQGu8yFsiMRIudg==}
@@ -3996,6 +4001,9 @@ packages:
   rehype-raw@7.0.0:
     resolution: {integrity: sha512-/aE8hCfKlQeA8LmyeyQvQF3eBiLRGNlfBJEvWH7ivp9sBqs7TNqBL5X3v157rM4IFETqDnIOO+z5M/biZbo9Ww==}
 
+  rehype-sanitize@6.0.0:
+    resolution: {integrity: sha512-CsnhKNsyI8Tub6L4sm5ZFsme4puGfc6pYylvXo1AeqaGbjOYyzNv3qZPwvs0oMJ39eryyeOdmxwUIo94IpEhqg==}
+
   remark-parse@11.0.0:
     resolution: {integrity: sha512-FCxlKLNGknS5ba/1lmpYijMUzX2esxW5xQqjWxw2eHFfS2MSdaHVINFmhjo+qN1WhZhNimq0dZATN9pH0IDrpA==}
 
@@ -4049,10 +4057,6 @@ packages:
 
   scheduler@0.27.0:
     resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==}
-
-  section-matter@1.0.0:
-    resolution: {integrity: sha512-vfD3pmTzGpufjScBh50YHKzEu2lxBWhVEHsNGoEXmCmn2hKGfeNLYMzCJpe8cD7gqX7TJluOVpBkAequ6dgMmA==}
-    engines: {node: '>=4'}
 
   semver@6.3.1:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
@@ -4136,9 +4140,6 @@ packages:
   space-separated-tokens@2.0.2:
     resolution: {integrity: sha512-PEGlAwrG8yXGXRjW32fGbg66JAlOAwbObuqVoJpv/mRgoWDQfgH1wDPvtzWyUSNAXBGSk8h755YDbbcEy3SH2Q==}
 
-  sprintf-js@1.0.3:
-    resolution: {integrity: sha512-D9cPgkvLlV3t3IzL0D0YLvGA9Ahk4PcvVwUbN0dSGr1aP0Nrt4AEnTUbuGvquEC0mA64Gqt1fzirlRs5ibXx8g==}
-
   stable-hash@0.0.5:
     resolution: {integrity: sha512-+L3ccpzibovGXFK+Ap/f8LOS0ahMrHTf3xu7mMLSpEGU0EO9ucaysSylKo9eRDFNhWve/y275iPmIZ4z39a9iA==}
 
@@ -4191,10 +4192,6 @@ packages:
   strip-ansi@7.1.2:
     resolution: {integrity: sha512-gmBGslpoQJtgnMAvOVqGZpEz9dyoKTCzy2nfz/n8aIFhN/jCE/rCmcxabB6jOOHV+0WNnylOxaxBQPSvcWklhA==}
     engines: {node: '>=12'}
-
-  strip-bom-string@1.0.0:
-    resolution: {integrity: sha512-uCC2VHvQRYu+lMh4My/sFNmF2klFymLX1wHJeXnbEJERpV/ZsVuonzerjfrGpIGF7LBVa1O7i9kjiWvJiFck8g==}
-    engines: {node: '>=0.10.0'}
 
   strip-bom@3.0.0:
     resolution: {integrity: sha512-vavAMRXOgBVNF6nyEEmL3DBK19iRpDcoIwW+swQ+CbGiu7lju6t+JklA1MHweoWtadgt4ISVUsXLyDq34ddcwA==}
@@ -4805,7 +4802,7 @@ snapshots:
       '@smithy/middleware-serde': 4.2.3
       '@smithy/middleware-stack': 4.2.3
       '@smithy/node-config-provider': 4.3.3
-      '@smithy/node-http-handler': 4.4.3
+      '@smithy/node-http-handler': 4.4.4
       '@smithy/protocol-http': 5.3.3
       '@smithy/smithy-client': 4.9.1
       '@smithy/types': 4.8.0
@@ -4958,7 +4955,7 @@ snapshots:
       '@smithy/middleware-serde': 4.2.3
       '@smithy/middleware-stack': 4.2.3
       '@smithy/node-config-provider': 4.3.3
-      '@smithy/node-http-handler': 4.4.3
+      '@smithy/node-http-handler': 4.4.4
       '@smithy/protocol-http': 5.3.3
       '@smithy/smithy-client': 4.9.1
       '@smithy/types': 4.8.0
@@ -5003,7 +5000,7 @@ snapshots:
       '@smithy/middleware-serde': 4.2.3
       '@smithy/middleware-stack': 4.2.3
       '@smithy/node-config-provider': 4.3.3
-      '@smithy/node-http-handler': 4.4.3
+      '@smithy/node-http-handler': 4.4.4
       '@smithy/protocol-http': 5.3.3
       '@smithy/smithy-client': 4.9.1
       '@smithy/types': 4.8.0
@@ -5050,7 +5047,7 @@ snapshots:
       '@smithy/middleware-serde': 4.2.3
       '@smithy/middleware-stack': 4.2.3
       '@smithy/node-config-provider': 4.3.3
-      '@smithy/node-http-handler': 4.4.3
+      '@smithy/node-http-handler': 4.4.4
       '@smithy/protocol-http': 5.3.3
       '@smithy/smithy-client': 4.9.1
       '@smithy/types': 4.8.0
@@ -5131,10 +5128,10 @@ snapshots:
       '@smithy/middleware-serde': 4.2.3
       '@smithy/middleware-stack': 4.2.3
       '@smithy/node-config-provider': 4.3.3
-      '@smithy/node-http-handler': 4.4.3
-      '@smithy/protocol-http': 5.3.3
+      '@smithy/node-http-handler': 4.4.4
+      '@smithy/protocol-http': 5.3.4
       '@smithy/smithy-client': 4.9.1
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       '@smithy/url-parser': 4.2.3
       '@smithy/util-base64': 4.3.0
       '@smithy/util-body-length-browser': 4.2.0
@@ -5278,7 +5275,7 @@ snapshots:
       '@aws-sdk/core': 3.916.0
       '@aws-sdk/types': 3.914.0
       '@smithy/property-provider': 4.2.3
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       tslib: 2.8.1
 
   '@aws-sdk/credential-provider-env@3.927.0':
@@ -5294,11 +5291,11 @@ snapshots:
       '@aws-sdk/core': 3.916.0
       '@aws-sdk/types': 3.914.0
       '@smithy/fetch-http-handler': 5.3.4
-      '@smithy/node-http-handler': 4.4.3
+      '@smithy/node-http-handler': 4.4.4
       '@smithy/property-provider': 4.2.3
-      '@smithy/protocol-http': 5.3.3
+      '@smithy/protocol-http': 5.3.4
       '@smithy/smithy-client': 4.9.1
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       '@smithy/util-stream': 4.5.4
       tslib: 2.8.1
 
@@ -5343,7 +5340,7 @@ snapshots:
       '@smithy/credential-provider-imds': 4.2.3
       '@smithy/property-provider': 4.2.3
       '@smithy/shared-ini-file-loader': 4.3.3
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       tslib: 2.8.1
     transitivePeerDependencies:
       - aws-crt
@@ -5430,7 +5427,7 @@ snapshots:
       '@aws-sdk/types': 3.914.0
       '@smithy/property-provider': 4.2.3
       '@smithy/shared-ini-file-loader': 4.3.3
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       tslib: 2.8.1
 
   '@aws-sdk/credential-provider-process@3.927.0':
@@ -5462,7 +5459,7 @@ snapshots:
       '@aws-sdk/types': 3.914.0
       '@smithy/property-provider': 4.2.3
       '@smithy/shared-ini-file-loader': 4.3.3
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       tslib: 2.8.1
     transitivePeerDependencies:
       - aws-crt
@@ -5494,7 +5491,7 @@ snapshots:
       '@aws-sdk/types': 3.914.0
       '@smithy/property-provider': 4.2.3
       '@smithy/shared-ini-file-loader': 4.3.3
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       tslib: 2.8.1
     transitivePeerDependencies:
       - aws-crt
@@ -5657,7 +5654,7 @@ snapshots:
     dependencies:
       '@aws-sdk/types': 3.914.0
       '@smithy/smithy-client': 4.9.1
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       '@smithy/util-hex-encoding': 4.2.0
       '@smithy/util-utf8': 4.2.0
       tslib: 2.8.1
@@ -5738,10 +5735,10 @@ snapshots:
       '@smithy/middleware-serde': 4.2.3
       '@smithy/middleware-stack': 4.2.3
       '@smithy/node-config-provider': 4.3.3
-      '@smithy/node-http-handler': 4.4.3
-      '@smithy/protocol-http': 5.3.3
+      '@smithy/node-http-handler': 4.4.4
+      '@smithy/protocol-http': 5.3.4
       '@smithy/smithy-client': 4.9.1
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       '@smithy/url-parser': 4.2.3
       '@smithy/util-base64': 4.3.0
       '@smithy/util-body-length-browser': 4.2.0
@@ -5881,7 +5878,7 @@ snapshots:
       '@aws-sdk/types': 3.914.0
       '@smithy/property-provider': 4.2.3
       '@smithy/shared-ini-file-loader': 4.3.3
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       tslib: 2.8.1
     transitivePeerDependencies:
       - aws-crt
@@ -6008,7 +6005,7 @@ snapshots:
 
   '@aws-sdk/xml-builder@3.914.0':
     dependencies:
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       fast-xml-parser: 5.2.5
       tslib: 2.8.1
 
@@ -6602,6 +6599,10 @@ snapshots:
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
+  '@playwright/test@1.56.1':
+    dependencies:
+      playwright: 1.56.1
+
   '@radix-ui/react-compose-refs@1.1.2(@types/react@18.3.26)(react@19.2.0)':
     dependencies:
       react: 19.2.0
@@ -6626,7 +6627,7 @@ snapshots:
 
   '@smithy/abort-controller@4.2.3':
     dependencies:
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       tslib: 2.8.1
 
   '@smithy/abort-controller@4.2.4':
@@ -6707,7 +6708,7 @@ snapshots:
     dependencies:
       '@smithy/node-config-provider': 4.3.3
       '@smithy/property-provider': 4.2.3
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       '@smithy/url-parser': 4.2.3
       tslib: 2.8.1
 
@@ -6722,7 +6723,7 @@ snapshots:
   '@smithy/eventstream-codec@4.2.3':
     dependencies:
       '@aws-crypto/crc32': 5.2.0
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       '@smithy/util-hex-encoding': 4.2.0
       tslib: 2.8.1
 
@@ -6736,7 +6737,7 @@ snapshots:
   '@smithy/eventstream-serde-browser@4.2.3':
     dependencies:
       '@smithy/eventstream-serde-universal': 4.2.3
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       tslib: 2.8.1
 
   '@smithy/eventstream-serde-browser@4.2.4':
@@ -6747,7 +6748,7 @@ snapshots:
 
   '@smithy/eventstream-serde-config-resolver@4.3.3':
     dependencies:
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       tslib: 2.8.1
 
   '@smithy/eventstream-serde-config-resolver@4.3.4':
@@ -6758,7 +6759,7 @@ snapshots:
   '@smithy/eventstream-serde-node@4.2.3':
     dependencies:
       '@smithy/eventstream-serde-universal': 4.2.3
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       tslib: 2.8.1
 
   '@smithy/eventstream-serde-node@4.2.4':
@@ -6770,7 +6771,7 @@ snapshots:
   '@smithy/eventstream-serde-universal@4.2.3':
     dependencies:
       '@smithy/eventstream-codec': 4.2.3
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       tslib: 2.8.1
 
   '@smithy/eventstream-serde-universal@4.2.4':
@@ -6862,7 +6863,7 @@ snapshots:
 
   '@smithy/md5-js@4.2.3':
     dependencies:
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       '@smithy/util-utf8': 4.2.0
       tslib: 2.8.1
 
@@ -7019,14 +7020,6 @@ snapshots:
       '@smithy/types': 2.12.0
       tslib: 2.8.1
 
-  '@smithy/node-http-handler@4.4.3':
-    dependencies:
-      '@smithy/abort-controller': 4.2.3
-      '@smithy/protocol-http': 5.3.3
-      '@smithy/querystring-builder': 4.2.3
-      '@smithy/types': 4.8.0
-      tslib: 2.8.1
-
   '@smithy/node-http-handler@4.4.4':
     dependencies:
       '@smithy/abort-controller': 4.2.4
@@ -7042,7 +7035,7 @@ snapshots:
 
   '@smithy/property-provider@4.2.3':
     dependencies:
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       tslib: 2.8.1
 
   '@smithy/property-provider@4.2.4':
@@ -7078,7 +7071,7 @@ snapshots:
 
   '@smithy/querystring-builder@4.2.3':
     dependencies:
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       '@smithy/util-uri-escape': 4.2.0
       tslib: 2.8.1
 
@@ -7095,7 +7088,7 @@ snapshots:
 
   '@smithy/querystring-parser@4.2.3':
     dependencies:
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       tslib: 2.8.1
 
   '@smithy/querystring-parser@4.2.4':
@@ -7109,7 +7102,7 @@ snapshots:
 
   '@smithy/service-error-classification@4.2.3':
     dependencies:
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
 
   '@smithy/service-error-classification@4.2.4':
     dependencies:
@@ -7122,7 +7115,7 @@ snapshots:
 
   '@smithy/shared-ini-file-loader@4.3.3':
     dependencies:
-      '@smithy/types': 4.8.0
+      '@smithy/types': 4.8.1
       tslib: 2.8.1
 
   '@smithy/shared-ini-file-loader@4.3.4':
@@ -7143,8 +7136,8 @@ snapshots:
   '@smithy/signature-v4@5.3.3':
     dependencies:
       '@smithy/is-array-buffer': 4.2.0
-      '@smithy/protocol-http': 5.3.3
-      '@smithy/types': 4.8.0
+      '@smithy/protocol-http': 5.3.4
+      '@smithy/types': 4.8.1
       '@smithy/util-hex-encoding': 4.2.0
       '@smithy/util-middleware': 4.2.3
       '@smithy/util-uri-escape': 4.2.0
@@ -7386,8 +7379,8 @@ snapshots:
   '@smithy/util-stream@4.5.4':
     dependencies:
       '@smithy/fetch-http-handler': 5.3.4
-      '@smithy/node-http-handler': 4.4.3
-      '@smithy/types': 4.8.0
+      '@smithy/node-http-handler': 4.4.4
+      '@smithy/types': 4.8.1
       '@smithy/util-base64': 4.3.0
       '@smithy/util-buffer-from': 4.2.0
       '@smithy/util-hex-encoding': 4.2.0
@@ -7448,6 +7441,11 @@ snapshots:
   '@swc/helpers@0.5.15':
     dependencies:
       tslib: 2.8.1
+
+  '@tailwindcss/typography@0.5.19(tailwindcss@3.4.18(tsx@4.20.6)(yaml@2.8.1))':
+    dependencies:
+      postcss-selector-parser: 6.0.10
+      tailwindcss: 3.4.18(tsx@4.20.6)(yaml@2.8.1)
 
   '@tanstack/query-core@5.90.5': {}
 
@@ -7725,10 +7723,6 @@ snapshots:
   arg@4.1.3: {}
 
   arg@5.0.2: {}
-
-  argparse@1.0.10:
-    dependencies:
-      sprintf-js: 1.0.3
 
   argparse@2.0.1: {}
 
@@ -8455,8 +8449,6 @@ snapshots:
       acorn-jsx: 5.3.2(acorn@8.15.0)
       eslint-visitor-keys: 4.2.1
 
-  esprima@4.0.1: {}
-
   esquery@1.6.0:
     dependencies:
       estraverse: 5.3.0
@@ -8509,10 +8501,6 @@ snapshots:
       vary: 1.1.2
     transitivePeerDependencies:
       - supports-color
-
-  extend-shallow@2.0.1:
-    dependencies:
-      is-extendable: 0.1.1
 
   extend@3.0.2: {}
 
@@ -8632,9 +8620,9 @@ snapshots:
 
   functions-have-names@1.2.3: {}
 
-  geist@1.5.1(next@15.5.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0)):
+  geist@1.5.1(next@15.5.6(@playwright/test@1.56.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)):
     dependencies:
-      next: 15.5.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      next: 15.5.6(@playwright/test@1.56.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
 
   generator-function@2.0.1: {}
 
@@ -8701,13 +8689,6 @@ snapshots:
 
   graphemer@1.4.0: {}
 
-  gray-matter@4.0.3:
-    dependencies:
-      js-yaml: 3.14.1
-      kind-of: 6.0.3
-      section-matter: 1.0.0
-      strip-bom-string: 1.0.0
-
   gzip-size@6.0.0:
     dependencies:
       duplexer: 0.1.2
@@ -8768,6 +8749,12 @@ snapshots:
       vfile: 6.0.3
       web-namespaces: 2.0.1
       zwitch: 2.0.4
+
+  hast-util-sanitize@5.0.2:
+    dependencies:
+      '@types/hast': 3.0.4
+      '@ungap/structured-clone': 1.3.0
+      unist-util-position: 5.0.0
 
   hast-util-to-jsx-runtime@2.3.6:
     dependencies:
@@ -8920,8 +8907,6 @@ snapshots:
 
   is-decimal@2.0.1: {}
 
-  is-extendable@0.1.1: {}
-
   is-extglob@2.1.1: {}
 
   is-finalizationregistry@1.1.1:
@@ -9023,11 +9008,6 @@ snapshots:
 
   js-tokens@4.0.0: {}
 
-  js-yaml@3.14.1:
-    dependencies:
-      argparse: 1.0.10
-      esprima: 4.0.1
-
   js-yaml@4.1.0:
     dependencies:
       argparse: 2.0.1
@@ -9052,8 +9032,6 @@ snapshots:
   keyv@4.5.4:
     dependencies:
       json-buffer: 3.0.1
-
-  kind-of@6.0.3: {}
 
   language-subtag-registry@0.3.23: {}
 
@@ -9393,13 +9371,13 @@ snapshots:
 
   negotiator@1.0.0: {}
 
-  next-auth@5.0.0-beta.30(next@15.5.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react@19.2.0):
+  next-auth@5.0.0-beta.30(next@15.5.6(@playwright/test@1.56.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react@19.2.0):
     dependencies:
       '@auth/core': 0.41.0
-      next: 15.5.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      next: 15.5.6(@playwright/test@1.56.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       react: 19.2.0
 
-  next@15.5.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0):
+  next@15.5.6(@playwright/test@1.56.1)(react-dom@19.2.0(react@19.2.0))(react@19.2.0):
     dependencies:
       '@next/env': 15.5.6
       '@swc/helpers': 0.5.15
@@ -9417,6 +9395,7 @@ snapshots:
       '@next/swc-linux-x64-musl': 15.5.6
       '@next/swc-win32-arm64-msvc': 15.5.6
       '@next/swc-win32-x64-msvc': 15.5.6
+      '@playwright/test': 1.56.1
       sharp: 0.34.4
     transitivePeerDependencies:
       - '@babel/core'
@@ -9558,6 +9537,14 @@ snapshots:
 
   pirates@4.0.7: {}
 
+  playwright-core@1.56.1: {}
+
+  playwright@1.56.1:
+    dependencies:
+      playwright-core: 1.56.1
+    optionalDependencies:
+      fsevents: 2.3.2
+
   possible-typed-array-names@1.1.0: {}
 
   postcss-import@15.1.0(postcss@8.5.6):
@@ -9585,6 +9572,11 @@ snapshots:
     dependencies:
       postcss: 8.5.6
       postcss-selector-parser: 6.1.2
+
+  postcss-selector-parser@6.0.10:
+    dependencies:
+      cssesc: 3.0.0
+      util-deprecate: 1.0.2
 
   postcss-selector-parser@6.1.2:
     dependencies:
@@ -9724,6 +9716,11 @@ snapshots:
       hast-util-raw: 9.1.0
       vfile: 6.0.3
 
+  rehype-sanitize@6.0.0:
+    dependencies:
+      '@types/hast': 3.0.4
+      hast-util-sanitize: 5.0.2
+
   remark-parse@11.0.0:
     dependencies:
       '@types/mdast': 4.0.4
@@ -9797,11 +9794,6 @@ snapshots:
   safer-buffer@2.1.2: {}
 
   scheduler@0.27.0: {}
-
-  section-matter@1.0.0:
-    dependencies:
-      extend-shallow: 2.0.1
-      kind-of: 6.0.3
 
   semver@6.3.1: {}
 
@@ -9935,8 +9927,6 @@ snapshots:
 
   space-separated-tokens@2.0.2: {}
 
-  sprintf-js@1.0.3: {}
-
   stable-hash@0.0.5: {}
 
   statuses@2.0.1: {}
@@ -10020,8 +10010,6 @@ snapshots:
   strip-ansi@7.1.2:
     dependencies:
       ansi-regex: 6.2.2
-
-  strip-bom-string@1.0.0: {}
 
   strip-bom@3.0.0: {}
 

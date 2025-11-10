@@ -23,7 +23,7 @@ This page describes the current “Ask my portfolio” experience as it exists i
 - `ChatThread` identifies the most recent assistant message so the UI knows which bubble should continue typing. A “Thinking…” spinner appears whenever `isBusy` is true.
 - `ChatMessageBubble` renders a message as a sequence of `parts`. User text is shown verbatim. Assistant text is special-cased:
   - For the most recent assistant message the final text block flows through `TypewriterMessage`, which animates toward the latest string and can optionally show a cursor for Markdown blocks.
-  - Once a message is “settled” it falls back to `ChatMarkdown`, so re-renders skip the animation.
+  - Once a message is "settled" it falls back to the unified `Markdown` component (`variant="compact"`), so re-renders skip the animation.
 - Attachments (`part.kind === 'attachment'`) are delegated to helper components so Project cards, README panels, docs, nav links, and social lists all share one renderer.
 - `ChatComposer` keeps the textarea auto-resized, disables send while busy, and submits on Enter (Shift+Enter inserts a newline). `AnimatedSendButton` matches the textarea height so the pill always lines up.
 
@@ -32,13 +32,14 @@ This page describes the current “Ask my portfolio” experience as it exists i
 - `ProjectInlineDetails` wraps `ProjectContent` in the compact Markdown variant. When the assistant asks you to “open docs/foo.md”, click handlers call `useRepoDocument.ensureDocument` and swap in the requested doc while keeping breadcrumbs inside the same attachment.
 - `DocumentInlinePanel` handles standalone doc attachments sent straight from tool calls (the assistant might jump from the chat to a doc). Breadcrumbs always offer a quick way back to the README.
 - `SocialLinkList` powers the “follow me” style attachment and simply renders cards with external anchors.
-- `MarkdownViewer` accepts `variant="chat"` to enforce a max height (`60vh`), smaller type, and scroll overflow so inline docs never overrun the viewport.
-- `createMarkdownComponents` intercepts repo-relative `docs/*` links. In the chat variant we prevent default navigation and call `onDocLinkClick`, which keeps the experience inside the inline panel; otherwise the link points to `/projects/[pid]/doc/...`.
+- `MarkdownViewer` accepts `variant="chat"` to enforce a max height (`60vh`), smaller type, and scroll overflow so inline docs never overrun the viewport. It wraps the unified `Markdown` component with layout and breadcrumbs.
+- The unified `Markdown` component (`src/components/Markdown.tsx`) intercepts repo-relative `docs/*` links. In the compact variant (used for chat) we prevent default navigation and call `onDocLinkClick`, which keeps the experience inside the inline panel; otherwise the link points to `/projects/[pid]/doc/...`.
 
 ## 6. Markdown Streaming & Cursor Logic
-- `TypewriterMessage` lives in `src/components/chat/TypewriterMessage.tsx`. Rather than re-implementing Markdown, it delegates to `ChatMarkdown` with the progressively-growing text.
-- `ChatMarkdown` performs a double-pass render: the first pass counts block-level nodes for a given string; the second pass knows which block is last so the blinking cursor only appears at the true end of the response even while Markdown is still rendering.
+- `TypewriterMessage` lives in `src/components/chat/TypewriterMessage.tsx`. Rather than re-implementing Markdown, it delegates to the unified `Markdown` component (`variant="compact"`) with the progressively-growing text.
+- The unified `Markdown` component (`src/components/Markdown.tsx`) performs a double-pass render when `showCursor` is enabled: the first pass counts block-level nodes for a given string; the second pass knows which block is last so the blinking cursor only appears at the true end of the response even while Markdown is still rendering.
 - When `showCursor` is true (only on the last assistant block) the cursor rides on the final paragraph/list/blockquote or code fence. Older bubbles never show cursors.
+- The same unified `Markdown` component is used throughout the app (blog posts, project READMEs, documentation) with different variants (`default` for full pages, `compact` for chat).
 
 ## 7. React Query–Backed Chat Data
 - `ChatQueryProvider` instantiates a `QueryClient` with a 5‑minute `staleTime`, 30‑minute `gcTime`, and no refetch-on-focus. That keeps READMEs and docs warm for the duration of a visit.

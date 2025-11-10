@@ -75,6 +75,33 @@ jobs:
         working-directory: ${{ env.APP_ROOT }}
         run: pnpm install --frozen-lockfile
 
+      - name: Install Playwright Browsers
+        working-directory: ${{ env.APP_ROOT }}
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build Next.js app (for testing)
+        working-directory: ${{ env.APP_ROOT }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          PORTFOLIO_GIST_ID: ${{ env.PORTFOLIO_GIST_ID }}
+        run: pnpm exec next build
+
+      - name: Run E2E Tests
+        working-directory: ${{ env.APP_ROOT }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          PORTFOLIO_GIST_ID: ${{ env.PORTFOLIO_GIST_ID }}
+          CI: true
+        run: pnpm test
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
       - name: Build Next.js with OpenNext
         working-directory: ${{ env.APP_ROOT }}
         env:
@@ -122,3 +149,51 @@ jobs:
           SECRETS_MANAGER_REPO_SECRET_ID: ${{ env.SECRETS_MANAGER_REPO_SECRET_ID }}
         run: |
           pnpm exec cdk deploy PortfolioStack --require-approval never --verbose
+
+  smoke-tests:
+    name: Post-deploy smoke tests
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: ${{ vars.API_INTEGRATION_BASE_URL != '' || env.APP_DOMAIN_NAME != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node and pnpm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install app dependencies
+        working-directory: ${{ env.APP_ROOT }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Browsers
+        working-directory: ${{ env.APP_ROOT }}
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run real API smoke tests
+        working-directory: ${{ env.APP_ROOT }}
+        env:
+          CI: true
+          PLAYWRIGHT_SKIP_WEBSERVER: 'true'
+          E2E_USE_REAL_APIS: 'true'
+          E2E_API_BASE_URL: ${{ vars.API_INTEGRATION_BASE_URL != '' && vars.API_INTEGRATION_BASE_URL || (env.APP_DOMAIN_NAME != '' && format('https://{0}', env.APP_DOMAIN_NAME)) }}
+          E2E_API_REPO_OWNER: ${{ vars.API_INTEGRATION_REPO_OWNER }}
+          E2E_API_REPO_NAME: ${{ vars.API_INTEGRATION_REPO_NAME }}
+          E2E_API_DOC_PATH: ${{ vars.API_INTEGRATION_DOC_PATH }}
+        run: pnpm run test:real-api
+
+      - name: Upload smoke test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-smoke
+          path: playwright-report/
+          retention-days: 30
