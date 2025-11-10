@@ -7,7 +7,7 @@ import { ProjectInlineDetails } from './attachments/ProjectInlineDetails';
 import { DocumentInlinePanel } from './attachments/DocumentInlinePanel';
 import { SocialLinkList } from './attachments/SocialLinkList';
 import { TypewriterMessage } from './TypewriterMessage';
-import { ChatMarkdown } from './ChatMarkdown';
+import { Markdown } from '@/components/Markdown';
 import Link from 'next/link';
 
 interface ChatMessageBubbleProps {
@@ -40,9 +40,11 @@ export function ChatMessageBubble({ message, isLastAssistantMessage = false }: C
     return null;
   }
 
+  const testId = isUser ? 'chat-user-message' : 'chat-assistant-message';
+
   return (
     <div className={cn('flex w-full', isUser ? 'justify-end' : 'justify-start')}>
-      <div className={wrapperClass}>
+      <div className={wrapperClass} data-testid={testId}>
         {message.parts.map((part, index) => {
           if (part.kind === 'text') {
             // Skip empty text parts
@@ -74,7 +76,7 @@ export function ChatMessageBubble({ message, isLastAssistantMessage = false }: C
             }
 
             // All other assistant messages just display normally (with Markdown)
-            return <ChatMarkdown key={`${message.id}-text-${index}`} text={part.text} />;
+            return <Markdown key={`${message.id}-text-${index}`} content={part.text} variant="compact" />;
           }
 
           if (part.kind === 'attachment') {

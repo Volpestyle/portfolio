@@ -8,6 +8,7 @@ import { MarkdownViewer } from '@/components/MarkdownViewer';
 import { cn, formatDate } from '@/lib/utils';
 import { useImageCarousel } from '@/hooks/useImageCarousel';
 import { AnimatedExpandButton } from '@/components/ui/AnimatedExpandButton';
+import { LanguageBar } from '@/components/LanguageBar';
 
 interface ProjectContentProps {
   pid: string;
@@ -72,6 +73,28 @@ export function ProjectContent({
           {repoInfo.pushed_at && (
             <div className={cn('text-gray-400', isChat ? 'text-[11px]' : 'text-sm')}>
               <span className="font-bold">Last commit:</span> {formatDate(repoInfo.pushed_at)}
+            </div>
+          )}
+
+          {repoInfo.languagePercentages && repoInfo.languagePercentages.length > 0 && (
+            <div className={cn('mt-4', isChat ? '' : '')}>
+              <LanguageBar languages={repoInfo.languagePercentages} maxLabels={isChat ? 3 : 5} />
+            </div>
+          )}
+
+          {repoInfo.tags && repoInfo.tags.length > 0 && (
+            <div className={cn('mt-4 flex flex-wrap gap-2', isChat ? '' : '')}>
+              {repoInfo.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className={cn(
+                    'rounded-full border border-white/20 bg-white/5 text-white/80',
+                    isChat ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs'
+                  )}
+                >
+                  {tag}
+                </span>
+              ))}
             </div>
           )}
         </div>

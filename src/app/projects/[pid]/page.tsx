@@ -1,8 +1,15 @@
 import { ProjectContent } from '@/components/ProjectContent';
 import { getRepoDetails, getRepoReadme, getPortfolioRepos } from '@/lib/github-server';
+import { augmentRepoWithKnowledge } from '@/server/project-knowledge';
 import type { Metadata } from 'next';
 
-export async function generateMetadata({ params }: { params: Promise<{ pid: string }> }): Promise<Metadata> {
+type ProjectParams = { pid: string };
+
+export async function generateMetadata({
+  params,
+}: {
+  params: ProjectParams | Promise<ProjectParams>;
+}): Promise<Metadata> {
   const { pid } = await params;
   const repoInfo = await getRepoDetails(pid);
 
@@ -26,13 +33,20 @@ export async function generateStaticParams() {
   }));
 }
 
-export default async function ProjectDetail({ params }: { params: Promise<{ pid: string }> }) {
+export default async function ProjectDetail({
+  params,
+}: {
+  params: ProjectParams | Promise<ProjectParams>;
+}) {
   const { pid } = await params;
   const [repoInfo, readme] = await Promise.all([getRepoDetails(pid), getRepoReadme(pid)]);
 
+  // Augment repo with knowledge (tags, summary, etc.)
+  const enrichedRepoInfo = augmentRepoWithKnowledge(repoInfo);
+
   return (
     <div className="-mx-8 -my-8 bg-black/10 backdrop-blur-sm">
-      <ProjectContent pid={pid} repoInfo={repoInfo} readme={readme} />
+      <ProjectContent pid={pid} repoInfo={enrichedRepoInfo} readme={readme} />
     </div>
   );
 }

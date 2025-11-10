@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChatMarkdown } from './ChatMarkdown';
+import { Markdown } from '@/components/Markdown';
 
 type TypewriterMessageProps = {
   text: string;
@@ -50,7 +50,7 @@ export function TypewriterMessage({
 
   return (
     <div className={cn(baseClass, className)}>
-      {markdown ? <ChatMarkdown text={display} showCursor={showCursor} /> : display}
+      {markdown ? <Markdown content={display} variant="compact" showCursor={showCursor} /> : display}
     </div>
   );
 }

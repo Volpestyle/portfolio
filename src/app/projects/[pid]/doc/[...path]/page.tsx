@@ -5,9 +5,9 @@ import { notFound } from 'next/navigation';
 export default async function DocumentPage({
   params,
 }: {
-  params: Promise<{ pid: string; path: string[] }>;
+  params: { pid: string; path: string[] };
 }) {
-  const { pid, path } = await params;
+  const { pid, path } = params;
   const docPath = path.join('/');
 
   try {
