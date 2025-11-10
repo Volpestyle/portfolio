@@ -12,11 +12,11 @@ import { motion } from 'framer-motion';
 import { springAnimations } from '@/lib/animations';
 
 const NAV_ITEMS = [
-  { href: '/', icon: MessageSquare, label: 'Chat', message: '', expandedWidth: '4.5rem' },
-  { href: '/about', icon: User, label: 'About', message: hoverMessages.about, expandedWidth: '5rem' },
-  { href: '/projects', icon: Rocket, label: 'Projects', message: hoverMessages.projects, expandedWidth: '6.5rem' },
-  { href: '/blog', icon: BookOpen, label: 'Blog', message: hoverMessages.blog, expandedWidth: '4.5rem' },
-  { href: '/contact', icon: Mail, label: 'Contact', message: hoverMessages.contact, expandedWidth: '6rem' },
+  { href: '/', icon: MessageSquare, label: 'chat', message: '', expandedWidth: '4.5rem' },
+  { href: '/about', icon: User, label: 'about', message: hoverMessages.about, expandedWidth: '5rem' },
+  { href: '/projects', icon: Rocket, label: 'projects', message: hoverMessages.projects, expandedWidth: '6.5rem' },
+  { href: '/blog', icon: BookOpen, label: 'blog', message: hoverMessages.blog, expandedWidth: '4.5rem' },
+  { href: '/contact', icon: Mail, label: 'contact', message: hoverMessages.contact, expandedWidth: '6rem' },
 ] as const;
 
 export function Header() {
@@ -44,7 +44,7 @@ export function Header() {
           </Link>
         </div>
 
-        <nav className="flex items-center gap-2">
+        <nav className="flex items-center gap-2" aria-label="Primary">
           {NAV_ITEMS.map(({ href, icon: Icon, label, message, expandedWidth }, index) => {
             const isActive = pathname === href;
             const headerCopy = resolveHeaderBaseText(href);

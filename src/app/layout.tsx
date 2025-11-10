@@ -1,15 +1,11 @@
 import './globals.css';
 import 'highlight.js/styles/github-dark.css';
-import '@/styles/markdown.css';
 import { ReactNode } from 'react';
-import AnimatedBackground from '@/components/AnimatedBackground';
-import { Header } from '@/components/Header';
 import { jetbrainsMono, sourceCodePro, firaCode, spaceMono, ibmPlexMono, geistMono } from './fonts';
 import { Metadata } from 'next';
 import { Providers } from './providers';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { AnimatedLayout } from '@/components/AnimatedLayout';
-import { LoadingOverlay } from '@/components/LoadingOverlay';
+import { ConditionalLayout } from '@/components/ConditionalLayout';
 
 export const metadata: Metadata = {
   title: {
@@ -55,16 +51,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <body className="bg-black font-geist-mono text-white">
         <ErrorBoundary>
-          <AnimatedBackground />
           <Providers>
-            <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
-              <AnimatedLayout>
-                <Header />
-                <LoadingOverlay spinnerVariant="ring">
-                  <main className="px-4 py-8 sm:px-8">{children}</main>
-                </LoadingOverlay>
-              </AnimatedLayout>
-            </div>
+            <ConditionalLayout>{children}</ConditionalLayout>
           </Providers>
         </ErrorBoundary>
       </body>

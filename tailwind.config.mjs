@@ -1,3 +1,5 @@
+const typography = require('@tailwindcss/typography');
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ['class'],
@@ -96,10 +98,11 @@ module.exports = {
         'fade-in-delay': 'fade-in-delay 1s ease-in-out forwards',
         'pulse-fade': 'pulse-fade 2s ease-in-out infinite',
         'fade-in-pulse': 'fade-in-delay 1s ease-in-out forwards, pulse-fade 2s ease-in-out infinite 1s',
+        blink: 'blink 1s steps(1, end) infinite',
       },
     },
   },
-  plugins: [],
+  plugins: [typography],
   future: {
     hoverOnlyWhenSupported: true,
   },

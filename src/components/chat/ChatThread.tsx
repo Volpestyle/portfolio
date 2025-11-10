@@ -30,7 +30,7 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
     .find((msg) => msg.role === 'assistant')?.id;
 
   return (
-    <div className="flex flex-col gap-3" aria-live="polite">
+    <div className="flex flex-col gap-3" aria-live="polite" data-testid="chat-thread">
       {messages.map((message) => (
         <ChatMessageBubble
           key={message.id}

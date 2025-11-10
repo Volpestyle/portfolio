@@ -148,7 +148,7 @@ export function TypeWriter({
   return (
     <div className={cn('whitespace-pre-line font-mono', className)}>
       {displayText}
-      {shouldShowCursor ? <span className={cn('ml-1 animate-[blink_1s_infinite]', cursorClassName)}>▋</span> : null}
+      {shouldShowCursor ? <span className={cn('ml-1 animate-blink', cursorClassName)}>▋</span> : null}
     </div>
   );
 }
