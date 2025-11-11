@@ -7,8 +7,12 @@ export const metadata = {
   title: 'Edit Post',
 };
 
-export default async function EditPostPage({ params }: { params: { slug: string } }) {
-  const { slug } = params;
+type PageProps = {
+  params: Promise<{ slug: string }>;
+};
+
+export default async function EditPostPage({ params }: PageProps) {
+  const { slug } = await params;
   const post = await getAdminPost(slug);
 
   if (!post) {

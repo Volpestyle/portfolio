@@ -6,6 +6,48 @@ import { PortfolioStack } from '../lib/portfolio-stack';
 
 const OPEN_NEXT_OUTPUT_FILE = 'open-next.output.json';
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+interface LambdaEnvironment {
+  Variables?: Record<string, unknown>;
+}
+
+interface LambdaProperties {
+  Environment?: LambdaEnvironment;
+}
+
+interface LambdaTemplateResource {
+  Properties?: LambdaProperties;
+}
+
+const isLambdaEnvironment = (value: unknown): value is LambdaEnvironment => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const { Variables } = value;
+  return Variables === undefined || isRecord(Variables);
+};
+
+const isLambdaProperties = (value: unknown): value is LambdaProperties => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const { Environment } = value;
+  return Environment === undefined || isLambdaEnvironment(Environment);
+};
+
+const isLambdaTemplateResource = (value: unknown): value is LambdaTemplateResource => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const { Properties } = value;
+  return Properties === undefined || isLambdaProperties(Properties);
+};
+
 function resolveOpenNextPath(): string {
   const repoRoot = path.resolve(__dirname, '../../..');
   const repoOpenNextDir = path.join(repoRoot, '.open-next');
@@ -32,6 +74,15 @@ function resolveOpenNextPath(): string {
 function validateStack() {
   const app = new App();
   const openNextPath = resolveOpenNextPath();
+
+  const requireEnv = (name: string): string => {
+    const value = process.env[name];
+    if (!value) {
+      throw new Error(`${name} must be set before running validate-stack.ts`);
+    }
+    return value;
+  };
+
   const stack = new PortfolioStack(app, 'ValidationStack', {
     env: {
       account: '000000000000',
@@ -39,8 +90,10 @@ function validateStack() {
     },
     openNextPath,
     environment: {
-      NEXT_PUBLIC_SITE_URL: 'https://example.com',
+      NEXT_PUBLIC_SITE_URL: requireEnv('NEXT_PUBLIC_SITE_URL'),
+      REVALIDATE_SECRET: requireEnv('REVALIDATE_SECRET'),
     },
+    validationMode: true,
   });
 
   const template = Template.fromStack(stack);
@@ -57,15 +110,26 @@ function validateStack() {
     throw new Error('Expected at least one S3 bucket in the stack');
   }
 
-  template.hasResourceProperties('AWS::Lambda::Function', {
-    Environment: {
-      Variables: Match.objectLike({
-        NODE_ENV: 'production',
-        NEXT_PUBLIC_SITE_URL: 'https://example.com',
-      }),
-    },
-    Runtime: Match.stringLikeRegexp('nodejs'),
+  const expectedSiteUrl = requireEnv('NEXT_PUBLIC_SITE_URL');
+  const lambdaResourceValues: unknown[] = Object.values(lambdaResources);
+  const lambdaHasSiteEnv = lambdaResourceValues.some((resource) => {
+    if (!isLambdaTemplateResource(resource)) {
+      return false;
+    }
+
+    const variables = resource.Properties?.Environment?.Variables;
+    return (
+      typeof variables?.NEXT_PUBLIC_SITE_URL === 'string' &&
+      variables.NEXT_PUBLIC_SITE_URL === expectedSiteUrl &&
+      typeof variables.NODE_ENV === 'string' &&
+      variables.NODE_ENV === 'production'
+    );
   });
+  if (!lambdaHasSiteEnv) {
+    throw new Error(
+      `Expected at least one Lambda function to include NEXT_PUBLIC_SITE_URL=${expectedSiteUrl} and NODE_ENV=production`
+    );
+  }
 
   template.hasResourceProperties('AWS::S3::Bucket', {
     VersioningConfiguration: Match.objectLike({

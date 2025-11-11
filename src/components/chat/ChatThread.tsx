@@ -2,7 +2,6 @@
 
 import type { ChatMessage } from '@/types/chat';
 import { ChatMessageBubble } from '@/components/chat/ChatMessageBubble';
-import { Spinner } from '@/components/ui/spinner';
 
 interface ChatThreadProps {
   messages: ChatMessage[];

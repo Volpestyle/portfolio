@@ -1,7 +1,7 @@
-const typography = require('@tailwindcss/typography');
+import typography from '@tailwindcss/typography';
 
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+const config = {
   darkMode: ['class'],
   content: ['./pages/**/*.{ts,tsx}', './components/**/*.{ts,tsx}', './app/**/*.{ts,tsx}', './src/**/*.{ts,tsx}'],
   theme: {
@@ -107,3 +107,5 @@ module.exports = {
     hoverOnlyWhenSupported: true,
   },
 };
+
+export default config;

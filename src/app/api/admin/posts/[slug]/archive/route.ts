@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server';
 import { archivePost } from '@/server/blog/actions';
 
 type RouteContext = {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 };
 
 export async function POST(req: Request, context: RouteContext) {
   try {
-    const { slug } = context.params;
+    const { slug } = await context.params;
     const body = await req.json().catch(() => ({}));
     const version = Number(body.version);
     if (!Number.isFinite(version)) {

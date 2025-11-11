@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useHover } from '@/context/HoverContext';
 
 interface UseAutoCycleProps {

@@ -10,7 +10,28 @@ const config: OpenNextConfig = {
     },
     placement: 'global',
     install: {
-      packages: ['@next/env@15.5.6', '@swc/helpers@0.5.15', 'postcss@8.4.31', 'styled-jsx@5.1.6'],
+      packages: [
+        '@next/env@15.5.6',
+        '@swc/helpers@0.5.15',
+        'postcss@8.4.31',
+        'styled-jsx@5.1.6',
+        'react@19.0.0',
+        'react-dom@19.0.0',
+        // Add AWS SDK and Smithy dependencies for Lambda@Edge
+        '@aws-sdk/client-dynamodb@3',
+        '@aws-sdk/lib-dynamodb@3',
+        '@aws-sdk/client-s3@3',
+        '@aws-sdk/s3-request-presigner@3',
+        '@aws-sdk/client-scheduler@3',
+        '@smithy/config-resolver@3',
+        '@smithy/core@2',
+        '@smithy/middleware-retry@3',
+        '@smithy/node-config-provider@3',
+        '@smithy/protocol-http@4',
+        '@smithy/smithy-client@3',
+        '@smithy/types@3',
+        '@smithy/util-stream@3'
+      ],
     },
   },
   imageOptimization: {

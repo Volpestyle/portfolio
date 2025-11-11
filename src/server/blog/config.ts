@@ -1,4 +1,4 @@
-import { isMockBlogStore } from '@/lib/blog-store-mode';
+import { isBlogFixtureRuntime } from '@/lib/test-mode';
 
 type BlogConfig = {
   region: string;
@@ -18,18 +18,31 @@ function requiredEnv(value: string | undefined, name: string): string {
 }
 
 function resolveEnv(value: string | undefined, name: string, mockFallback: string): string {
-  if (isMockBlogStore) {
+  if (isBlogFixtureRuntime()) {
     return value?.trim() ? value : mockFallback;
   }
   return requiredEnv(value, name);
 }
 
-export const blogConfig: BlogConfig = {
-  region: process.env.AWS_REGION ?? 'us-east-1',
-  tableName: resolveEnv(process.env.POSTS_TABLE, 'POSTS_TABLE', 'mock-posts-table'),
-  statusIndexName: process.env.POSTS_STATUS_INDEX ?? 'byStatusPublishedAt',
-  contentBucket: resolveEnv(process.env.CONTENT_BUCKET, 'CONTENT_BUCKET', 'mock-content-bucket'),
-  mediaBucket: resolveEnv(process.env.MEDIA_BUCKET, 'MEDIA_BUCKET', 'mock-media-bucket'),
-  publishLambdaArn: process.env.BLOG_PUBLISH_FUNCTION_ARN,
-  schedulerRoleArn: process.env.SCHEDULER_ROLE_ARN,
-};
+let cachedConfig: BlogConfig | null = null;
+
+function buildBlogConfig(): BlogConfig {
+  return {
+    region: process.env.AWS_REGION ?? 'us-east-1',
+    tableName: resolveEnv(process.env.POSTS_TABLE, 'POSTS_TABLE', 'mock-posts-table'),
+    statusIndexName: process.env.POSTS_STATUS_INDEX ?? 'byStatusPublishedAt',
+    contentBucket: resolveEnv(process.env.CONTENT_BUCKET, 'CONTENT_BUCKET', 'mock-content-bucket'),
+    mediaBucket: resolveEnv(process.env.MEDIA_BUCKET, 'MEDIA_BUCKET', 'mock-media-bucket'),
+    publishLambdaArn: process.env.BLOG_PUBLISH_FUNCTION_ARN,
+    schedulerRoleArn: process.env.SCHEDULER_ROLE_ARN,
+  };
+}
+
+export const blogConfig: BlogConfig = new Proxy({} as BlogConfig, {
+  get(_target, prop: string) {
+    if (!cachedConfig) {
+      cachedConfig = buildBlogConfig();
+    }
+    return cachedConfig[prop as keyof BlogConfig];
+  },
+});

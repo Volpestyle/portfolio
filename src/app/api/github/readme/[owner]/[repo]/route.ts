@@ -1,17 +1,20 @@
 import { NextResponse } from 'next/server';
 import { getRepoReadme } from '@/lib/github-server';
-import { isE2ETestMode } from '@/lib/test-mode';
+import { shouldReturnTestFixtures } from '@/lib/test-mode';
 import { TEST_README, TEST_REPO } from '@/lib/test-fixtures';
 
-export async function GET(
-  request: Request,
-  context: { params: { owner: string; repo: string } }
-) {
-  try {
-    const owner = decodeURIComponent(context.params.owner);
-    const repo = decodeURIComponent(context.params.repo);
+type RouteContext = {
+  params: Promise<{ owner: string; repo: string }>;
+};
 
-    if (isE2ETestMode(request.headers)) {
+export async function GET(request: Request, context: RouteContext) {
+  try {
+    const { owner: rawOwner, repo: rawRepo } = await context.params;
+    const owner = decodeURIComponent(rawOwner);
+    const repo = decodeURIComponent(rawRepo);
+
+    // Return deterministic fixtures for E2E tests
+    if (shouldReturnTestFixtures(request.headers)) {
       return NextResponse.json(
         {
           repo: TEST_REPO.name,

@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MarkdownEditor } from './MarkdownEditor';
 import { MediaUploader } from './MediaUploader';
-import type { BlogPostRecord, BlogPostWithContent } from '@/types/blog';
+import type { BlogPostWithContent } from '@/types/blog';
 
 interface PostEditorProps {
   post?: BlogPostWithContent;

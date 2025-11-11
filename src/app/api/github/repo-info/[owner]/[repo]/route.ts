@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getRepoDetails } from '@/lib/github-server';
 
-export async function GET(
-  _request: Request,
-  context: { params: { owner: string; repo: string } }
-) {
+type RouteContext = {
+  params: Promise<{ owner: string; repo: string }>;
+};
+
+export async function GET(_request: Request, context: RouteContext) {
   try {
-    const owner = decodeURIComponent(context.params.owner);
-    const repo = decodeURIComponent(context.params.repo);
+    const { owner: rawOwner, repo: rawRepo } = await context.params;
+    const owner = decodeURIComponent(rawOwner);
+    const repo = decodeURIComponent(rawRepo);
     const details = await getRepoDetails(repo, owner);
     return NextResponse.json(details, {
       headers: {

@@ -2,12 +2,12 @@ import { DocumentContent } from './DocumentContent';
 import { getDocumentContent } from '@/lib/github-server';
 import { notFound } from 'next/navigation';
 
-export default async function DocumentPage({
-  params,
-}: {
-  params: { pid: string; path: string[] };
-}) {
-  const { pid, path } = params;
+type PageContext = {
+  params: Promise<{ pid: string; path: string[] }>;
+};
+
+export default async function DocumentPage({ params }: PageContext) {
+  const { pid, path } = await params;
   const docPath = path.join('/');
 
   try {

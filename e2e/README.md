@@ -1,6 +1,29 @@
 # E2E Testing Guide
 
-Playwright drives full-stack verification for the portfolio. The suite now focuses on realistic flows (navigation, projects, blog, contact, and chat) while keeping the runtime lean on a single Chromium runner.
+Playwright drives full-stack verification for the portfolio with a **unified testing architecture** that cleanly separates behavioral E2E tests from integration tests.
+
+## 🎯 Testing Philosophy
+
+We support **two distinct test types** with one clear API:
+
+1. **E2E/Behavioral Tests** - Fast, deterministic tests using fixtures to verify UI behavior
+2. **Integration Tests** - Verify real services (AWS, GitHub, OpenAI) work correctly
+
+### Architecture: Two Independent Layers
+
+#### Layer 1: Runtime Fixture Flag (Infrastructure)
+
+- **What**: Determines whether blog APIs use mock fixtures or DynamoDB/S3
+- **When**: Only when `BLOG_TEST_FIXTURES=true` (Playwright/local dev opt-in)
+- **Function**: `isBlogFixtureRuntime()` - checks the explicit env flag
+
+#### Layer 2: Test Fixtures (Request-Scoped)
+
+- **What**: Returns deterministic fixtures for E2E tests
+- **When**: Any test that needs predictable data
+- **Function**: `shouldReturnTestFixtures()` - checks `x-portfolio-test-mode` header (ignored in production for safety)
+
+**Key Insight**: All APIs check `shouldReturnTestFixtures()` at the top and return fixtures if true. Local dev/CI runs can flip fixtures via header; production ignores the header so only explicit env flags (which are stripped there) can enable mocks.
 
 ## 🚀 Quick Start
 
@@ -9,8 +32,11 @@ Playwright drives full-stack verification for the portfolio. The suite now focus
 pnpm install
 pnpm exec playwright install
 
-# Run everything headless
+# Run E2E tests (fast, fixtures)
 pnpm test
+
+# Run integration tests (real APIs)
+pnpm test:real-api
 
 # Develop interactively
 pnpm test:ui
@@ -23,122 +49,236 @@ pnpm test:report
 
 - ✅ **Global navigation** – hero render, header links, resume modal, project detail pages, blog list & article view.
 - ✅ **Projects + knowledge flows** – opening project cards, README rendering, doc breadcrumbs.
-- ✅ **Blog** – handles both “no posts yet” and published article paths.
-- ✅ **Contact** – native validation, success toast, and API error handling (mocked).
-- ✅ **Chat** – full message send using the built-in SSE test mode, project card attachments, README doc links, and document fetching.
+- ✅ **Blog** – handles both "no posts yet" and published article paths.
+- ✅ **Contact** – native validation, success toast, and API error handling.
+- ✅ **Chat** – full message send using SSE streaming, project card attachments, README doc links, and document fetching.
 - ✅ **Error surfaces** – ensures users see actionable messaging without relying on real upstream services.
 
 ### Test Suites
 
 ```
 e2e/
-├── site-flows.spec.ts         # Navigation, pages, projects, blog
-├── engagement.spec.ts         # Contact form + chat interactions
-└── api-integration.spec.ts    # Remote API checks (requires E2E_API_* envs)
+├── site-flows.spec.ts         # Navigation, pages, projects, blog (E2E)
+├── engagement.spec.ts         # Contact form + chat interactions (E2E)
+└── api-integration.spec.ts    # Real service verification (Integration)
 ```
 
 ## 🎯 Everyday Commands
 
-| Command                                | Description                                        |
-| -------------------------------------- | -------------------------------------------------- |
-| `pnpm test`                            | Run the full suite (headless Chromium)             |
-| `pnpm test:ui`                         | Visual runner with watch mode                      |
-| `pnpm test:headed`                     | Headed Chromium without the UI window              |
-| `pnpm test:debug`                      | Debug session with Playwright Inspector            |
-| `pnpm test e2e/site-flows.spec.ts`     | Execute a single file                              |
-| `pnpm test --grep "contact form"`      | Run tests matching a title/name pattern            |
-| `pnpm test:report`                     | Open the HTML report from the last run             |
-| `pnpm run test:real-api`               | Real smoke suite against an already running host   |
-| `pnpm run test:real-api:dev`           | Same real suite but auto-starts the local dev app  |
-| `pnpm run test:real-ui`                | Run the real UI suite against an existing host (no dev server) |
-| `pnpm run test:real-ui:dev`            | Same suite but auto-starts `pnpm dev` when targeting localhost |
-| `pnpm run test:real-ui:dev:headed`     | Headed Chromium run of the local real UI suite     |
+| Command                            | Description                                                    | Uses Fixtures? |
+| ---------------------------------- | -------------------------------------------------------------- | -------------- |
+| `pnpm test`                        | Run the full suite (headless Chromium)                         | ✅ Yes         |
+| `pnpm test:ui`                     | Visual runner with watch mode                                  | ✅ Yes         |
+| `pnpm test:headed`                 | Headed Chromium without the UI window                          | ✅ Yes         |
+| `pnpm test:debug`                  | Debug session with Playwright Inspector                        | ✅ Yes         |
+| `pnpm test e2e/site-flows.spec.ts` | Execute a single file                                          | ✅ Yes         |
+| `pnpm test --grep "contact form"`  | Run tests matching a title/name pattern                        | ✅ Yes         |
+| `pnpm test:report`                 | Open the HTML report from the last run                         | N/A            |
+| `pnpm run test:real-api`           | Real smoke suite against an already running host               | ❌ No (real)   |
+| `pnpm run test:real-api:dev`       | Same real suite but auto-starts the local dev app              | ❌ No (real)   |
+| `pnpm run test:real-ui`            | Run the real UI suite against an existing host (no dev server) | ❌ No (real)   |
+| `pnpm run test:real-ui:dev`        | Same suite but auto-starts `pnpm dev` when targeting localhost | ❌ No (real)   |
+| `pnpm run test:real-ui:dev:headed` | Headed Chromium run of the local real UI suite                 | ❌ No (real)   |
 
-## 🔧 Configuration Notes
+## 🔧 How Testing Works
 
-- `playwright.config.ts` now exposes two projects: `chromium` (full UI + mocks) and `real-integration` (API smoke tests). Use `--project=real-integration` or `pnpm run test:real-api` when you want to bypass mocks.
-- The config defaults `BLOG_STORE_MODE=mock` only when no blog-store infra env vars (`POSTS_TABLE`, `CONTENT_BUCKET`, `MEDIA_BUCKET`) are present. Export those (or set `BLOG_STORE_MODE=aws`) before `pnpm test` if you want the suite to exercise the real DynamoDB/S3 store.
-- The runner automatically picks the test origin in this order: `PLAYWRIGHT_TEST_BASE_URL` → `E2E_API_BASE_URL` → `APP_DOMAIN_NAME` → `NEXT_PUBLIC_SITE_URL` → `http://localhost:3000`. Anything that isn’t localhost flips the suite into integration mode automatically (dev server skipped, mocks disabled, requests hit the real origin).
-- Override the automatic detection with `E2E_TEST_MODE=mock|integration|real`. `mock` forces fixtures even when you point at a preview build, `integration` disables mocks without forcing the extra “real” assertions, and `real` (or `E2E_USE_REAL_APIS=true`) ensures every call hits external providers even on localhost.
-- The dev server now starts only when the detected origin is local. Set `PLAYWRIGHT_SKIP_WEBSERVER=true` to skip it manually (or `PLAYWRIGHT_SKIP_WEBSERVER=false` if you really want to start it while pointing at a remote URL).
-- In mock mode the config injects the test-mode headers for you: UI flows get `x-portfolio-test-mode: e2e`, API smoke tests get `x-portfolio-test-mode: integration`. As soon as you target a remote origin or force `integration/real`, those headers disappear so the app exercises the true providers.
-- CI retries remain enabled (`retries: 2` on CI), and traces/videos are still captured on the first retry for easier debugging.
+### Simple Rule: Headers for API, Flag for SSR
 
-## 🧪 Mocking External Systems
+**API Routes** → Check request header:
 
-- Use `page.route('**/api/send-email', ...)` to control SES responses. See `engagement.spec.ts` for helpers that simulate both success and failure.
-- When the runtime is in mock mode, the runner automatically adds `x-portfolio-test-mode: e2e` so `/api/chat` and `/api/github/document` return deterministic fixtures. Force that behavior with `E2E_TEST_MODE=mock` if you need fixtures while targeting a remote preview.
-
-## 🌐 Remote API Integration
-
-`e2e/api-integration.spec.ts` shares the same base URL as the UI suite, so pointing `PLAYWRIGHT_TEST_BASE_URL` (or `E2E_API_BASE_URL`) at a preview automatically redirects the API checks there too. When the runtime is in mock mode (localhost), Playwright injects `x-portfolio-test-mode: integration` so chat/email short-circuit. As soon as you target any remote origin—or force `E2E_TEST_MODE=integration|real`—those headers are dropped and the tests expect the live providers.
-
-Optional knobs:
-
-| Env Var              | Description                                                             |
-| -------------------- | ----------------------------------------------------------------------- |
-| `E2E_API_REPO_OWNER` | Owner/organization for `/api/github/repo-info` & `/document` checks     |
-| `E2E_API_REPO_NAME`  | Repository name for the repo/document checks                            |
-| `E2E_API_DOC_PATH`   | Optional repo-relative doc path (e.g., `docs/API.md`) for document test |
-
-The discrete repo/doc tests skip automatically when their env vars are absent. The chat + email routes only short-circuit when the injected header is present (i.e., mock mode), so integration runs now exercise the true OpenAI/SES stacks by default.
-
-### 🔥 Real API Smoke Tests
-
-Need to verify an actual deployment (OpenAI, SES, GitHub, etc.)? Flip on the new real mode:
-
-```bash
-# Run once you have a deployed base URL and secrets available
-E2E_API_BASE_URL=https://your-domain.com \
-PLAYWRIGHT_SKIP_WEBSERVER=true \
-E2E_USE_REAL_APIS=true \
-pnpm exec playwright test --project=real-integration
-
-# or use the shortcuts
-pnpm run test:real-api            # assumes target server already running
-pnpm run test:real-ui             # real Chromium UI suite against the resolved base URL (dev server never started)
-
-# local dev convenience (spins up `pnpm dev` automatically)
-pnpm run test:real-api:dev        # runs the real suite against http://localhost:3000
-pnpm run test:real-ui:dev         # same UI suite; auto-starts pnpm dev when the base URL is localhost
-pnpm run test:real-ui:dev:headed  # same dev flow but opens Chromium in headed mode
+```typescript
+export async function GET(request: Request) {
+  // Playwright sends 'x-portfolio-test-mode: e2e' header during local/CI mock runs
+  if (shouldReturnTestFixtures(request.headers)) {
+    return NextResponse.json(TEST_FIXTURES);
+  }
+  // Otherwise use real data
+  return NextResponse.json(await fetchRealData());
+}
 ```
 
-- `E2E_USE_REAL_APIS=true` tells both `api-integration.spec.ts` and the primary UI suite to hit live providers, so the chat + contact flows exercise OpenAI/SES rather than fixtures.
-- `PLAYWRIGHT_SKIP_WEBSERVER=true` keeps Playwright from launching `pnpm dev`, since the tests talk to your deployed URL (or a dev server you started yourself).
-- `pnpm run test:real-ui:dev` omits that flag. When the base URL resolves to `http://localhost:3000`, Playwright launches `pnpm dev` for you; if you override the base URL to a remote host, it behaves like `test:real-ui`.
-- Use `pnpm run test:real-ui:dev:headed` (or append `--headed`) when you want the Chromium window for the local real run.
-- The smoke run requires `E2E_API_BASE_URL` and re-uses optional repo/doc vars if you want GitHub content checks.
-- Real chat calls stream SSE tokens and incur OpenAI + Upstash costs. Real contact tests send an SES email to the address hard-coded in the API route—point that route at a test inbox before enabling scheduled smoke runs.
+**SSR Pages** → Check runtime flag:
+
+```typescript
+export async function fetchPortfolioRepos() {
+  // When PORTFOLIO_TEST_FIXTURES is set (pnpm test), use deterministic data
+  if (process.env.PORTFOLIO_TEST_FIXTURES === 'true') {
+    return TEST_FIXTURES;
+  }
+  return await fetchFromGitHub();
+}
+```
+
+### Why Two Approaches?
+
+- **API routes** get request headers → can detect test mode per-request
+- **SSR pages** render at build time → no request headers, use environment instead
+- Both ensure: ✅ Tests get fixtures, ✅ Production gets real data
+
+### What You Get
+
+| Test Type       | Command              | Uses Fixtures? | Tests What?                         |
+| --------------- | -------------------- | -------------- | ----------------------------------- |
+| **E2E**         | `pnpm test`          | ✅ Yes         | UI behavior with predictable data   |
+| **Integration** | `pnpm test:real-api` | ❌ No          | Real AWS/GitHub/OpenAI integrations |
+| **Local Dev**   | `pnpm dev`           | ✅ Yes\*       | Works without AWS credentials       |
+| **Production**  | (deployed)           | ❌ No          | Real data from real services        |
+
+_\*Set `PORTFOLIO_TEST_FIXTURES=true` to opt into fixtures locally (Playwright does this automatically)_
+
+### Key Environment Variables
+
+| Variable                        | What It Does                                               |
+| ------------------------------- | ---------------------------------------------------------- |
+| `PORTFOLIO_TEST_FIXTURES=true`  | Forces SSR/data loaders to return fixtures (used by tests) |
+| `CI=true`                       | Enables Playwright defaults (retries, workers, etc.)       |
+| `BLOG_TEST_FIXTURES=true`      | Forces blog APIs to use mock data (set during tests)       |
+| `E2E_USE_REAL_APIS=true`        | Integration tests use real services                        |
+| `PLAYWRIGHT_TEST_BASE_URL`      | Override what URL to test against                          |
+
+## 🧪 E2E Tests (Fast & Reliable)
+
+Playwright automatically sends `x-portfolio-test-mode: e2e` header when running in mock mode (local dev/CI), making all APIs return predictable test data. Production deployments ignore this header entirely, so real traffic cannot opt into fixtures.
+
+**Benefits:**
+
+- ⚡ Fast (no real API calls)
+- 🎯 Deterministic (same data every time)
+- 🔒 Safe (production ignores the header; real users cannot trigger fixtures)
+
+**What gets mocked:**
+
+- Blog posts, projects, chat responses, READMEs, etc.
+- Some external services need network stubbing (see `engagement.spec.ts` for examples)
+
+## 🔌 Integration Tests (Real Services)
+
+Verify that AWS, GitHub, OpenAI, and email actually work. Run with `pnpm test:real-api`.
+
+**Tests real integrations:**
+
+- AWS DynamoDB & S3 (blog posts)
+- GitHub API (repos, READMEs)
+- OpenAI chat (costs $$$)
+- Email sending (sends real emails!)
+
+**Setup:** Set `E2E_USE_REAL_APIS=true` and required API credentials (AWS, GitHub token, OpenAI key).
+
+⚠️ **Warning:** Costs money (OpenAI) and sends real emails!
 
 ## 🔄 CI / CD
 
-- `.github/workflows/test.yml` runs on pull requests to `main`, ensuring every change gets E2E coverage before merge.
-- `.github/workflows/deploy.yml` re-runs the mocked suite on `main` pushes right before the CDK deployment and then executes the real API smoke project after the stack finishes deploying.
-- Failures upload `playwright-report/` artifacts for 30 days; grab them from the Actions run if you can’t reproduce locally.
+Our GitHub Actions workflows use the unified testing architecture:
 
-### Test Mode Headers
+### `.github/workflows/test.yml` (PR checks)
 
-- In mock mode the UI project sends `x-portfolio-test-mode: e2e` while the API project sends `x-portfolio-test-mode: integration`. Integration and real modes automatically drop both headers so you always hit the true environment.
+- Runs E2E tests with `x-portfolio-test-mode: e2e` header while targeting the local dev server (never production)
+- Fast, deterministic fixture-based tests
+- No real API calls, no costs
+- Validates UI behavior before merge
+
+### `.github/workflows/deploy.yml` (Deployment)
+
+1. **Pre-deployment**: E2E tests with fixtures (fast safety check)
+2. **Deploy**: CDK stack to AWS
+3. **Post-deployment**: Integration tests with `E2E_USE_REAL_APIS=true`
+   - Verifies real AWS resources (DynamoDB, S3, CloudFront)
+   - Validates Lambda@Edge environment variables
+   - Confirms blog/project APIs work in production
+
+### Artifacts & Debugging
+
+- Test failures upload `playwright-report/` artifacts (30 day retention)
+- Traces and videos captured on first retry
+- View reports in GitHub Actions → Artifacts section
 
 ## ✍️ Authoring New Tests
+
+### E2E Test (Fixture-Based)
 
 ```ts
 import { test, expect } from '@playwright/test';
 
-test('example', async ({ page }) => {
+test('displays blog posts correctly', async ({ page }) => {
+  // Playwright automatically injects x-portfolio-test-mode: e2e during local/CI mock runs
+  // API will return TEST_BLOG_POSTS fixture
+
+  await page.goto('/blog');
+  await expect(page.getByRole('heading')).toContainText('Shipping AI Updates');
+});
+
+test('contact form validation', async ({ page }) => {
   await page.goto('/contact');
-  await page.getByPlaceholder('name...').fill('Automation');
-  await page.getByRole('button', { name: /send message/i }).click();
-  await expect(page.getByText(/Message sent/i)).toBeVisible();
+  await page.getByPlaceholder('name...').fill('Test User');
+
+  // Stub external service not covered by test mode
+  await page.route('**/api/send-email', async (route) => {
+    await route.fulfill({ status: 200, body: JSON.stringify({ success: true }) });
+  });
+
+  await page.getByRole('button', { name: /send/i }).click();
+  await expect(page.getByText(/sent/i)).toBeVisible();
 });
 ```
 
-Guidelines:
+### Integration Test (Real Services)
 
-- Prefer semantic queries (`getByRole`, `getByLabel`, `getByPlaceholder`) to stay resilient against cosmetic changes.
-- Keep tests isolated—navigate within each test rather than relying on shared state.
-- When stubbing network calls, add the `page.route` hook **before** triggering the action that fires the request.
-- If a page depends on remote content, assert the user-facing fallback (empty states, toasts) so regressions are still caught even when data is unavailable.
+```ts
+import { test, expect } from '@playwright/test';
 
-That’s it—run `pnpm test` before you push to catch regressions early.
+test('fetches real GitHub repos', async ({ request }) => {
+  // Test runs with E2E_USE_REAL_APIS=true
+  // No test mode header sent → real GitHub API call
+
+  const response = await request.get('/api/github/portfolio-repos');
+  expect(response.ok()).toBeTruthy();
+
+  const data = await response.json();
+  expect(data.starred.length).toBeGreaterThan(0);
+  expect(data.starred[0].owner.login).toBe('volpestyle');
+});
+```
+
+### Guidelines
+
+**For all tests:**
+
+- ✅ Use semantic queries (`getByRole`, `getByLabel`, `getByPlaceholder`)
+- ✅ Keep tests isolated - navigate within each test
+- ✅ Add `page.route` **before** triggering the request
+- ✅ Assert user-facing behavior, not implementation details
+
+**For E2E tests:**
+
+- ✅ Rely on automatic `x-portfolio-test-mode: e2e` header when running locally/in CI (production ignores it)
+- ✅ Expect deterministic TEST\_\* fixtures from APIs
+- ✅ Focus on UI behavior and user flows
+- ✅ Should be fast and never flaky
+
+**For integration tests:**
+
+- ✅ Run with `E2E_USE_REAL_APIS=true`
+- ✅ Expect real data from services
+- ✅ Verify integrations actually work
+- ✅ Account for costs and side effects
+
+---
+
+## 🎯 Quick Decision Guide
+
+**"Should I write an E2E test or integration test?"**
+
+| You want to...              | Test Type   | Command              |
+| --------------------------- | ----------- | -------------------- |
+| Verify button clicks work   | E2E         | `pnpm test`          |
+| Check form validation       | E2E         | `pnpm test`          |
+| Test navigation flows       | E2E         | `pnpm test`          |
+| Verify AWS DynamoDB works   | Integration | `pnpm test:real-api` |
+| Test GitHub API integration | Integration | `pnpm test:real-api` |
+| Confirm email sending works | Integration | `pnpm test:real-api` |
+
+**When in doubt**: Write an E2E test first (fast, safe). Add integration tests when you need to verify the real service connection.
+
+---
+
+Run `pnpm test` before pushing to catch regressions early! 🚀

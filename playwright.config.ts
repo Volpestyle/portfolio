@@ -1,22 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
-import { config as loadEnv } from 'dotenv';
-import fs from 'node:fs';
-import path from 'node:path';
 import { resolveTestRuntime, buildProjectHeaders } from './e2e/utils/runtime-env';
 
-// Load environment variables
-const envFile = process.env.CI ? '.env.production' : '.env.local';
-const envPath = path.resolve(process.cwd(), envFile);
-if (fs.existsSync(envPath)) {
-  loadEnv({ path: envPath });
-}
 
-// Set test defaults (application mode is handled centrally in test-mode.ts)
-process.env.E2E_ADMIN_BYPASS_SECRET ??= 'playwright-admin-secret';
-process.env.E2E_ADMIN_BYPASS_EMAIL ??= 'playwright-admin@example.com';
-process.env.POSTS_TABLE ??= 'playwright-posts';
-process.env.CONTENT_BUCKET ??= 'playwright-content';
-process.env.MEDIA_BUCKET ??= 'playwright-media';
+const LOCAL_E2E_BASE = 'http://127.0.0.1:3000';
+if (process.env.PLAYWRIGHT_SKIP_WEBSERVER !== 'true') {
+  process.env.PLAYWRIGHT_TEST_BASE_URL ??= LOCAL_E2E_BASE;
+}
 
 const runtime = resolveTestRuntime();
 const uiHeaders = buildProjectHeaders('ui', runtime);
@@ -81,10 +70,16 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: shouldStartWebServer
     ? {
-      command: process.env.CI ? 'pnpm exec next start -p 3000' : 'pnpm run dev',
+      // Use dev mode so tests run against a fresh Next build
+      command: 'pnpm run dev',
       url: 'http://localhost:3000',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 120 * 1000,
+      env: {
+        ...process.env,
+        BLOG_TEST_FIXTURES: 'true', // Force mock blog data for Playwright runs
+        PORTFOLIO_TEST_FIXTURES: 'true', // Enable SSR fixtures while Playwright runs
+      },
     }
     : undefined,
 });

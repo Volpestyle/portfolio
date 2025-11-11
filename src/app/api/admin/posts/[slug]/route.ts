@@ -10,11 +10,11 @@ function normalizeTags(value: unknown): string[] {
     .filter(Boolean);
 }
 
-type RouteContext = { params: { slug: string } };
+type RouteContext = { params: Promise<{ slug: string }> };
 
 export async function GET(_req: Request, context: RouteContext) {
   try {
-    const { slug } = context.params;
+    const { slug } = await context.params;
     const post = await getAdminPost(slug);
     if (!post) {
       return NextResponse.json({ message: 'Post not found' }, { status: 404 });
@@ -27,7 +27,7 @@ export async function GET(_req: Request, context: RouteContext) {
 
 export async function PUT(req: Request, context: RouteContext) {
   try {
-    const { slug } = context.params;
+    const { slug } = await context.params;
     const body = await req.json();
     const version = Number(body.version);
     if (!Number.isFinite(version)) {

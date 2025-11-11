@@ -40,7 +40,7 @@ import {
 import { upsertPublishSchedule, deletePublishSchedule } from '@/server/blog/scheduler';
 
 async function requireAdmin() {
-  const requestHeaders = headers();
+  const requestHeaders = await headers();
   if (hasAdminBypass(requestHeaders)) {
     const email = process.env.E2E_ADMIN_BYPASS_EMAIL || 'playwright-admin@example.com';
     return {

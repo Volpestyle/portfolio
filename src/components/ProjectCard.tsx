@@ -3,7 +3,7 @@
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
 import { StarIcon } from '@/lib/svgs';
-import { cn, formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import {
   ArrowRight,
   Code2,

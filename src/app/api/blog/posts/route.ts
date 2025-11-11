@@ -1,7 +1,18 @@
 import { NextResponse } from 'next/server';
 import { listPublishedPosts, InvalidBlogCursorError } from '@/server/blog/store';
+import { shouldReturnTestFixtures } from '@/lib/test-mode';
+import { TEST_BLOG_POSTS } from '@/lib/test-fixtures';
 
 export async function GET(req: Request) {
+  // Return deterministic fixtures for E2E tests
+  if (shouldReturnTestFixtures(req.headers)) {
+    const published = TEST_BLOG_POSTS.filter((post) => post.status === 'published');
+    return NextResponse.json({
+      posts: published,
+      hasMore: false,
+    });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const cursor = searchParams.get('cursor') || undefined;

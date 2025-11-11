@@ -50,7 +50,7 @@ export function SocialLinks() {
   ];
 
   return (
-    <div className="flex flex-row items-start gap-6">
+    <div className="flex flex-row items-start justify-start gap-6">
       {socialLinks.map((link, i) => {
         const isHovered = hoveredIndex === i;
         return (

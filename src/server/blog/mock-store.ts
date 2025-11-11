@@ -50,6 +50,7 @@ function savePost(next: MockPost): MockPost {
 
 function toRecord(post: MockPost): BlogPostRecord {
   const { content, ...record } = post;
+  void content;
   return record;
 }
 
@@ -89,8 +90,10 @@ export async function listPublishedPosts(
     });
 
   const postsSlice = allPosts.slice(0, limit).map((post) => {
-      const { content, version, ...rest } = post;
-      return { ...rest };
+    const { content, version, ...rest } = post;
+    void content;
+    void version;
+    return { ...rest };
   });
 
   return {

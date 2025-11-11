@@ -1,7 +1,7 @@
-import { isMockBlogStore } from '@/lib/blog-store-mode';
-
 export const TEST_MODE_HEADER = 'x-portfolio-test-mode';
 export const ADMIN_SECRET_HEADER = 'x-portfolio-admin-secret';
+const PORTFOLIO_FIXTURE_RUNTIME_FLAG = 'PORTFOLIO_TEST_FIXTURES';
+const BLOG_FIXTURE_RUNTIME_FLAG = 'BLOG_TEST_FIXTURES';
 
 type HeadersLike = Pick<Headers, 'get'>;
 
@@ -10,40 +10,77 @@ type HeadersLike = Pick<Headers, 'get'>;
  */
 export type TestMode = 'e2e' | 'integration' | null;
 
-/**
- * Overall application mode for centralized mode detection
- */
-export type ApplicationMode = 'mock' | 'real-api' | 'production';
+export function isFixtureRuntime(flag: string = PORTFOLIO_FIXTURE_RUNTIME_FLAG): boolean {
+  if (process.env.E2E_USE_REAL_APIS === 'true') {
+    return false;
+  }
+  if (process.env.SKIP_TEST_FIXTURES === 'true') {
+    return false;
+  }
+  return process.env[flag] === 'true';
+}
+
+export function isBlogFixtureRuntime(): boolean {
+  return isFixtureRuntime(BLOG_FIXTURE_RUNTIME_FLAG);
+}
 
 /**
- * Simple header detection - direct approach that's more reliable
- * than the complex multi-header parsing logic
+ * Check if the request is in E2E test mode.
+ * When true, APIs should return deterministic fixtures instead of real data.
+ *
+ * In production, the header alone cannot toggle fixtures—only explicit
+ * runtime flags (which are stripped from prod) can enable them.
+ *
+ * @example
+ * // In API route:
+ * if (shouldReturnTestFixtures(request.headers)) {
+ *   return NextResponse.json(TEST_FIXTURES);
+ * }
  */
+export function shouldReturnTestFixtures(headers: HeadersLike): boolean {
+  // If explicitly running with real APIs for integration tests, never use fixtures
+  if (process.env.E2E_USE_REAL_APIS === 'true') {
+    return false;
+  }
+
+  if (process.env.SKIP_TEST_FIXTURES === 'true') {
+    return false;
+  }
+
+  const mode = headers.get(TEST_MODE_HEADER);
+
+  // Explicit E2E mode = always use fixtures outside production.
+  // In production we ignore the header unless the runtime itself
+  // has been placed into a fixture mode via env flags.
+  if (mode === 'e2e') {
+    if (process.env.NODE_ENV !== 'production') {
+      return true;
+    }
+    return isFixtureRuntime();
+  }
+
+  // Integration mode = use real APIs even with mock environment
+  if (mode === 'integration') {
+    return false;
+  }
+
+  return isFixtureRuntime();
+}
+
+/**
+ * Legacy alias - kept for backward compatibility
+ * @deprecated Use shouldReturnTestFixtures() instead for clearer intent
+ */
+export function isE2ETestMode(headers: HeadersLike): boolean {
+  return shouldReturnTestFixtures(headers);
+}
+
 export function getTestMode(headers: HeadersLike): TestMode {
   const value = headers.get(TEST_MODE_HEADER);
   if (value === 'integration' || value === 'e2e') {
     return value;
   }
   return null;
-}
-
-/**
- * Centralized mode detection that provides a single source of truth
- * for determining the current application mode
- */
-export function getCurrentApplicationMode(): ApplicationMode {
-  // Real API mode takes precedence - explicitly enabled for expensive integration tests
-  if (process.env.E2E_USE_REAL_APIS === 'true') {
-    return 'real-api';
-  }
-
-  // Production mode - when running in CI or production environment
-  if (process.env.CI || process.env.NODE_ENV === 'production') {
-    return 'production';
-  }
-
-  // Default to mock mode for development and local testing
-  return 'mock';
 }
 
 export function headerIncludesTestMode(
@@ -53,28 +90,12 @@ export function headerIncludesTestMode(
   return headers.get(TEST_MODE_HEADER) === mode;
 }
 
-export function isE2ETestMode(headers: HeadersLike): boolean {
-  if (process.env.E2E_USE_REAL_APIS === 'true') {
-    return false;
-  }
-
-  const mode = headers.get(TEST_MODE_HEADER);
-
-  // Integration mode takes precedence
-  if (mode === 'integration') {
-    return false;
-  }
-
-  // Explicit E2E mode or mock environment
-  return mode === 'e2e' || isMockBlogStore;
-}
-
 export function hasAdminBypass(headers: HeadersLike): boolean {
   const secret = process.env.E2E_ADMIN_BYPASS_SECRET;
   if (!secret) {
     return false;
   }
-  if (!isE2ETestMode(headers)) {
+  if (!shouldReturnTestFixtures(headers)) {
     return false;
   }
   return headers.get(ADMIN_SECRET_HEADER) === secret;

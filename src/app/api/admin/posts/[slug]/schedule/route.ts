@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server';
 import { schedulePost } from '@/server/blog/actions';
 
 type RouteContext = {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 };
 
 export async function POST(req: Request, context: RouteContext) {
   try {
-    const { slug } = context.params;
+    const { slug } = await context.params;
     const body = await req.json().catch(() => ({}));
     const version = Number(body.version);
     const scheduledFor = body.scheduledFor;

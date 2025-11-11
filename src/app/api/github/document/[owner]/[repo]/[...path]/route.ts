@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDocumentContent } from '@/lib/github-server';
-import { isE2ETestMode } from '@/lib/test-mode';
+import { shouldReturnTestFixtures } from '@/lib/test-mode';
 import { TEST_DOC_CONTENT, TEST_REPO } from '@/lib/test-fixtures';
 
 type RouteParams = {
@@ -21,7 +21,8 @@ export async function GET(request: Request, context: { params: Promise<RoutePara
       return NextResponse.json({ error: 'Document path is required' }, { status: 400 });
     }
 
-    if (isE2ETestMode(request.headers)) {
+    // Return deterministic fixtures for E2E tests
+    if (shouldReturnTestFixtures(request.headers)) {
       return NextResponse.json(
         {
           repo,

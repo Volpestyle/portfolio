@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getPortfolioRepos } from '@/lib/github-server';
-import { isE2ETestMode } from '@/lib/test-mode';
+import { shouldReturnTestFixtures } from '@/lib/test-mode';
 import { TEST_REPO } from '@/lib/test-fixtures';
 
 export async function GET(request: Request) {
-  if (isE2ETestMode(request.headers)) {
+  // Return deterministic fixtures for E2E tests
+  if (shouldReturnTestFixtures(request.headers)) {
     return NextResponse.json({
       starred: [TEST_REPO],
       normal: [],

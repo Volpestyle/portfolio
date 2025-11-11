@@ -34,7 +34,6 @@ export function ContactForm() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [isPending, startTransition] = useTransition();
   const [isVisible, setIsVisible] = useState(false);
-  const [messageHeight, setMessageHeight] = useState(120);
   const messageRef = useRef<HTMLTextAreaElement>(null);
   const {
     [FormFieldId.Name]: name,
@@ -58,7 +57,6 @@ export function ContactForm() {
       textarea.style.height = 'auto';
       const newHeight = Math.max(120, textarea.scrollHeight);
       textarea.style.height = `${newHeight}px`;
-      setMessageHeight(newHeight);
     }
   }, [message]);
 

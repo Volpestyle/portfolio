@@ -48,6 +48,10 @@ env:
   # Optional repo variables you referenced
   PORTFOLIO_GIST_ID: ${{ vars.PORTFOLIO_GIST_ID }}
   UPSTASH_REDIS_REST_URL: ${{ vars.UPSTASH_REDIS_REST_URL }}
+  ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
+  GH_CLIENT_ID: ${{ vars.GH_CLIENT_ID }}
+  GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
+  NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
 
 jobs:
   deploy:
@@ -60,15 +64,78 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Prepare pnpm for cache
+        run: corepack enable pnpm
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
       - name: Enable pnpm
         uses: pnpm/action-setup@v4
         with:
           version: ${{ env.PNPM_VERSION }}
-      - name: Setup Node and pnpm cache
-        uses: actions/setup-node@v4
+
+      - name: Ensure pnpm store directory exists
+        run: |
+          STORE="$(pnpm store path --silent)"
+          mkdir -p "$STORE"
+
+      # ----- AWS access for build-time data -----
+      - name: Configure AWS credentials for build (OIDC)
+        if: ${{ vars.CDK_DEPLOY_ROLE_ARN != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
+          role-to-assume: ${{ vars.CDK_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Resolve deployed resource names for SSR build
+        id: resolve-runtime
+        run: |
+          set -euo pipefail
+
+          echo "Attempting to load CloudFormation outputs for PortfolioStack..."
+          outputs_json=$(aws cloudformation describe-stacks \
+            --stack-name PortfolioStack \
+            --query 'Stacks[0].Outputs' \
+            --output json 2>/dev/null || true)
+
+          if [ -z "$outputs_json" ] || [ "$outputs_json" = "null" ]; then
+            echo "PortfolioStack not found (likely first deploy). Falling back to fixture runtime for this build."
+            echo "BLOG_TEST_FIXTURES=true" >> "$GITHUB_ENV"
+            echo "PORTFOLIO_TEST_FIXTURES=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          export_output () {
+            local key="$1"
+            local env_name="$2"
+            local value
+            value=$(echo "$outputs_json" | jq -r ".[] | select(.OutputKey==\"${key}\") | .OutputValue" | head -n 1)
+            if [ -z "$value" ] || [ "$value" = "null" ]; then
+              echo "Missing CloudFormation output ${key}. Falling back to fixture runtime for this build."
+              echo "BLOG_TEST_FIXTURES=true" >> "$GITHUB_ENV"
+              echo "PORTFOLIO_TEST_FIXTURES=true" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "${env_name}=${value}" >> "$GITHUB_ENV"
+            export "${env_name}=${value}"
+          }
+
+          export_output "BlogPostsTableName" "POSTS_TABLE"
+          export_output "BlogContentBucketName" "CONTENT_BUCKET"
+          export_output "BlogMediaBucketName" "MEDIA_BUCKET"
+          export_output "AssetBucketName" "CACHE_BUCKET_NAME"
+
+          echo "Resolved runtime resources for build: POSTS_TABLE=${POSTS_TABLE}, CONTENT_BUCKET=${CONTENT_BUCKET}, MEDIA_BUCKET=${MEDIA_BUCKET}"
 
       # ----- Build your Next.js app with OpenNext (produces .open-next) -----
       - name: Install app dependencies
@@ -79,12 +146,14 @@ jobs:
         working-directory: ${{ env.APP_ROOT }}
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Build Next.js app (for testing)
+      - name: Build Next.js with OpenNext
         working-directory: ${{ env.APP_ROOT }}
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           PORTFOLIO_GIST_ID: ${{ env.PORTFOLIO_GIST_ID }}
-        run: pnpm exec next build
+        run: |
+          pnpm dlx @opennextjs/aws@latest build
+          test -f .open-next/open-next.output.json
 
       - name: Run E2E Tests
         working-directory: ${{ env.APP_ROOT }}
@@ -92,6 +161,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           PORTFOLIO_GIST_ID: ${{ env.PORTFOLIO_GIST_ID }}
           CI: true
+          # Keep Playwright in mock mode for deterministic data & so local dev environments aren't required
+          BLOG_TEST_FIXTURES: 'true'
+          PORTFOLIO_TEST_FIXTURES: 'true'
         run: pnpm test
 
       - name: Upload test results
@@ -102,15 +174,6 @@ jobs:
           path: playwright-report/
           retention-days: 30
 
-      - name: Build Next.js with OpenNext
-        working-directory: ${{ env.APP_ROOT }}
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          PORTFOLIO_GIST_ID: ${{ env.PORTFOLIO_GIST_ID }}
-        run: |
-          pnpm dlx @opennextjs/aws@latest build
-          test -f .open-next/open-next.output.json
-
       # ----- Prepare CDK workspace -----
       - name: Install CDK workspace deps
         working-directory: ${{ env.CDK_WORKDIR }}
@@ -120,10 +183,6 @@ jobs:
         working-directory: ${{ env.CDK_WORKDIR }}
         run: pnpm run build
 
-      - name: Validate stack configuration
-        working-directory: ${{ env.CDK_WORKDIR }}
-        run: pnpm run validate
-
       # ----- Configure AWS credentials -----
       # Prefer OIDC with a deploy role (recommended)
       - name: Configure AWS credentials (OIDC)
@@ -132,6 +191,13 @@ jobs:
         with:
           role-to-assume: ${{ vars.CDK_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
+
+      - name: Validate stack configuration
+        working-directory: ${{ env.CDK_WORKDIR }}
+        env:
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: pnpm run validate
 
       # ----- Deploy -----
       - name: CDK deploy PortfolioStack
@@ -147,28 +213,84 @@ jobs:
           APP_ALTERNATE_DOMAINS: ${{ env.APP_ALTERNATE_DOMAINS }}
           SECRETS_MANAGER_ENV_SECRET_ID: ${{ env.SECRETS_MANAGER_ENV_SECRET_ID }}
           SECRETS_MANAGER_REPO_SECRET_ID: ${{ env.SECRETS_MANAGER_REPO_SECRET_ID }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: |
           pnpm exec cdk deploy PortfolioStack --require-approval never --verbose
+
+      # ----- Invalidate CloudFront cache for ISR pages -----
+      - name: Get CloudFront Distribution ID
+        id: get-distribution
+        working-directory: ${{ env.CDK_WORKDIR }}
+        run: |
+          DIST_ID=$(aws cloudformation describe-stacks \
+            --stack-name PortfolioStack \
+            --query "Stacks[0].Outputs[?OutputKey=='DistributionId'].OutputValue" \
+            --output text)
+          echo "distribution_id=$DIST_ID" >> $GITHUB_OUTPUT
+          echo "Found CloudFront Distribution: $DIST_ID"
+
+      - name: Invalidate CloudFront cache
+        if: steps.get-distribution.outputs.distribution_id != ''
+        run: |
+          echo "Creating invalidation for CloudFront distribution ${{ steps.get-distribution.outputs.distribution_id }}"
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ steps.get-distribution.outputs.distribution_id }} \
+            --paths "/blog" "/blog/*" "/projects" "/projects/*" "/api/*" "/api/github/*" "/_next/data/*" \
+            --query 'Invalidation.Id' \
+            --output text
+          echo "CloudFront cache invalidation created successfully"
+      - name: Revalidate server caches
+        env:
+          TARGET_URL: ${{ vars.API_INTEGRATION_BASE_URL != '' && vars.API_INTEGRATION_BASE_URL || (env.APP_DOMAIN_NAME != '' && format('https://{0}', env.APP_DOMAIN_NAME)) }}
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: |
+          if [ -z "${TARGET_URL}" ]; then
+            echo "No target URL configured, skipping server cache revalidation."
+            exit 0
+          fi
+          echo "Sending revalidate request to ${TARGET_URL}"
+          curl -s -X POST "${TARGET_URL}/api/revalidate" \
+            -H 'content-type: application/json' \
+            -H "x-revalidate-secret: ${REVALIDATE_SECRET}" \
+            --data '{"paths":["/projects","/blog","/_next/data/*","/api/github/portfolio-repos","/api/blog/posts"],"tags":["github-repos","posts"]}' \
+            --fail
+          echo "Server caches revalidated."
 
   smoke-tests:
     name: Post-deploy smoke tests
     runs-on: ubuntu-latest
     needs: deploy
-    if: ${{ vars.API_INTEGRATION_BASE_URL != '' || env.APP_DOMAIN_NAME != '' }}
+    if: ${{ vars.API_INTEGRATION_BASE_URL != '' || vars.APP_DOMAIN_NAME != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Prepare pnpm for cache
+        run: corepack enable pnpm
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Enable pnpm
         uses: pnpm/action-setup@v4
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - name: Setup Node and pnpm cache
-        uses: actions/setup-node@v4
+      - name: Cache pnpm store
+        uses: actions/cache@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Ensure pnpm store directory exists
+        run: |
+          STORE="$(pnpm store path --silent)"
+          mkdir -p "$STORE"
 
       - name: Install app dependencies
         working-directory: ${{ env.APP_ROOT }}
@@ -184,11 +306,21 @@ jobs:
           CI: true
           PLAYWRIGHT_SKIP_WEBSERVER: 'true'
           E2E_USE_REAL_APIS: 'true'
-          E2E_API_BASE_URL: ${{ vars.API_INTEGRATION_BASE_URL != '' && vars.API_INTEGRATION_BASE_URL || (env.APP_DOMAIN_NAME != '' && format('https://{0}', env.APP_DOMAIN_NAME)) }}
+          E2E_API_BASE_URL: ${{ vars.API_INTEGRATION_BASE_URL != '' && vars.API_INTEGRATION_BASE_URL || (vars.APP_DOMAIN_NAME != '' && format('https://{0}', vars.APP_DOMAIN_NAME)) }}
           E2E_API_REPO_OWNER: ${{ vars.API_INTEGRATION_REPO_OWNER }}
           E2E_API_REPO_NAME: ${{ vars.API_INTEGRATION_REPO_NAME }}
           E2E_API_DOC_PATH: ${{ vars.API_INTEGRATION_DOC_PATH }}
         run: pnpm run test:real-api
+
+      - name: Run real UI smoke tests
+        working-directory: ${{ env.APP_ROOT }}
+        env:
+          CI: true
+          PLAYWRIGHT_SKIP_WEBSERVER: 'true'
+          E2E_USE_REAL_APIS: 'true'
+          PLAYWRIGHT_TEST_BASE_URL: ${{ vars.API_INTEGRATION_BASE_URL != '' && vars.API_INTEGRATION_BASE_URL || (vars.APP_DOMAIN_NAME != '' && format('https://{0}', vars.APP_DOMAIN_NAME)) }}
+          E2E_API_BASE_URL: ${{ vars.API_INTEGRATION_BASE_URL != '' && vars.API_INTEGRATION_BASE_URL || (vars.APP_DOMAIN_NAME != '' && format('https://{0}', vars.APP_DOMAIN_NAME)) }}
+        run: pnpm run test:real-ui
 
       - name: Upload smoke test report
         if: failure()

@@ -1,10 +1,4 @@
-import {
-  PutObjectCommand,
-  GetObjectCommand,
-  DeleteObjectCommand,
-  DeleteObjectsCommand,
-  ListObjectsV2Command,
-} from '@aws-sdk/client-s3';
+import { PutObjectCommand, GetObjectCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand, DeleteCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'node:crypto';
@@ -12,9 +6,26 @@ import { blogConfig } from '@/server/blog/config';
 import * as mockStore from '@/server/blog/mock-store';
 import { getDocumentClient, getS3Client } from '@/server/blog/clients';
 import type { BlogPostRecord, BlogPostStatus, BlogPostSummary, BlogPostWithContent } from '@/types/blog';
-import { isMockBlogStore } from '@/lib/blog-store-mode';
+import { isBlogFixtureRuntime } from '@/lib/test-mode';
 
-const useMockStore = isMockBlogStore;
+type RawBlogRecord = {
+  slug: string;
+  title: string;
+  summary?: string;
+  status?: BlogPostStatus | string;
+  publishedAt?: string;
+  updatedAt?: string;
+  tags?: unknown;
+  heroImageKey?: string;
+  readTimeMinutes?: number | string;
+  currentRevisionKey?: string;
+  version?: number | string;
+  scheduledFor?: string;
+  activeScheduleArn?: string;
+  activeScheduleName?: string;
+};
+
+const useMockStore = () => isBlogFixtureRuntime();
 const docClient = getDocumentClient();
 const s3Client = getS3Client();
 const MAX_REVISIONS_PER_POST = 5;
@@ -36,25 +47,32 @@ function normalizeTags(value?: unknown): string[] {
     .filter(Boolean);
 }
 
-function toRecord(item?: Record<string, any>): BlogPostRecord | null {
+function toRecord(item?: RawBlogRecord | null): BlogPostRecord | null {
   if (!item) {
     return null;
   }
 
-  const readTimeMinutes = item.readTimeMinutes ? Number(item.readTimeMinutes) : undefined;
+  const readTimeValue = item.readTimeMinutes;
+  const readTimeMinutes =
+    typeof readTimeValue === 'number'
+      ? readTimeValue
+      : typeof readTimeValue === 'string'
+      ? Number(readTimeValue)
+      : undefined;
+
   const record: BlogPostRecord = {
     slug: item.slug,
     title: item.title,
     summary: item.summary ?? '',
-    status: item.status as BlogPostStatus,
+    status: (item.status ?? 'draft') as BlogPostStatus,
     publishedAt: item.publishedAt,
-    updatedAt: item.updatedAt,
+    updatedAt: item.updatedAt ?? new Date().toISOString(),
     tags: normalizeTags(item.tags),
     heroImageKey: item.heroImageKey,
     readTimeMinutes,
     readTimeLabel: buildReadTimeLabel(readTimeMinutes),
     currentRevisionKey: item.currentRevisionKey,
-    version: Number(item.version ?? 1),
+    version: typeof item.version === 'number' ? item.version : Number(item.version ?? 1),
     scheduledFor: item.scheduledFor,
     activeScheduleArn: item.activeScheduleArn,
     activeScheduleName: item.activeScheduleName,
@@ -130,7 +148,7 @@ async function deleteAllRevisions(slug: string) {
 }
 
 async function pruneRevisions(slug: string, latestKey: string) {
-  if (useMockStore) {
+  if (useMockStore()) {
     return;
   }
   const bucket = blogConfig.contentBucket;
@@ -204,7 +222,7 @@ export async function listPublishedPosts(
   limit: number = 20,
   cursor?: string
 ): Promise<PaginatedPosts> {
-  if (useMockStore) {
+  if (useMockStore()) {
     const { posts, hasMore, nextCursor } = await mockStore.listPublishedPosts(limit);
     return { posts, hasMore, nextCursor };
   }
@@ -237,7 +255,7 @@ export async function listPublishedPosts(
   );
 
   const posts = (response.Items ?? [])
-    .map((item) => toRecord(item))
+    .map((item) => toRecord(item as RawBlogRecord))
     .filter((record): record is BlogPostRecord => Boolean(record))
     .map((record) => ({
       slug: record.slug,
@@ -264,7 +282,7 @@ export async function listPublishedPosts(
 }
 
 export async function listPosts(options: { status?: BlogPostStatus; search?: string } = {}): Promise<BlogPostRecord[]> {
-  if (useMockStore) {
+  if (useMockStore()) {
     return mockStore.listPosts(options);
   }
 
@@ -277,7 +295,7 @@ export async function listPosts(options: { status?: BlogPostStatus; search?: str
   const searchValue = options.search?.toLowerCase().trim();
 
   return (response.Items ?? [])
-    .map((item) => toRecord(item))
+    .map((item) => toRecord(item as RawBlogRecord))
     .filter((record): record is BlogPostRecord => Boolean(record))
     .filter((record) => {
       if (options.status && record.status !== options.status) {
@@ -302,7 +320,7 @@ export async function getPostWithContent(
   slug: string,
   options: { includeDraft?: boolean } = {}
 ): Promise<BlogPostWithContent | null> {
-  if (useMockStore) {
+  if (useMockStore()) {
     return mockStore.getPostWithContent(slug, options);
   }
 
@@ -313,7 +331,7 @@ export async function getPostWithContent(
     })
   );
 
-  const record = toRecord(response.Item);
+  const record = toRecord(response.Item as RawBlogRecord | null | undefined);
   if (!record) {
     return null;
   }
@@ -351,7 +369,7 @@ export async function createPostRecord(input: {
   tags?: string[];
   heroImageKey?: string;
 }): Promise<BlogPostRecord> {
-  if (useMockStore) {
+  if (useMockStore()) {
     return mockStore.createPostRecord(input);
   }
 
@@ -397,7 +415,7 @@ export async function saveDraftRecord(input: {
   extension?: string;
   expectedVersion: number;
 }): Promise<BlogPostWithContent> {
-  if (useMockStore) {
+  if (useMockStore()) {
     return mockStore.saveDraftRecord(input);
   }
 
@@ -470,7 +488,7 @@ export async function saveDraftRecord(input: {
     })
   );
 
-  const record = toRecord(response.Attributes);
+  const record = toRecord(response.Attributes as RawBlogRecord | null | undefined);
   if (!record) {
     throw new Error('Failed to update blog post');
   }
@@ -497,7 +515,7 @@ export async function publishPostRecord(input: {
   publishedAt?: string;
   expectedVersion: number;
 }): Promise<BlogPostRecord> {
-  if (useMockStore) {
+  if (useMockStore()) {
     return mockStore.publishPostRecord(input);
   }
 
@@ -531,7 +549,7 @@ export async function publishPostRecord(input: {
     })
   );
 
-  const record = toRecord(response.Attributes);
+  const record = toRecord(response.Attributes as RawBlogRecord | null | undefined);
   if (!record) {
     throw new Error('Unable to publish blog post');
   }
@@ -539,7 +557,7 @@ export async function publishPostRecord(input: {
 }
 
 export async function archivePostRecord(input: { slug: string; expectedVersion: number }): Promise<BlogPostRecord> {
-  if (useMockStore) {
+  if (useMockStore()) {
     return mockStore.archivePostRecord(input);
   }
 
@@ -568,7 +586,7 @@ export async function archivePostRecord(input: { slug: string; expectedVersion: 
     })
   );
 
-  const record = toRecord(response.Attributes);
+  const record = toRecord(response.Attributes as RawBlogRecord | null | undefined);
   if (!record) {
     throw new Error('Unable to archive blog post');
   }
@@ -582,7 +600,7 @@ export async function markScheduledRecord(input: {
   scheduleName: string;
   expectedVersion: number;
 }): Promise<BlogPostRecord> {
-  if (useMockStore) {
+  if (useMockStore()) {
     return mockStore.markScheduledRecord(input);
   }
 
@@ -616,7 +634,7 @@ export async function markScheduledRecord(input: {
     })
   );
 
-  const record = toRecord(response.Attributes);
+  const record = toRecord(response.Attributes as RawBlogRecord | null | undefined);
   if (!record) {
     throw new Error('Unable to schedule blog post');
   }
@@ -627,7 +645,7 @@ export async function unmarkScheduledRecord(input: {
   slug: string;
   expectedVersion: number;
 }): Promise<BlogPostRecord> {
-  if (useMockStore) {
+  if (useMockStore()) {
     return mockStore.unmarkScheduledRecord(input);
   }
 
@@ -657,7 +675,7 @@ export async function unmarkScheduledRecord(input: {
     })
   );
 
-  const record = toRecord(response.Attributes);
+  const record = toRecord(response.Attributes as RawBlogRecord | null | undefined);
   if (!record) {
     throw new Error('Unable to unschedule blog post');
   }
@@ -665,7 +683,7 @@ export async function unmarkScheduledRecord(input: {
 }
 
 export async function deletePostRecord(slug: string): Promise<void> {
-  if (useMockStore) {
+  if (useMockStore()) {
     return mockStore.deletePostRecord(slug);
   }
 
@@ -676,7 +694,7 @@ export async function deletePostRecord(slug: string): Promise<void> {
     })
   );
 
-  const record = toRecord(existing.Item);
+  const record = toRecord(existing.Item as RawBlogRecord | null | undefined);
   if (!record) {
     return;
   }
@@ -692,7 +710,7 @@ export async function deletePostRecord(slug: string): Promise<void> {
 }
 
 export async function getPostRecord(slug: string): Promise<BlogPostRecord | null> {
-  if (useMockStore) {
+  if (useMockStore()) {
     return mockStore.getPostRecord(slug);
   }
 
@@ -702,14 +720,14 @@ export async function getPostRecord(slug: string): Promise<BlogPostRecord | null
       Key: { slug },
     })
   );
-  return toRecord(response.Item);
+  return toRecord(response.Item as RawBlogRecord | null | undefined);
 }
 
 export async function generateMediaUploadUrl(input: {
   contentType: string;
   extension?: string;
 }): Promise<{ uploadUrl: string; key: string }> {
-  if (useMockStore) {
+  if (useMockStore()) {
     return mockStore.generateMediaUploadUrl(input);
   }
 

@@ -10,6 +10,10 @@ permissions:
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '9'
+  ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
+  GH_CLIENT_ID: ${{ vars.GH_CLIENT_ID }}
+  GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
+  NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
 
 jobs:
   test:

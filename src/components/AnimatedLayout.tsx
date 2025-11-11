@@ -1,12 +1,9 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
-import { ReactNode, useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { motion } from 'framer-motion';
+import type { ReactNode } from 'react';
 
 export function AnimatedLayout({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-
   return (
     <motion.div
       layout

@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useState, ReactNode, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, ReactNode, useMemo } from 'react';
 
 interface HoverContextType {
   hoverText: string;

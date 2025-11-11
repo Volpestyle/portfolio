@@ -21,8 +21,8 @@ function buildProviders() {
     );
   }
 
-  const githubId = process.env.GITHUB_CLIENT_ID;
-  const githubSecret = process.env.GITHUB_CLIENT_SECRET;
+  const githubId = process.env.GH_CLIENT_ID;
+  const githubSecret = process.env.GH_CLIENT_SECRET;
   if (githubId && githubSecret) {
     providers.push(
       GitHub({

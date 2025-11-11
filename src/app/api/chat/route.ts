@@ -14,14 +14,12 @@ import { tools, toolRouter } from '@/server/tools';
 import type { ChatRequestMessage } from '@/types/chat';
 import { enforceChatRateLimit } from '@/lib/rate-limit';
 import { resolveSecretValue } from '@/lib/secrets/manager';
-import { headerIncludesTestMode, isE2ETestMode } from '@/lib/test-mode';
+import { headerIncludesTestMode, shouldReturnTestFixtures } from '@/lib/test-mode';
 import { TEST_REPO, TEST_README } from '@/lib/test-fixtures';
 
 export const runtime = 'nodejs';
 
 let cachedClient: OpenAI | undefined;
-
-const TEST_MODE_HEADER = 'x-portfolio-test-mode';
 
 function isOutputItemAddedEvent(event: ResponseStreamEvent): event is ResponseOutputItemAddedEvent {
   return event.type === 'response.output_item.added';
@@ -74,7 +72,9 @@ export async function POST(req: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-  if (isE2ETestMode(headersList)) {
+
+  // Return deterministic fixtures for E2E tests
+  if (shouldReturnTestFixtures(headersList)) {
     return buildE2EChatResponse();
   }
 

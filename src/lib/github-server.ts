@@ -6,11 +6,24 @@ import {
   fetchRepoLanguages,
   calculateLanguagePercentages,
 } from './github-api';
-import { PortfolioRepoConfig, PrivateRepoData } from '@/types/portfolio';
 import { unstable_cache } from 'next/cache';
 import { convertRelativeToAbsoluteUrls } from './readme-utils';
-import { TEST_DOC_CONTENT, TEST_README, TEST_REPO } from '@/lib/test-fixtures';
-import { isMockBlogStore } from '@/lib/blog-store-mode';
+import { TEST_REPO, TEST_README, TEST_DOC_CONTENT } from '@/lib/test-fixtures';
+import { isFixtureRuntime } from '@/lib/test-mode';
+
+/**
+ * Check if SSR pages should use test fixtures. This is used for build-time
+ * rendering where we don't have request headers, so we rely on an explicit
+ * runtime flag that the Playwright runner enables during `pnpm test`.
+ */
+function shouldUseSSRFixtures(): boolean {
+  // Escape hatch
+  if (process.env.SKIP_TEST_FIXTURES) {
+    return false;
+  }
+
+  return isFixtureRuntime();
+}
 
 export type RepoData = {
   id?: number;
@@ -42,31 +55,17 @@ export type PortfolioReposResponse = {
   normal: RepoData[]
 };
 
-const isMockGithubData = isMockBlogStore;
-
-function cloneRepo(repo: RepoData, overrides: Partial<RepoData> = {}): RepoData {
-  return {
-    ...repo,
-    ...overrides,
-    owner: overrides.owner
-      ? { ...overrides.owner }
-      : repo.owner
-        ? { ...repo.owner }
-        : undefined,
-    tags: overrides.tags ?? (repo.tags ? [...repo.tags] : undefined),
-    languagePercentages:
-      overrides.languagePercentages ??
-      (repo.languagePercentages ? repo.languagePercentages.map((lang) => ({ ...lang })) : undefined),
-  };
-}
+// Removed cloneRepo function - no longer needed since we don't return mock data
 
 export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
-  if (isMockGithubData) {
+  // Return fixtures for test builds (SSR during CI test runs)
+  if (shouldUseSSRFixtures()) {
     return {
-      starred: [cloneRepo(TEST_REPO)],
+      starred: [TEST_REPO],
       normal: [],
     };
   }
+
   const token = await resolveGitHubToken();
   if (!token) {
     throw new Error('GitHub token is not configured');
@@ -92,10 +91,6 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
       username: GH_CONFIG.USERNAME,
       per_page: 100,
     });
-
-    const portfolioRepoMap = new Map<string, PortfolioRepoConfig>(
-      portfolioConfig.repositories.map((r) => [r.name, r])
-    );
 
     const publicRepoMap = new Map(repos.data.map((r) => [r.name, r]));
 
@@ -171,12 +166,11 @@ export const getPortfolioRepos = unstable_cache(
 );
 
 export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.USERNAME): Promise<RepoData> {
-  if (isMockGithubData) {
-    return cloneRepo(TEST_REPO, {
-      name: repo,
-      owner: { login: owner },
-    });
+  // Return fixtures for test builds
+  if (shouldUseSSRFixtures()) {
+    return { ...TEST_REPO, name: repo, owner: { login: owner } };
   }
+
   const token = await resolveGitHubToken();
   if (!token) throw new Error('GitHub token is not configured');
   const octokit = createOctokit(token);
@@ -255,9 +249,11 @@ export const getRepoDetails = unstable_cache(
 );
 
 export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.USERNAME): Promise<string> {
-  if (isMockGithubData) {
+  // Return fixtures for test builds
+  if (shouldUseSSRFixtures()) {
     return TEST_README;
   }
+
   const token = await resolveGitHubToken();
   if (!token) throw new Error('GitHub token is not configured');
   const octokit = createOctokit(token);
@@ -397,12 +393,14 @@ export async function fetchDocumentContent(
   docPath: string,
   owner: string = GH_CONFIG.USERNAME
 ): Promise<{ content: string; projectName: string }> {
-  if (isMockGithubData) {
+  // Return fixtures for test builds
+  if (shouldUseSSRFixtures()) {
     return {
       content: TEST_DOC_CONTENT,
       projectName: repo,
     };
   }
+
   const token = await resolveGitHubToken();
   if (!token) throw new Error('GitHub token is not configured');
   const octokit = createOctokit(token);

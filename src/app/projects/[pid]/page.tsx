@@ -4,12 +4,9 @@ import { augmentRepoWithKnowledge } from '@/server/project-knowledge';
 import type { Metadata } from 'next';
 
 type ProjectParams = { pid: string };
+type PageContext = { params: Promise<ProjectParams> };
 
-export async function generateMetadata({
-  params,
-}: {
-  params: ProjectParams | Promise<ProjectParams>;
-}): Promise<Metadata> {
+export async function generateMetadata({ params }: PageContext): Promise<Metadata> {
   const { pid } = await params;
   const repoInfo = await getRepoDetails(pid);
 
@@ -33,11 +30,7 @@ export async function generateStaticParams() {
   }));
 }
 
-export default async function ProjectDetail({
-  params,
-}: {
-  params: ProjectParams | Promise<ProjectParams>;
-}) {
+export default async function ProjectDetail({ params }: PageContext) {
   const { pid } = await params;
   const [repoInfo, readme] = await Promise.all([getRepoDetails(pid), getRepoReadme(pid)]);
 

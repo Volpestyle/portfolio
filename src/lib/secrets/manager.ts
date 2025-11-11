@@ -330,6 +330,5 @@ export const secretsManagerCache = {
 };
 
 declare global {
-  // eslint-disable-next-line no-var
   var __portfolioSecretsCaches: Record<string, SecretsManagerCache> | undefined;
 }

@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { deletePost } from '@/server/blog/actions';
 
-type RouteContext = { params: { slug: string } };
+type RouteContext = { params: Promise<{ slug: string }> };
 
 export async function POST(_req: Request, context: RouteContext) {
   try {
-    const { slug } = context.params;
+    const { slug } = await context.params;
     await deletePost({ slug });
     return NextResponse.json({ success: true });
   } catch (error) {

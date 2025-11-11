@@ -93,6 +93,7 @@ export interface PortfolioStackProps extends StackProps {
   environment?: Record<string, string>;
   appDirectory?: string;
   openNextPath?: string;
+  validationMode?: boolean;
 }
 
 export class PortfolioStack extends Stack {
@@ -120,6 +121,7 @@ export class PortfolioStack extends Stack {
   private readonly blogSchedulerRole: iam.Role;
   private readonly alternateDomains: string[] = [];
   private readonly primaryDomainName?: string;
+  private readonly validationMode: boolean;
 
   constructor(scope: Construct, id: string, props: PortfolioStackProps = {}) {
     super(scope, id, props);
@@ -132,8 +134,10 @@ export class PortfolioStack extends Stack {
       environment = {},
       appDirectory = path.resolve(process.cwd(), '..', '..'),
       openNextPath,
+      validationMode = false,
     } = props;
 
+    this.validationMode = validationMode;
     this.primaryDomainName = domainName;
     this.alternateDomains = alternateDomainNames;
 
@@ -278,8 +282,12 @@ export class PortfolioStack extends Stack {
     });
 
     const edgeFunction = serverEdgeFunction.lambda as lambda.Function;
-    edgeFunction.addEnvironment('CLOUDFRONT_DISTRIBUTION_ID', distribution.distributionId);
-    this.attachCloudFrontInvalidationPermission(serverEdgeFunction, distribution);
+    edgeFunction.addEnvironment('CLOUDFRONT_DISTRIBUTION_ID', distribution.distributionId, {
+      removeInEdge: true,
+    });
+    if (!this.validationMode) {
+      this.attachCloudFrontInvalidationPermission(serverEdgeFunction);
+    }
 
     this.deployStaticAssets(this.openNextOutput.origins.s3, distribution);
 
@@ -318,6 +326,8 @@ export class PortfolioStack extends Stack {
       NODE_ENV: 'production',
       ...environment,
     };
+    delete env['BLOG_TEST_FIXTURES'];
+    delete env['PORTFOLIO_TEST_FIXTURES'];
 
     if (!env['AWS_SECRETS_MANAGER_PRIMARY_REGION'] && env['AWS_REGION']) {
       env['AWS_SECRETS_MANAGER_PRIMARY_REGION'] = env['AWS_REGION'];
@@ -479,7 +489,7 @@ export class PortfolioStack extends Stack {
       throw new Error('REVALIDATE_SECRET is required to enable blog publishing.');
     }
 
-    const assetPath = path.resolve(__dirname, '..', '..', 'functions', 'blog-publisher');
+    const assetPath = path.resolve(__dirname, '..', 'functions', 'blog-publisher');
     if (!fs.existsSync(assetPath)) {
       throw new Error(`Blog publisher function assets missing at ${assetPath}`);
     }
@@ -611,6 +621,14 @@ export class PortfolioStack extends Stack {
 
     if (!env['AWS_SECRETS_MANAGER_PRIMARY_REGION']) {
       env['AWS_SECRETS_MANAGER_PRIMARY_REGION'] = region;
+    }
+
+    if (!env['NEXTAUTH_URL']) {
+      const siteUrl =
+        env['NEXT_PUBLIC_SITE_URL'] ?? (this.primaryDomainName ? `https://${this.primaryDomainName}` : undefined);
+      if (siteUrl) {
+        env['NEXTAUTH_URL'] = siteUrl.replace(/\/$/, '');
+      }
     }
 
     return env;
@@ -861,9 +879,10 @@ export class PortfolioStack extends Stack {
         'next-router-prefetch',
         'next-router-state-tree',
         'next-url',
-        'x-prerender-revalidate'
+        'x-prerender-revalidate',
+        'x-portfolio-test-mode'
       ),
-      cookieBehavior: cloudfront.CacheCookieBehavior.none(),
+      cookieBehavior: cloudfront.CacheCookieBehavior.all(),
       enableAcceptEncodingGzip: true,
       enableAcceptEncodingBrotli: true,
     });
@@ -1108,14 +1127,26 @@ export class PortfolioStack extends Stack {
 
   private attachCloudFrontInvalidationPermission(
     fn: cloudfrontExperimental.EdgeFunction,
-    distribution: cloudfront.Distribution
   ) {
+    const stack = Stack.of(this);
+    const distributionArn = stack.formatArn({
+      service: 'cloudfront',
+      region: '',
+      account: stack.account,
+      resource: 'distribution',
+      resourceName: '*',
+    });
+
     fn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['cloudfront:CreateInvalidation'],
-        resources: [
-          `arn:aws:cloudfront::${Stack.of(this).account}:distribution/${distribution.distributionId}`,
-        ],
+        resources: [distributionArn],
+        conditions: {
+          StringEquals: {
+            'aws:ResourceTag/aws:cloudformation:stack-id': Stack.of(this).stackId,
+            'aws:ResourceTag/aws:cloudformation:stack-name': Stack.of(this).stackName,
+          },
+        },
       })
     );
   }
@@ -1218,6 +1249,14 @@ export class PortfolioStack extends Stack {
       'SCHEDULER_ROLE_ARN',
       'CLOUDFRONT_DISTRIBUTION_ID',
       'REVALIDATE_SECRET',
+      'NEXTAUTH_URL',
+      'NEXTAUTH_SECRET',
+      'GH_CLIENT_ID',
+      'GH_CLIENT_SECRET',
+      'GOOGLE_CLIENT_ID',
+      'GOOGLE_CLIENT_SECRET',
+      'ADMIN_EMAILS',
+      'PORTFOLIO_GIST_ID',
     ];
     const configuredKeys = splitList(this.runtimeEnvironment['EDGE_RUNTIME_ENV_KEYS']);
     const explicitKeys = new Set<string>([...defaultExplicitKeys, ...configuredKeys]);
@@ -1258,7 +1297,7 @@ export class PortfolioStack extends Stack {
     for (let start = 0; start < entries.length; start += chunkSize) {
       const chunkEntries = entries.slice(start, start + chunkSize);
       const templateParts: string[] = ['{'];
-      const substitutions: Record<string, any> = {};
+      const substitutions: Record<string, string> = {};
 
       chunkEntries.forEach(([key, value], index) => {
         const placeholder = `v${index}`;
@@ -1426,6 +1465,7 @@ function applyRuntimeConfig(config) {
   if (!config) {
     return;
   }
+
   for (const [key, value] of Object.entries(config)) {
     if (typeof value === 'string' && process.env[key] === undefined) {
       process.env[key] = value;

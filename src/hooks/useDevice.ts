@@ -20,11 +20,10 @@ export function useDevice(): DeviceInfo {
   useEffect(() => {
     const updateDeviceInfo = () => {
       // Check for touch capability
+      const legacyTouchPoints =
+        (navigator as Navigator & { msMaxTouchPoints?: number }).msMaxTouchPoints ?? 0;
       const isTouch =
-        'ontouchstart' in window ||
-        navigator.maxTouchPoints > 0 ||
-        // @ts-ignore
-        navigator.msMaxTouchPoints > 0;
+        'ontouchstart' in window || navigator.maxTouchPoints > 0 || legacyTouchPoints > 0;
 
       // Screen width breakpoints (you can adjust these)
       const mobileBreakpoint = 768;
