@@ -8,11 +8,11 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 
 type PageContext = {
-  params: Promise<{ slug: string }>;
+  params: { slug: string };
 };
 
 export async function generateMetadata({ params }: PageContext): Promise<Metadata> {
-  const { slug } = await params;
+  const { slug } = params;
   const post = await getPostWithContent(slug).catch(() => null);
 
   if (!post) {
@@ -46,7 +46,7 @@ export async function generateStaticParams() {
 }
 
 export default async function BlogPostPage({ params }: PageContext) {
-  const { slug } = await params;
+  const { slug } = params;
   const { isEnabled } = await draftMode();
   const postRecord = await getPostWithContent(slug, { includeDraft: isEnabled });
 
