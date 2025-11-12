@@ -91,7 +91,6 @@ function validateStack() {
     openNextPath,
     environment: {
       NEXT_PUBLIC_SITE_URL: requireEnv('NEXT_PUBLIC_SITE_URL'),
-      REVALIDATE_SECRET: requireEnv('REVALIDATE_SECRET'),
     },
     validationMode: true,
   });

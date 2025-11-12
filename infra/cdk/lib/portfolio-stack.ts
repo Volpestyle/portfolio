@@ -484,15 +484,18 @@ export class PortfolioStack extends Stack {
   }
 
   private createBlogPublishFunction(): lambda.Function {
-    const revalidateSecret = this.runtimeEnvironment['REVALIDATE_SECRET'];
-    if (!revalidateSecret) {
-      throw new Error('REVALIDATE_SECRET is required to enable blog publishing.');
-    }
-
     const assetPath = path.resolve(__dirname, '..', 'functions', 'blog-publisher');
     if (!fs.existsSync(assetPath)) {
       throw new Error(`Blog publisher function assets missing at ${assetPath}`);
     }
+
+    const secretEnv = this.pickRuntimeEnv(this.runtimeEnvironment, [
+      'SECRETS_MANAGER_ENV_SECRET_ID',
+      'SECRETS_MANAGER_REPO_SECRET_ID',
+      'AWS_SECRETS_MANAGER_PRIMARY_REGION',
+      'AWS_SECRETS_MANAGER_FALLBACK_REGION',
+    ]);
+    const legacySecret = this.runtimeEnvironment['REVALIDATE_SECRET'];
 
     const fn = new lambda.Function(this, 'BlogPublishFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -504,11 +507,13 @@ export class PortfolioStack extends Stack {
       environment: {
         POSTS_TABLE: this.postsTable.tableName,
         REVALIDATE_ENDPOINT: `${this.resolveSiteUrl()}/api/revalidate`,
-        REVALIDATE_SECRET: revalidateSecret,
+        ...(legacySecret ? { REVALIDATE_SECRET: legacySecret } : {}),
+        ...secretEnv,
       },
     });
 
     this.postsTable.grantReadWriteData(fn);
+    this.grantSecretAccess(fn);
     return fn;
   }
 
@@ -882,7 +887,7 @@ export class PortfolioStack extends Stack {
         'x-prerender-revalidate',
         'x-portfolio-test-mode'
       ),
-      cookieBehavior: cloudfront.CacheCookieBehavior.all(),
+      cookieBehavior: cloudfront.CacheCookieBehavior.none(),
       enableAcceptEncodingGzip: true,
       enableAcceptEncodingBrotli: true,
     });
@@ -1248,13 +1253,9 @@ export class PortfolioStack extends Stack {
       'BLOG_PUBLISH_FUNCTION_ARN',
       'SCHEDULER_ROLE_ARN',
       'CLOUDFRONT_DISTRIBUTION_ID',
-      'REVALIDATE_SECRET',
       'NEXTAUTH_URL',
-      'NEXTAUTH_SECRET',
       'GH_CLIENT_ID',
-      'GH_CLIENT_SECRET',
       'GOOGLE_CLIENT_ID',
-      'GOOGLE_CLIENT_SECRET',
       'ADMIN_EMAILS',
       'PORTFOLIO_GIST_ID',
     ];
@@ -1271,6 +1272,10 @@ export class PortfolioStack extends Stack {
       'AWS_SECRETS_MANAGER_FALLBACK_REGION',
       'OPENAI_API_KEY',
       'GH_TOKEN',
+      'REVALIDATE_SECRET',
+      'NEXTAUTH_SECRET',
+      'GH_CLIENT_SECRET',
+      'GOOGLE_CLIENT_SECRET',
       'DATABASE_URL',
       'API_KEY',
     ]);
