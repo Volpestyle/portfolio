@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { auth } from '@/auth';
 import { isAdminEmail } from '@/lib/auth/allowlist';
 import { hasAdminBypass } from '@/lib/test-mode';
 
-export async function middleware(req: NextRequest) {
+export default auth((req) => {
   if (!req.nextUrl.pathname.startsWith('/admin')) {
     return NextResponse.next();
   }
@@ -13,13 +12,15 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  if (!token?.email || !isAdminEmail(String(token.email))) {
-    return NextResponse.redirect(new URL('/api/auth/signin', req.url));
+  const email = req.auth?.user?.email;
+  if (!email || !isAdminEmail(email)) {
+    const url = new URL('/api/auth/signin', req.url);
+    url.searchParams.set('callbackUrl', req.nextUrl.href);
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: ['/admin/:path*'],
