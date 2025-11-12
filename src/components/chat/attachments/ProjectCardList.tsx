@@ -7,9 +7,14 @@ import { ProjectInlineDetails } from './ProjectInlineDetails';
 import { useRepoReadme } from '@/hooks/useRepoReadme';
 import { useProjectListCache } from '@/hooks/useProjectListCache';
 
+interface ExpandedRepoData {
+  readme: string;
+  isLoading: boolean;
+}
+
 export function ProjectCardList({ repos }: { repos: RepoData[] }) {
-  const [expandedRepo, setExpandedRepo] = useState<{ repo: RepoData; readme: string } | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  // Track expanded state per repo by repo name
+  const [expandedRepos, setExpandedRepos] = useState<Map<string, ExpandedRepoData>>(new Map());
   const { getCachedReadme, ensureReadme } = useRepoReadme();
   const { seedProjectList } = useProjectListCache();
 
@@ -25,24 +30,50 @@ export function ProjectCardList({ repos }: { repos: RepoData[] }) {
         return;
       }
 
-      const cachedReadme = getCachedReadme(owner, repo.name);
-      if (cachedReadme) {
-        setExpandedRepo({ repo, readme: cachedReadme });
+      // Check if already expanded
+      if (expandedRepos.has(repo.name)) {
+        // Collapse it
+        setExpandedRepos((prev) => {
+          const next = new Map(prev);
+          next.delete(repo.name);
+          return next;
+        });
         return;
       }
 
-      setIsLoading(true);
+      // Check cache first
+      const cachedReadme = getCachedReadme(owner, repo.name);
+      if (cachedReadme) {
+        setExpandedRepos((prev) => new Map(prev).set(repo.name, { readme: cachedReadme, isLoading: false }));
+        return;
+      }
+
+      // Set loading state
+      setExpandedRepos((prev) => new Map(prev).set(repo.name, { readme: '', isLoading: true }));
+
       try {
         const readme = await ensureReadme(owner, repo.name);
-        setExpandedRepo({ repo, readme });
+        setExpandedRepos((prev) => new Map(prev).set(repo.name, { readme, isLoading: false }));
       } catch (error) {
         console.error('Error fetching README:', error);
-      } finally {
-        setIsLoading(false);
+        // Remove from expanded on error
+        setExpandedRepos((prev) => {
+          const next = new Map(prev);
+          next.delete(repo.name);
+          return next;
+        });
       }
     },
-    [ensureReadme, getCachedReadme]
+    [ensureReadme, getCachedReadme, expandedRepos]
   );
+
+  const handleCollapseRepo = useCallback((repoName: string) => {
+    setExpandedRepos((prev) => {
+      const next = new Map(prev);
+      next.delete(repoName);
+      return next;
+    });
+  }, []);
 
   if (!repos.length) {
     return (
@@ -52,32 +83,41 @@ export function ProjectCardList({ repos }: { repos: RepoData[] }) {
     );
   }
 
-  // If a repo is expanded, show the inline details
-  if (expandedRepo) {
-    return (
-      <ProjectInlineDetails
-        repo={expandedRepo.repo}
-        readme={expandedRepo.readme}
-        breadcrumbsOverride={[
-          { label: 'Projects', onClick: () => setExpandedRepo(null) },
-          { label: expandedRepo.repo.name },
-        ]}
-      />
-    );
-  }
-
-  // Otherwise show the card list
   return (
     <div className="mt-3 space-y-3">
-      {isLoading ? (
-        <div className="flex items-center justify-center rounded-2xl border border-white/10 bg-black/10 py-8 backdrop-blur-sm">
-          <div className="animate-pulse text-sm text-white/60">Loading project...</div>
-        </div>
-      ) : (
-        repos.map((repo) => (
-          <ProjectCard key={repo.name} repo={repo} variant="chat" onOpen={() => handleOpenRepo(repo)} />
-        ))
-      )}
+      {repos.map((repo) => {
+        const expandedData = expandedRepos.get(repo.name);
+        const isExpanded = expandedData !== undefined;
+
+        return (
+          <div key={repo.name}>
+            {/* Show the card */}
+            {!isExpanded && (
+              <ProjectCard key={repo.name} repo={repo} variant="chat" onOpen={() => handleOpenRepo(repo)} />
+            )}
+
+            {/* Show the expanded details if this repo is expanded */}
+            {isExpanded && (
+              <>
+                {expandedData.isLoading ? (
+                  <div className="flex items-center justify-center rounded-2xl border border-white/10 bg-black/10 py-8 backdrop-blur-sm">
+                    <div className="animate-pulse text-sm text-white/60">Loading project...</div>
+                  </div>
+                ) : (
+                  <ProjectInlineDetails
+                    repo={repo}
+                    readme={expandedData.readme}
+                    breadcrumbsOverride={[
+                      { label: 'Projects', onClick: () => handleCollapseRepo(repo.name) },
+                      { label: repo.name },
+                    ]}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

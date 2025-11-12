@@ -20,14 +20,14 @@ interface MarkdownProps {
   content: string;
   variant?: MarkdownVariant;
   className?: string;
-  
+
   // Streaming cursor support
   showCursor?: boolean;
-  
+
   // Image handling
   imageRenderer?: ImageRenderer;
   onImageClick?: (src: string) => void;
-  
+
   // Link handling (for project docs)
   pid?: string;
   onDocLinkClick?: (path: string, label?: string) => void;
@@ -44,23 +44,23 @@ export function Markdown({
   onDocLinkClick,
 }: MarkdownProps) {
   const isCompact = variant === 'compact';
-  
+
   // Cursor tracking state (for streaming)
   const [elementCounts, setElementCounts] = useState<Map<string, number>>(new Map());
   const currentElementIndexRef = useRef(0);
-  
+
   const totalElements = elementCounts.get(content) ?? -1;
   const isCountingPass = totalElements === -1;
-  
+
   // Reset counter at start of render
   currentElementIndexRef.current = 0;
-  
-  const cursorElement = useMemo(() => <span className="ml-1 animate-blink">▋</span>, []);
-  
+
+  const cursorElement = useMemo(() => <span className="animate-blink ml-1">▋</span>, []);
+
   const trackBlockElement = () => {
     return currentElementIndexRef.current++;
   };
-  
+
   const shouldShowCursor = useCallback(
     (index: number) => {
       if (!showCursor || isCountingPass) return false;
@@ -68,7 +68,7 @@ export function Markdown({
     },
     [showCursor, isCountingPass, totalElements]
   );
-  
+
   const components = useMemo<Components>(() => {
     const baseComponents: Components = {
       h1: ({ children, ...props }) => {
@@ -89,13 +89,7 @@ export function Markdown({
       h2: ({ children, ...props }) => {
         const index = trackBlockElement();
         return (
-          <h2
-            className={cn(
-              'font-bold text-white',
-              isCompact ? 'mb-2 mt-4 text-xl' : 'mb-4 mt-8 text-3xl'
-            )}
-            {...props}
-          >
+          <h2 className={cn('font-bold text-white', isCompact ? 'mb-2 mt-4 text-xl' : 'mb-4 mt-8 text-3xl')} {...props}>
             {children}
             {shouldShowCursor(index) && cursorElement}
           </h2>
@@ -105,10 +99,7 @@ export function Markdown({
         const index = trackBlockElement();
         return (
           <h3
-            className={cn(
-              'font-semibold text-white',
-              isCompact ? 'mb-2 mt-3 text-lg' : 'mb-3 mt-6 text-2xl'
-            )}
+            className={cn('font-semibold text-white', isCompact ? 'mb-2 mt-3 text-lg' : 'mb-3 mt-6 text-2xl')}
             {...props}
           >
             {children}
@@ -120,10 +111,7 @@ export function Markdown({
         const index = trackBlockElement();
         return (
           <h4
-            className={cn(
-              'font-semibold text-white',
-              isCompact ? 'mb-1 mt-2 text-base' : 'mb-2 mt-4 text-xl'
-            )}
+            className={cn('font-semibold text-white', isCompact ? 'mb-1 mt-2 text-base' : 'mb-2 mt-4 text-xl')}
             {...props}
           >
             {children}
@@ -135,10 +123,7 @@ export function Markdown({
         const index = trackBlockElement();
         return (
           <h5
-            className={cn(
-              'font-semibold text-white',
-              isCompact ? 'mb-1 mt-2 text-sm' : 'mb-2 mt-3 text-lg'
-            )}
+            className={cn('font-semibold text-white', isCompact ? 'mb-1 mt-2 text-sm' : 'mb-2 mt-3 text-lg')}
             {...props}
           >
             {children}
@@ -150,10 +135,7 @@ export function Markdown({
         const index = trackBlockElement();
         return (
           <h6
-            className={cn(
-              'font-semibold text-white',
-              isCompact ? 'mb-1 mt-2 text-xs' : 'mb-2 mt-3 text-base'
-            )}
+            className={cn('font-semibold text-white', isCompact ? 'mb-1 mt-2 text-xs' : 'mb-2 mt-3 text-base')}
             {...props}
           >
             {children}
@@ -164,8 +146,7 @@ export function Markdown({
       p: ({ children, node, ...props }) => {
         const index = trackBlockElement();
         const childNodes = getChildNodes(node);
-        const containsOnlyImageAndText =
-          childNodes.length > 0 && childNodes.every(isImageOrWhitespaceTextNode);
+        const containsOnlyImageAndText = childNodes.length > 0 && childNodes.every(isImageOrWhitespaceTextNode);
 
         if (containsOnlyImageAndText) {
           return (
@@ -187,10 +168,7 @@ export function Markdown({
         }
 
         return (
-          <p
-            className={cn('leading-relaxed text-gray-300', isCompact ? 'mb-2' : 'mb-4')}
-            {...props}
-          >
+          <p className={cn('leading-relaxed text-gray-300', isCompact ? 'mb-2' : 'mb-4')} {...props}>
             {children}
             {shouldShowCursor(index) && cursorElement}
           </p>
@@ -200,7 +178,7 @@ export function Markdown({
         // Handle doc links for projects
         if (href && pid && isDocsLink(href)) {
           const cleanPath = normalizeDocPath(href);
-          
+
           if (onDocLinkClick) {
             return (
               <a
@@ -215,7 +193,7 @@ export function Markdown({
               </a>
             );
           }
-          
+
           return (
             <Link
               href={`/projects/${pid}/doc/${cleanPath}`}
@@ -225,7 +203,7 @@ export function Markdown({
             </Link>
           );
         }
-        
+
         // External links
         return (
           <a
@@ -240,40 +218,34 @@ export function Markdown({
         );
       },
       ul: ({ children, ...props }) => {
-        const index = trackBlockElement();
         return (
           <ul
-            className={cn(
-              'list-disc text-gray-300',
-              isCompact ? 'mb-2 ml-5 space-y-1' : 'mb-4 ml-6 space-y-2'
-            )}
+            className={cn('list-disc text-gray-300', isCompact ? 'mb-2 ml-5 space-y-1' : 'mb-4 ml-6 space-y-2')}
             {...props}
           >
             {children}
-            {shouldShowCursor(index) && cursorElement}
           </ul>
         );
       },
       ol: ({ children, ...props }) => {
-        const index = trackBlockElement();
         return (
           <ol
-            className={cn(
-              'list-decimal text-gray-300',
-              isCompact ? 'mb-2 ml-5 space-y-1' : 'mb-4 ml-6 space-y-2'
-            )}
+            className={cn('list-decimal text-gray-300', isCompact ? 'mb-2 ml-5 space-y-1' : 'mb-4 ml-6 space-y-2')}
             {...props}
           >
             {children}
-            {shouldShowCursor(index) && cursorElement}
           </ol>
         );
       },
-      li: ({ children, ...props }) => (
-        <li className="leading-relaxed" {...props}>
-          {children}
-        </li>
-      ),
+      li: ({ children, ...props }) => {
+        const index = trackBlockElement();
+        return (
+          <li className="leading-relaxed" {...props}>
+            {children}
+            {shouldShowCursor(index) && cursorElement}
+          </li>
+        );
+      },
       blockquote: ({ children, ...props }) => {
         const index = trackBlockElement();
         return (
@@ -308,7 +280,7 @@ export function Markdown({
             </code>
           );
         }
-        
+
         const index = trackBlockElement();
         return (
           <code className={cn('font-mono text-sm', className)} {...props}>
@@ -330,20 +302,15 @@ export function Markdown({
       ),
       img: ({ src, alt, ...props }) => {
         if (!src) return null;
-        
+
         if (imageRenderer === 'server') {
           return (
             <span className="inline-block">
-              <ServerImageRenderer
-                src={src}
-                alt={alt || ''}
-                onImageClick={onImageClick}
-                {...props}
-              />
+              <ServerImageRenderer src={src} alt={alt || ''} onImageClick={onImageClick} {...props} />
             </span>
           );
         }
-        
+
         // Next.js Image
         return (
           <span className={cn('block', isCompact ? 'my-4' : 'my-6')}>
@@ -376,10 +343,7 @@ export function Markdown({
         </div>
       ),
       th: ({ children, ...props }) => (
-        <th
-          className="border border-white/20 bg-white/10 px-4 py-2 text-left font-semibold text-white"
-          {...props}
-        >
+        <th className="border border-white/20 bg-white/10 px-4 py-2 text-left font-semibold text-white" {...props}>
           {children}
         </th>
       ),
@@ -399,10 +363,10 @@ export function Markdown({
         </em>
       ),
     };
-    
+
     return baseComponents;
   }, [isCompact, pid, onDocLinkClick, onImageClick, imageRenderer, cursorElement, shouldShowCursor]);
-  
+
   // Store element count after counting pass
   useLayoutEffect(() => {
     if (isCountingPass && currentElementIndexRef.current > 0) {
@@ -420,19 +384,15 @@ export function Markdown({
       });
     }
   }, [content, isCountingPass]);
-  
+
   if (!content?.trim()) {
     return null;
   }
-  
+
   return (
-    <div className={cn('max-w-none text-base text-gray-200 leading-relaxed [&>*:first-child]:mt-0', className)}>
+    <div className={cn('max-w-none text-base leading-relaxed text-gray-200 [&>*:first-child]:mt-0', className)}>
       <ReactMarkdown
-        rehypePlugins={[
-          rehypeRaw,
-          [rehypeSanitize, markdownSanitizeSchema],
-          rehypeHighlight,
-        ]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, markdownSanitizeSchema], rehypeHighlight]}
         components={components}
       >
         {content}

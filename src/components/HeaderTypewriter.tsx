@@ -56,7 +56,7 @@ export function HeaderTypewriter({ hoverText }: HeaderTypewriterProps) {
 
   return (
     <motion.div
-      className="font-mono text-2xl font-semibold text-white"
+      className="font-mono text-lg font-semibold text-white [@media(min-width:440px)]:text-2xl"
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       animate={{
@@ -68,7 +68,7 @@ export function HeaderTypewriter({ hoverText }: HeaderTypewriterProps) {
       }}
     >
       {displayText}
-      {displayText !== targetText && <span className="ml-1 animate-blink">▋</span>}
+      {displayText !== targetText && <span className="animate-blink ml-1">▋</span>}
     </motion.div>
   );
 }

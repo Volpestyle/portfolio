@@ -4,5 +4,5 @@ export const GH_CONFIG = {
 } as const;
 
 export const RESUME_CONFIG = {
-  RESUME_FILENAME: 'jcv-resume-2025.pdf',
+  RESUME_FILENAME: 'jcvolpe-resume.pdf',
 };

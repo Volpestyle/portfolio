@@ -19,7 +19,7 @@ const ResumeModal: React.FC<ResumeModalProps> = ({ isOpen, onClose }) => {
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="flex h-full max-h-[90vh] w-full max-w-6xl flex-col rounded-lg border border-white p-4">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-white">My Resume</h2>
+            <h2 className="text-2xl font-bold text-white">my resume</h2>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button
                 onClick={onClose}
