@@ -1,6 +1,6 @@
-import { getDoc, getReadme, listProjects, searchProjects } from './github-tools';
+import { findProjects, getDoc, getReadme } from './github-tools';
 
-type FunctionTool = {
+export type FunctionTool = {
   type: 'function';
   name: string;
   description: string;
@@ -13,103 +13,67 @@ type FunctionTool = {
   strict: boolean;
 };
 
-export const tools: FunctionTool[] = [
-  {
-    type: 'function',
-    name: 'listProjects',
-    description:
-      "List James's projects/repositories. PRIMARY TOOL for showing projects. Use filters to group by language (e.g., 'TypeScript', 'Python') or topic/subject (e.g., 'ai', 'web', 'data', 'fullstack'). Combine filters to narrow results. CRITICAL: When user asks for ONE specific project by name, ALWAYS set limit=1. For general browsing, use 3-5. Sort by 'recent' for latest work, 'starred' for highlights, or 'alphabetical'. Returns project cards that display inline in the chat.",
-    parameters: {
-      type: 'object',
-      properties: {
-        filters: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              field: { type: 'string', enum: ['language', 'topic'] },
-              value: { type: 'string' },
-            },
-            required: ['field', 'value'],
-            additionalProperties: false,
+export async function buildTools(): Promise<FunctionTool[]> {
+  return [
+    {
+      type: 'function',
+      name: 'findProjects',
+      description:
+        "Intelligent project search using AI-powered filtering. Describe what you're looking for in natural language (e.g., 'TypeScript AWS apps', 'AI research tools', 'Rust projects'). The tool uses semantic search + LLM re-ranking to filter false positives and return only genuinely matching projects. Use limit=1 for a single highlight and 3–5 for overviews. If nothing matches, expect an empty list and explain that to the user.",
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description:
+              'Natural language search query. The tool intelligently matches projects and filters out false positives (e.g., "Rust" will not match "Rubiks").',
           },
-          description:
-            "Filter projects by 'language' (programming language) or 'topic' (domain/category). Can use multiple filters.",
+          limit: {
+            type: 'integer',
+            minimum: 1,
+            maximum: 10,
+            description: 'Maximum number of projects to return.',
+            default: 5,
+          },
         },
-        limit: {
-          type: 'integer',
-          minimum: 1,
-          maximum: 20,
-          description: 'Maximum number of projects to return. Use 1 for single project, 3-5 for focused lists.',
-        },
-        sort: {
-          type: 'string',
-          enum: ['recent', 'alphabetical', 'starred'],
-          description:
-            "Sort order: 'recent' for latest updates, 'starred' for highlighted projects, 'alphabetical' for A-Z.",
-        },
+        required: ['query', 'limit'],
+        additionalProperties: false,
       },
-      required: [],
-      additionalProperties: false,
+      strict: true,
     },
-    strict: false,
-  },
-  {
-    type: 'function',
-    name: 'searchProjects',
-    description:
-      'Semantic project lookup. Use when a user asks for themes (e.g., "AWS work", "AED sheets", "data pipelines") or specific project names (e.g., "improview", "ilikeyacut"). CRITICAL: When user asks for ONE specific project, ALWAYS set limit=1. For thematic searches, use 3-5. Returns the most relevant project cards ranked by similarity.',
-    parameters: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Free-form text describing what to look for (technologies, domains, questions).',
+    {
+      type: 'function',
+      name: 'getReadme',
+      description:
+        'Fetch and display the README for a specific repository. Only call when the user explicitly asks to read/open a README.',
+      parameters: {
+        type: 'object',
+        properties: {
+          repo: { type: 'string', description: 'Repository name to fetch the README for.' },
         },
-        limit: {
-          type: 'integer',
-          minimum: 1,
-          maximum: 10,
-          description: 'How many semantic matches to return (defaults to 5).',
+        required: ['repo'],
+        additionalProperties: false,
+      },
+      strict: true,
+    },
+    {
+      type: 'function',
+      name: 'getDoc',
+      description:
+        'Load a specific markdown document from a repository (e.g., docs/architecture.md). Only call when the user names the document.',
+      parameters: {
+        type: 'object',
+        properties: {
+          repo: { type: 'string', description: 'Repository name.' },
+          path: { type: 'string', description: 'Document path inside the repository.' },
         },
+        required: ['repo', 'path'],
+        additionalProperties: false,
       },
-      required: ['query'],
-      additionalProperties: false,
+      strict: true,
     },
-    strict: false,
-  },
-  {
-    type: 'function',
-    name: 'getReadme',
-    description:
-      'Fetch and display full README content for a specific repository. ONLY use when user explicitly asks to see/open/read a README (e.g., "show me the README for X", "open X\'s README"). Returns inline project details with the full README rendered.',
-    parameters: {
-      type: 'object',
-      properties: {
-        repo: { type: 'string', description: 'Repository name to fetch README for' },
-      },
-      required: ['repo'],
-      additionalProperties: false,
-    },
-    strict: true,
-  },
-  {
-    type: 'function',
-    name: 'getDoc',
-    description:
-      'Load a specific markdown document from within a repository (e.g., docs/architecture.md, docs/api.md). ONLY use when user explicitly requests a specific document by name or path. Returns the document content rendered inline.',
-    parameters: {
-      type: 'object',
-      properties: {
-        repo: { type: 'string', description: 'Repository name' },
-        path: { type: 'string', description: 'Path to the document within the repo (e.g., "docs/setup.md")' },
-      },
-      required: ['repo', 'path'],
-      additionalProperties: false,
-    },
-    strict: true,
-  },
-];
+  ];
+}
 
 type ToolCall = {
   name: string;
@@ -120,22 +84,15 @@ export async function toolRouter(call: ToolCall) {
   const args = call.arguments ? JSON.parse(call.arguments) : {};
 
   switch (call.name) {
-    case 'listProjects': {
+    case 'findProjects': {
       const limitArg =
         typeof args?.limit === 'number' && Number.isFinite(args.limit)
-          ? Math.max(1, Math.min(20, Math.floor(args.limit)))
+          ? Math.max(1, Math.min(10, Math.floor(args.limit)))
           : undefined;
-      const primaryRepos = await listProjects(args);
-      let combinedRepos = primaryRepos;
-
-      if (limitArg) {
-        combinedRepos = combinedRepos.slice(0, limitArg);
-      }
-
-      return { type: 'project-cards', repos: combinedRepos } as const;
-    }
-    case 'searchProjects': {
-      const repos = await searchProjects(args);
+      const repos = await findProjects({
+        query: typeof args?.query === 'string' ? args.query : '',
+        limit: limitArg,
+      });
       return { type: 'project-cards', repos } as const;
     }
     case 'getReadme': {

@@ -1,67 +1,58 @@
 import { getAboutMarkdown } from '@/server/content';
-import { getRepos } from '@/lib/github-server';
+
 import repoSummaries from '../../../generated/repo-summaries.json';
-
-type RepoSummaryRecord = {
-  name: string;
-  summary: string;
-  tags?: string[];
-};
-
-const summaryRecords = repoSummaries as RepoSummaryRecord[];
-const summaryMap = new Map(summaryRecords.map((record) => [record.name.toLowerCase(), record]));
 
 export async function buildSystemPrompt() {
   const about = await getAboutMarkdown();
-  const repos = await getRepos();
-
-  const repoInventory = repos
-    .map((repo) => {
-      const language = repo.language ? ` (${repo.language})` : '';
-      const topics = repo.topics?.length ? ` — topics: ${repo.topics.join(', ')}` : '';
-      const enriched = summaryMap.get(repo.name.toLowerCase());
-      const tagLine = enriched?.tags?.length ? ` — tags: ${enriched.tags.join(', ')}` : '';
-      const summaryLine = enriched?.summary ? ` — summary: ${enriched.summary}` : '';
-      return `- ${repo.name}${language}${topics}${tagLine}${summaryLine}`;
-    })
-    .join('\n');
-
-  const summarySection = summaryRecords.length
-    ? summaryRecords
-      .map(
-        (record) =>
-          `### ${record.name}\n${record.summary}\nTags: ${record.tags?.join(', ') || 'n/a'}`
-      )
-      .join('\n\n')
-    : '';
+  const summaries = repoSummaries as Array<{
+    tags?: string[];
+    languages?: Array<{ name: string }>;
+  }>;
+  const langSet = new Set<string>();
+  const topicSet = new Set<string>();
+  for (const rec of summaries) {
+    (rec.languages ?? []).forEach((l) => {
+      const name = (l?.name || '').trim();
+      if (name) langSet.add(name);
+    });
+    (rec.tags ?? []).forEach((t) => {
+      const tag = (t || '').trim();
+      if (tag) topicSet.add(tag);
+    });
+  }
+  const allowedLanguages = Array.from(langSet).sort((a, b) => a.localeCompare(b));
+  const allowedTopics = Array.from(topicSet).sort((a, b) => a.localeCompare(b));
 
   return [
-    'You are "James Volpe" speaking in the first person on a personal portfolio site. Keep responses natural, concise, and conversational.',
+    'You are "James Volpe" on your personal portfolio. Speak in the first person with a relaxed, confident tone.',
     '',
-    '## Tone',
-    'Match the user\'s vibe. If they\'re casual, keep it brief. Don\'t list capabilities or offer menus—just respond naturally.',
-    'Be helpful when asked, but don\'t oversell. Let the conversation flow organically.',
+    '## Voice & Workflow',
+    '- Mirror the user\'s vibe and keep replies conversational. You\'re a helpful assistant whose focus is to answer questions specifically about James Volpe\'s portfolio and experience.',
+    '- You want to guide the user and supply context around your thought process of calling tools, and then the results of the tool calls. But always address the users greeting/question/prompt directly first.',
+    '- For any question about projects, stacks, or experience, ALWAYS call `findProjects` before you answer—even when you expect zero results.',
+    '- If no projects match, say so plainly and suggest adjacent work.',
     '',
     '## Tool Usage',
-    'You always have the most up-to-date project data when you call tools. Even though this prompt includes an overview, you USUALLY should still use the project tools whenever a user asks about projects, but go off what feels natural. You are the helpful assistant/guide for this portfolio. Use the in-prompt context to choose good filters/queries, then fetch project cards to share.',
-    'Start with what you know from our given context, but many times it will be more helpful for the user experience—especially if they might want to click through—call a project tool to attach interactive cards and then layer in your personal context.',
-    'When a user explicitly asks for a technical topic, list, highlights, tour, etc., reach for `listProjects` or `searchProjects`',
-    'For a single project mention, calling the tool with `limit:1` is recommended so the user can explore. If you stay text-only, make it clear you can grab the card on request.',
-    '**Before each tool call, briefly say what you\'re looking up.**',
-    'Never return tool calls alone—always include context/explanation text.',
+    '- `findProjects`: Pass natural language queries. The tool uses AI to filter results, so trust it to find the right matches.',
+    '  - The tool will return a list of interactive projects cards that match the query. The cards will show the name, description, github link, metadata and languages of the projects. Never be redundant be repeating this info in the same turn.',
+    '  - The cards can be clicked into to see full readme and docs for a given project.',
+    '  - The cards returned show all details about a project—don\'t be redundant by repeating too much of it in your responses in the same turn.',
+    '  - No need to reiterate this project info that can be seen in the project cards.',
+    '  - Only use `limit: 1` when the user explicitly wants a single project; otherwise default to 3 (or more for overviews).',
+    '  - The tool intelligently filters false positives (e.g., "Rust" won\'t match "Rubiks"). Do not suggest projects that are not in the list of allowed languages or topics.',
     '',
-    '### Project Tools',
-    '- When using both tools, make sure to limit the number of projects returned to a reasonable number, trying to only include relevant projects. (For example, the user may only ask about one specific project, so you should return a single project card (limit:1))',
-    '- `listProjects`: Show projects by language, topic, or framework. Reach for this when the user names a category ("React stuff", "recent highlights") or you want a curated shortlist. Use specific filters (language:typescript, topic:ai) to stay focused.',
-    '- `searchProjects`: For fuzzy asks like "AWS work" or "robotics stuff"—leverages semantic search over project summaries. Prefer this when the user gives keywords that map poorly to filters, or when you are guessing what they mean.',
-    '- If a `listProjects` call feels too broad, pivot to `searchProjects`, and vice versa.',
-    '### Document Tools',
-    '- `getReadme`: Only when explicitly asked to view/open a specific project\'s README.',
-    '- `getDoc`: Only when explicitly asked for a specific document.',
+    '## Critical Rules',
+    '- Do not suggest things outside of your capabilties that are clearly defined above.',
+    '- You cannot create repos, run builds, or execute commands—offer suggestions the user can run.',
+    '- You cannot do things like "sketch a plan for a new Rust project and add it to the portfolio."',
+    '- If you already wrote a brief preface before calling tools, do NOT write another one after tools. Avoid repeating phrases in the same turn.',
     '',
-    `## About Me\n${about}`,
-    `## Repo Inventory\n${repoInventory}`,
-    summarySection ? `## Project Summaries\n\n${summarySection}` : '',
+    '## Knowledge Base',
+    `- Languages you can claim from portfolio examples: ${allowedLanguages.join(', ') || 'n/a'}.`,
+    `- Topics you can claim from portfolio examples: ${allowedTopics.join(', ') || 'n/a'}.`,
+    '- Only claim experience with technologies in the lists above or those that appear in the attached cards for this reply.',
+    ` - About Me\n${about}`,
+    '',
   ]
     .filter(Boolean)
     .join('\n\n');

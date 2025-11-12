@@ -1,29 +1,9 @@
-import {
-  getRepos,
-  getRepoByName,
-  getReadmeForRepo,
-  getRawDoc,
-  type RepoData,
-} from '@/lib/github-server';
-import {
-  augmentRepoWithKnowledge,
-  getKnowledgeRecords,
-  normalizeSearchTerm,
-  searchRepoKnowledge,
-} from '@/server/project-knowledge';
+import OpenAI from 'openai';
+import { getRepos, getRepoByName, getReadmeForRepo, getRawDoc, type RepoData } from '@/lib/github-server';
+import { augmentRepoWithKnowledge, searchRepoKnowledge } from '@/server/project-knowledge';
+import { resolveSecretValue } from '@/lib/secrets/manager';
 
-type ProjectFilter = {
-  field: 'language' | 'topic';
-  value: string;
-};
-
-type ListProjectsInput = {
-  filters?: ProjectFilter[];
-  limit?: number;
-  sort?: 'recent' | 'alphabetical' | 'starred';
-};
-
-type SearchProjectsInput = {
+type FindProjectsInput = {
   query: string;
   limit?: number;
 };
@@ -37,82 +17,167 @@ type GetDocInput = {
   path: string;
 };
 
-type NavigateInput = {
-  section: 'about' | 'projects' | 'contact';
+const TOOL_LOGGING_DISABLED = process.env.CHAT_TOOL_LOGGING === '0';
+
+let cachedOpenAI: OpenAI | undefined;
+
+async function getOpenAI() {
+  if (!cachedOpenAI) {
+    const apiKey = await resolveSecretValue('OPENAI_API_KEY', { scope: 'repo', required: true });
+    cachedOpenAI = new OpenAI({ apiKey });
+  }
+  return cachedOpenAI;
+}
+
+function logToolEvent(event: string, payload: Record<string, unknown>) {
+  if (TOOL_LOGGING_DISABLED) {
+    return;
+  }
+  console.info(`[chat-tools] ${event}`, payload);
+}
+
+const normalizeName = (input: string) => input.toLowerCase();
+
+type Candidate = {
+  name: string;
+  summary: string;
+  languages: string[];
+  tags: string[];
 };
 
-const STARRED_SCORE_BOOST = 1.1;
+export async function findProjects({ query, limit = 5 }: FindProjectsInput) {
+  const trimmed = typeof query === 'string' ? query.trim() : '';
+  if (!trimmed) {
+    throw new Error('Search query is required');
+  }
 
-type NormalizedFilter = {
-  field: 'language' | 'topic';
-  value: string;
-};
+  const cappedLimit = Math.max(1, Math.min(10, Math.floor(limit ?? 5)));
 
-export async function listProjects({ filters, limit, sort }: ListProjectsInput = {}) {
-  const cappedLimit =
-    typeof limit === 'number' && Number.isFinite(limit) ? Math.min(Math.max(Math.floor(limit), 1), 20) : undefined;
+  // Step 1: Semantic search returns broader set of candidates
+  const candidateLimit = Math.min(cappedLimit * 4, 20);
+  const { matches } = await searchRepoKnowledge(trimmed, candidateLimit);
 
-  const normalizedFilters: NormalizedFilter[] = Array.isArray(filters)
-    ? filters
-      .map((filter) => ({
-        field: filter.field,
-        value: normalizeSearchTerm(filter.value),
-      }))
-      .filter((filter) => filter.value.length > 0)
-    : [];
+  if (!matches.length) {
+    logToolEvent('findProjects.zeroResults', { query: trimmed, stage: 'semantic' });
+    return [];
+  }
 
-  if (normalizedFilters.length) {
-    const semanticQuery = normalizedFilters
-      .map((filter) => `${filter.field} ${filter.value}`)
-      .join(' ')
+  // Step 2: Prepare candidates for LLM filtering
+  const candidates: Candidate[] = matches.map((m) => ({
+    name: m.name,
+    summary: m.summary || '',
+    languages: (m.languages || []).map((l) => l.name),
+    tags: m.tags || [],
+  }));
+
+  // Step 3: Ask LLM to filter and rank candidates
+  let filteredIndices: number[];
+  let fallbackReason: string | null = null;
+  try {
+    const client = await getOpenAI();
+    const response = await client.chat.completions.create({
+      model: 'gpt-5-nano-2025-08-07',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a project filter. Given a user query and project candidates, return the indices (0-based) of projects that actually match the query. Return them in order of relevance (best match first).
+
+Rules:
+- Only include projects that genuinely match the query
+- "Rust" should NOT match "Rubiks" (not the same thing)
+- If no projects match, return an empty array
+- Return ONLY a JSON array of numbers, nothing else`,
+        },
+        {
+          role: 'user',
+          content: `Query: "${trimmed}"
+
+Candidates:
+${candidates.map((c, i) => `${i}. ${c.name}: ${c.summary.slice(0, 200)} | Languages: ${c.languages.join(', ')} | Tags: ${c.tags.slice(0, 5).join(', ')}`).join('\n')}
+
+Return JSON array of matching indices:`,
+        },
+      ],
+      temperature: 0,
+      max_tokens: 100,
+    });
+
+    const rawContent = response.choices[0]?.message?.content ?? '[]';
+    const cleanedContent = rawContent
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
       .trim();
 
-    if (!semanticQuery) {
-      return [];
+    filteredIndices = JSON.parse(cleanedContent || '[]');
+
+    if (!Array.isArray(filteredIndices)) {
+      throw new Error('LLM did not return array');
+    }
+  } catch (error) {
+    fallbackReason = error instanceof Error ? error.message : String(error);
+    console.error('[chat-tools] LLM filtering failed, falling back to semantic only', error);
+    // Fallback: use semantic results as-is
+    filteredIndices = matches.slice(0, cappedLimit).map((_, i) => i);
+  }
+
+  // Step 4: Resolve filtered candidates to full repo data
+  const repos = await getRepos();
+  const repoMap = new Map(repos.map((repo) => [normalizeName(repo.name), augmentRepoWithKnowledge(repo)]));
+  const resolved: RepoData[] = [];
+  const seen = new Set<string>();
+
+  for (const index of filteredIndices) {
+    if (resolved.length >= cappedLimit) break;
+
+    const candidate = candidates[index];
+    if (!candidate) continue;
+
+    const key = normalizeName(candidate.name);
+    if (seen.has(key)) continue;
+
+    let repo = repoMap.get(key);
+    if (!repo) {
+      try {
+        repo = augmentRepoWithKnowledge(await getRepoByName(candidate.name));
+      } catch (error) {
+        console.warn('[chat-tools] findProjects missing repo data', { repo: candidate.name, error });
+        continue;
+      }
     }
 
-    const semanticLimit = cappedLimit ?? 10;
-    const semanticRepos = await searchProjects({
-      query: semanticQuery,
-      limit: semanticLimit,
+    resolved.push(repo);
+    seen.add(key);
+  }
+
+  const candidateNames = candidates.map((c) => c.name);
+  const filteredNames = filteredIndices
+    .map((index) => candidates[index]?.name)
+    .filter((name): name is string => Boolean(name));
+  const resultNames = resolved.map((repo) => repo.name);
+
+  logToolEvent('findProjects', {
+    query: trimmed,
+    limit: cappedLimit,
+    candidatesCount: matches.length,
+    filteredCount: filteredIndices.length,
+    resultsCount: resolved.length,
+    candidates: candidateNames,
+    filteredCandidates: filteredNames,
+    resultCandidates: resultNames,
+    fallbackReason,
+  });
+
+  if (!resolved.length) {
+    logToolEvent('findProjects.zeroResults', {
+      query: trimmed,
+      candidatesTried: matches.length,
+      candidateNames,
+      stage: 'llm-filter',
+      fallbackReason,
     });
-
-    const sortedSemantic = sortRepos(semanticRepos, sort);
-    if (cappedLimit) {
-      return sortedSemantic.slice(0, cappedLimit);
-    }
-    return sortedSemantic;
   }
 
-  const knowledgeRecords = getKnowledgeRecords();
-  let rankedRecords = knowledgeRecords;
-  const allRepos = await getRepos();
-  const repoMap = new Map(allRepos.map((repo) => [repo.name.toLowerCase(), repo]));
-  const repoOrder = new Map(allRepos.map((repo, index) => [repo.name.toLowerCase(), index]));
-
-  if (!normalizedFilters.length && !sort) {
-    rankedRecords = [...rankedRecords].sort((a, b) => {
-      const aIndex = repoOrder.get(a.name.toLowerCase()) ?? Number.MAX_SAFE_INTEGER;
-      const bIndex = repoOrder.get(b.name.toLowerCase()) ?? Number.MAX_SAFE_INTEGER;
-      return aIndex - bIndex;
-    });
-  }
-
-  const mergedRepos: RepoData[] = [];
-  for (const record of rankedRecords) {
-    const repo = repoMap.get(record.name.toLowerCase());
-    if (repo) {
-      mergedRepos.push(augmentRepoWithKnowledge(repo));
-    }
-  }
-
-  const sortedRepos = sortRepos(mergedRepos, sort);
-
-  if (cappedLimit) {
-    return sortedRepos.slice(0, cappedLimit);
-  }
-
-  return sortedRepos;
+  return resolved;
 }
 
 export async function getReadme({ repo }: GetReadmeInput) {
@@ -131,65 +196,4 @@ export async function getDoc({ repo, path }: GetDocInput) {
     title,
     content: data.content,
   };
-}
-
-export function navigate({ section }: NavigateInput) {
-  const map = {
-    about: '/about',
-    projects: '/projects',
-    contact: '/contact',
-  } as const;
-
-  return { url: map[section] };
-}
-
-export async function searchProjects({ query, limit = 5 }: SearchProjectsInput) {
-  if (!query?.trim()) {
-    throw new Error('search query is required');
-  }
-
-  const targetLimit = Math.max(1, Math.floor(limit));
-  const matches = await searchRepoKnowledge(query, targetLimit);
-  if (!matches.length) {
-    return [];
-  }
-
-  const repos = await getRepos();
-  const repoMap = new Map(repos.map((repo) => [repo.name.toLowerCase(), repo]));
-
-  const weighted = matches
-    .map((match) => {
-      const repo = repoMap.get(match.name.toLowerCase());
-      if (!repo) {
-        return null;
-      }
-      const hydrated = augmentRepoWithKnowledge(repo);
-      const baseScore = Number.isFinite(match.score) ? (match.score as number) : 0;
-      const weightedScore = hydrated.isStarred ? baseScore * STARRED_SCORE_BOOST : baseScore;
-      return { repo: hydrated, score: weightedScore };
-    })
-    .filter((entry): entry is { repo: RepoData; score: number } => Boolean(entry));
-
-  const sortedByScore = weighted.sort((a, b) => b.score - a.score).map((entry) => entry.repo);
-  return sortedByScore.slice(0, targetLimit);
-}
-
-function sortRepos(repos: RepoData[], sort?: 'recent' | 'alphabetical' | 'starred') {
-  if (sort === 'recent') {
-    return [...repos].sort((a, b) => {
-      const toTime = (repo: RepoData) =>
-        new Date(repo.pushed_at || repo.updated_at || repo.created_at).getTime();
-      return toTime(b) - toTime(a);
-    });
-  }
-
-  if (sort === 'alphabetical') {
-    return [...repos].sort((a, b) => a.name.localeCompare(b.name));
-  }
-
-  if (sort === 'starred') {
-    return [...repos].sort((a, b) => Number(b.isStarred) - Number(a.isStarred));
-  }
-
-  return repos;
 }

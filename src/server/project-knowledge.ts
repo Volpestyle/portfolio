@@ -24,6 +24,19 @@ type RepoEmbeddingRecord = {
   embedding: number[];
 };
 
+export type RepoKnowledgeMatch = {
+  name: string;
+  summary?: string;
+  tags?: string[];
+  languages?: Array<{ name: string; percent: number }>;
+  score: number;
+};
+
+export type SearchRepoKnowledgeResult = {
+  matches: RepoKnowledgeMatch[];
+  queryVector: number[];
+};
+
 const summaryRecords: RepoSummaryRecord[] = repoSummaries as RepoSummaryRecord[];
 const embeddingRecords: RepoEmbeddingRecord[] = repoEmbeddings as RepoEmbeddingRecord[];
 let cachedOpenAI: OpenAI | undefined;
@@ -128,15 +141,9 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(magA) * Math.sqrt(magB) || 1);
 }
 
-export async function searchRepoKnowledge(query: string, limit: number = 5) {
+export async function searchRepoKnowledge(query: string, limit: number = 5): Promise<SearchRepoKnowledgeResult> {
   if (!query?.trim() || !embeddingRecords.length) {
-    return [] as Array<{
-      name: string;
-      summary?: string;
-      tags?: string[];
-      languages?: Array<{ name: string; percent: number }>;
-      score: number;
-    }>;
+    return { matches: [], queryVector: [] };
   }
 
   let client: OpenAI;
@@ -144,7 +151,7 @@ export async function searchRepoKnowledge(query: string, limit: number = 5) {
     client = await getOpenAI();
   } catch (error) {
     console.error('[ProjectKnowledge] Missing OPENAI_API_KEY secret', error);
-    return [];
+    return { matches: [], queryVector: [] };
   }
 
   const response = await client.embeddings.create({
@@ -154,13 +161,16 @@ export async function searchRepoKnowledge(query: string, limit: number = 5) {
 
   const queryVector = response.data[0]?.embedding;
   if (!queryVector) {
-    return [];
+    return { matches: [], queryVector: [] };
   }
 
+  // Pure semantic search - no keyword filtering
+  // LLM re-ranker will handle filtering false positives
   const scored = embeddingRecords
     .map((record) => {
       const summary = getSummaryRecord(record.name);
       const score = cosineSimilarity(queryVector, record.embedding);
+
       return {
         name: record.name,
         summary: summary?.summary,
@@ -173,5 +183,8 @@ export async function searchRepoKnowledge(query: string, limit: number = 5) {
     .sort((a, b) => b.score - a.score);
 
   const limited = scored.slice(0, limit);
-  return limited.filter((item) => typeof item.summary === 'string');
+  return {
+    matches: limited.filter((item) => typeof item.summary === 'string'),
+    queryVector: queryVector as number[],
+  };
 }
