@@ -3,6 +3,8 @@ import type {
   ResponseCompletedEvent,
   ResponseFunctionCallArgumentsDoneEvent,
   ResponseFunctionToolCall,
+  ResponseInput,
+  ResponseInputItem,
   ResponseOutputItem,
   ResponseOutputItemAddedEvent,
   ResponseStreamEvent,
@@ -10,13 +12,13 @@ import type {
 } from 'openai/resources/responses/responses';
 import { NextRequest } from 'next/server';
 import { buildSystemPrompt } from '@/server/prompt/buildSystemPrompt';
-import { tools, toolRouter } from '@/server/tools';
+import { buildTools, toolRouter } from '@/server/tools';
+import type { FunctionTool } from '@/server/tools';
 import type { ChatRequestMessage } from '@/types/chat';
 import { enforceChatRateLimit } from '@/lib/rate-limit';
 import { resolveSecretValue } from '@/lib/secrets/manager';
 import { headerIncludesTestMode, shouldReturnTestFixtures } from '@/lib/test-mode';
 import { TEST_REPO, TEST_README } from '@/lib/test-fixtures';
-
 export const runtime = 'nodejs';
 
 let cachedClient: OpenAI | undefined;
@@ -115,108 +117,62 @@ export async function POST(req: NextRequest) {
   }
 
   const instructions = await buildSystemPrompt();
-  const stream = (await client.responses.create({
-    model: 'gpt-5-nano-2025-08-07',
-    input: [
-      {
-        role: 'system',
-        content: `${instructions}
+  const toolDefinitions = await buildTools();
 
-When you need to look something up or fetch information, naturally explain what you're checking before using tools. Keep things conversational and friendly throughout - no need for rigid structure, just be transparent about your thought process.`,
-      },
-      ...body.messages.map((message) => ({ role: message.role, content: message.content })),
-    ],
-    tools,
-    stream: true,
-  })) as AsyncIterable<ResponseStreamEvent>;
+  const systemPrompt = `${instructions}
 
+Keep your internal planning and tool usage private; gather whatever you need quietly, then reply once with a concise, conversational answer.`;
+
+  const baseInput: ResponseInput = [
+    {
+      role: 'system',
+      content: systemPrompt,
+    },
+    ...body.messages.map((message) => ({ role: message.role, content: message.content })),
+  ];
   const encoder = new TextEncoder();
   let completed = false;
-  const toolNameByItemId = new Map<string, string>();
 
   const readable = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const event of stream) {
-          if (isOutputItemAddedEvent(event)) {
-            const item = event.item;
-            if (isFunctionCallItem(item) && item.id && item.name) {
-              toolNameByItemId.set(item.id, item.name);
-            }
+        let nextInput: ResponseInput = baseInput;
+        let previousResponseId: string | undefined;
 
-            const itemId = getItemId(item);
-            if (itemId) {
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({
-                    type: 'item',
-                    itemId,
-                    itemType: item?.type,
-                  })}\n\n`
-                )
-              );
-            }
+        while (true) {
+          const payload: {
+            model: string;
+            input: ResponseInput;
+            tools: FunctionTool[];
+            stream: true;
+            previous_response_id?: string;
+          } = {
+            model: 'gpt-5-nano-2025-08-07',
+            input: nextInput,
+            tools: toolDefinitions,
+            stream: true,
+          };
+
+          if (previousResponseId) {
+            payload.previous_response_id = previousResponseId;
+          }
+
+          const stream = (await client.responses.create(payload)) as AsyncIterable<ResponseStreamEvent>;
+          const result = await processResponseStream({
+            stream,
+            controller,
+            encoder,
+          });
+
+          if (result.status === 'needs-tool-output') {
+            previousResponseId = result.responseId;
+            nextInput = result.toolOutputs;
             continue;
           }
 
-          if (isOutputTextDeltaEvent(event)) {
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: 'token',
-                  delta: event.delta,
-                  itemId: event.item_id,
-                })}\n\n`
-              )
-            );
-            continue;
-          }
-
-          if (isFunctionCallArgumentsDoneEvent(event)) {
-            const itemId = event.item_id;
-            const resolvedName = event.name ?? (itemId ? toolNameByItemId.get(itemId) : undefined);
-
-            if (!resolvedName) {
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({ type: 'error', error: 'Unknown tool call (missing name).' })}\n\n`
-                )
-              );
-              continue;
-            }
-
-            try {
-              const attachment = await toolRouter({
-                name: resolvedName,
-                arguments: event.arguments,
-              });
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({
-                    type: 'attachment',
-                    attachment,
-                    itemId,
-                  })}\n\n`
-                )
-              );
-              if (itemId) {
-                toolNameByItemId.delete(itemId);
-              }
-            } catch (toolError) {
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({ type: 'error', error: String(toolError) })}\n\n`
-                )
-              );
-            }
-            continue;
-          }
-
-          if (isResponseCompletedEvent(event)) {
-            completed = true;
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
-            continue;
-          }
+          completed = true;
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
+          break;
         }
       } catch (error) {
         controller.enqueue(
@@ -270,4 +226,133 @@ function buildE2EChatResponse() {
       Connection: 'keep-alive',
     },
   });
+}
+
+type ToolOutputInput = ResponseInputItem.FunctionCallOutput;
+
+type StreamIterationResult =
+  | {
+    status: 'needs-tool-output';
+    responseId: string;
+    toolOutputs: ResponseInput;
+  }
+  | { status: 'completed' };
+
+async function processResponseStream({
+  stream,
+  controller,
+  encoder,
+}: {
+  stream: AsyncIterable<ResponseStreamEvent>;
+  controller: ReadableStreamDefaultController<Uint8Array>;
+  encoder: TextEncoder;
+}): Promise<StreamIterationResult> {
+  const toolOutputs: ToolOutputInput[] = [];
+  const toolMetadataByItemId = new Map<string, { name: string; callId?: string }>();
+  let responseId: string | undefined;
+
+  for await (const event of stream) {
+    if (event.type === 'response.created') {
+      responseId = event.response.id;
+      continue;
+    }
+
+    if (isOutputItemAddedEvent(event)) {
+      const item = event.item;
+      if (isFunctionCallItem(item) && item.id && item.name) {
+        toolMetadataByItemId.set(item.id, { name: item.name, callId: item.call_id });
+      }
+
+      const itemId = getItemId(item);
+      if (itemId) {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: 'item',
+              itemId,
+              itemType: item?.type,
+            })}\n\n`
+          )
+        );
+      }
+      continue;
+    }
+
+    if (isOutputTextDeltaEvent(event)) {
+      controller.enqueue(
+        encoder.encode(
+          `data: ${JSON.stringify({
+            type: 'token',
+            delta: event.delta,
+            itemId: event.item_id,
+          })}\n\n`
+        )
+      );
+      continue;
+    }
+
+    if (isFunctionCallArgumentsDoneEvent(event)) {
+      const metadata = toolMetadataByItemId.get(event.item_id);
+      const resolvedName = event.name ?? metadata?.name;
+
+      if (!resolvedName) {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ type: 'error', error: 'Unknown tool call (missing name).' })}\n\n`
+          )
+        );
+        continue;
+      }
+
+      try {
+        const attachment = await toolRouter({
+          name: resolvedName,
+          arguments: event.arguments,
+        });
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: 'attachment',
+              attachment,
+              itemId: event.item_id,
+            })}\n\n`
+          )
+        );
+
+        const callId = metadata?.callId ?? event.item_id;
+        toolOutputs.push({
+          type: 'function_call_output',
+          call_id: callId,
+          output: JSON.stringify(attachment),
+        });
+        toolMetadataByItemId.delete(event.item_id);
+      } catch (toolError) {
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: 'error', error: String(toolError) })}\n\n`)
+        );
+      }
+      continue;
+    }
+
+    if (isResponseCompletedEvent(event)) {
+      if (toolOutputs.length > 0) {
+        return {
+          status: 'needs-tool-output',
+          responseId: responseId ?? event.response.id,
+          toolOutputs,
+        };
+      }
+      return { status: 'completed' };
+    }
+  }
+
+  if (toolOutputs.length > 0 && responseId) {
+    return {
+      status: 'needs-tool-output',
+      responseId,
+      toolOutputs,
+    };
+  }
+
+  return { status: 'completed' };
 }
