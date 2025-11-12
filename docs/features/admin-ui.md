@@ -7,39 +7,38 @@ The admin UI provides a comprehensive blog content management system accessible 
 ## Features
 
 ### Posts List (`/admin`)
+
 - **Search**: Filter posts by title or slug
 - **Status Filter**: Filter by draft, scheduled, published, or archived status
 - **Table View**: Displays title, status, updated date, published date, and actions
 - **Quick Actions**: Edit, View, Publish, Archive, and Delete buttons for each post
 
 ### Post Editor (`/admin/[slug]` and `/admin/new`)
+
 - **Metadata Form**:
   - Title (required)
   - Slug (auto-generated from title, required)
   - Summary (required)
   - Tags (comma-separated)
   - Hero Image Key
-  
 - **Markdown Editor**:
   - Syntax highlighting toolbar
   - Preview mode
   - Common markdown shortcuts (bold, italic, code, links, images, headings, lists)
-  
 - **Media Uploader**:
   - Drag-and-drop support
   - File validation (JPEG, PNG, GIF, WebP, max 5MB)
   - Presigned S3 upload
   - Easy insertion into content
-  
 - **Actions Sidebar**:
   - Save Draft
   - Preview Draft (opens in new tab)
   - Publish Now
   - View Live (for published posts)
-  
 - **Post Info**: Version, created date, published date
 
 ### Keyboard Shortcuts
+
 - `⌘ + S` - Save Draft (planned)
 - `⌘ + P` - Preview (planned)
 
@@ -65,6 +64,7 @@ src/app/admin/
 The UI expects the following API endpoints to be implemented:
 
 ### Posts Management
+
 - `GET /api/admin/posts` - List posts (with optional ?status and ?search params)
 - `GET /api/admin/posts/[slug]` - Get single post with content
 - `POST /api/admin/posts` - Create new post
@@ -74,16 +74,23 @@ The UI expects the following API endpoints to be implemented:
 - `POST /api/admin/posts/[slug]/delete` - Delete post
 
 ### Media Management
+
 - `POST /api/admin/media/presigned-url` - Get presigned S3 upload URL
 
 ### Preview
+
 - `GET /api/draft` - Enable draft mode and redirect
 
 ## Authentication
 
 The admin routes are protected by Auth.js middleware (configured in `middleware.ts`). Users must:
+
 1. Be authenticated via OAuth (Google/GitHub)
 2. Have their email in the `ADMIN_EMAILS` environment variable
+
+### Authentication Flow Diagram
+
+![Admin auth flow](../../generated-diagrams/admin-auth-flow.png)
 
 ## Accessibility
 
@@ -96,6 +103,7 @@ The admin routes are protected by Auth.js middleware (configured in `middleware.
 ## Styling
 
 Uses the existing Tailwind CSS design system with custom UI components:
+
 - Button variants (default, outline, ghost, destructive, secondary)
 - Card components for content sections
 - Input and Textarea with consistent styling
@@ -116,6 +124,7 @@ To make the admin UI fully functional, you'll need to:
 ## Environment Variables
 
 Required environment variables:
+
 - `ADMIN_EMAILS` - Comma-separated list of allowed admin emails
 - `NEXTAUTH_SECRET` - Auth.js secret
 - `NEXTAUTH_URL` - Auth.js callback URL
@@ -124,4 +133,3 @@ Required environment variables:
 - `CONTENT_BUCKET` - S3 bucket for content
 - `MEDIA_BUCKET` - S3 bucket for media
 - `CLOUDFRONT_DISTRIBUTION_ID` - For cache invalidation
-

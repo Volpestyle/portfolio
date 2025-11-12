@@ -96,7 +96,7 @@ pnpm cdk deploy
 - 502s with `MODULE_NOT_FOUND` at runtime: a dependency may be missing from the OpenNext bundle. Rebuild and inspect the server/image bundles.
 - 403s on image or custom origins: ensure Function URLs are restricted to the CloudFront distribution (the stack sets this automatically); invalidate CloudFront after deploy if needed.
 - Revalidation not working: check DynamoDB table and SQS queue; verify `CACHE_DYNAMO_TABLE` and queue env are present for the worker.
-- Logs: see `docs/reference/log-diving.md` for locating and tailing log groups for Edge and regional functions.
+- Logs: see [Log Diving](../operations/log-diving.md) for locating and tailing log groups for Edge and regional functions.
 
 #### FAQ
 

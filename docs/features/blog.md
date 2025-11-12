@@ -122,7 +122,7 @@ Use Server Actions for mutations (validate with Zod + re-check session).
 
 10. Env vars
     • Auth: NEXTAUTH_URL, NEXTAUTH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (or GitHub equivalents).
-    • App: POSTS_TABLE, CONTENT_BUCKET, MEDIA_BUCKET, AWS_REGION, CLOUDFRONT_DISTRIBUTION_ID, REVALIDATE_SECRET.
+    • App: POSTS_TABLE, CONTENT_BUCKET, MEDIA_BUCKET, AWS_REGION, CLOUDFRONT_DISTRIBUTION_ID. Secrets (REVALIDATE_SECRET, NEXTAUTH_SECRET, etc.) are read from AWS Secrets Manager at runtime.
     • OpenNext cache: CACHE_BUCKET_NAME, CACHE_BUCKET_REGION, CACHE_DYNAMO_TABLE (set by your CDK). ￼
 
 ⸻
@@ -134,27 +134,43 @@ auth.ts
 
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
+import { resolveSecretValue } from "@/lib/secrets/manager";
 
 const ALLOW = new Set((process.env.ADMIN_EMAILS ?? "").split(",").map(s => s.trim()).filter(Boolean));
 
+const nextAuthSecret = await resolveSecretValue("NEXTAUTH_SECRET", { scope: "repo", required: true });
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
-session: { strategy: "jwt" }, // no DB
-providers: [Google],
-callbacks: {
-async jwt({ token, profile }) {
-if (profile?.email) token.email = profile.email;
-return token;
-},
-async session({ session, token }) {
-session.user = { email: token.email as string };
-return session;
-},
-async authorized({ request, auth }) {
-// (Optional) coarse auth gate for route handlers; we'll still gate in middleware
-return !!auth?.user?.email && ALLOW.has(auth.user.email);
-},
-},
-secret: process.env.NEXTAUTH_SECRET,
+  session: { strategy: "jwt" }, // no DB
+  trustHost: true,
+  providers: [
+    Google({
+      authorization: { params: { prompt: "select_account" } },
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: await resolveSecretValue("GOOGLE_CLIENT_SECRET", { scope: "env", required: true }),
+    }),
+  ],
+  secret: nextAuthSecret,
+  callbacks: {
+    async jwt({ token, user, profile }) {
+      token.email ??= user?.email ?? profile?.email ?? token.email;
+      return token;
+    },
+    async session({ session, token }) {
+      if (typeof token.email === "string") {
+        session.user = { ...session.user, email: token.email };
+      }
+      return session;
+    },
+    async signIn({ user, profile }) {
+      const email = user?.email ?? profile?.email ?? null;
+      const verified =
+        (profile as Record<string, unknown>)?.email_verified ??
+        (profile as Record<string, unknown>)?.verified ??
+        true;
+      return !!email && verified && ALLOW.has(email);
+    },
+  },
 });
 
 app/api/auth/[...nextauth]/route.ts
@@ -163,26 +179,32 @@ export { GET, POST } from "@/auth";
 
 Auth.js v5 uses a central auth.ts and re-exported route handlers for App Router. ￼
 
+ℹ️ In the production code we call `resolveSecretValue()` before instantiating Auth.js so `NEXTAUTH_SECRET` (and the OAuth client secrets) can live exclusively in AWS Secrets Manager.
+
 Middleware: protect /admin/\*
 middleware.ts
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { auth } from "@/auth";
+import { isAdminEmail } from "@/lib/auth/allowlist";
 
-const ALLOW = new Set((process.env.ADMIN_EMAILS ?? "").split(",").map(s => s.trim()).filter(Boolean));
+export default auth((req) => {
+  if (!req.nextUrl.pathname.startsWith("/admin")) return NextResponse.next();
+  const email = req.auth?.user?.email;
+  if (!email || !isAdminEmail(email)) {
+    const redirect = new URL("/api/auth/signin", req.url);
+    redirect.searchParams.set("callbackUrl", req.nextUrl.href);
+    return NextResponse.redirect(redirect);
+  }
+  return NextResponse.next();
+});
 
-export async function middleware(req: NextRequest) {
-if (!req.nextUrl.pathname.startsWith("/admin")) return NextResponse.next();
-const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-if (!token?.email || !ALLOW.has(String(token.email))) {
-return NextResponse.redirect(new URL("/api/auth/signin", req.url));
-}
-return NextResponse.next();
-}
 export const config = { matcher: ["/admin/:path*"] };
 
 getToken() is the documented way to read the JWT in server/middleware contexts. ￼
+
+ℹ️ The repo currently uses the `auth()` helper from `next-auth` plus Secrets Manager lookups, so the middleware no longer needs to read `process.env.NEXTAUTH_SECRET` directly.
 
 Draft Mode (preview unpublished)
 app/api/draft/route.ts
@@ -211,7 +233,8 @@ InvalidationBatch: { CallerReference: `${Date.now()}`, Paths: { Quantity: paths.
 
 export async function POST(req: Request) {
 const secret = req.headers.get("x-revalidate-secret");
-if (secret !== process.env.REVALIDATE_SECRET) return new Response("Unauthorized", { status: 401 });
+const expectedSecret = await resolveSecretValue("REVALIDATE_SECRET", { scope: "repo", required: true });
+if (secret !== expectedSecret) return new Response("Unauthorized", { status: 401 });
 
 const { paths = [], tags = [] } = await req.json();
 tags.forEach(t => revalidateTag(t));
