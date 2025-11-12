@@ -1,8 +1,13 @@
 [
   {
     "name": "improview",
-    "summary": "improview appears to be an early-stage project focused on improving and organizing documentation, with the README indicating ongoing development and an active, living project.",
-    "tags": [],
+    "summary": "improview is an early-stage project centered on LeetCode-related content with no implemented languages, frameworks, or runtimes yet. The README teases upcoming updates, including friendly robots tidying the docs, a full tour, and an invitation to star the repo.",
+    "tags": [
+      "documentation-automation",
+      "readme-placeholder",
+      "coming-soon",
+      "leetcode"
+    ],
     "languages": [
       {
         "name": "TypeScript",
@@ -32,20 +37,20 @@
   },
   {
     "name": "ilikeyacut",
-    "summary": "ilikeyacut is a native iOS hairstyling app monorepo that lets users try on different hairstyles via Gemini's nano-banana (Flash Image 2.5). The stack includes a Swift iOS frontend and a serverless backend implemented as Go-based AWS Lambda functions, deployed with AWS SAM templates for a modular, scalable beauty-tech mobile experience.",
+    "summary": "ilikeyacut is a native iOS mobile app monorepo for virtual hairstyle try-ons powered by Gemini's nano banana (Flash Image 2.5). It uses a serverless backend on AWS Lambda orchestrated via AWS SAM templates (Serverless Application Model) to deliver scalable, mobile-first beautytech experiences.",
     "tags": [
-      "SAM",
       "Serverless Application Model",
-      "AWS Serverless Application Model",
-      "AWS SAM templates",
       "iOS",
       "AWS Lambda",
-      "Flash Image 2.5",
-      "Gemini's nano-banana",
+      "AWS SAM templates",
+      "Serverless Application Model (SAM)",
       "hairstyling",
-      "beauty tech",
-      "mobile app",
-      "monorepo"
+      "virtual try-on",
+      "beautytech",
+      "monorepo",
+      "Gemini-nano-banana",
+      "Flash-Image-2.5",
+      "mobile-first-experience"
     ],
     "languages": [
       {
@@ -72,20 +77,20 @@
   },
   {
     "name": "wallcrawler",
-    "summary": "Wallcrawler is a self-hosted, AWS-backed remote browser platform that orchestrates LLM-powered browsing using Playwright for browser automation and Stagehand, with a Browserbase-compatible API surface. This monorepo bundles infrastructure-as-code via AWS CDK, Go-based Lambda services, a Node/TypeScript SDK, and UI components to deploy a multi-arch Docker solution that persists browser contexts in S3 and supports JWT-based session flows.",
+    "summary": "Wallcrawler is a self-hosted, AWS‑backed remote browser platform enabling Stagehand-powered LLM browsing and offering Browserbase-compatible APIs. It ships a TypeScript/Node SDK, Playwright integration, and multi-arch Docker images orchestrated via AWS CDK, Lambda, ECS/Fargate, API Gateway, EventBridge, DynamoDB, and S3 for session metadata, persisted contexts, and lifecycle management.",
     "tags": [
+      "AWS Cloud Development Kit (AWS CDK)",
+      "Stagehand (fork) for LLM-powered browsing",
       "Playwright",
-      "Stagehand",
       "Vercel AI SDK",
-      "AWS CDK",
+      "Browserbase APIs",
+      "Wallcrawler SDK Node (TypeScript/Node client)",
       "AWS",
+      "AWS Lambda",
+      "ECS/Fargate",
       "Docker",
-      "Node.js",
-      "Go",
-      "pnpm",
-      "AWS CLI",
-      "CDK Toolkit",
-      "AI"
+      "API Gateway",
+      "EventBridge"
     ],
     "languages": [
       {
@@ -116,20 +121,20 @@
   },
   {
     "name": "jobseek",
-    "summary": "Jobseek automates job search and screening by orchestrating Wallcrawler headless browsing across job boards (Stagehand drives automated browsing and extraction; Wallcrawler SDK handles sessions and results) through a Next.js 15 app with API routes and a Server-Sent Events stream for real-time progress. The backend and hosting run on AWS with CDK-managed infrastructure, using a pnpm workspace to link Wallcrawler packages and provide a scalable, API-driven platform for authentication, authorization, and job discovery.",
+    "summary": "Jobseek automates job search across multiple job boards by orchestrating Wallcrawler-based headless browser automation and session management for scalable scraping and extraction. It’s a Next.js 15 app (Node.js) organized as a pnpm workspace with AWS CDK-based infrastructure, integrating Wallcrawler SDK and Anthropic API, exposing API routes to start searches, stream progress via Server-Sent Events, and manage sessions.",
     "tags": [
       "Next.js",
-      "Next.js App Router (App Router)",
-      "Wallcrawler",
-      "Wallcrawler SDK",
-      "Wallcrawler Stagehand",
-      "AWS CDK",
-      "AWS",
       "Node.js",
+      "Wallcrawler",
+      "Stagehand",
+      "Wallcrawler SDK",
       "pnpm",
+      "AWS CDK",
       "Anthropic API",
-      "OAuth",
-      "JWT (JSON Web Token)"
+      "Job search automation",
+      "Web scraping / web automation",
+      "Headless browser automation",
+      "WC"
     ],
     "languages": [
       {
@@ -151,53 +156,21 @@
     ]
   },
   {
-    "name": "portfolio",
-    "summary": "portfolio is a Next.js 15 App Router-based portfolio site deployed on AWS via a custom CDK stack using OpenNext packaging, delivering static assets through S3/CloudFront and SSR/API routes via Lambda@Edge. It streams React Server Components with a typed server/client boundary, uses a TailwindCSS-based component library, and sources project data from GitHub for offline summarization and embedding-based search; an OpenAI-powered chat assistant answers questions using precomputed knowledge stored in generated/ with graceful fallbacks to live GitHub queries.",
-    "tags": [
-      "Next.js",
-      "AWS",
-      "CloudFront",
-      "Amazon S3",
-      "Lambda@Edge",
-      "Route53",
-      "ACM",
-      "Secrets Manager",
-      "GitHub",
-      "TailwindCSS",
-      "React Server Components",
-      "OpenNext"
-    ],
-    "languages": [
-      {
-        "name": "TypeScript",
-        "percent": 94.3
-      },
-      {
-        "name": "CSS",
-        "percent": 3.25
-      },
-      {
-        "name": "JavaScript",
-        "percent": 2.45
-      }
-    ]
-  },
-  {
     "name": "rubiks-cube",
-    "summary": "A React + Next.js + TailwindCSS frontend for managing and visualizing Rubik's cube state in a dynamic 2D flattened layout. It labels each square with face identifiers (U/L/F/R/B/D) and original coordinates for debugging, implements face-specific rotation transforms, provides an initial-state generator, and includes Jest-based tests along with a live demo.",
+    "summary": "Rubiks Cube State Management is a React/Next.js web app styled with TailwindCSS that renders a dynamic 2D flattened Rubik’s cube and exposes a face-labeled state with fixed coordinates for debugging. Rotation logic is implemented per-face via distinct transforms; the initial cube state is generated programmatically through loops and a helper function; testing uses Jest with coverage for all face rotations (including inverted rotations); the app is bootstrapped with create-next-app and deployable to GitHub Pages.",
     "tags": [
       "React",
       "Next.js",
       "TailwindCSS",
-      "npm",
-      "yarn",
-      "pnpm",
-      "bun",
       "Jest",
       "create-next-app",
-      "Rubiks cube state management",
-      "Frontend UI",
-      "Game/Simulation"
+      "Web application",
+      "2D visualization",
+      "State management",
+      "ReactJS",
+      "2D_flattened_representation",
+      "face_labeled_state",
+      "coordinate_per_face"
     ],
     "languages": [
       {
@@ -215,16 +188,65 @@
     ]
   },
   {
+    "name": "portfolio",
+    "summary": "portfolio is a full-stack Next.js 15 App Router site with streaming server components and a TailwindCSS-based component library, deployed on AWS via a CDK-based infra using OpenNext packaging and served from S3 behind CloudFront with Lambda@Edge SSR. It features GitHub-sourced projects with offline summaries, an OpenAI-powered chat assistant leveraging precomputed repo knowledge, a blog with Markdown and frontmatter, and an admin area secured by Auth.js/OAuth, all coordinated through GitHub Actions and a comprehensive deployment workflow.",
+    "tags": [
+      "Next.js",
+      "TailwindCSS",
+      "AWS",
+      "Lambda@Edge",
+      "CloudFront",
+      "S3",
+      "DynamoDB",
+      "Route53",
+      "ACM",
+      "pnpm",
+      "OpenNext",
+      "AWS CDK"
+    ],
+    "languages": [
+      {
+        "name": "TypeScript",
+        "percent": 97.2
+      },
+      {
+        "name": "JavaScript",
+        "percent": 2.34
+      },
+      {
+        "name": "CSS",
+        "percent": 0.46
+      }
+    ]
+  },
+  {
+    "name": "AWS-IAM-Projects",
+    "summary": "Polaris-driven UX mock of a new IAM Console built for the Web using React, focusing on the Users entity. The prototype leverages AWS IAM APIs to demonstrate a React-based console experience with Polaris UI framework integration for IAM.",
+    "tags": [
+      "Polaris",
+      "React",
+      "Web",
+      "AWS IAM APIs",
+      "Identity and Access Management (IAM)",
+      "Cloud Console UI",
+      "IAM Console",
+      "IAM",
+      "Users entity",
+      "UX mock",
+      "Console redesign"
+    ],
+    "languages": []
+  },
+  {
     "name": "slash-siege",
-    "summary": "slash-siege is a multiplayer stick-figure fighter game hosted on GitHub Pages. The project uses a Trello board for project management and targets Gaming, Multiplayer Gaming, and Entertainment audiences.",
+    "summary": "slash-siege is a web-based, multiplayer stick-figure fighter hosted on GitHub Pages, enabling browser-based real-time battles. Development is organized with a Trello board and tested at the project's GitHub Pages URL (volpestyle.github.io/slash-siege/).",
     "tags": [
       "GitHub Pages",
-      "Trello",
-      "Gaming",
-      "Multiplayer Gaming",
-      "Entertainment",
-      "slash-siege",
-      "Slash Siege"
+      "Trello (board)",
+      "GitHub Pages (hosting)",
+      "Multiplayer game",
+      "Web-based game",
+      "slash-siege"
     ],
     "languages": [
       {
@@ -242,39 +264,58 @@
     ]
   },
   {
-    "name": "AWS-IAM-Projects",
-    "summary": "This repository hosts a UX mock/demo for a redesigned AWS IAM Console built with Polaris internal UI framework, React, and TypeScript. It showcases basic features for the Users entity via AWS IAM APIs and serves as a frontend prototype for identity and access management tooling.",
+    "name": "AED-Sheets",
+    "summary": "Audio Engineering Discrepancy Logger is a MEAN-stack web application (MongoDB, Express.js, Angular, Node.js) built for NPR to log, search, and manage incidents and technical logs, with subscription-based alerts and automatic IT ticket creation. It includes automatic NPR employee provisioning, role-based access control, and both personal and global subscriptions delivering email or SMS notifications.",
     "tags": [
-      "Polaris",
-      "React",
-      "TypeScript",
-      "Polaris (internal UI framework)",
-      "AWS IAM APIs",
-      "Identity and Access Management (IAM)",
-      "AWS Console",
-      "IAM (Identity and Access Management)",
-      "IAM",
-      "Identity and Access Management",
-      "ux-mock",
-      "demo"
+      "Express JS",
+      "Angular",
+      "MongoDB",
+      "Node JS",
+      "Confluence",
+      "PDF documentation",
+      "Log management",
+      "Incident logging",
+      "IT ticketing",
+      "MEAN",
+      "Mean stack",
+      "Role-based access control"
     ],
-    "languages": []
+    "languages": [
+      {
+        "name": "TypeScript",
+        "percent": 50.56
+      },
+      {
+        "name": "HTML",
+        "percent": 28.67
+      },
+      {
+        "name": "JavaScript",
+        "percent": 15.28
+      },
+      {
+        "name": "SCSS",
+        "percent": 4.31
+      },
+      {
+        "name": "CSS",
+        "percent": 1.19
+      }
+    ]
   },
   {
     "name": "personal-website-v1",
-    "summary": "personal-website-v1 is a first personal portfolio site crafted to showcase work and attract internships, delivered as a static website. It was hosted on AWS using an S3 bucket for storage with CloudFront as a CDN, and also published via GitHub Pages for public access.",
+    "summary": "A personal website and portfolio hosted as a static site on AWS using an S3 bucket with CloudFront CDN. It serves as a static website for internship applications and showcases web development work.",
     "tags": [
-      "Amazon Web Services (AWS)",
-      "Amazon Simple Storage Service (S3)",
-      "Amazon CloudFront",
-      "GitHub Pages",
-      "Web Development",
-      "Portfolio Website",
-      "Static Website Hosting",
       "AWS",
-      "Amazon Web Services",
-      "CDN",
-      "static-site"
+      "AWS S3 bucket",
+      "Amazon S3",
+      "Amazon CloudFront",
+      "CloudFront",
+      "Personal website",
+      "Portfolio",
+      "Static website hosting",
+      "AWS S3"
     ],
     "languages": [
       {
@@ -297,20 +338,20 @@
   },
   {
     "name": "Parse-Tree-Calculator",
-    "summary": "Parse-Tree-Calculator is a client-side web-based scientific calculator built with HTML, SASS, and Vanilla JavaScript that evaluates expressions in the browser using a parse-tree approach, supporting decimals, parentheses, and basic trigonometry.",
+    "summary": "Parse-Tree-Calculator is a web-based scientific calculator that evaluates expressions using a parse-tree to enforce operator precedence, supporting decimals, nested parentheses, and trig functions via a stack-driven evaluation approach. Built with HTML, SASS, and vanilla JavaScript, it tokenizes input, builds a parse tree, and applies explicit multiplication rules to ensure correct, in-browser evaluation.",
     "tags": [
-      "HTML",
-      "SASS",
-      "Web Browser",
-      "Client-Side Web",
+      "Web",
+      "buildTree()",
+      "Tokenizing",
+      "Parse Tree Formation",
+      "Stack-based function handling (trig)",
+      "Recursive parenthesis handling",
+      "Right-rotation to fix operator precedence",
+      "Scientific Calculator",
+      "Parsing/Parse Tree",
       "Mathematics",
-      "Educational Technology",
       "Parse-Tree-Calculator",
-      "Parse Tree Calculator",
-      "parse-tree",
-      "tokenization",
-      "buildTree",
-      "token-array"
+      "Parse Tree Calculator"
     ],
     "languages": [
       {
@@ -328,46 +369,6 @@
       {
         "name": "CSS",
         "percent": 10.13
-      }
-    ]
-  },
-  {
-    "name": "AED-Sheets",
-    "summary": "AED-Sheets is a MEAN-stack web application (MongoDB, Express.js, Angular, Node.js) built for NPR’s internal logging, incident management, and IT ticketing. It enables automatic NPR employee account provisioning, log creation and search, personal and global subscriptions with email or SMS notifications, automatic IT ticket creation, and role-based access control.",
-    "tags": [
-      "MEAN stack",
-      "Express JS",
-      "Angular",
-      "Node.js",
-      "MongoDB",
-      "Confluence",
-      "Logging",
-      "Incident management",
-      "IT ticketing",
-      "MEAN",
-      "RESTful API",
-      "Single-page application (SPA)"
-    ],
-    "languages": [
-      {
-        "name": "TypeScript",
-        "percent": 50.56
-      },
-      {
-        "name": "HTML",
-        "percent": 28.67
-      },
-      {
-        "name": "JavaScript",
-        "percent": 15.28
-      },
-      {
-        "name": "SCSS",
-        "percent": 4.31
-      },
-      {
-        "name": "CSS",
-        "percent": 1.19
       }
     ]
   }
