@@ -15,9 +15,9 @@ import type {
 } from './types';
 import { DEFAULT_ENV_FILES } from './env';
 
-export const DEFAULT_TEXT_MODEL = 'gpt-5-nano-2025-08-07';
-export const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-large';
-export const DEFAULT_RESUME_FILENAME = 'resume.pdf';
+const DEFAULT_TEXT_MODEL = 'gpt-5-nano-2025-08-07';
+const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-large';
+const DEFAULT_RESUME_FILENAME = 'resume.pdf';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

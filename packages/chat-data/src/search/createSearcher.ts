@@ -58,12 +58,12 @@ export type SearchSpec<TRecord, TInput, TFilters, TResult> = {
   recencyLambda?: number;
 };
 
-export type SearchIndexEntry<TRecord> = {
+type SearchIndexEntry<TRecord> = {
   record: TRecord;
   score: number;
 };
 
-export type SemanticScorer<TRecord> = (
+type SemanticScorer<TRecord> = (
   records: readonly TRecord[],
   query: string
 ) => Promise<Map<string, number>>;

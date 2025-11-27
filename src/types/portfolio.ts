@@ -1,10 +1,10 @@
-export interface DocumentConfig {
+interface DocumentConfig {
   path: string;
   gistId: string;
   filename?: string;
 }
 
-export interface PortfolioRepoConfig {
+interface PortfolioRepoConfig {
   name: string;
   publicRepo?: string;
   isStarred?: boolean;
@@ -28,26 +28,4 @@ export interface PortfolioRepoConfig {
 
 export interface PortfolioConfig {
   repositories: PortfolioRepoConfig[];
-}
-
-export interface PrivateRepoData {
-  name: string;
-  full_name: string;
-  private: boolean;
-  owner: {
-    login: string;
-    avatar_url?: string;
-  };
-  description: string | null;
-  homepage: string | null;
-  language: string | null;
-  topics?: string[];
-  created_at: string;
-  updated_at: string;
-  isStarred?: boolean;
-  readme?: string;
-  techStack?: string[];
-  demoUrl?: string;
-  screenshots?: string[];
-  icon?: string;
 }

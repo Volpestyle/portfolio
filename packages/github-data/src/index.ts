@@ -1,7 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import type { RepoData } from '@portfolio/chat-contract';
 
-export type PortfolioRepoConfig = {
+type PortfolioRepoConfig = {
   name: string;
   owner?: string;
   description?: string | null;
@@ -22,16 +22,16 @@ export type PortfolioRepoConfig = {
   readme?: string;
 };
 
-export type PortfolioConfig = {
+type PortfolioConfig = {
   repositories: PortfolioRepoConfig[];
 };
 
-export type PortfolioReposResponse = {
+type PortfolioReposResponse = {
   starred: RepoData[];
   normal: RepoData[];
 };
 
-export type ResolveOctokitOptions = {
+type ResolveOctokitOptions = {
   token?: string;
   octokit?: Octokit;
 };
@@ -41,18 +41,18 @@ type FetchPortfolioConfigOptions = ResolveOctokitOptions & {
   configFileName?: string;
 };
 
-export type FetchPortfolioReposOptions = ResolveOctokitOptions & {
+type FetchPortfolioReposOptions = ResolveOctokitOptions & {
   gistId: string;
   configFileName?: string;
   defaultUsername?: string;
 };
 
-export type FetchRepoLanguagesOptions = ResolveOctokitOptions & {
+type FetchRepoLanguagesOptions = ResolveOctokitOptions & {
   owner: string;
   repo: string;
 };
 
-export type FetchRepoReadmeOptions = ResolveOctokitOptions & {
+type FetchRepoReadmeOptions = ResolveOctokitOptions & {
   owner?: string;
   repo: string;
   inlineReadme?: string;

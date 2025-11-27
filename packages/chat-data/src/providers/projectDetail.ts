@@ -1,7 +1,7 @@
 import { buildProjectDetail } from '../projects';
 import type { ProjectDetailProvider, ProjectRepository } from './types';
 
-export type ProjectDetailProviderOptions = {
+type ProjectDetailProviderOptions = {
   repository: ProjectRepository;
 };
 
@@ -31,4 +31,3 @@ export function createProjectDetailProvider(
     },
   };
 }
-

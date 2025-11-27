@@ -26,10 +26,9 @@ type StreamOptions = {
   };
 };
 
-export const DEFAULT_OUTPUT_REFUSAL_MESSAGE =
+const DEFAULT_OUTPUT_REFUSAL_MESSAGE =
   "I can't help with that request. I'm here to talk about my work, projects, and experience if you'd like.";
-export const DEFAULT_OUTPUT_REFUSAL_BANNER = 'That response was blocked by my safety filters.';
-export const DEFAULT_BUDGET_EXCEEDED_MESSAGE = 'Experiencing technical issues, try again later.';
+const DEFAULT_BUDGET_EXCEEDED_MESSAGE = 'Experiencing technical issues, try again later.';
 
 export function createChatSseStream(api: ChatApi, client: OpenAI, messages: ChatRequestMessage[], options?: StreamOptions) {
   const encoder = new TextEncoder();

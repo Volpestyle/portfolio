@@ -8,7 +8,7 @@ export type SemanticRanker = {
   scoreProjects(projects: ProjectRecord[], query: string): Promise<Map<string, number>>;
 };
 
-export type EmbeddingSemanticRankerOptions = {
+type EmbeddingSemanticRankerOptions = {
   embeddingProvider: EmbeddingProvider;
   projectRepository: Pick<ProjectRepository, 'getEmbedding'>;
   scoreScale?: number;
@@ -81,4 +81,3 @@ export function createEmbeddingSemanticRanker(
     },
   };
 }
-

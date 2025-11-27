@@ -36,9 +36,7 @@ export function createChatApi(config: ChatApiConfig): ChatApi {
 
 export { createChatSseStream, SSE_HEADERS } from './stream';
 export type { ChatbotResponse } from '@portfolio/chat-orchestrator';
-export { createSemanticRanker } from './semanticRanking';
-export { createExperienceSemanticRanker } from './experienceSemanticRanking';
-export { createPortfolioChatServer, createFilesystemChatProviders } from './bootstrap';
+export { createPortfolioChatServer } from './bootstrap';
 export {
   createChatServerLogger,
   logChatDebug,
@@ -48,4 +46,3 @@ export {
   CHAT_DEBUG_LEVEL,
 } from './server';
 export type { ChatDebugLogEntry } from './server';
-export { recordOpenAICostFromUsage } from './costMetrics';

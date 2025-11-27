@@ -53,7 +53,7 @@ export type ProjectSearcher = {
   searchProjects(input: ProjectSearchInput): Promise<Scored<ProjectSearchResult>[]>;
 };
 
-export type ProjectSearcherOptions = {
+type ProjectSearcherOptions = {
   searchIndex?: (query: string) => Promise<ProjectSearchIndexEntry[]>;
   semanticRanker?: SemanticRanker | null;
   logger?: (payload: ProjectSearchLogPayload) => void;

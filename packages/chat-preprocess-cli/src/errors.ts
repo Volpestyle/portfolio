@@ -23,7 +23,7 @@ export const PREPROCESS_ERROR_CODES = {
   RESUME_FIELD_INVALID: 'PREPROCESS_RESUME_FIELD_INVALID',
 } as const;
 
-export type PreprocessErrorCode = (typeof PREPROCESS_ERROR_CODES)[keyof typeof PREPROCESS_ERROR_CODES];
+type PreprocessErrorCode = (typeof PREPROCESS_ERROR_CODES)[keyof typeof PREPROCESS_ERROR_CODES];
 
 export class PreprocessError extends Error {
   code: PreprocessErrorCode;

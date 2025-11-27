@@ -3,7 +3,7 @@ const LOCAL_BASE_FALLBACK = 'http://localhost:3000';
 
 type TestRuntimeMode = 'mock' | 'integration' | 'real';
 
-export type TestRuntime = {
+type TestRuntime = {
   baseUrl: string;
   mode: TestRuntimeMode;
   isLocalBase: boolean;
@@ -47,11 +47,11 @@ function pickFirstUrl(): string {
   return LOCAL_BASE_FALLBACK;
 }
 
-export function resolveBaseUrl(): string {
+function resolveBaseUrl(): string {
   return pickFirstUrl();
 }
 
-export function isLocalUrl(value: string): boolean {
+function isLocalUrl(value: string): boolean {
   try {
     const { hostname } = new URL(value);
     if (LOCAL_HOSTNAMES.has(hostname)) {

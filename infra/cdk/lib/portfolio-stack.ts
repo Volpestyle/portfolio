@@ -89,7 +89,7 @@ type ImageOptimizationResources = {
   functionUrl: lambda.IFunctionUrl;
 };
 
-export interface PortfolioStackProps extends StackProps {
+interface PortfolioStackProps extends StackProps {
   domainName?: string;
   hostedZoneDomain?: string;
   certificateArn?: string;

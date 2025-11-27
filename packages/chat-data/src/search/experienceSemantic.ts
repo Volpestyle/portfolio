@@ -6,7 +6,7 @@ export type ExperienceSemanticRanker = {
   scoreExperiences(records: ResumeEntry[], query: string): Promise<Map<string, number>>;
 };
 
-export type ExperienceEmbeddingSemanticRankerOptions = {
+type ExperienceEmbeddingSemanticRankerOptions = {
   embeddingProvider: EmbeddingProvider;
   experienceRepository: Pick<ExperienceRepository, 'getEmbedding'>;
   scoreScale?: number;

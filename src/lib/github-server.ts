@@ -321,49 +321,6 @@ function extractBranchFromDownloadUrl(url?: string | null): string | undefined {
 }
 
 /**
- * Gets the GitHub raw URL for an image in a repository
- * Handles both public and private repos (via their public counterparts)
- * @param repo - The repository name
- * @param imagePath - Path to the image file
- * @param owner - GitHub username (defaults to GH_CONFIG.USERNAME)
- * @returns The raw GitHub URL for the image
- */
-export async function getGithubImageUrl(
-  repo: string,
-  imagePath: string,
-  owner: string = GH_CONFIG.USERNAME
-): Promise<string> {
-  // If path starts with /, it's a local public asset
-  if (imagePath.startsWith('/')) {
-    return imagePath;
-  }
-
-  // If it's an external URL, return as-is
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-
-  // Get repo details to determine if it's private and get the default branch
-  const repoDetails = await getRepoDetails(repo, owner);
-
-  // For private repos, use the public repo counterpart
-  let targetRepo = repo;
-  if (repoDetails.private) {
-    const portfolioConfig = await getPortfolioConfig();
-    const repoConfig = portfolioConfig?.repositories?.find(r => r.name === repo);
-    targetRepo = repoConfig?.publicRepo || `${repo}-public`;
-  }
-
-  const branch = repoDetails.default_branch || 'main';
-  const cleanPath = imagePath
-    .replace(/^(\.\/)+/, '')
-    .replace(/^\/+/, '')
-    .replace(/\?raw=true$/, '');
-
-  return `https://raw.githubusercontent.com/${owner}/${targetRepo}/${branch}/${cleanPath}`;
-}
-
-/**
  * Fetches document content from a repository
  * @param repo - The repository name
  * @param docPath - Path to the document
@@ -478,14 +435,6 @@ export async function getRepoByName(name: string): Promise<RepoData> {
     return match;
   }
   return getRepoDetails(name);
-}
-
-export async function getReadmeForRepo(repo: string, owner?: string) {
-  return getRepoReadme(repo, owner);
-}
-
-export async function getRawDoc(repo: string, path: string, owner?: string) {
-  return getDocumentContent(repo, path, owner);
 }
 
 type OctokitError = {

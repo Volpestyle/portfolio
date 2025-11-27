@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { projectDocumentQueryKey } from '@/lib/query-keys';
 import { normalizeProjectKey } from '@/lib/projects/normalize';
 
-export type ProjectDocument = {
+type ProjectDocument = {
   repoName: string;
   path: string;
   title: string;

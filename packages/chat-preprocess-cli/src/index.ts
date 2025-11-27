@@ -86,7 +86,7 @@ type TaskSummary = {
   result: PreprocessTaskResult;
 };
 
-export type RunPreprocessCliOptions = {
+type RunPreprocessCliOptions = {
   argv?: string[];
   config?: ChatPreprocessConfig;
 };

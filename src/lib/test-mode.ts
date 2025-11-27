@@ -8,7 +8,7 @@ type HeadersLike = Pick<Headers, 'get'>;
 /**
  * Test mode types for better type safety
  */
-export type TestMode = 'e2e' | 'integration' | null;
+type TestMode = 'e2e' | 'integration' | null;
 
 export function isFixtureRuntime(flag: string = PORTFOLIO_FIXTURE_RUNTIME_FLAG): boolean {
   if (process.env.E2E_USE_REAL_APIS === 'true') {

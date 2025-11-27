@@ -10,11 +10,11 @@ export type ProfileSocialLink = {
   blurb?: string;
 };
 
-export type RepoOwner = {
+type RepoOwner = {
   login: string;
 };
 
-export type RepoLanguagePercentage = {
+type RepoLanguagePercentage = {
   name: string;
   percent: number;
 };
@@ -42,9 +42,9 @@ export type RepoData = {
   languagePercentages?: RepoLanguagePercentage[];
 };
 
-export type ProjectContextType = 'personal' | 'work' | 'oss' | 'academic' | 'other';
+type ProjectContextType = 'personal' | 'work' | 'oss' | 'academic' | 'other';
 
-export type ProjectTimeframe = {
+type ProjectTimeframe = {
   start?: string;
   end?: string;
 };
@@ -56,7 +56,7 @@ export type ProjectContext = {
   timeframe?: ProjectTimeframe;
 };
 
-export type ScoreSignals = {
+type ScoreSignals = {
   structured?: number;
   text?: number;
   semantic?: number;
@@ -253,17 +253,6 @@ export type ChatRequestMessage = {
   content: string;
 };
 
-export type ChatApiRequest = {
-  ownerId: string;
-  messages: ChatRequestMessage[];
-  responseAnchorId: string;
-};
-
-export type ChatApiResponse = {
-  message: ChatMessage;
-  bannerText?: string;
-};
-
 // Chat pipeline contract (planner/evidence/answer)
 export type RetrievalSource = 'projects' | 'resume' | 'profile';
 
@@ -318,7 +307,7 @@ export type PlannerLLMOutput = {
  * Derived behavior computed from intent (per spec §4.2).
  * These are NOT LLM outputs - they are computed by the orchestrator.
  */
-export type DerivedPlanBehavior = {
+type DerivedPlanBehavior = {
   answerMode: AnswerMode;
   enumerateAllRelevant: boolean;
 };
@@ -347,7 +336,7 @@ export function deriveFromIntent(intent: Intent): DerivedPlanBehavior {
  */
 export type RetrievalPlan = PlannerLLMOutput & DerivedPlanBehavior;
 
-export type EvidenceItemSource = 'project' | 'resume' | 'profile';
+type EvidenceItemSource = 'project' | 'resume' | 'profile';
 
 export type EvidenceItem = {
   source: EvidenceItemSource;
@@ -361,7 +350,7 @@ export type HighLevelAnswer = 'yes' | 'no' | 'partial' | 'unknown' | 'not_applic
 
 export type EvidenceCompleteness = 'strong' | 'weak' | 'none';
 
-export type SemanticFlagType = 'uncertain' | 'ambiguous' | 'multi_topic' | 'off_topic' | 'needs_clarification';
+type SemanticFlagType = 'uncertain' | 'ambiguous' | 'multi_topic' | 'off_topic' | 'needs_clarification';
 
 export type SemanticFlag = {
   type: SemanticFlagType;
@@ -414,7 +403,7 @@ export const EVIDENCE_SOURCE_VALUES = ['project', 'resume', 'profile'] as const;
 export const SEMANTIC_FLAG_VALUES = ['uncertain', 'ambiguous', 'multi_topic', 'off_topic', 'needs_clarification'] as const;
 export const RETRIEVAL_REQUEST_TOPK_MAX = 10;
 
-export const RetrievalRequestSchema: z.ZodType<RetrievalRequest, z.ZodTypeDef, unknown> = z.object({
+const RetrievalRequestSchema: z.ZodType<RetrievalRequest, z.ZodTypeDef, unknown> = z.object({
   source: z.enum(RETRIEVAL_SOURCE_VALUES),
   queryText: z.string().default(''),
   topK: z.number().int().min(0).default(8),
@@ -441,23 +430,7 @@ export const PlannerLLMOutputSchema: z.ZodType<PlannerLLMOutput, z.ZodTypeDef, u
  * Schema for full RetrievalPlan (LLM output + derived fields + optional extras).
  * Used after the orchestrator has computed derived behavior.
  */
-export const RetrievalPlanSchema: z.ZodType<RetrievalPlan, z.ZodTypeDef, unknown> = z.object({
-  intent: z.enum(INTENT_VALUES).default('describe'),
-  topic: z.string().nullable().default(null),
-  plannerConfidence: z.number().min(0).max(1).default(0.6),
-  isFollowup: z.boolean().default(false),
-  experienceScope: z.enum(['employment_only', 'any_experience']).nullable().default(null),
-  retrievalRequests: z.array(RetrievalRequestSchema).default([]),
-  resumeFacets: z.array(z.enum(RESUME_FACET_VALUES)).default([]),
-  answerLengthHint: z.enum(ANSWER_LENGTH_VALUES).default('medium'),
-  uiTarget: z.enum(UI_TARGET_VALUES).nullable().default(null),
-  debugNotes: z.string().max(600).nullable().default(null),
-  // Derived fields (computed by orchestrator from intent)
-  answerMode: z.enum(ANSWER_MODE_VALUES),
-  enumerateAllRelevant: z.boolean().default(false),
-});
-
-export const EvidenceItemSchema: z.ZodType<EvidenceItem, z.ZodTypeDef, unknown> = z.object({
+const EvidenceItemSchema: z.ZodType<EvidenceItem, z.ZodTypeDef, unknown> = z.object({
   source: z.enum(EVIDENCE_SOURCE_VALUES),
   id: z.string(),
   title: z.string().default(''),
@@ -465,18 +438,18 @@ export const EvidenceItemSchema: z.ZodType<EvidenceItem, z.ZodTypeDef, unknown> 
   relevance: z.enum(['high', 'medium', 'low']).default('medium'),
 });
 
-export const SemanticFlagSchema: z.ZodType<SemanticFlag, z.ZodTypeDef, unknown> = z.object({
+const SemanticFlagSchema: z.ZodType<SemanticFlag, z.ZodTypeDef, unknown> = z.object({
   type: z.enum(SEMANTIC_FLAG_VALUES),
   reason: z.string().default(''),
 });
 
-export const UiHintValidationWarningSchema: z.ZodType<UiHintValidationWarning, z.ZodTypeDef, unknown> = z.object({
+const UiHintValidationWarningSchema: z.ZodType<UiHintValidationWarning, z.ZodTypeDef, unknown> = z.object({
   code: z.enum(['UIHINT_INVALID_PROJECT_ID', 'UIHINT_INVALID_EXPERIENCE_ID']),
   invalidIds: z.array(z.string()).default([]),
   retrievedIds: z.array(z.string()).default([]),
 });
 
-export const EvidenceUiHintsSchema: z.ZodType<EvidenceUiHints, z.ZodTypeDef, unknown> = z.object({
+const EvidenceUiHintsSchema: z.ZodType<EvidenceUiHints, z.ZodTypeDef, unknown> = z.object({
   projects: z.array(z.string()).default([]),
   experiences: z.array(z.string()).default([]),
 });
@@ -521,7 +494,7 @@ export type ReasoningTraceError = {
   retryAfterMs?: number;
 };
 
-export type ReasoningAnswerMeta = {
+type ReasoningAnswerMeta = {
   model: string;
   answerMode: AnswerMode;
   answerLengthHint: AnswerLengthHint;
@@ -543,7 +516,7 @@ type CompleteReasoningTrace<T extends PartialReasoningTrace> = {
 
 export type ReasoningTrace = CompleteReasoningTrace<PartialReasoningTrace>;
 
-export type StreamErrorCode =
+type StreamErrorCode =
   | 'llm_timeout'
   | 'llm_error'
   | 'retrieval_error'
