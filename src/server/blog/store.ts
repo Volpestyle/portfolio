@@ -1,6 +1,12 @@
 import { PutObjectCommand, GetObjectCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand, DeleteCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import type {
+  GetCommandOutput,
+  QueryCommandOutput,
+  ScanCommandOutput,
+  UpdateCommandOutput,
+} from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'node:crypto';
 import { blogConfig } from '@/server/blog/config';
 import * as mockStore from '@/server/blog/mock-store';
@@ -27,6 +33,13 @@ type RawBlogRecord = {
 
 const useMockStore = () => isBlogFixtureRuntime();
 const docClient = getDocumentClient();
+const rawDocClient = docClient as unknown as { send: (command: unknown) => Promise<unknown> };
+
+// Preserve command outputs without tripping Smithy version skews.
+const sendDocumentCommand = async <Output>(command: unknown): Promise<Output> => {
+  return rawDocClient.send(command) as Promise<Output>;
+};
+
 const s3Client = getS3Client();
 const MAX_REVISIONS_PER_POST = 5;
 const REVISION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -237,7 +250,7 @@ export async function listPublishedPosts(
     }
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<QueryCommandOutput>(
     new QueryCommand({
       TableName: blogConfig.tableName,
       IndexName: blogConfig.statusIndexName,
@@ -286,7 +299,7 @@ export async function listPosts(options: { status?: BlogPostStatus; search?: str
     return mockStore.listPosts(options);
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<ScanCommandOutput>(
     new ScanCommand({
       TableName: blogConfig.tableName,
     })
@@ -324,7 +337,7 @@ export async function getPostWithContent(
     return mockStore.getPostWithContent(slug, options);
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<GetCommandOutput>(
     new GetCommand({
       TableName: blogConfig.tableName,
       Key: { slug },
@@ -374,7 +387,7 @@ export async function createPostRecord(input: {
   }
 
   const now = new Date().toISOString();
-  await docClient.send(
+  await sendDocumentCommand(
     new PutCommand({
       TableName: blogConfig.tableName,
       Item: {
@@ -471,7 +484,7 @@ export async function saveDraftRecord(input: {
     values[':tags'] = input.tags;
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<UpdateCommandOutput>(
     new UpdateCommand({
       TableName: blogConfig.tableName,
       Key: { slug: input.slug },
@@ -522,7 +535,7 @@ export async function publishPostRecord(input: {
   const publishedAt = input.publishedAt ?? new Date().toISOString();
   const nextVersion = input.expectedVersion + 1;
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<UpdateCommandOutput>(
     new UpdateCommand({
       TableName: blogConfig.tableName,
       Key: { slug: input.slug },
@@ -561,7 +574,7 @@ export async function archivePostRecord(input: { slug: string; expectedVersion: 
     return mockStore.archivePostRecord(input);
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<UpdateCommandOutput>(
     new UpdateCommand({
       TableName: blogConfig.tableName,
       Key: { slug: input.slug },
@@ -604,7 +617,7 @@ export async function markScheduledRecord(input: {
     return mockStore.markScheduledRecord(input);
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<UpdateCommandOutput>(
     new UpdateCommand({
       TableName: blogConfig.tableName,
       Key: { slug: input.slug },
@@ -649,7 +662,7 @@ export async function unmarkScheduledRecord(input: {
     return mockStore.unmarkScheduledRecord(input);
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<UpdateCommandOutput>(
     new UpdateCommand({
       TableName: blogConfig.tableName,
       Key: { slug: input.slug },
@@ -687,7 +700,7 @@ export async function deletePostRecord(slug: string): Promise<void> {
     return mockStore.deletePostRecord(slug);
   }
 
-  const existing = await docClient.send(
+  const existing = await sendDocumentCommand<GetCommandOutput>(
     new GetCommand({
       TableName: blogConfig.tableName,
       Key: { slug },
@@ -699,7 +712,7 @@ export async function deletePostRecord(slug: string): Promise<void> {
     return;
   }
 
-  await docClient.send(
+  await sendDocumentCommand(
     new DeleteCommand({
       TableName: blogConfig.tableName,
       Key: { slug },
@@ -714,7 +727,7 @@ export async function getPostRecord(slug: string): Promise<BlogPostRecord | null
     return mockStore.getPostRecord(slug);
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<GetCommandOutput>(
     new GetCommand({
       TableName: blogConfig.tableName,
       Key: { slug },
