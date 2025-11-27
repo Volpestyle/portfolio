@@ -142,6 +142,10 @@ jobs:
         working-directory: ${{ env.APP_ROOT }}
         run: pnpm install --frozen-lockfile
 
+      - name: Validate chat preprocess artifacts
+        working-directory: ${{ env.APP_ROOT }}
+        run: pnpm chat:validate
+
       - name: Install Playwright Browsers
         working-directory: ${{ env.APP_ROOT }}
         run: pnpm exec playwright install --with-deps chromium

@@ -14,6 +14,8 @@ import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import { experimental as cloudfrontExperimental } from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as cloudwatchActions from 'aws-cdk-lib/aws-cloudwatch-actions';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
@@ -25,6 +27,8 @@ import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as subs from 'aws-cdk-lib/aws-sns-subscriptions';
 import { Provider } from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
 
@@ -183,6 +187,8 @@ export class PortfolioStack extends Stack {
 
     const baseEnv = this.buildBaseEnvironment();
 
+    this.createOpenAiCostAlarm();
+
     this.createCacheInitializer(baseEnv);
     const revalidationWorker = this.createRevalidationConsumer(baseEnv);
     if (revalidationWorker) {
@@ -205,6 +211,7 @@ export class PortfolioStack extends Stack {
     this.attachSchedulerPermissions(serverEdgeFunction);
     this.attachSesPermissions(serverEdgeFunction);
     this.grantSecretAccess(serverEdgeFunction);
+    this.attachCostMetricPermissions(serverEdgeFunction);
 
     const imageResources = this.createImageOptimizationResources(baseEnv);
     if (imageResources) {
@@ -495,7 +502,6 @@ export class PortfolioStack extends Stack {
       'AWS_SECRETS_MANAGER_PRIMARY_REGION',
       'AWS_SECRETS_MANAGER_FALLBACK_REGION',
     ]);
-    const legacySecret = this.runtimeEnvironment['REVALIDATE_SECRET'];
 
     const fn = new lambda.Function(this, 'BlogPublishFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -507,7 +513,6 @@ export class PortfolioStack extends Stack {
       environment: {
         POSTS_TABLE: this.postsTable.tableName,
         REVALIDATE_ENDPOINT: `${this.resolveSiteUrl()}/api/revalidate`,
-        ...(legacySecret ? { REVALIDATE_SECRET: legacySecret } : {}),
         ...secretEnv,
       },
     });
@@ -637,6 +642,62 @@ export class PortfolioStack extends Stack {
     }
 
     return env;
+  }
+
+  private createOpenAiCostAlarm() {
+    const email = this.runtimeEnvironment['OPENAI_COST_ALERT_EMAIL'];
+    const metricsEnabled = this.runtimeEnvironment['OPENAI_COST_METRICS_ENABLED'] === 'true';
+    if (!email || !metricsEnabled) {
+      return;
+    }
+
+    const namespace = this.runtimeEnvironment['OPENAI_COST_METRIC_NAMESPACE'] ?? 'PortfolioChat/OpenAI';
+    const metricName = this.runtimeEnvironment['OPENAI_COST_METRIC_NAME'] ?? 'EstimatedCost';
+
+    const dailyCost = new cloudwatch.Metric({
+      namespace,
+      metricName,
+      statistic: 'Sum',
+      period: Duration.days(1),
+    });
+
+    const rolling30d = new cloudwatch.MathExpression({
+      // Rolling sum of the past 30 one-day data points.
+      expression: 'SUM([cost], 30)',
+      usingMetrics: { cost: dailyCost },
+      period: Duration.days(1),
+      label: 'OpenAICost30d',
+    });
+
+    const alarm = new cloudwatch.Alarm(this, 'OpenAICostAlarm', {
+      metric: rolling30d,
+      threshold: 10,
+      evaluationPeriods: 1,
+      datapointsToAlarm: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      alarmDescription: 'OpenAI estimated cost over the last ~30 days exceeded $10.',
+    });
+
+    const missingDataAlarm = new cloudwatch.Alarm(this, 'OpenAICostMetricMissing', {
+      metric: dailyCost.with({ statistic: 'SampleCount' }),
+      threshold: 1,
+      evaluationPeriods: 3,
+      datapointsToAlarm: 3,
+      treatMissingData: cloudwatch.TreatMissingData.BREACHING,
+      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+      alarmDescription: 'No OpenAI cost metrics received for 3 days; publishing may be broken.',
+    });
+
+    const topic = new sns.Topic(this, 'OpenAICostAlarmTopic', {
+      displayName: 'OpenAI Cost Alarm',
+    });
+    topic.addSubscription(new subs.EmailSubscription(email));
+
+    alarm.addAlarmAction(new cloudwatchActions.SnsAction(topic));
+    alarm.addOkAction(new cloudwatchActions.SnsAction(topic));
+    missingDataAlarm.addAlarmAction(new cloudwatchActions.SnsAction(topic));
+    missingDataAlarm.addOkAction(new cloudwatchActions.SnsAction(topic));
   }
 
   private createCacheInitializer(baseEnv: Record<string, string>) {
@@ -1161,6 +1222,20 @@ export class PortfolioStack extends Stack {
       new iam.PolicyStatement({
         actions: ['ses:SendEmail', 'ses:SendRawEmail'],
         resources: ['*'],
+      })
+    );
+  }
+
+  private attachCostMetricPermissions(grantable: iam.IGrantable) {
+    grantable.grantPrincipal.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        actions: ['cloudwatch:PutMetricData'],
+        resources: ['*'],
+        conditions: {
+          StringEquals: {
+            'cloudwatch:namespace': this.runtimeEnvironment['OPENAI_COST_METRIC_NAMESPACE'] ?? 'PortfolioChat/OpenAI',
+          },
+        },
       })
     );
   }
