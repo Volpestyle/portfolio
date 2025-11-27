@@ -1,0 +1,321 @@
+import { useCallback } from 'react';
+import type { ChatMessage, ChatTextPart, PartialReasoningTrace, ReasoningTraceError } from '@portfolio/chat-contract';
+import { parseChatStream, type ChatStreamEvent } from './chatStreamParser';
+import type { ApplyUiActionOptions } from './chatUiState';
+
+export type ChatAttachment = {
+  type: 'project' | 'resume';
+  id: string;
+  data?: unknown;
+};
+
+type StreamDependencies = {
+  replaceMessage: (message: ChatMessage) => void;
+  applyUiActions: (options?: ApplyUiActionOptions) => void;
+  applyBannerText?: (text?: string | null) => void;
+  applyReasoningTrace: (itemId?: string, trace?: PartialReasoningTrace) => void;
+  applyAttachment?: (attachment: ChatAttachment) => void;
+  markCompletedAt?: (itemId?: string, timestamp?: number) => void;
+};
+
+type StreamRequest = {
+  response: Response;
+  assistantMessage: ChatMessage;
+};
+
+export function useChatStream({
+  replaceMessage,
+  applyUiActions,
+  applyBannerText,
+  applyReasoningTrace,
+  applyAttachment,
+  markCompletedAt,
+}: StreamDependencies) {
+  return useCallback(
+    async ({ response, assistantMessage }: StreamRequest) => {
+      if (!response.body) {
+        throw new Error('The chat response body is missing.');
+      }
+
+      let mutableAssistant = assistantMessage;
+      const itemOrder: string[] = [];
+
+      const applyAssistantChange = (mutator: (message: ChatMessage) => void) => {
+        mutator(mutableAssistant);
+        mutableAssistant = {
+          ...mutableAssistant,
+          parts: mutableAssistant.parts.map((part) => (part.kind === 'text' ? { ...part } : part)),
+        };
+        replaceMessage(mutableAssistant);
+      };
+
+      const registerItem = (itemId?: string) => {
+        if (!itemId || itemOrder.includes(itemId)) {
+          return;
+        }
+        itemOrder.push(itemId);
+      };
+
+      const findInsertIndex = (message: ChatMessage, itemId?: string) => {
+        if (!itemId) {
+          return message.parts.length;
+        }
+
+        let targetIndex = itemOrder.indexOf(itemId);
+        if (targetIndex === -1) {
+          itemOrder.push(itemId);
+          targetIndex = itemOrder.length - 1;
+        }
+
+        for (let idx = 0; idx < message.parts.length; idx += 1) {
+          const partItemId = message.parts[idx].itemId;
+          if (!partItemId) {
+            continue;
+          }
+          const partOrderIndex = itemOrder.indexOf(partItemId);
+          if (partOrderIndex !== -1 && partOrderIndex > targetIndex) {
+            return idx;
+          }
+        }
+
+        return message.parts.length;
+      };
+
+      const ensureTextPart = (message: ChatMessage, itemId?: string): ChatTextPart => {
+        if (itemId) {
+          const existingPart = message.parts.find((part) => part.kind === 'text' && part.itemId === itemId) as
+            | ChatTextPart
+            | undefined;
+          if (existingPart) {
+            return existingPart;
+          }
+        }
+
+        // Reuse a single existing text part if it matches or is unlabeled to avoid duplicate renderings.
+        const fallback = message.parts.find((part) => part.kind === 'text') as ChatTextPart | undefined;
+        if (fallback && (!itemId || !fallback.itemId || fallback.itemId === itemId)) {
+          if (itemId && !fallback.itemId) {
+            fallback.itemId = itemId;
+          }
+          return fallback;
+        }
+
+        if (itemId) {
+          const insertIndex = findInsertIndex(message, itemId);
+          const nextPart: ChatTextPart = { kind: 'text', text: '', itemId };
+          message.parts.splice(insertIndex, 0, nextPart);
+          return nextPart;
+        }
+
+        const nextPart: ChatTextPart = { kind: 'text', text: '' };
+        message.parts.push(nextPart);
+        return nextPart;
+      };
+
+      const handleEvent = (event: ChatStreamEvent) => {
+        if (event.type === 'item' && typeof event.itemId === 'string') {
+          registerItem(event.itemId);
+          return;
+        }
+
+        if (event.type === 'ui') {
+          const itemId = typeof event.itemId === 'string' ? event.itemId : undefined;
+          registerItem(itemId);
+          const uiPayload = coerceUiPayload((event as { ui?: unknown }).ui);
+          applyUiActions({
+            anchorItemId: itemId ?? mutableAssistant.id,
+            ui: uiPayload,
+          });
+          const bannerText = coerceBannerText(uiPayload?.bannerText);
+          if (applyBannerText && bannerText !== undefined) {
+            applyBannerText(bannerText);
+          }
+          return;
+        }
+
+        if (event.type === 'token' && typeof (event as { token?: unknown }).token === 'string') {
+          const itemId = typeof event.itemId === 'string' ? event.itemId : undefined;
+          registerItem(itemId);
+          applyAssistantChange((message) => {
+            const textPart = ensureTextPart(message, itemId);
+            textPart.text += (event as { token: string }).token;
+          });
+          return;
+        }
+
+        if (event.type === 'reasoning') {
+          const itemId = typeof event.itemId === 'string' ? event.itemId : mutableAssistant.id;
+          registerItem(itemId);
+          const trace = coerceReasoningTrace((event as { trace?: unknown }).trace);
+          if (trace) {
+            applyReasoningTrace(itemId, trace);
+          }
+          return;
+        }
+
+        if (event.type === 'ui_actions') {
+          const itemId = typeof event.itemId === 'string' ? event.itemId : mutableAssistant.id;
+          registerItem(itemId);
+          return;
+        }
+
+        if (event.type === 'attachment') {
+          const attachment = coerceAttachment((event as { attachment?: unknown }).attachment);
+          if (attachment && applyAttachment) {
+            applyAttachment(attachment);
+          }
+          return;
+        }
+
+        if (event.type === 'error') {
+          const itemId = typeof event.itemId === 'string' ? event.itemId : mutableAssistant.id;
+          registerItem(itemId);
+          const reasoningError = coerceReasoningError(event);
+          if (reasoningError) {
+            applyReasoningTrace(itemId, {
+              plan: null,
+              retrieval: null,
+              evidence: null,
+              answerMeta: null,
+              uiHintWarnings: null,
+              error: reasoningError,
+            });
+          }
+          markCompletedAt?.(itemId);
+          const errorMessage =
+            (event as { message?: string }).message ??
+            (event as { error?: string }).error ??
+            'Chat stream error';
+          applyAssistantChange((message) => {
+            message.animated = false;
+          });
+          throw new Error(errorMessage);
+        }
+
+        if (event.type === 'done') {
+          const itemId = typeof event.itemId === 'string' ? event.itemId : mutableAssistant.id;
+          registerItem(itemId);
+          const totalDurationMs = typeof event.totalDurationMs === 'number' ? event.totalDurationMs : undefined;
+          markCompletedAt?.(itemId, totalDurationMs ? Date.now() : undefined);
+        }
+      };
+
+      for await (const event of parseChatStream(response.body, {
+        onParseError: (err) => console.warn('Failed to parse chat event', err),
+      })) {
+        if (event.type === 'done') {
+          applyAssistantChange((message) => {
+            message.animated = false;
+          });
+          break;
+        }
+        handleEvent(event);
+      }
+    },
+    [applyAttachment, applyBannerText, applyReasoningTrace, applyUiActions, markCompletedAt, replaceMessage]
+  );
+}
+
+function coerceUiPayload(
+  input: unknown
+): {
+  showProjects?: string[];
+  showExperiences?: string[];
+  bannerText?: string | null;
+  coreEvidenceIds?: string[];
+} | undefined {
+  if (!input || typeof input !== 'object') {
+    return undefined;
+  }
+  const record = input as Record<string, unknown>;
+  const normalizeIds = (value: unknown) => {
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
+    return value.filter((entry): entry is string => typeof entry === 'string');
+  };
+
+  const showProjects = normalizeIds(record.showProjects);
+  const showExperiences = normalizeIds(record.showExperiences);
+  const bannerText = coerceBannerText(record.bannerText);
+  const coreEvidenceIds = normalizeIds(record.coreEvidenceIds);
+
+  if (
+    showProjects === undefined &&
+    showExperiences === undefined &&
+    bannerText === undefined &&
+    coreEvidenceIds === undefined
+  ) {
+    return undefined;
+  }
+
+  return {
+    showProjects,
+    showExperiences,
+    bannerText,
+    coreEvidenceIds,
+  };
+}
+
+function coerceBannerText(value: unknown): string | null | undefined {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value === null) {
+    return null;
+  }
+  return undefined;
+}
+
+function coerceReasoningTrace(input: unknown): PartialReasoningTrace | undefined {
+  if (!input || typeof input !== 'object') {
+    return undefined;
+  }
+  const record = input as Partial<PartialReasoningTrace>;
+  const hasKnownField =
+    'plan' in record || 'retrieval' in record || 'evidence' in record || 'answerMeta' in record || 'error' in record;
+  if (!hasKnownField) {
+    return undefined;
+  }
+  return {
+    plan: 'plan' in record ? (record.plan ?? null) : null,
+    retrieval: 'retrieval' in record ? (record.retrieval ?? null) : null,
+    evidence: 'evidence' in record ? (record.evidence ?? null) : null,
+    answerMeta: 'answerMeta' in record ? (record.answerMeta ?? null) : null,
+    error: 'error' in record ? (record.error ?? null) : null,
+  };
+}
+
+function coerceReasoningError(input: unknown): ReasoningTraceError | undefined {
+  if (!input || typeof input !== 'object') {
+    return undefined;
+  }
+  const record = input as Record<string, unknown>;
+  const message =
+    typeof record.message === 'string'
+      ? record.message
+      : typeof record.error === 'string'
+        ? record.error
+        : undefined;
+  if (!message) {
+    return undefined;
+  }
+  const code = typeof record.code === 'string' ? record.code : undefined;
+  const retryable = typeof record.retryable === 'boolean' ? record.retryable : undefined;
+  const retryAfterMs = typeof record.retryAfterMs === 'number' ? record.retryAfterMs : undefined;
+  const stage = typeof record.stage === 'string' ? (record.stage as ReasoningTraceError['stage']) : undefined;
+  return { message, code, retryable, retryAfterMs, stage };
+}
+
+function coerceAttachment(input: unknown): ChatAttachment | undefined {
+  if (!input || typeof input !== 'object') {
+    return undefined;
+  }
+  const record = input as Record<string, unknown>;
+  const type = record.type;
+  const id = typeof record.id === 'string' ? record.id.trim() : '';
+  if (!id || (type !== 'project' && type !== 'resume')) {
+    return undefined;
+  }
+  return { type, id, data: record.data } as ChatAttachment;
+}
