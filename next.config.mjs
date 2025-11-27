@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  experimental: {
+    externalDir: true,
+  },
+  transpilePackages: ['@portfolio/chat-contract', '@portfolio/chat-data', '@portfolio/chat-orchestrator'],
   images: {
     qualities: [75, 85],
     remotePatterns: [
