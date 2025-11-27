@@ -1,0 +1,27 @@
+export type {
+  RetrievalSource,
+  RetrievalRequest,
+  RetrievalPlan,
+  EvidenceSummary,
+  SemanticFlag,
+  EvidenceItem,
+  UiPayload,
+  HighLevelAnswer,
+  EvidenceCompleteness,
+  AnswerPayload,
+  ExperienceScope,
+  AnswerMode,
+  AnswerLengthHint,
+} from '@portfolio/chat-contract';
+export {
+  EvidenceSummarySchema,
+  AnswerPayloadSchema,
+  ANSWER_MODE_VALUES,
+  ANSWER_LENGTH_VALUES,
+  INTENT_VALUES,
+  RESUME_FACET_VALUES,
+  EVIDENCE_SOURCE_VALUES,
+  SEMANTIC_FLAG_VALUES,
+  RETRIEVAL_SOURCE_VALUES,
+  RETRIEVAL_REQUEST_TOPK_MAX,
+} from '@portfolio/chat-contract';

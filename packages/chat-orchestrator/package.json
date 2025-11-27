@@ -1,0 +1,14 @@
+{
+  "name": "@portfolio/chat-orchestrator",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@portfolio/chat-contract": "workspace:*",
+    "@portfolio/chat-data": "workspace:*",
+    "js-tiktoken": "^1.0.21",
+    "openai": "^6.9.1"
+  }
+}
