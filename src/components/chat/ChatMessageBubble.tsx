@@ -1,21 +1,22 @@
 'use client';
 
-import type { ChatAttachment, ChatMessage } from '@/types/chat';
+import type { ChatMessage } from '@portfolio/chat-contract';
 import { cn } from '@/lib/utils';
-import { ProjectCardList } from './attachments/ProjectCardList';
-import { ProjectInlineDetails } from './attachments/ProjectInlineDetails';
-import { DocumentInlinePanel } from './attachments/DocumentInlinePanel';
-import { SocialLinkList } from './attachments/SocialLinkList';
 import { TypewriterMessage } from './TypewriterMessage';
 import { Markdown } from '@/components/Markdown';
-import Link from 'next/link';
+import { InlineUiPortalAnchor } from '@/components/chat/InlineUiPortal';
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
+  isStreamingMessage?: boolean;
   isLastAssistantMessage?: boolean;
 }
 
-export function ChatMessageBubble({ message, isLastAssistantMessage = false }: ChatMessageBubbleProps) {
+export function ChatMessageBubble({
+  message,
+  isStreamingMessage = false,
+  isLastAssistantMessage = false,
+}: ChatMessageBubbleProps) {
   const isUser = message.role === 'user';
 
   const wrapperClass = isUser
@@ -29,11 +30,7 @@ export function ChatMessageBubble({ message, isLastAssistantMessage = false }: C
     .pop();
 
   // Check if message has any content
-  const hasContent = message.parts.some((part) => {
-    if (part.kind === 'text') return part.text.trim().length > 0;
-    if (part.kind === 'attachment') return true;
-    return false;
-  });
+  const hasContent = message.parts.some((part) => part.kind === 'text' && part.text.trim().length > 0);
 
   // Don't render completely empty messages
   if (!hasContent) {
@@ -62,77 +59,36 @@ export function ChatMessageBubble({ message, isLastAssistantMessage = false }: C
 
             const isLastTextPart = index === lastTextPartIndex;
 
-            // Only use typewriter effect for the last assistant message
-            if (isLastAssistantMessage) {
+            const canAnimate = isStreamingMessage && message.animated !== false;
+
+            if (canAnimate) {
               return (
                 <TypewriterMessage
                   key={`${message.id}-text-${index}`}
                   text={part.text}
                   className="text-sm leading-relaxed"
                   showCursor={isLastTextPart}
+                  streaming
                   markdown
                 />
               );
             }
 
             // All other assistant messages just display normally (with Markdown)
-            return <Markdown key={`${message.id}-text-${index}`} content={part.text} variant="compact" />;
-          }
-
-          if (part.kind === 'attachment') {
-            return <div key={`${message.id}-attachment-${index}`}>{renderAttachment(part.attachment)}</div>;
+            return (
+              <Markdown
+                key={`${message.id}-text-${index}`}
+                content={part.text}
+                variant="compact"
+                showCursor={isLastAssistantMessage && isLastTextPart}
+              />
+            );
           }
 
           return null;
         })}
+        {!isUser ? <InlineUiPortalAnchor anchorId={message.id} /> : null}
       </div>
-    </div>
-  );
-}
-
-function renderAttachment(attachment: ChatAttachment) {
-  switch (attachment.type) {
-    case 'project-cards':
-      return <ProjectCardList repos={attachment.repos} />;
-    case 'project-details':
-      return (
-        <ProjectInlineDetails
-          repo={attachment.repo}
-          readme={attachment.readme}
-          breadcrumbsOverride={attachment.breadcrumbsOverride}
-        />
-      );
-    case 'doc':
-      return (
-        <DocumentInlinePanel
-          repo={attachment.repoName}
-          title={attachment.title}
-          path={attachment.path}
-          content={attachment.content}
-          breadcrumbsOverride={attachment.breadcrumbsOverride}
-        />
-      );
-    case 'social-links':
-      return (
-        <div className="mt-3">
-          <SocialLinkList links={attachment.links} />
-        </div>
-      );
-    case 'link':
-      return <ChatLinkAttachment url={attachment.url} label={attachment.label} />;
-    default:
-      return null;
-  }
-}
-
-function ChatLinkAttachment({ url, label }: { url: string; label?: string }) {
-  const text = label || url;
-  return (
-    <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3">
-      <p className="text-xs uppercase tracking-wide text-white/60">Navigate</p>
-      <Link href={url} className="text-blue-300 underline underline-offset-4">
-        {text}
-      </Link>
     </div>
   );
 }
