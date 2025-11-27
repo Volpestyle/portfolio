@@ -9,8 +9,7 @@ import { cn, formatDate } from '@/lib/utils';
 import { useImageCarousel } from '@/hooks/useImageCarousel';
 import { AnimatedExpandButton } from '@/components/ui/AnimatedExpandButton';
 import { LanguageBar } from '@/components/LanguageBar';
-import { motion, type Transition } from 'framer-motion';
-import { cardTransitions } from '@/lib/animations';
+import { motion } from 'framer-motion';
 
 interface BreadcrumbOverride {
   label: string;

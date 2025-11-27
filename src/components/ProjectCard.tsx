@@ -91,7 +91,10 @@ export function ProjectCard({ project, repo, variant = 'default', onOpen, isExpa
     return (
       <Card className="group relative flex h-full flex-col overflow-hidden border-0 bg-transparent p-4 text-white">
         {summaryText && (
-          <motion.h2 className="mb-2 flex items-center justify-between text-xl font-bold">
+          <motion.h2
+            layoutId={layoutId ? `${layoutId}-title` : undefined}
+            className="mb-2 flex items-center justify-between text-xl font-bold"
+          >
             <button
               onClick={(event) => {
                 event.stopPropagation();
