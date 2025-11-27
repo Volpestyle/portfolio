@@ -121,8 +121,8 @@ export function ProjectCard({ project, repo, variant = 'default', onOpen, isExpa
               <Icon className="h-4 w-4" />
             </motion.div>
           </button>
-          {repo?.isStarred && <StarIcon />}
         </motion.h2>
+        {repo?.isStarred ? <StarIcon /> : <StarIcon />}
 
         {summaryText && <p className="mb-4 text-sm opacity-90">{summaryText}</p>}
 
@@ -196,7 +196,7 @@ export function ProjectCard({ project, repo, variant = 'default', onOpen, isExpa
             <Icon className="h-4 w-4" />
           </motion.div>
         </Link>
-        {repo?.isStarred && <StarIcon />}
+        {repo?.isStarred ? <StarIcon /> : <StarIcon />}
       </h2>
 
       {summaryText && <p className="mb-4 text-sm opacity-90">{summaryText}</p>}
