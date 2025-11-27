@@ -1825,8 +1825,7 @@ export function buildUiArtifacts(params: BuildUiArtifactsParams): UiPayload {
 
   const suppressCards =
     (params.evidence.highLevelAnswer === 'no' || params.evidence.highLevelAnswer === 'unknown') &&
-    params.plan.intent !== 'meta' &&
-    params.plan.answerMode !== 'meta_chitchat';
+    (params.plan.intent === 'meta' || params.plan.answerMode === 'meta_chitchat');
 
   if (suppressCards) {
     projectIds = [];

@@ -1,12 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import type { ResumeEntry } from '@portfolio/chat-contract';
 import { cn } from '@/lib/utils';
 import { ToolCallIndicator } from './ToolCallIndicator';
-import { cardTransitions } from '@/lib/animations';
 
 function formatDate(value?: string | null) {
   if (!value) return null;
@@ -92,10 +91,9 @@ function ExperienceCard({ experience: exp, variant = 'default' }: ExperienceCard
 
   return (
     <motion.div
-      layout
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={cardTransitions.layout}
+      transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
       className={cn(
         'flex flex-col rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm transition-colors duration-300 hover:border-white/20 hover:bg-black/40',
         variant === 'compact' && 'p-3'
@@ -224,19 +222,11 @@ export function ExperienceList({
     return (
       <section>
         <p className="text-[11px] uppercase tracking-wide text-white/60">{title}</p>
-        <LayoutGroup>
-          <motion.div layout className="mt-2 space-y-3" transition={cardTransitions.layout}>
-            {entries.map((exp) => {
-              return (
-                <ExperienceCard
-                  key={exp.id}
-                  experience={exp}
-                  variant={variant}
-                />
-              );
-            })}
-          </motion.div>
-        </LayoutGroup>
+        <div className="mt-2 space-y-3">
+          {entries.map((exp) => {
+            return <ExperienceCard key={exp.id} experience={exp} variant={variant} />;
+          })}
+        </div>
       </section>
     );
   };

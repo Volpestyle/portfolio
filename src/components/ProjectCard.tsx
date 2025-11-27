@@ -90,39 +90,30 @@ export function ProjectCard({ project, repo, variant = 'default', onOpen, isExpa
   if (isChat) {
     return (
       <Card className="group relative flex h-full flex-col overflow-hidden border-0 bg-transparent p-4 text-white">
-        <motion.h2
-          layoutId={layoutId ? `${layoutId}-title` : undefined}
-          className="mb-2 flex items-center justify-between text-xl font-bold"
-        >
-          <button
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpen?.();
-            }}
-            disabled={!onOpen}
-            className="group/title relative inline-flex items-center gap-2 rounded transition-all duration-200 hover:bg-white hover:text-black active:bg-white active:text-black disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-white"
-            style={{
-              paddingLeft: isTitleHovered ? '12px' : '0px',
-              paddingRight: isTitleHovered ? '12px' : '0px',
-              paddingTop: '8px',
-              paddingBottom: '8px',
-            }}
-            onMouseEnter={() => setIsTitleHovered(true)}
-            onMouseLeave={() => setIsTitleHovered(false)}
-          >
-            {project.name}
-            <motion.div
-              animate={{
-                x: isTitleHovered ? 0 : -8,
-                opacity: isTitleHovered ? 1 : 0,
+        {summaryText && (
+          <motion.h2 className="mb-2 flex items-center justify-between text-xl font-bold">
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpen?.();
               }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
+              disabled={!onOpen}
+              className="group/title relative inline-flex items-center gap-2 rounded transition-all duration-200 hover:bg-white hover:text-black active:bg-white active:text-black disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-white"
+              style={{
+                paddingLeft: isTitleHovered ? '12px' : '0px',
+                paddingRight: isTitleHovered ? '12px' : '0px',
+                paddingTop: '8px',
+                paddingBottom: '8px',
+              }}
+              onMouseEnter={() => setIsTitleHovered(true)}
+              onMouseLeave={() => setIsTitleHovered(false)}
             >
+              {project.name}
               <Icon className="h-4 w-4" />
-            </motion.div>
-          </button>
-        </motion.h2>
-        {repo?.isStarred ? <StarIcon /> : <StarIcon />}
+            </button>
+            {repo?.isStarred && <StarIcon />}
+          </motion.h2>
+        )}
 
         {summaryText && <p className="mb-4 text-sm opacity-90">{summaryText}</p>}
 
@@ -172,32 +163,24 @@ export function ProjectCard({ project, repo, variant = 'default', onOpen, isExpa
 
   return (
     <Card className="relative flex h-full flex-col border-white bg-black/5 p-4 text-white backdrop-blur-sm">
-      <h2 className="mb-2 flex items-center justify-between text-xl font-bold">
-        <Link
-          href={projectLink}
-          className="group relative inline-flex items-center gap-2 rounded transition-all duration-200 hover:bg-white hover:text-black active:bg-white active:text-black"
-          style={{
-            paddingLeft: isTitleHovered ? '12px' : '0px',
-            paddingRight: isTitleHovered ? '12px' : '0px',
-            paddingTop: '8px',
-            paddingBottom: '8px',
-          }}
-          onMouseEnter={() => setIsTitleHovered(true)}
-          onMouseLeave={() => setIsTitleHovered(false)}
-        >
-          {project.name}
-          <motion.div
-            animate={{
-              x: isTitleHovered ? 0 : -8,
-              opacity: isTitleHovered ? 1 : 0,
+      {summaryText && (
+        <h2 className="mb-2 flex items-center justify-between text-xl font-bold">
+          <Link
+            href={projectLink}
+            className="group relative inline-flex items-center gap-2 rounded transition-all duration-200 hover:bg-white hover:text-black active:bg-white active:text-black"
+            style={{
+              paddingLeft: isTitleHovered ? '12px' : '0px',
+              paddingRight: isTitleHovered ? '12px' : '0px',
             }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
+            onMouseEnter={() => setIsTitleHovered(true)}
+            onMouseLeave={() => setIsTitleHovered(false)}
           >
+            {project.name}
             <Icon className="h-4 w-4" />
-          </motion.div>
-        </Link>
-        {repo?.isStarred ? <StarIcon /> : <StarIcon />}
-      </h2>
+          </Link>
+          {repo?.isStarred && <StarIcon />}
+        </h2>
+      )}
 
       {summaryText && <p className="mb-4 text-sm opacity-90">{summaryText}</p>}
       {createdDate && (
