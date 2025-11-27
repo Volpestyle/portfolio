@@ -34,6 +34,9 @@ test.describe('API integration', () => {
 
   test('document endpoint serves configured doc (optional)', async ({ request }) => {
     test.skip(!(repoOwner && repoName && docPath), 'Document path environment variables not set');
+    if (!docPath) {
+      throw new Error('Document path configuration is required for this test.');
+    }
     const encodedPath = docPath
       .split('/')
       .map((segment) => encodeURIComponent(segment))
@@ -61,6 +64,9 @@ test.describe('API integration', () => {
             content: 'integration ping',
           },
         ],
+        ownerId: process.env.CHAT_OWNER_ID ?? 'portfolio-owner',
+        responseAnchorId: 'integration-anchor',
+        conversationId: 'integration-conversation',
       },
     });
 
@@ -72,8 +78,8 @@ test.describe('API integration', () => {
       const errorEvents = events.filter((event) => event.type === 'error');
       expect(errorEvents.length, 'SSE stream should not include error frames').toBe(0);
       const streamedText = events
-        .filter((event) => event.type === 'token' && typeof event.delta === 'string')
-        .map((event) => event.delta)
+        .filter((event) => event.type === 'token' && typeof event.token === 'string')
+        .map((event) => event.token as string)
         .join('')
         .trim();
       expect(streamedText.length, 'Chat response should return tokens from the real provider').toBeGreaterThan(0);
@@ -105,7 +111,7 @@ test.describe('API integration', () => {
 
 type ChatSseEvent = {
   type?: string;
-  delta?: string;
+  token?: string;
 };
 
 async function readSseEvents(response: APIResponse): Promise<ChatSseEvent[]> {

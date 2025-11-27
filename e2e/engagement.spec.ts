@@ -68,7 +68,7 @@ test.describe('Engagement surfaces', () => {
     await expect(page.getByText(/failed to send message|server error/i)).toBeVisible();
   });
 
-  test('chat streams responses with project attachments', async ({ page }) => {
+  test('chat streams responses with portfolio surfaces', async ({ page }) => {
     if (!hitsRealApis) {
       await mockChatStream(page);
     }

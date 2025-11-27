@@ -8,22 +8,16 @@ export async function fillContactForm(page: Page) {
 
 export async function mockChatStream(page: Page) {
   const repoFixture = {
+    id: 'sample-ai-app',
+    slug: 'sample-ai-app',
     name: 'sample-ai-app',
-    description: 'Edge-optimized AI assistant with inline documentation.',
-    created_at: '2024-01-01T00:00:00.000Z',
-    pushed_at: '2024-02-15T12:00:00.000Z',
-    updated_at: '2024-02-15T12:00:00.000Z',
-    html_url: 'https://github.com/volpestyle/sample-ai-app',
-    owner: { login: 'volpestyle' },
-    isStarred: true,
-    private: false,
+    oneLiner: 'Edge-optimized AI assistant with inline documentation.',
+    description: 'Edge-optimized AI assistant with inline documentation and streaming UI surfaces.',
+    techStack: ['Next.js', 'TypeScript', 'OpenAI'],
+    languages: ['TypeScript'],
     tags: ['nextjs', 'ai', 'edge'],
-    icon: 'rocket',
-    languagePercentages: [
-      { name: 'TypeScript', percent: 72 },
-      { name: 'Rust', percent: 18 },
-      { name: 'Python', percent: 10 },
-    ],
+    context: { type: 'personal' as const },
+    githubUrl: 'https://github.com/volpestyle/sample-ai-app',
   };
 
   // Deterministic SSE payload so chat tests do not rely on real providers.
@@ -31,35 +25,47 @@ export async function mockChatStream(page: Page) {
     { type: 'item', itemId: 'assistant-item' },
     {
       type: 'token',
-      delta: "Here's a featured project and its inline docs.",
+      token: "Here's a featured project and its inline docs.",
       itemId: 'assistant-item',
     },
     {
-      type: 'attachment',
-      attachment: {
-        type: 'project-cards',
-        repos: [repoFixture],
-      },
+      type: 'ui',
       itemId: 'assistant-item',
-    },
-    {
-      type: 'attachment',
-      attachment: {
-        type: 'project-details',
-        repo: repoFixture,
-        readme: `# Sample AI App
-
-This assistant streams responses from edge functions and can surface inline documentation.
-
-## Docs
-Read the [API Contract](docs/API.md) for payload details.`,
-      },
-      itemId: 'assistant-item',
+      ui: { showProjects: [repoFixture.id], showExperiences: [] },
     },
     { type: 'done' },
   ];
 
   const body = frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join('');
+
+  const projectSummary = {
+    id: repoFixture.id,
+    slug: repoFixture.slug,
+    name: repoFixture.name,
+    oneLiner: repoFixture.oneLiner,
+    description: repoFixture.description,
+    techStack: repoFixture.techStack,
+    languages: repoFixture.languages,
+    tags: repoFixture.tags,
+    context: repoFixture.context,
+    githubUrl: repoFixture.githubUrl,
+  };
+
+  await page.route('**/api/projects', async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projects: [projectSummary] }),
+    });
+  });
+
+  await page.route('**/api/resume', async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries: [] }),
+    });
+  });
 
   await page.route('**/api/chat', async (route) => {
     await route.fulfill({

@@ -120,7 +120,3 @@ export function buildProjectHeaders(
 export function usingRealApis(runtime: TestRuntime): boolean {
   return runtime.mode === 'integration' || runtime.mode === 'real';
 }
-
-export function getTestModeHeaderName(): string {
-  return TEST_MODE_HEADER;
-}

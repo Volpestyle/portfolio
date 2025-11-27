@@ -51,7 +51,7 @@ pnpm test:report
 - ✅ **Projects + knowledge flows** – opening project cards, README rendering, doc breadcrumbs.
 - ✅ **Blog** – handles both "no posts yet" and published article paths.
 - ✅ **Contact** – native validation, success toast, and API error handling.
-- ✅ **Chat** – full message send using SSE streaming, project card attachments, README doc links, and document fetching.
+- ✅ **Chat** – full message send using SSE streaming, portfolio UI surfaces, README doc links, and document fetching.
 - ✅ **Error surfaces** – ensures users see actionable messaging without relying on real upstream services.
 
 ### Test Suites
