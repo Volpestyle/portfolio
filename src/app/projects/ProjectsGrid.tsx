@@ -1,13 +1,18 @@
 'use client';
 
 import { ProjectCard } from '@/components/ProjectCard';
-import type { RepoData } from '@/lib/github-server';
+import type { ProjectSummary, RepoData } from '@portfolio/chat-contract';
 
-export function ProjectsGrid({ repos }: { repos: RepoData[] }) {
+type ProjectCardEntry = {
+  project: ProjectSummary;
+  repo?: RepoData;
+};
+
+export function ProjectsGrid({ projects }: { projects: ProjectCardEntry[] }) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      {repos.map((repo) => (
-        <ProjectCard key={repo.name} repo={repo} />
+      {projects.map(({ project, repo }) => (
+        <ProjectCard key={project.id} project={project} repo={repo} />
       ))}
     </div>
   );

@@ -9,14 +9,23 @@ import { cn, formatDate } from '@/lib/utils';
 import { useImageCarousel } from '@/hooks/useImageCarousel';
 import { AnimatedExpandButton } from '@/components/ui/AnimatedExpandButton';
 import { LanguageBar } from '@/components/LanguageBar';
+import { motion, type Transition } from 'framer-motion';
+import { cardTransitions } from '@/lib/animations';
+
+interface BreadcrumbOverride {
+  label: string;
+  href?: string;
+  onClick?: () => void;
+}
 
 interface ProjectContentProps {
   pid: string;
   readme: string;
   repoInfo: RepoData;
-  breadcrumbsOverride?: { label: string; href?: string }[];
+  breadcrumbsOverride?: BreadcrumbOverride[];
   variant?: 'page' | 'chat';
   onDocLinkClick?: (docPath: string, label?: string) => void;
+  layoutId?: string;
 }
 
 export function ProjectContent({
@@ -26,6 +35,7 @@ export function ProjectContent({
   breadcrumbsOverride,
   variant = 'page',
   onDocLinkClick,
+  layoutId,
 }: ProjectContentProps) {
   const isChat = variant === 'chat';
   const { allImages, carouselInitialIndex, isCarouselOpen, handleImageClick, closeCarousel } = useImageCarousel({
@@ -48,7 +58,12 @@ export function ProjectContent({
       >
         <div className={cn('mb-6', isChat ? 'px-2' : '')}>
           <div className="mb-3 flex items-center">
-            <h1 className={cn('mr-4 font-bold', isChat ? 'text-lg' : 'text-3xl')}>{pid}</h1>
+            <motion.h1
+              layoutId={layoutId ? `${layoutId}-title` : undefined}
+              className={cn('mr-4 font-bold', isChat ? 'text-lg' : 'text-3xl')}
+            >
+              {pid}
+            </motion.h1>
             {repoInfo.private ? (
               <Button
                 disabled
@@ -59,7 +74,7 @@ export function ProjectContent({
             ) : (
               <AnimatedExpandButton
                 icon={<ExternalLinkIcon className="h-5 w-5" />}
-                text="View on GitHub"
+                text="view on github"
                 expandedWidth={isChat ? '8rem' : '9rem'}
                 href={repoInfo.html_url}
                 external

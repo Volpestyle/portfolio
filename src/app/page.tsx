@@ -1,6 +1,6 @@
 import ChatDock from '@/components/chat/ChatDock';
-import { HeroTitle } from '@/components/HeroTitle';
 import { ChatDevTools } from '@/components/chat/ChatDevTools';
+import { HeroTitle } from '@/components/HeroTitle';
 
 export default function Home() {
   return (

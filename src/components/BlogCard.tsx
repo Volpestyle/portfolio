@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { formatDate } from '@/lib/utils';
 import { ArrowRight, BookOpen, Clock, Calendar } from 'lucide-react';
-import { springAnimations } from '@/lib/animations';
 import { AnimatedExpandButton } from '@/components/ui/AnimatedExpandButton';
 import type { BlogPostSummary } from '@/types/blog';
 
@@ -22,7 +21,7 @@ export function BlogCard({ post }: BlogCardProps) {
       <h2 className="mb-3 text-2xl font-bold">
         <Link
           href={`/blog/${post.slug}`}
-          className="group/title relative inline-flex items-center gap-2 rounded transition-all duration-300 hover:bg-white hover:text-black active:bg-white active:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          className="group/title relative inline-flex items-center gap-2 rounded transition-all duration-200 hover:bg-white hover:text-black active:bg-white active:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           style={{
             paddingLeft: isTitleHovered ? '12px' : '0px',
             paddingRight: isTitleHovered ? '12px' : '0px',
@@ -38,7 +37,7 @@ export function BlogCard({ post }: BlogCardProps) {
               x: isTitleHovered ? 0 : -8,
               opacity: isTitleHovered ? 1 : 0,
             }}
-            transition={springAnimations.iconText}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
           >
             <BookOpen className="h-5 w-5" />
           </motion.div>
