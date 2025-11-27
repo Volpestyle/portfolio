@@ -1,0 +1,324 @@
+digraph PortfolioChatEngine {
+  graph [
+    label="Portfolio Chat Engine — High-Level Architecture (vNext · 2025-11-23)",
+    labelloc="t",
+    fontsize=14,
+    fontname="Inter, Helvetica, Arial",
+    bgcolor="white",
+    rankdir="LR",
+    nodesep=0.5,
+    ranksep=0.7,
+    splines=true
+  ];
+
+  node [
+    fontname="Inter, Helvetica, Arial",
+    fontsize=10,
+    shape=box,
+    style="rounded,filled",
+    fillcolor="#f8fafc",
+    color="#cbd5f5"
+  ];
+
+  edge [
+    fontname="Inter, Helvetica, Arial",
+    fontsize=9,
+    color="#64748b",
+    arrowsize=0.7
+  ];
+
+  // =========================
+  // Frontend & Chat API
+  // =========================
+  subgraph cluster_frontend {
+    label="Frontend (Next.js)";
+    fontsize=11;
+    fontname="Inter, Helvetica, Arial";
+    color="#e2e8f0";
+    style="rounded";
+
+    user [label="User", shape=oval, fillcolor="#e0f2fe", color="#7fb4ff"];
+
+    frontend_ui [
+      label="Chat UI\n(threads, composer, reasoning drawer,\nportfolio cards)",
+      shape=box,
+      fillcolor="#eff6ff"
+    ];
+  }
+
+  subgraph cluster_api {
+    label="Chat API (Next.js /api/chat)";
+    fontsize=11;
+    fontname="Inter, Helvetica, Arial";
+    color="#e2e8f0";
+    style="rounded";
+
+    chat_api [
+      label="Chat API Handler\n- Validates ChatRequestPayload\n- Binds ownerId\n- Streams SSE events\n(item, token, ui, reasoning, done)"
+    ];
+  }
+
+  // =========================
+  // Runtime Config
+  // =========================
+  subgraph cluster_config {
+    label="Runtime Configuration";
+    fontsize=11;
+    fontname="Inter, Helvetica, Arial";
+    color="#e2e8f0";
+    style="rounded";
+
+    owner_config [
+      label="OwnerConfig\n- ownerId\n- ownerName\n- pronouns\n- domainLabel\n- portfolioKind?",
+      fillcolor="#fefce8"
+    ];
+
+    model_config [
+      label="ModelConfig\n- plannerModel\n- evidenceModel/DeepDive\n- answerModel\n- embeddingModel",
+      fillcolor="#fefce8"
+    ];
+
+    data_providers [
+      label="DataProviders\n- projects\n- resume\n- profile\n- persona\n- embeddingIndexes",
+      fillcolor="#fefce8"
+    ];
+
+  }
+
+  // =========================
+  // Orchestrator & Pipeline
+  // =========================
+  subgraph cluster_orchestrator {
+    label="Chat Orchestrator (packages/chat-orchestrator)";
+    fontsize=11;
+    fontname="Inter, Helvetica, Arial";
+    color="#e2e8f0";
+    style="rounded";
+
+    orchestrator [
+      label="ChatRuntime\n(createChatRuntime)\n- Planner → Retrieval → Evidence → Answer\n- Builds ReasoningTrace & UiPayload\n- Enforces invariants",
+      shape=component,
+      fillcolor="#eef2ff"
+    ];
+
+    planner [
+      label="Planner\n- Intent classification\n- RetrievalPlan\n(intent, answerMode, enumerateAllRelevant,\nexperienceScope, retrievalRequests,\nresumeFacets)",
+      fillcolor="#e0f2fe"
+    ];
+
+    retrieval [
+      label="Retrieval Engine\n(packages/chat-data)\n- BM25 shortlist\n- Embedding re-ranking\n- Recency scoring\n- Enumeration mode (topK↑ when enumerateAllRelevant)",
+      fillcolor="#e0f2fe"
+    ];
+
+    evidence [
+      label="Evidence Stage\n- EvidenceSummary\n(highLevelAnswer, evidenceCompleteness,\nselectedEvidence, semanticFlags,\nuiHints.projects/experiences)",
+      fillcolor="#e0f2fe"
+    ];
+
+    answer [
+      label="Answer Stage\n- AnswerPayload\n(message, thoughts?)\n- Uses intent, answerMode,\nanswerLengthHint, uiHints",
+      fillcolor="#e0f2fe"
+    ];
+
+    { rank = same; planner; retrieval; evidence; answer; }
+  }
+
+  // =========================
+  // Data & Retrieval Layer
+  // =========================
+  subgraph cluster_data {
+    label="Retrieval & Data Layer (packages/chat-data)";
+    fontsize=11;
+    fontname="Inter, Helvetica, Arial";
+    color="#e2e8f0";
+    style="rounded";
+
+    projects_corpus [
+      label="Projects Corpus\n(ProjectDoc[])",
+      fillcolor="#f1f5f9"
+    ];
+
+    resume_corpus [
+      label="Resume Corpus\n(ResumeDoc[]: experiences,\neducation, awards, skills)",
+      fillcolor="#f1f5f9"
+    ];
+
+    profile_corpus [
+      label="Profile\n(ProfileDoc | null)",
+      fillcolor="#f1f5f9"
+    ];
+
+    persona_summary [
+      label="PersonaSummary\n(style, tone, key facts)",
+      fillcolor="#f1f5f9"
+    ];
+
+    embedding_indexes [
+      label="EmbeddingIndexes\n- projects\n- resume\n- profile?",
+      fillcolor="#f1f5f9"
+    ];
+  }
+
+  // =========================
+  // LLM Integration
+  // =========================
+  subgraph cluster_llm {
+    label="LLM Integration (OpenAI Responses API)";
+    fontsize=11;
+    fontname="Inter, Helvetica, Arial";
+    color="#e2e8f0";
+    style="rounded";
+
+    planner_llm [
+      label="callPlanner\n- plannerModel (gpt-5-nano-2025-06-01)\n- response_format: retrievalPlanSchema",
+      shape=box,
+      fillcolor="#fdf2ff"
+    ];
+
+    evidence_llm [
+      label="callEvidence\n- evidenceModel/DeepDive\n- response_format: evidenceSummarySchema",
+      shape=box,
+      fillcolor="#fdf2ff"
+    ];
+
+    answer_llm [
+      label="callAnswer\n- answerModel\n- response_format: answerPayloadSchema\n- streams AnswerPayload.message",
+      shape=box,
+      fillcolor="#fdf2ff"
+    ];
+
+    embedding_llm [
+      label="Embeddings\n(text-embedding-3-large or -small)",
+      shape=box,
+      fillcolor="#fdf2ff"
+    ];
+  }
+
+  // =========================
+  // Offline Preprocessing
+  // =========================
+  subgraph cluster_preprocess {
+    label="Offline Preprocessing (packages/chat-preprocess-cli)";
+    fontsize=11;
+    fontname="Inter, Helvetica, Arial";
+    color="#e2e8f0";
+    style="rounded,dashed";
+
+    preprocess_cli [
+      label="Preprocess CLI\n- Ingest data/chat/* & GitHub\n- Build generated/ corpora\n- Enrich persona\n- Compute embeddings\n- Emit token & cost metrics",
+      fillcolor="#fdf4ff"
+    ];
+
+    preprocess_models [
+      label="Offline Models\n- gpt-5.1 (enrichment, persona)\n- text-embedding-3-large",
+      fillcolor="#fdf4ff"
+    ];
+  }
+
+  // =========================
+  // Observability & Metrics
+  // =========================
+  subgraph cluster_observability {
+    label="Observability & Devtools";
+    fontsize=11;
+    fontname="Inter, Helvetica, Arial";
+    color="#e2e8f0";
+    style="rounded";
+
+    runtime_metrics [
+      label="Runtime Metrics\n- tokens & cost per stage\n- planner intent/kind/answerMode\n- retrieval stats\n- evidence & uiHints sizes\n- answer length & thoughts",
+      fillcolor="#ecfdf5"
+    ];
+
+    reasoning_trace [
+      label="ReasoningTrace & Dev UI\n- plan (intent, enumerateAllRelevant)\n- retrieval summaries\n- EvidenceSummary (uiHints)\n- Answer meta",
+      fillcolor="#ecfdf5"
+    ];
+  }
+
+  // =========================
+  // Edges: User → Runtime → UI
+  // =========================
+
+  // Frontend <-> User
+  user -> frontend_ui [label="chat messages"];
+
+  // Frontend -> Chat API
+  frontend_ui -> chat_api [
+    label="HTTP POST\nChatRequestPayload\n(ownerId, messages, responseAnchorId)"
+  ];
+
+  // Chat API -> Orchestrator
+  chat_api -> orchestrator [
+    label="chatApi.run()\n(createChatApi → createChatRuntime)",
+    penwidth=1.2
+  ];
+
+  // Orchestrator -> Pipeline stages
+  orchestrator -> planner [label="latest message\n+ conversation window"];
+  planner -> retrieval [label="RetrievalPlan\n(intent, enumerateAllRelevant,\nretrievalRequests, resumeFacets)"];
+  retrieval -> evidence [label="retrieved docs\n(projects, resume, profile)"];
+  evidence -> answer [label="EvidenceSummary\n(highLevelAnswer,\nselectedEvidence, uiHints)"];
+
+  // Pipeline results back to Orchestrator & API
+  answer -> orchestrator [label="AnswerPayload\n(message, thoughts?)"];
+  evidence -> orchestrator [label="EvidenceSummary\n(for UiPayload & ReasoningTrace)"];
+  orchestrator -> chat_api [
+    label="SSE events\n- token, ui, reasoning, done",
+    penwidth=1.1
+  ];
+  chat_api -> frontend_ui [
+    label="SSE stream\n- tokens (answer)\n- ui (cards, overview grid)\n- reasoning (dev)",
+    penwidth=1.1
+  ];
+
+  // =========================
+  // Edges: Config & Data
+  // =========================
+  owner_config -> orchestrator [label="owner config", style="dashed"];
+  model_config -> orchestrator [label="model config", style="dashed"];
+
+  // Data providers feed retrieval & answer context
+  data_providers -> projects_corpus [style="dashed", arrowhead="none"];
+  data_providers -> resume_corpus   [style="dashed", arrowhead="none"];
+  data_providers -> profile_corpus  [style="dashed", arrowhead="none"];
+  data_providers -> persona_summary [style="dashed", arrowhead="none"];
+  data_providers -> embedding_indexes [style="dashed", arrowhead="none"];
+
+  retrieval -> projects_corpus [label="BM25 + embeddings", style="solid"];
+  retrieval -> resume_corpus   [label="BM25 + embeddings", style="solid"];
+  retrieval -> profile_corpus  [label="BM25 + embeddings", style="solid"];
+  retrieval -> embedding_indexes [label="vector search", style="solid"];
+
+  orchestrator -> persona_summary [label="persona context", style="dotted"];
+  orchestrator -> profile_corpus  [label="identity context", style="dotted"];
+
+  // =========================
+  // Edges: LLM Calls
+  // =========================
+  planner -> planner_llm [label="callPlanner\n(JSON schema)", style="dotted"];
+  evidence -> evidence_llm [label="callEvidence\n(JSON schema)", style="dotted"];
+  answer -> answer_llm [label="callAnswer\n(JSON schema + streaming)", style="dotted"];
+  retrieval -> embedding_llm [label="embedding queries", style="dotted"];
+
+  model_config -> planner_llm  [label="plannerModel", style="dashed"];
+  model_config -> evidence_llm [label="evidenceModel*", style="dashed"];
+  model_config -> answer_llm   [label="answerModel", style="dashed"];
+  model_config -> embedding_llm [label="embeddingModel", style="dashed"];
+
+  // =========================
+  // Edges: Offline Preprocessing
+  // =========================
+  preprocess_cli -> preprocess_models [label="gpt-5.1 + embeddings", style="dotted"];
+  preprocess_cli -> data_providers [
+    label="generated/\n(projects, resume, profile,\npersona, embeddingIndexes)",
+    style="dashed"
+  ];
+
+  // =========================
+  // Edges: Observability
+  // =========================
+  orchestrator -> runtime_metrics [label="LLM usage & pipeline metrics", style="dotted"];
+  orchestrator -> reasoning_trace [label="PartialReasoningTrace\n(plan, retrieval, evidence, answerMeta)", style="dotted"];
+}
