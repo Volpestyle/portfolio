@@ -1,0 +1,26 @@
+{
+  "name": "@portfolio/chat-preprocess-cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "chat-preprocess": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@portfolio/github-data": "workspace:*",
+    "@aws-sdk/client-s3": "^3.927.0",
+    "yaml": "^2.6.0"
+  },
+  "peerDependencies": {
+    "@portfolio/chat-contract": "workspace:*",
+    "@portfolio/chat-data": "workspace:*"
+  }
+}
