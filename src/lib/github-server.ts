@@ -1,3 +1,4 @@
+import type { RepoData } from '@portfolio/chat-contract';
 import { GH_CONFIG } from './constants';
 import {
   createOctokit,
@@ -10,6 +11,8 @@ import { unstable_cache } from 'next/cache';
 import { convertRelativeToAbsoluteUrls } from './readme-utils';
 import { TEST_REPO, TEST_README, TEST_DOC_CONTENT } from '@/lib/test-fixtures';
 import { isFixtureRuntime } from '@/lib/test-mode';
+
+export type { RepoData };
 
 /**
  * Check if SSR pages should use test fixtures. This is used for build-time
@@ -24,31 +27,6 @@ function shouldUseSSRFixtures(): boolean {
 
   return isFixtureRuntime();
 }
-
-export type RepoData = {
-  id?: number;
-  name: string;
-  full_name?: string;
-  description: string | null;
-  created_at: string;
-  pushed_at?: string | null;
-  updated_at?: string | null;
-  html_url?: string;
-  isStarred: boolean;
-  default_branch?: string;
-  private?: boolean;
-  icon?: string;
-  owner?: {
-    login: string;
-  };
-  homepage?: string | null;
-  language?: string | null;
-  topics?: string[];
-  summary?: string;
-  tags?: string[];
-  languagesBreakdown?: Record<string, number>;
-  languagePercentages?: Array<{ name: string; percent: number }>;
-};
 
 export type PortfolioReposResponse = {
   starred: RepoData[];
@@ -74,7 +52,7 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
     throw new Error('Portfolio gist ID is not configured');
   }
 
-  const octokit = createOctokit(token);
+  const octokit = await createOctokit(token);
 
   try {
     const portfolioConfig = await getPortfolioConfig();
@@ -173,7 +151,7 @@ export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.U
 
   const token = await resolveGitHubToken();
   if (!token) throw new Error('GitHub token is not configured');
-  const octokit = createOctokit(token);
+  const octokit = await createOctokit(token);
 
   try {
     // First try to get from portfolio config for private repos
@@ -256,7 +234,9 @@ export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.US
 
   const token = await resolveGitHubToken();
   if (!token) throw new Error('GitHub token is not configured');
-  const octokit = createOctokit(token);
+  const octokit = await createOctokit(token);
+
+  let actualRepoName = repo;
 
   try {
     // First check portfolio config for private repos
@@ -264,7 +244,6 @@ export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.US
     const repoConfig = portfolioConfig?.repositories?.find(r => r.name === repo);
 
     // Determine the actual repo name to fetch from
-    let actualRepoName = repo;
     if (repoConfig?.isPrivate) {
       actualRepoName = repoConfig.publicRepo || `${repo}-public`;
     }
@@ -272,7 +251,7 @@ export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.US
     // If we have inline README content for private repos
     if (repoConfig?.isPrivate && repoConfig.readme) {
       // Transform relative URLs to point to the public repo
-      return convertRelativeToAbsoluteUrls(repoConfig.readme, owner, actualRepoName);
+      return convertRelativeToAbsoluteUrls(repoConfig.readme, owner, actualRepoName, undefined, 'README.md');
     }
 
     // Fetch README from GitHub (public repo or public counterpart of private repo)
@@ -297,15 +276,18 @@ export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.US
       readmeContent,
       owner,
       actualRepoName,
-      branchFromDownloadUrl
+      branchFromDownloadUrl,
+      'README.md'
     );
   } catch (error) {
-    console.error('Error fetching readme:', error);
-
     if (isGithubNotFoundError(error)) {
+      console.warn(
+        `[github-server] README not found for ${owner}/${actualRepoName}. Using placeholder content.`
+      );
       return buildMissingReadmeMessage(repo);
     }
 
+    console.error('Error fetching readme:', error);
     throw error;
   }
 }
@@ -403,7 +385,7 @@ export async function fetchDocumentContent(
 
   const token = await resolveGitHubToken();
   if (!token) throw new Error('GitHub token is not configured');
-  const octokit = createOctokit(token);
+  const octokit = await createOctokit(token);
 
   try {
     // Check portfolio config for private repos and document overrides
@@ -454,8 +436,16 @@ export async function fetchDocumentContent(
 
     if ('content' in response.data && response.data.type === 'file') {
       const content = Buffer.from(response.data.content, 'base64').toString();
-      return {
+      const branchFromDownloadUrl = extractBranchFromDownloadUrl(response.data.download_url);
+      const normalizedContent = convertRelativeToAbsoluteUrls(
         content,
+        owner,
+        repoToFetch,
+        branchFromDownloadUrl,
+        docPath
+      );
+      return {
+        content: normalizedContent,
         projectName: repo,
       };
     }

@@ -1,9 +1,8 @@
-import { Octokit } from '@octokit/rest';
 import { GH_CONFIG } from '@/lib/constants';
-import { PortfolioConfig, PortfolioRepoConfig } from '@/types/portfolio';
+import { PortfolioConfig } from '@/types/portfolio';
 import { resolveSecretValue } from '@/lib/secrets/manager';
-
-const octokitByToken = new Map<string, Octokit>();
+import { fetchPortfolioConfig, fetchRepoLanguages as fetchRepoLanguagesBase, getOctokit } from '@portfolio/github-data';
+export { calculateLanguagePercentages } from '@portfolio/github-data';
 
 export async function resolveGitHubToken(): Promise<string | null> {
   const envToken = process.env.GH_TOKEN ?? null;
@@ -16,20 +15,10 @@ export async function resolveGitHubToken(): Promise<string | null> {
   }
 }
 
-/**
- * Creates or returns a cached Octokit instance for the provided token.
- */
-export function createOctokit(token: string): Octokit {
-  const existing = octokitByToken.get(token);
-  if (existing) return existing;
-  const client = new Octokit({ auth: token });
-  octokitByToken.set(token, client);
-  return client;
+export async function createOctokit(token: string) {
+  return getOctokit({ token });
 }
 
-/**
- * Fetches the portfolio configuration from the configured gist
- */
 export async function getPortfolioConfig(): Promise<PortfolioConfig | null> {
   const gistId = process.env.PORTFOLIO_GIST_ID;
   if (!gistId) {
@@ -37,77 +26,47 @@ export async function getPortfolioConfig(): Promise<PortfolioConfig | null> {
     return null;
   }
 
-  try {
-    const token = await resolveGitHubToken();
-    if (!token) {
-      console.error('GitHub token not configured');
-      return null;
-    }
-    const octokit = createOctokit(token);
-    const gistResponse = await octokit.rest.gists.get({
-      gist_id: gistId,
-    });
-
-    const portfolioFile = gistResponse.data.files?.[GH_CONFIG.PORTFOLIO_CONFIG_FILENAME];
-
-    if (!portfolioFile || !portfolioFile.content) {
-      return null;
-    }
-
-    return JSON.parse(portfolioFile.content) as PortfolioConfig;
-  } catch (error) {
-    console.error('Error fetching portfolio config:', error);
+  const token = await resolveGitHubToken();
+  if (!token) {
+    console.error('GitHub token not configured');
     return null;
   }
-}
 
-/**
- * Finds a repository configuration by owner and repo name
- */
-export function findRepoConfig(
-  portfolioConfig: PortfolioConfig,
-  owner: string,
-  repo: string
-): PortfolioRepoConfig | undefined {
-  return portfolioConfig.repositories.find(
-    (r) => r.name === repo && (r.owner || GH_CONFIG.USERNAME) === owner
-  );
-}
+  const fetched = await fetchPortfolioConfig({
+    token,
+    gistId,
+    configFileName: GH_CONFIG.PORTFOLIO_CONFIG_FILENAME,
+  });
 
-/**
- * Gets the actual repository name, handling private repos with public counterparts
- */
-export async function getActualRepoName(owner: string, repo: string): Promise<string> {
-  const portfolioConfig = await getPortfolioConfig();
-
-  if (!portfolioConfig) {
-    return repo;
+  if (!fetched) {
+    return null;
   }
 
-  const repoConfig = findRepoConfig(portfolioConfig, owner, repo);
-
-  if (repoConfig?.isPrivate) {
-    if (repoConfig.publicRepo) {
-      return repoConfig.publicRepo;
-    }
-    return `${repo}-public`;
-  }
-
-  return repo;
-}
-
-/**
- * Standard error response for not found resources
- */
-export function notFoundResponse(resource: string = 'Resource'): Response {
-  return Response.json({ error: `${resource} not found` }, { status: 404 });
-}
-
-/**
- * Standard error response for server errors
- */
-export function serverErrorResponse(message: string = 'Internal server error'): Response {
-  return Response.json({ error: message }, { status: 500 });
+  return {
+    repositories: fetched.repositories.map((repo) => ({
+      name: repo.name,
+      publicRepo: repo.publicRepo,
+      isStarred: repo.isStarred,
+      isPrivate: repo.isPrivate,
+      owner: repo.owner,
+      description: repo.description ?? undefined,
+      readme: repo.readme ?? undefined,
+      readmeGistId: undefined,
+      documents: [],
+      techStack: repo.techStack,
+      demoUrl: repo.demoUrl ?? undefined,
+      screenshots: repo.screenshots,
+      topics: repo.topics,
+      language: repo.language ?? undefined,
+      languages: repo.languages
+        ? Object.entries(repo.languages).map(([name, percent]) => ({ name, percent }))
+        : repo.languagePercentages,
+      createdAt: repo.createdAt,
+      updatedAt: repo.updatedAt,
+      homepage: repo.homepage ?? undefined,
+      icon: repo.icon,
+    })),
+  };
 }
 
 /**
@@ -124,69 +83,14 @@ export async function fetchRepoLanguages(
       console.error('GitHub token not configured');
       return null;
     }
-    const octokit = createOctokit(token);
-    const response = await octokit.rest.repos.listLanguages({
+    const result = await fetchRepoLanguagesBase({
+      token,
       owner,
       repo,
     });
-
-    return response.data;
+    return result;
   } catch (error) {
     console.error(`Error fetching languages for ${owner}/${repo}:`, error);
-    return null;
-  }
-}
-
-/**
- * Converts language byte counts to percentages
- */
-export function calculateLanguagePercentages(
-  languagesBreakdown: Record<string, number>
-): Array<{ name: string; percent: number }> {
-  const totalBytes = Object.values(languagesBreakdown).reduce((sum, bytes) => sum + bytes, 0);
-
-  if (totalBytes === 0) {
-    return [];
-  }
-
-  return Object.entries(languagesBreakdown)
-    .map(([name, bytes]) => ({
-      name,
-      percent: Math.round((bytes / totalBytes) * 100 * 100) / 100, // Round to 2 decimal places
-    }))
-    .sort((a, b) => b.percent - a.percent);
-}
-
-/**
- * Fetches README content from a gist
- */
-export async function getReadmeFromGist(gistId: string): Promise<string | null> {
-  try {
-    const token = await resolveGitHubToken();
-    if (!token) {
-      console.error('GitHub token not configured');
-      return null;
-    }
-    const octokit = createOctokit(token);
-    const gistResponse = await octokit.rest.gists.get({
-      gist_id: gistId,
-    });
-
-    const files = gistResponse.data.files;
-
-    if (!files || Object.keys(files).length === 0) {
-      return null;
-    }
-
-    const firstFile = files[Object.keys(files)[0]];
-
-    if (!firstFile || !firstFile.content) {
-      return null;
-    }
-
-    return firstFile.content;
-  } catch (error) {
-    console.error('Error fetching README from gist:', error);
     return null;
   }
 }

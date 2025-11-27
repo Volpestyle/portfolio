@@ -22,7 +22,3 @@ export function isAdminEmail(email?: string | null): boolean {
   }
   return ADMIN_EMAILS.has(email.toLowerCase());
 }
-
-export function getAdminEmails(): string[] {
-  return Array.from(ADMIN_EMAILS.values());
-}

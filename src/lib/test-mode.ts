@@ -1,5 +1,5 @@
-export const TEST_MODE_HEADER = 'x-portfolio-test-mode';
-export const ADMIN_SECRET_HEADER = 'x-portfolio-admin-secret';
+const TEST_MODE_HEADER = 'x-portfolio-test-mode';
+const ADMIN_SECRET_HEADER = 'x-portfolio-admin-secret';
 const PORTFOLIO_FIXTURE_RUNTIME_FLAG = 'PORTFOLIO_TEST_FIXTURES';
 const BLOG_FIXTURE_RUNTIME_FLAG = 'BLOG_TEST_FIXTURES';
 
@@ -65,22 +65,6 @@ export function shouldReturnTestFixtures(headers: HeadersLike): boolean {
   }
 
   return isFixtureRuntime();
-}
-
-/**
- * Legacy alias - kept for backward compatibility
- * @deprecated Use shouldReturnTestFixtures() instead for clearer intent
- */
-export function isE2ETestMode(headers: HeadersLike): boolean {
-  return shouldReturnTestFixtures(headers);
-}
-
-export function getTestMode(headers: HeadersLike): TestMode {
-  const value = headers.get(TEST_MODE_HEADER);
-  if (value === 'integration' || value === 'e2e') {
-    return value;
-  }
-  return null;
 }
 
 export function headerIncludesTestMode(

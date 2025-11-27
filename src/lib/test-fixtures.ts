@@ -1,4 +1,4 @@
-import type { RepoData } from '@/lib/github-server';
+import type { ProjectDetail, RepoData } from '@portfolio/chat-contract';
 import type { BlogPostWithContent } from '@/types/blog';
 
 export const TEST_REPO: RepoData = {
@@ -36,7 +36,8 @@ export const TEST_DOC_CONTENT = `# API Reference
 
 ## POST /api/chat
 - Streams responses over SSE.
-- Supports attachments for project cards and docs.
+- Requires an ownerId plus recent message history.
+- Sends UI instructions for portfolio cards.
 
 ## POST /api/send-email
 - Accepts name, email, and message payloads.
@@ -83,3 +84,18 @@ export const TEST_BLOG_POSTS: BlogPostWithContent[] = [
 3. Admin flows`,
   },
 ];
+
+export const TEST_PROJECT_DETAIL: ProjectDetail = {
+  id: 'sample-ai-app',
+  slug: 'sample-ai-app',
+  name: 'sample-ai-app',
+  oneLiner: TEST_REPO.description ?? 'Edge-optimized AI assistant.',
+  description: 'Edge-optimized AI assistant with inline documentation and streaming UI surfaces.',
+  bullets: ['Streaming SSE UI cues', 'Inline markdown viewer', 'Tool-augmented retrieval'],
+  techStack: ['Next.js', 'TypeScript', 'Vercel Edge'],
+  languages: ['TypeScript', 'Rust', 'Python'],
+  tags: ['nextjs', 'ai', 'edge'],
+  context: { type: 'personal' },
+  githubUrl: TEST_REPO.html_url,
+  readme: TEST_README,
+};

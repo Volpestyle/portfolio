@@ -24,18 +24,3 @@ export const StarIcon = () => (
     />
   </svg>
 );
-
-export interface SocialLink {
-  name: string;
-  icon: {
-    path: string;
-    hex: string;
-  };
-  url: string;
-}
-
-export const SocialIcon: React.FC<{ icon: { path: string; hex: string } }> = ({ icon }) => (
-  <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor">
-    <path d={icon.path} />
-  </svg>
-);
