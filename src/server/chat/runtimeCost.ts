@@ -35,7 +35,7 @@ const DEFAULT_BUDGET_USD = 10;
 const WARNING_THRESHOLD = 80;
 const CRITICAL_THRESHOLD = 95;
 
-let cachedClients: RuntimeCostClients | null = null;
+let cachedClients: { key: string; clients: RuntimeCostClients } | null = null;
 
 function parseNumber(value: unknown): number {
   if (typeof value === 'number') return value;
@@ -142,10 +142,6 @@ function getOwnerEnvKey(ownerId: string, env: string): string {
 }
 
 export async function getRuntimeCostClients(ownerId: string): Promise<RuntimeCostClients | null> {
-  if (cachedClients && cachedClients.ownerId === ownerId) {
-    return cachedClients;
-  }
-
   const tableName = process.env.COST_TABLE_NAME ?? process.env.CHAT_COST_TABLE_NAME;
   if (!tableName) {
     return null;
@@ -154,16 +150,24 @@ export async function getRuntimeCostClients(ownerId: string): Promise<RuntimeCos
   const alertTopicArn = process.env.COST_ALERT_TOPIC_ARN ?? process.env.CHAT_COST_ALERT_TOPIC_ARN;
 
   const env = resolveEnv();
+  const cacheKey = [ownerId, tableName, alertTopicArn, env].join('|');
+  if (cachedClients?.key === cacheKey) {
+    return cachedClients.clients;
+  }
+
   cachedClients = {
-    dynamo: new DynamoDBClient({}),
-    cloudwatch: new CloudWatchClient({}),
-    sns: alertTopicArn ? new SNSClient({}) : undefined,
-    tableName,
-    alertTopicArn,
-    ownerId,
-    env,
+    key: cacheKey,
+    clients: {
+      dynamo: new DynamoDBClient({}),
+      cloudwatch: new CloudWatchClient({}),
+      sns: alertTopicArn ? new SNSClient({}) : undefined,
+      tableName,
+      alertTopicArn,
+      ownerId,
+      env,
+    },
   };
-  return cachedClients;
+  return cachedClients.clients;
 }
 
 export async function getRuntimeCostState(clients: RuntimeCostClients): Promise<RuntimeCostState> {
