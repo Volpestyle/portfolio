@@ -83,6 +83,14 @@ function buildFixtureResponse(headers: HeadersInit = {}): Response {
     },
     uiHintWarnings: [],
   };
+  const retrievalCounts = reasoningTrace.retrieval.reduce(
+    (acc, { source, numResults }) => {
+      acc.totalDocs += numResults;
+      if (!acc.sources.includes(source)) acc.sources.push(source);
+      return acc;
+    },
+    { totalDocs: 0, sources: [] as string[] },
+  );
   const frames = [
     { type: 'item', itemId: anchorId, anchorId, kind: 'answer' },
     { type: 'stage', itemId: anchorId, anchorId, stage: 'planner', status: 'start' },
@@ -102,7 +110,7 @@ function buildFixtureResponse(headers: HeadersInit = {}): Response {
       anchorId,
       stage: 'retrieval',
       status: 'complete',
-      meta: { docsFound: 5, sources: ['projects', 'resume'] },
+      meta: { docsFound: retrievalCounts.totalDocs, sources: retrievalCounts.sources },
       durationMs: 140,
     },
     { type: 'stage', itemId: anchorId, anchorId, stage: 'evidence', status: 'start' },
