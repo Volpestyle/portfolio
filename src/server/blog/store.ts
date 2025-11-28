@@ -9,10 +9,9 @@ import type {
 } from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'node:crypto';
 import { blogConfig } from '@/server/blog/config';
-import * as mockStore from '@/server/blog/mock-store';
 import { getDocumentClient, getS3Client } from '@/server/blog/clients';
 import type { BlogPostRecord, BlogPostStatus, BlogPostSummary, BlogPostWithContent } from '@/types/blog';
-import { isBlogFixtureRuntime } from '@/lib/test-mode';
+import { assertNoFixtureFlagsInProd, shouldUseBlogFixtureRuntime } from '@/lib/test-flags';
 
 type RawBlogRecord = {
   slug: string;
@@ -31,7 +30,12 @@ type RawBlogRecord = {
   activeScheduleName?: string;
 };
 
-const useMockStore = () => isBlogFixtureRuntime();
+const useMockStore = () => shouldUseBlogFixtureRuntime();
+const loadMockStore = async () => {
+  assertNoFixtureFlagsInProd();
+  return import('@portfolio/test-support/blog/mock-store');
+};
+
 const docClient = getDocumentClient();
 const rawDocClient = docClient as unknown as { send: (command: unknown) => Promise<unknown> };
 
@@ -236,7 +240,8 @@ export async function listPublishedPosts(
   cursor?: string
 ): Promise<PaginatedPosts> {
   if (useMockStore()) {
-    const { posts, hasMore, nextCursor } = await mockStore.listPublishedPosts(limit);
+    const store = await loadMockStore();
+    const { posts, hasMore, nextCursor } = await store.listPublishedPosts(limit);
     return { posts, hasMore, nextCursor };
   }
 
@@ -296,7 +301,8 @@ export async function listPublishedPosts(
 
 export async function listPosts(options: { status?: BlogPostStatus; search?: string } = {}): Promise<BlogPostRecord[]> {
   if (useMockStore()) {
-    return mockStore.listPosts(options);
+    const store = await loadMockStore();
+    return store.listPosts(options);
   }
 
   const response = await sendDocumentCommand<ScanCommandOutput>(
@@ -334,7 +340,8 @@ export async function getPostWithContent(
   options: { includeDraft?: boolean } = {}
 ): Promise<BlogPostWithContent | null> {
   if (useMockStore()) {
-    return mockStore.getPostWithContent(slug, options);
+    const store = await loadMockStore();
+    return store.getPostWithContent(slug, options);
   }
 
   const response = await sendDocumentCommand<GetCommandOutput>(
@@ -383,7 +390,8 @@ export async function createPostRecord(input: {
   heroImageKey?: string;
 }): Promise<BlogPostRecord> {
   if (useMockStore()) {
-    return mockStore.createPostRecord(input);
+    const store = await loadMockStore();
+    return store.createPostRecord(input);
   }
 
   const now = new Date().toISOString();
@@ -429,7 +437,8 @@ export async function saveDraftRecord(input: {
   expectedVersion: number;
 }): Promise<BlogPostWithContent> {
   if (useMockStore()) {
-    return mockStore.saveDraftRecord(input);
+    const store = await loadMockStore();
+    return store.saveDraftRecord(input);
   }
 
   const key = buildRevisionKey(input.slug, input.extension);
@@ -529,7 +538,8 @@ export async function publishPostRecord(input: {
   expectedVersion: number;
 }): Promise<BlogPostRecord> {
   if (useMockStore()) {
-    return mockStore.publishPostRecord(input);
+    const store = await loadMockStore();
+    return store.publishPostRecord(input);
   }
 
   const publishedAt = input.publishedAt ?? new Date().toISOString();
@@ -571,7 +581,8 @@ export async function publishPostRecord(input: {
 
 export async function archivePostRecord(input: { slug: string; expectedVersion: number }): Promise<BlogPostRecord> {
   if (useMockStore()) {
-    return mockStore.archivePostRecord(input);
+    const store = await loadMockStore();
+    return store.archivePostRecord(input);
   }
 
   const response = await sendDocumentCommand<UpdateCommandOutput>(
@@ -614,7 +625,8 @@ export async function markScheduledRecord(input: {
   expectedVersion: number;
 }): Promise<BlogPostRecord> {
   if (useMockStore()) {
-    return mockStore.markScheduledRecord(input);
+    const store = await loadMockStore();
+    return store.markScheduledRecord(input);
   }
 
   const response = await sendDocumentCommand<UpdateCommandOutput>(
@@ -659,7 +671,8 @@ export async function unmarkScheduledRecord(input: {
   expectedVersion: number;
 }): Promise<BlogPostRecord> {
   if (useMockStore()) {
-    return mockStore.unmarkScheduledRecord(input);
+    const store = await loadMockStore();
+    return store.unmarkScheduledRecord(input);
   }
 
   const response = await sendDocumentCommand<UpdateCommandOutput>(
@@ -697,7 +710,8 @@ export async function unmarkScheduledRecord(input: {
 
 export async function deletePostRecord(slug: string): Promise<void> {
   if (useMockStore()) {
-    return mockStore.deletePostRecord(slug);
+    const store = await loadMockStore();
+    return store.deletePostRecord(slug);
   }
 
   const existing = await sendDocumentCommand<GetCommandOutput>(
@@ -724,7 +738,8 @@ export async function deletePostRecord(slug: string): Promise<void> {
 
 export async function getPostRecord(slug: string): Promise<BlogPostRecord | null> {
   if (useMockStore()) {
-    return mockStore.getPostRecord(slug);
+    const store = await loadMockStore();
+    return store.getPostRecord(slug);
   }
 
   const response = await sendDocumentCommand<GetCommandOutput>(
@@ -741,7 +756,8 @@ export async function generateMediaUploadUrl(input: {
   extension?: string;
 }): Promise<{ uploadUrl: string; key: string }> {
   if (useMockStore()) {
-    return mockStore.generateMediaUploadUrl(input);
+    const store = await loadMockStore();
+    return store.generateMediaUploadUrl(input);
   }
 
   const now = new Date();

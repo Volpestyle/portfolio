@@ -1,5 +1,4 @@
 import OpenAI from 'openai';
-import { createHash } from 'crypto';
 import { fetchPortfolioRepos, fetchRepoReadme } from '@portfolio/github-data';
 import type { RepoData } from '@portfolio/chat-contract';
 import type { EmbeddingEntry, ProjectRecord } from '@portfolio/chat-data';
@@ -505,10 +504,6 @@ async function buildEmbedding(
   return response.data[0]?.embedding ?? [];
 }
 
-function computeSourceHash(value: unknown): string {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
-}
-
 export async function runProjectKnowledgeTask(context: PreprocessContext): Promise<PreprocessTaskResult> {
   requireEnv('GH_TOKEN');
   requireEnv('PORTFOLIO_GIST_ID');
@@ -527,7 +522,7 @@ export async function runProjectKnowledgeTask(context: PreprocessContext): Promi
     const buildId = new Date().toISOString();
     const dataset = { generatedAt: buildId, projects: [] as ProjectRecord[] };
     const emptyEmbeddings = {
-      meta: { schemaVersion: 1, buildId, sourceHash: computeSourceHash(dataset.projects) },
+      meta: { schemaVersion: 1, buildId },
       entries: [] as EmbeddingEntry[],
     };
     const [projectsArtifact, embeddingsArtifact] = await Promise.all([
@@ -623,7 +618,6 @@ export async function runProjectKnowledgeTask(context: PreprocessContext): Promi
     meta: {
       schemaVersion: 1,
       buildId,
-      sourceHash: computeSourceHash(dataset.projects),
     },
     entries: sortedEmbeddings,
   };

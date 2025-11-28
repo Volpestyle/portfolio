@@ -4,7 +4,7 @@ const nextConfig = {
   experimental: {
     externalDir: true,
   },
-  transpilePackages: ['@portfolio/chat-contract', '@portfolio/chat-data', '@portfolio/chat-orchestrator'],
+  transpilePackages: ['@portfolio/chat-contract', '@portfolio/chat-data', '@portfolio/chat-orchestrator', '@portfolio/test-support'],
   images: {
     qualities: [75, 85],
     remotePatterns: [

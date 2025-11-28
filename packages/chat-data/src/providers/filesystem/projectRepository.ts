@@ -1,4 +1,3 @@
-import { createHash } from 'crypto';
 import { assertProjectDataset, assertProjectEmbeddings, type EmbeddingIndex, type ProjectRecord } from '../../index';
 import type { ProjectRepository, ProjectSearchIndexEntry } from '../types';
 
@@ -107,10 +106,6 @@ function searchProjectIndex(query: string, index: IndexedProject[]): ProjectSear
     .map(({ entry, score }) => ({ project: entry.project, score }));
 }
 
-function buildSourceHash(value: unknown): string {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
-}
-
 export function createFilesystemProjectRepository(
   options: FilesystemProjectRepositoryOptions
 ): ProjectRepository {
@@ -125,15 +120,6 @@ export function createFilesystemProjectRepository(
   const embeddingsById = new Map(
     (embeddingIndex?.entries ?? []).map((record) => [normalizeKey(record.id), record.vector])
   );
-
-  if (embeddingIndex) {
-    const sourceHash = buildSourceHash(dataset.projects);
-    if (embeddingIndex.meta.sourceHash !== sourceHash) {
-      console.warn(
-        `[chat-data] project embeddings sourceHash mismatch — expected ${sourceHash} but got ${embeddingIndex.meta.sourceHash}`
-      );
-    }
-  }
 
   const searchIndex = createIndexedProjects(projects);
 

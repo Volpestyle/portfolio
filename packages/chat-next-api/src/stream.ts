@@ -81,9 +81,10 @@ export function createChatSseStream(api: ChatApi, client: OpenAI, messages: Chat
         resetTimeout();
         sendEvent('reasoning', { type: 'reasoning', stage, trace, itemId: anchorId, anchorId });
       };
+      type OnStageEvent = NonNullable<RunOptions['onStageEvent']>;
       const enqueueStageEvent = (
-        stage: Parameters<NonNullable<StreamOptions['runOptions']>['onStageEvent']>[0],
-        status: Parameters<NonNullable<StreamOptions['runOptions']>['onStageEvent']>[1],
+        stage: Parameters<OnStageEvent>[0],
+        status: Parameters<OnStageEvent>[1],
         meta?: Record<string, unknown>,
         durationMs?: number
       ) => {

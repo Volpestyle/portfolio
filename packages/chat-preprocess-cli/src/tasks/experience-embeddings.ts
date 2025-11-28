@@ -1,6 +1,5 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { createHash } from 'crypto';
 import OpenAI from 'openai';
 import { PreprocessError, PREPROCESS_ERROR_CODES } from '../errors';
 import { requireEnv } from '../env';
@@ -89,19 +88,6 @@ async function loadResume(filePath: string): Promise<ResumeDataset> {
   return { experiences: parsed.experiences, education: parsed.education ?? [], awards: parsed.awards ?? [], skills: parsed.skills ?? [] };
 }
 
-function computeSourceHash(value: unknown): string {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
-}
-
-async function loadExistingEmbeddings(filePath: string): Promise<{ meta?: { sourceHash?: string }; entries?: Array<{ id: string }> } | null> {
-  try {
-    const contents = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(contents) as { meta?: { sourceHash?: string }; entries?: Array<{ id: string }> };
-  } catch {
-    return null;
-  }
-}
-
 function relPath(context: PreprocessContext, filePath: string): string {
   return path.relative(context.paths.rootDir, filePath);
 }
@@ -125,22 +111,6 @@ export async function runExperienceEmbeddingsTask(context: PreprocessContext): P
   }
 
   const dataset = await loadResume(datasetPath);
-  const sourceHash = computeSourceHash(dataset);
-  const existing = await loadExistingEmbeddings(outputPath);
-  if (existing?.meta?.sourceHash && existing.meta.sourceHash === sourceHash) {
-    const count = existing.entries?.length ?? 0;
-    return {
-      description: 'Skipped resume embedding rebuild (existing vectors match sourceHash).',
-      counts: [
-        { label: 'Experiences', value: dataset.experiences.length },
-        { label: 'Education', value: dataset.education?.length ?? 0 },
-        { label: 'Awards', value: dataset.awards?.length ?? 0 },
-        { label: 'Skills', value: dataset.skills?.length ?? 0 },
-        { label: 'Embeddings', value: count },
-      ],
-      artifacts: [{ path: relPath(context, outputPath), note: `${count} vectors (reused)` }],
-    };
-  }
   const allEntries = [
     ...dataset.experiences,
     ...(dataset.education ?? []),
@@ -154,7 +124,6 @@ export async function runExperienceEmbeddingsTask(context: PreprocessContext): P
       meta: {
         schemaVersion: 1,
         buildId,
-        sourceHash: computeSourceHash(dataset),
       },
       entries: [] as Array<{ id: string; vector: number[] }>,
     };
@@ -219,7 +188,6 @@ export async function runExperienceEmbeddingsTask(context: PreprocessContext): P
     meta: {
       schemaVersion: 1,
       buildId,
-      sourceHash,
     },
     entries: embeddings,
   };

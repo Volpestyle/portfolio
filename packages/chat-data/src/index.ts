@@ -63,7 +63,6 @@ const socialPlatformSchema = z.enum(['x', 'github', 'youtube', 'linkedin', 'spot
 const embeddingIndexMetaSchema = z.object({
   schemaVersion: z.number(),
   buildId: z.string(),
-  sourceHash: z.string(),
 });
 
 const embeddingEntrySchema = z.object({

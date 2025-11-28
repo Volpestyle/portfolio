@@ -1,0 +1,19 @@
+{
+  "name": "@portfolio/test-support",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./fixtures": "./src/fixtures.ts",
+    "./chat/fixture-response": "./src/chat/fixture-response.ts",
+    "./blog/mock-store": "./src/blog/mock-store.ts"
+  },
+  "dependencies": {
+    "@portfolio/chat-contract": "workspace:*",
+    "@portfolio/chat-next-api": "workspace:*"
+  }
+}

@@ -180,7 +180,6 @@ export type PersonaSummary = {
   shortAbout: string;
   styleGuidelines: string[];
   generatedAt?: string;
-  sourceHashes?: Record<string, string>;
 };
 
 export type OwnerConfig = {
@@ -289,7 +288,6 @@ export type PlannerLLMOutput = {
   intent: Intent;
   topic: string | null;
   plannerConfidence: number;
-  isFollowup: boolean;
   experienceScope?: ExperienceScope | null;
   retrievalRequests: RetrievalRequest[];
   resumeFacets?: ResumeFacet[];
@@ -417,7 +415,6 @@ export const PlannerLLMOutputSchema: z.ZodType<PlannerLLMOutput, z.ZodTypeDef, u
   intent: z.enum(INTENT_VALUES).default('describe'),
   topic: z.string().nullable().default(null),
   plannerConfidence: z.number().min(0).max(1).default(0.6),
-  isFollowup: z.boolean().default(false),
   experienceScope: z.enum(['employment_only', 'any_experience']).nullable().default(null),
   retrievalRequests: z.array(RetrievalRequestSchema).default([]),
   resumeFacets: z.array(z.enum(RESUME_FACET_VALUES)).default([]),
@@ -535,7 +532,6 @@ export type ChatStreamError = {
 export type EmbeddingIndexMeta = {
   schemaVersion: number;
   buildId: string;
-  sourceHash: string;
 };
 
 export type EmbeddingEntry = {

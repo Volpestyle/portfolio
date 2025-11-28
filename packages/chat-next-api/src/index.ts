@@ -46,3 +46,16 @@ export {
   CHAT_DEBUG_LEVEL,
 } from './server';
 export type { ChatDebugLogEntry } from './server';
+export { validateChatPostBody, resolveReasoningEnabled } from './validation';
+export type { ChatPostBody } from './validation';
+export { moderateChatMessages } from './moderation';
+export type { ModerationResult } from './moderation';
+export {
+  getRuntimeCostClients,
+  shouldThrottleForBudget,
+  recordRuntimeCost,
+  type RuntimeCostClients,
+  type RuntimeCostState,
+  type CostLevel,
+} from './runtimeCost';
+export { createNextChatHandler, type NextChatHandlerOptions } from './nextHandler';

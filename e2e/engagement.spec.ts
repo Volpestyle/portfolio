@@ -82,14 +82,20 @@ test.describe('Engagement surfaces', () => {
     await expect(assistantMessages).toHaveCount(initialCount + 1, { timeout: 60_000 });
     const latestAssistant = assistantMessages.nth(initialCount);
 
+    await expect(latestAssistant).toBeVisible();
+
     if (hitsRealApis) {
-      await expect(latestAssistant).toBeVisible();
       const responseText = (await latestAssistant.innerText()).trim();
       expect(responseText.length).toBeGreaterThan(20);
-    } else {
-      await expect(page.getByRole('heading', { name: /sample-ai-app/i })).toBeVisible();
-      await page.getByRole('link', { name: 'API Contract' }).click();
-      await expect(page.getByRole('heading', { name: 'API Reference' })).toBeVisible({ timeout: 15000 });
+      return;
     }
+
+    // Mocked stream: verify surfaced project detail from UI hints.
+    const projectHeading = page.getByRole('heading', { name: /sample-ai-app/i }).first();
+    await expect(projectHeading).toBeVisible();
+    const expandButton = page.getByRole('button', { name: /view details/i }).first();
+    await expandButton.click();
+    await expect(page.getByTestId('markdown-viewer')).toBeVisible();
+    await expect(page.getByText(/inline documentation/i)).toBeVisible();
   });
 });

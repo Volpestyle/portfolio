@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import OpenAI from 'openai';
 import type { PersonaSummary, ProfileSummary } from '@portfolio/chat-contract';
@@ -23,7 +21,6 @@ type ResumeDataset = {
 
 type PersonaArtifact = {
   generatedAt: string;
-  sourceHashes: Record<string, string>;
 } & PersonaSummary;
 
 const SYSTEM_PROMPT = `
@@ -44,33 +41,6 @@ RULES
 async function loadJson<T>(filePath: string): Promise<T> {
   const contents = await fs.readFile(filePath, 'utf-8');
   return JSON.parse(contents) as T;
-}
-
-async function loadExistingPersona(filePath: string): Promise<PersonaArtifact | null> {
-  try {
-    const contents = await fs.readFile(filePath, 'utf-8');
-    const parsed = JSON.parse(contents) as PersonaArtifact & { persona?: PersonaSummary };
-    if (parsed.persona && typeof parsed.persona.systemPersona === 'string') {
-      return {
-        ...parsed.persona,
-        generatedAt: parsed.generatedAt,
-        sourceHashes: parsed.sourceHashes,
-      };
-    }
-    if (typeof parsed.systemPersona === 'string') {
-      return parsed as PersonaArtifact;
-    }
-    return null;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return null;
-    }
-    throw error;
-  }
-}
-
-function computeHash(value: unknown): string {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
 function buildResumeSnapshot(resume: ResumeDataset) {
@@ -181,22 +151,9 @@ export async function runPersonaTask(context: PreprocessContext): Promise<Prepro
   const profile = await loadJson<ProfileSummary>(profilePath);
   const resume = await loadJson<ResumeDataset>(resumePath);
 
-  const profileHash = computeHash(profile);
-  const resumeHash = computeHash(resume);
-
-  const existing = await loadExistingPersona(personaPath);
-  if (existing?.sourceHashes?.profile === profileHash && existing?.sourceHashes?.resume === resumeHash) {
-    return {
-      description: 'Persona unchanged; reused existing artifact.',
-      counts: [{ label: 'Style guidelines', value: existing.styleGuidelines.length }],
-      artifacts: [{ path: path.relative(context.paths.rootDir, personaPath), note: 'reuse' }],
-    };
-  }
-
   const persona = await generatePersonaSummary({ client, model, profile, resume, metrics: context.metrics });
   const artifactPayload: PersonaArtifact = {
     generatedAt: new Date().toISOString(),
-    sourceHashes: { profile: profileHash, resume: resumeHash },
     ...persona,
   };
   const artifact = await context.artifacts.writeJson({

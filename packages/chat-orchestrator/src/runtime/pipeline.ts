@@ -601,7 +601,6 @@ export function normalizeRetrievalPlan(plan: RetrievalPlan): RetrievalPlan {
     typeof plan.plannerConfidence === 'number' && Number.isFinite(plan.plannerConfidence)
       ? Math.max(0, Math.min(1, plan.plannerConfidence))
       : 0.5;
-  const isFollowup = Boolean(plan.isFollowup);
   const experienceScope =
     plan.experienceScope && plan.experienceScope !== null && (['employment_only', 'any_experience'] as const).includes(plan.experienceScope)
       ? plan.experienceScope
@@ -687,7 +686,6 @@ export function normalizeRetrievalPlan(plan: RetrievalPlan): RetrievalPlan {
     intent,
     topic,
     plannerConfidence,
-    isFollowup,
     experienceScope,
     retrievalRequests: normalizedRequests,
     resumeFacets,
@@ -720,7 +718,6 @@ function buildPlanAdjustments(rawPlan: RetrievalPlan, normalizedPlan: RetrievalP
     'intent',
     'topic',
     'plannerConfidence',
-    'isFollowup',
     'experienceScope',
     'answerMode',
     'answerLengthHint',

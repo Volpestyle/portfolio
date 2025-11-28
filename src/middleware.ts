@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { isAdminEmail } from '@/lib/auth/allowlist';
-import { hasAdminBypass } from '@/lib/test-mode';
+import { hasAdminBypass } from '@/lib/test-flags';
 
 export default auth((req) => {
   if (!req.nextUrl.pathname.startsWith('/admin')) {

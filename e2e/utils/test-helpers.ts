@@ -1,4 +1,5 @@
 import { Page } from '@playwright/test';
+import { TEST_DOC_CONTENT, TEST_PROJECT_DETAIL, TEST_REPO } from '@portfolio/test-support/fixtures';
 
 export async function fillContactForm(page: Page) {
   await page.getByPlaceholder('name...').fill('Playwright User');
@@ -7,48 +8,147 @@ export async function fillContactForm(page: Page) {
 }
 
 export async function mockChatStream(page: Page) {
-  const repoFixture = {
-    id: 'sample-ai-app',
-    slug: 'sample-ai-app',
-    name: 'sample-ai-app',
-    oneLiner: 'Edge-optimized AI assistant with inline documentation.',
-    description: 'Edge-optimized AI assistant with inline documentation and streaming UI surfaces.',
-    techStack: ['Next.js', 'TypeScript', 'OpenAI'],
-    languages: ['TypeScript'],
-    tags: ['nextjs', 'ai', 'edge'],
-    context: { type: 'personal' as const },
-    githubUrl: 'https://github.com/volpestyle/sample-ai-app',
-  };
+  const anchorId = 'assistant-fixture';
+  const project = TEST_PROJECT_DETAIL;
+  const repo = { ...TEST_REPO, name: project.name, owner: { login: 'volpestyle' } };
+  const docPath = 'docs/API.md';
 
-  // Deterministic SSE payload so chat tests do not rely on real providers.
+  // Deterministic SSE payload mirroring the spec stages + UI hints.
   const frames = [
-    { type: 'item', itemId: 'assistant-item' },
+    { type: 'item', itemId: anchorId, anchorId },
+    { type: 'stage', stage: 'planner', status: 'start', itemId: anchorId, anchorId },
+    {
+      type: 'reasoning',
+      stage: 'plan',
+      trace: {
+        plan: {
+          intent: 'describe',
+          topic: 'featured project',
+          plannerConfidence: 0.86,
+          retrievalRequests: [
+            { source: 'projects', topK: 5, queryText: 'featured project highlights' },
+            { source: 'resume', topK: 3, queryText: 'supporting experience context' },
+          ],
+          resumeFacets: [],
+          answerMode: 'narrative_with_examples',
+          answerLengthHint: 'medium',
+          enumerateAllRelevant: false,
+          debugNotes: null,
+        },
+      },
+      itemId: anchorId,
+      anchorId,
+    },
+    {
+      type: 'stage',
+      stage: 'planner',
+      status: 'complete',
+      meta: { intent: 'describe', topic: 'featured project' },
+      durationMs: 180,
+      itemId: anchorId,
+      anchorId,
+    },
+    { type: 'stage', stage: 'retrieval', status: 'start', itemId: anchorId, anchorId },
+    {
+      type: 'reasoning',
+      stage: 'retrieval',
+      trace: {
+        retrieval: [
+          { source: 'projects', queryText: 'featured project highlights', requestedTopK: 5, effectiveTopK: 5, numResults: 1 },
+          { source: 'resume', queryText: 'supporting experience context', requestedTopK: 3, effectiveTopK: 3, numResults: 0 },
+        ],
+      },
+      itemId: anchorId,
+      anchorId,
+    },
+    {
+      type: 'stage',
+      stage: 'retrieval',
+      status: 'complete',
+      meta: { docsFound: 1, sources: ['projects', 'resume'] },
+      durationMs: 140,
+      itemId: anchorId,
+      anchorId,
+    },
+    { type: 'stage', stage: 'evidence', status: 'start', itemId: anchorId, anchorId },
+    {
+      type: 'reasoning',
+      stage: 'evidence',
+      trace: {
+        evidence: {
+          highLevelAnswer: 'yes',
+          evidenceCompleteness: 'strong',
+          reasoning: 'Highlighted the featured project and invited the user to open the inline docs.',
+          selectedEvidence: [
+            { source: 'project', id: project.slug, title: project.name, snippet: project.oneLiner, relevance: 'high' },
+          ],
+          semanticFlags: [],
+          uiHints: { projects: [project.slug], experiences: [] },
+        },
+      },
+      itemId: anchorId,
+      anchorId,
+    },
+    {
+      type: 'stage',
+      stage: 'evidence',
+      status: 'complete',
+      meta: { highLevelAnswer: 'yes', evidenceCount: 1 },
+      durationMs: 220,
+      itemId: anchorId,
+      anchorId,
+    },
+    { type: 'stage', stage: 'answer', status: 'start', itemId: anchorId, anchorId },
     {
       type: 'token',
-      token: "Here's a featured project and its inline docs.",
-      itemId: 'assistant-item',
+      token: "Here's a featured project from my portfolio.",
+      itemId: anchorId,
+      anchorId,
     },
     {
       type: 'ui',
-      itemId: 'assistant-item',
-      ui: { showProjects: [repoFixture.id], showExperiences: [] },
+      itemId: anchorId,
+      anchorId,
+      ui: { showProjects: [project.slug], showExperiences: [], bannerText: 'Surfaced a featured project.' },
     },
-    { type: 'done' },
+    {
+      type: 'attachment',
+      itemId: anchorId,
+      anchorId,
+      attachment: { type: 'project', id: project.slug, data: project },
+    },
+    {
+      type: 'reasoning',
+      stage: 'answer',
+      trace: {
+        answerMeta: {
+          model: 'gpt-5-nano-2025-08-07',
+          answerMode: 'narrative_with_examples',
+          answerLengthHint: 'medium',
+          thoughts: ['Introduce the featured project', 'Invite the user to open the inline docs'],
+        },
+      },
+      itemId: anchorId,
+      anchorId,
+    },
+    { type: 'ui_actions', itemId: anchorId, anchorId, actions: [] },
+    { type: 'stage', stage: 'answer', status: 'complete', durationMs: 640, itemId: anchorId, anchorId },
+    { type: 'done', itemId: anchorId, anchorId },
   ];
 
   const body = frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join('');
 
   const projectSummary = {
-    id: repoFixture.id,
-    slug: repoFixture.slug,
-    name: repoFixture.name,
-    oneLiner: repoFixture.oneLiner,
-    description: repoFixture.description,
-    techStack: repoFixture.techStack,
-    languages: repoFixture.languages,
-    tags: repoFixture.tags,
-    context: repoFixture.context,
-    githubUrl: repoFixture.githubUrl,
+    id: project.id,
+    slug: project.slug,
+    name: project.name,
+    oneLiner: project.oneLiner,
+    description: project.description,
+    techStack: project.techStack,
+    languages: project.languages,
+    tags: project.tags,
+    context: project.context,
+    githubUrl: project.githubUrl ?? TEST_REPO.html_url,
   };
 
   await page.route('**/api/projects', async (route) => {
@@ -56,6 +156,29 @@ export async function mockChatStream(page: Page) {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ projects: [projectSummary] }),
+    });
+  });
+
+  await page.route(`**/api/projects/${project.slug}`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project, repo, readme: project.readme }),
+    });
+  });
+
+  await page.route(`**/api/projects/${project.slug}/doc/**`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        document: {
+          repoName: project.slug,
+          path: docPath,
+          title: 'API Reference',
+          content: TEST_DOC_CONTENT,
+        },
+      }),
     });
   });
 

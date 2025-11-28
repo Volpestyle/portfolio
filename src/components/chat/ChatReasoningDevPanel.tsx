@@ -81,7 +81,6 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                   <KeyValue label="answerMode" value={plan.answerMode} />
                   <KeyValue label="answerLengthHint" value={plan.answerLengthHint} />
                   <KeyValue label="plannerConfidence" value={plan.plannerConfidence.toFixed(3)} />
-                  <KeyValue label="isFollowup" value={plan.isFollowup} />
                   {planFocus && <KeyValue label="retrievalFocus" value={planFocus} />}
                   {plan.topic && <KeyValue label="topic" value={plan.topic} />}
                   {plan.experienceScope && <KeyValue label="experienceScope" value={plan.experienceScope} />}

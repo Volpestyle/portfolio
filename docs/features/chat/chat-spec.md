@@ -586,7 +586,6 @@ type EmbeddingIndex = {
   meta: {
     schemaVersion: string;
     buildId: string;
-    sourceHash: string;
   };
   entries: { id: string; vector: number[] }[];
 };
@@ -882,7 +881,6 @@ type PersonaSummary = {
   shortAbout: string; // 1‑2 line self‑intro
   styleGuidelines: string[]; // writing style instructions
   generatedAt: string;
-  sourceHashes: Record<string, string>;
 };
 ```
 
@@ -912,7 +910,6 @@ type EmbeddingIndex = {
   meta: {
     schemaVersion: string;
     buildId: string;
-    sourceHash: string; // stable hash of source inputs
   };
   entries: { id: string; vector: number[] }[];
 };
@@ -922,7 +919,6 @@ type EmbeddingIndex = {
   - projects
   - resume
 - Profile is intentionally not embedded (single document, auto-included for describe/meta) to avoid extra latency/cost.
-- sourceHash changes when underlying sources (gist, resume, profile) change, triggering a rebuild.
 - Preprocessing fails if any items cannot be embedded (no partial indexes).
 
 ### 3.5 Semantic Enrichment (no fixed taxonomy)
@@ -1150,8 +1146,7 @@ function validatePreprocessOutput(validation: PreprocessValidation): void {
 
 When `incrementalBuild: true`:
 
-- Check `EmbeddingIndex.meta.sourceHash` against current source hashes
-- Only rebuild corpora whose sourceHash has changed
+- Rebuild all corpora end-to-end (no hash-based reuse).
 - If any corpus needs rebuilding, rebuild it completely (no partial updates)
 - Validate all outputs before committing changes
 
@@ -1228,8 +1223,6 @@ type RetrievalPlan = {
   topic: string | null;
 
   plannerConfidence: number; // 0–1
-
-  isFollowup: boolean;
 
   experienceScope?: ExperienceScope;
 
@@ -1620,7 +1613,7 @@ type TruncationState = {
 
 **Impact on Follow-ups:**
 
-Follow-ups are best-effort from the visible sliding window only; no topic IDs are persisted once context falls out of the window. When turns are dropped, `isFollowup` detection may fail for references to old context. The Planner prompt should be aware that conversation history may be incomplete:
+Follow-ups are best-effort from the visible sliding window only; no topic IDs are persisted once context falls out of the window. When turns are dropped, treat references to very old context as new topics. The Planner prompt should be aware that conversation history may be incomplete:
 
 > "Note: You may only see recent conversation history. If the user references something not in the visible history, treat it as a new topic rather than a follow-up."
 
@@ -3132,8 +3125,6 @@ export const retrievalPlanSchema = z.object({
 
   plannerConfidence: z.number().min(0).max(1),
 
-  isFollowup: z.boolean(),
-
   experienceScope: experienceScopeSchema.optional(),
 
   retrievalRequests: z.array(retrievalRequestSchema),
@@ -3995,7 +3986,7 @@ metrics:
   runLabel: 'local-dev'
 
 options:
-  # If true, only rebuild corpora whose sourceHash has changed.
+  # Enable incremental build mode (currently rebuilds all corpora each run).
   incrementalBuild: true
   # Maximum number of docs per corpus to embed per run (for very large portfolios).
   maxProjects: 200
@@ -4020,7 +4011,6 @@ This example illustrates a single turn for the question: **"Have you used Go?"**
   "intent": "fact_check",
   "topic": "Go experience",
   "plannerConfidence": 0.92,
-  "isFollowup": false,
   "experienceScope": "any_experience",
   "retrievalRequests": [
     {

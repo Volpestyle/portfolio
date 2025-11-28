@@ -9,8 +9,7 @@ import {
 } from './github-api';
 import { unstable_cache } from 'next/cache';
 import { convertRelativeToAbsoluteUrls } from './readme-utils';
-import { TEST_REPO, TEST_README, TEST_DOC_CONTENT } from '@/lib/test-fixtures';
-import { isFixtureRuntime } from '@/lib/test-mode';
+import { assertNoFixtureFlagsInProd, shouldUseFixtureRuntime } from '@/lib/test-flags';
 
 export type { RepoData };
 
@@ -20,12 +19,8 @@ export type { RepoData };
  * runtime flag that the Playwright runner enables during `pnpm test`.
  */
 function shouldUseSSRFixtures(): boolean {
-  // Escape hatch
-  if (process.env.SKIP_TEST_FIXTURES) {
-    return false;
-  }
-
-  return isFixtureRuntime();
+  assertNoFixtureFlagsInProd();
+  return shouldUseFixtureRuntime();
 }
 
 export type PortfolioReposResponse = {
@@ -38,6 +33,7 @@ export type PortfolioReposResponse = {
 export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
   // Return fixtures for test builds (SSR during CI test runs)
   if (shouldUseSSRFixtures()) {
+    const { TEST_REPO } = await import('@portfolio/test-support/fixtures');
     return {
       starred: [TEST_REPO],
       normal: [],
@@ -146,6 +142,7 @@ export const getPortfolioRepos = unstable_cache(
 export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.USERNAME): Promise<RepoData> {
   // Return fixtures for test builds
   if (shouldUseSSRFixtures()) {
+    const { TEST_REPO } = await import('@portfolio/test-support/fixtures');
     return { ...TEST_REPO, name: repo, owner: { login: owner } };
   }
 
@@ -229,6 +226,7 @@ export const getRepoDetails = unstable_cache(
 export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.USERNAME): Promise<string> {
   // Return fixtures for test builds
   if (shouldUseSSRFixtures()) {
+    const { TEST_README } = await import('@portfolio/test-support/fixtures');
     return TEST_README;
   }
 
@@ -334,6 +332,7 @@ export async function fetchDocumentContent(
 ): Promise<{ content: string; projectName: string }> {
   // Return fixtures for test builds
   if (shouldUseSSRFixtures()) {
+    const { TEST_DOC_CONTENT } = await import('@portfolio/test-support/fixtures');
     return {
       content: TEST_DOC_CONTENT,
       projectName: repo,

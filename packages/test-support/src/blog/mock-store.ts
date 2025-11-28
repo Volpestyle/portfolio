@@ -1,6 +1,5 @@
-import { randomUUID } from 'crypto';
 import type { BlogPostRecord, BlogPostStatus, BlogPostSummary, BlogPostWithContent } from '@/types/blog';
-import { TEST_BLOG_POSTS } from '@/lib/test-fixtures';
+import { TEST_BLOG_POSTS } from '../fixtures';
 
 type MockPost = BlogPostWithContent;
 
@@ -201,13 +200,64 @@ export async function publishPostRecord(input: {
     status: 'published',
     publishedAt: input.publishedAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    scheduledFor: undefined,
-    activeScheduleArn: undefined,
-    activeScheduleName: undefined,
+    readTimeLabel: buildReadTimeLabel(existing.readTimeMinutes),
+    currentRevisionKey: `mock-rev-${input.slug}-${Date.now()}`,
     version: existing.version + 1,
   };
   savePost(update);
   return toRecord(update);
+}
+
+export async function deletePost(slug: string): Promise<void> {
+  posts.delete(slug);
+}
+
+export async function deleteAllPosts(): Promise<void> {
+  posts.clear();
+}
+
+export async function deleteDraft(slug: string): Promise<void> {
+  const existing = requirePost(slug);
+  if (existing.status !== 'draft') {
+    throw new Error('Cannot delete draft; post is already published');
+  }
+  posts.delete(slug);
+}
+
+export async function setPostPublishState(input: {
+  slug: string;
+  scheduledFor?: string | null;
+  expectedVersion: number;
+}): Promise<BlogPostRecord> {
+  const existing = requirePost(input.slug);
+  assertVersion(existing, input.expectedVersion);
+  const update: MockPost = {
+    ...existing,
+    scheduledFor: input.scheduledFor ?? undefined,
+    updatedAt: new Date().toISOString(),
+    version: existing.version + 1,
+  };
+  savePost(update);
+  return toRecord(update);
+}
+
+export async function createRevision(input: {
+  slug: string;
+  content: string;
+  extension?: string;
+  expectedVersion: number;
+}): Promise<{ revisionKey: string }> {
+  const existing = requirePost(input.slug);
+  assertVersion(existing, input.expectedVersion);
+  const revisionKey = `mock-rev-${input.slug}-${Date.now()}.${input.extension || 'md'}`;
+  savePost({
+    ...existing,
+    content: input.content,
+    updatedAt: new Date().toISOString(),
+    currentRevisionKey: revisionKey,
+    version: existing.version + 1,
+  });
+  return { revisionKey };
 }
 
 export async function archivePostRecord(input: { slug: string; expectedVersion: number }): Promise<BlogPostRecord> {
@@ -239,7 +289,6 @@ export async function markScheduledRecord(input: {
     ...existing,
     status: 'scheduled',
     scheduledFor: input.scheduledFor,
-    publishedAt: input.scheduledFor,
     activeScheduleArn: input.scheduleArn,
     activeScheduleName: input.scheduleName,
     updatedAt: new Date().toISOString(),
@@ -259,7 +308,6 @@ export async function unmarkScheduledRecord(input: {
     ...existing,
     status: 'draft',
     scheduledFor: undefined,
-    publishedAt: undefined,
     activeScheduleArn: undefined,
     activeScheduleName: undefined,
     updatedAt: new Date().toISOString(),
@@ -270,14 +318,12 @@ export async function unmarkScheduledRecord(input: {
 }
 
 export async function deletePostRecord(slug: string): Promise<void> {
-  ensureSeeded();
   posts.delete(slug);
 }
 
 export async function getPostRecord(slug: string): Promise<BlogPostRecord | null> {
-  ensureSeeded();
-  const existing = posts.get(slug);
-  return existing ? toRecord(existing) : null;
+  const post = posts.get(slug);
+  return post ? toRecord(post) : null;
 }
 
 export async function generateMediaUploadUrl(input: {
@@ -285,9 +331,7 @@ export async function generateMediaUploadUrl(input: {
   extension?: string;
 }): Promise<{ uploadUrl: string; key: string }> {
   const ext = (input.extension ?? 'bin').replace(/[^a-zA-Z0-9]/g, '');
-  const key = `images/mock/${randomUUID()}.${ext || 'bin'}`;
-  return {
-    uploadUrl: `https://mock-storage.local/${key}?contentType=${encodeURIComponent(input.contentType)}`,
-    key,
-  };
+  const key = `images/mock/${Date.now()}.${ext || 'bin'}`;
+  // In tests we don't actually upload; return deterministic URL
+  return { uploadUrl: `https://mock-upload.local/${key}`, key };
 }

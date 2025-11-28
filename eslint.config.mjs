@@ -39,4 +39,21 @@ export default defineConfig([
       ],
     },
   },
+  {
+    files: ['src/**/*.{ts,tsx}', 'packages/**/*.{ts,tsx}'],
+    ignores: ['packages/test-support/**', 'e2e/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@portfolio/test-support', '@portfolio/test-support/*'],
+              message: 'Test support modules are test-only; use dynamic import behind fixture guards.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);

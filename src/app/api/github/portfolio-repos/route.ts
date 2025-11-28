@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getPortfolioRepos } from '@/lib/github-server';
-import { shouldReturnTestFixtures } from '@/lib/test-mode';
-import { TEST_REPO } from '@/lib/test-fixtures';
+import { shouldServeFixturesForRequest } from '@/lib/test-flags';
 
 export async function GET(request: Request) {
   // Return deterministic fixtures for E2E tests
-  if (shouldReturnTestFixtures(request.headers)) {
+  if (shouldServeFixturesForRequest(request.headers)) {
+    const { TEST_REPO } = await import('@portfolio/test-support/fixtures');
     return NextResponse.json({
       starred: [TEST_REPO],
       normal: [],

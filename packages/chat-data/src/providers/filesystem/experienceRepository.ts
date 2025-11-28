@@ -1,4 +1,3 @@
-import { createHash } from 'crypto';
 import {
   assertResume,
   assertExperienceEmbeddings,
@@ -16,10 +15,6 @@ type FilesystemExperienceRepositoryOptions = {
   defaultLimit?: number;
   embeddingsFile?: unknown;
 };
-
-function buildSourceHash(value: unknown): string {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
-}
 
 export function createFilesystemExperienceRepository(
   options: FilesystemExperienceRepositoryOptions
@@ -46,15 +41,6 @@ export function createFilesystemExperienceRepository(
   const embeddingsById = new Map(
     (embeddingIndex?.entries ?? []).map((record) => [record.id.trim().toLowerCase(), record.vector])
   );
-
-  if (embeddingIndex) {
-    const sourceHash = buildSourceHash(dataset);
-    if (embeddingIndex.meta.sourceHash !== sourceHash) {
-      console.warn(
-        `[chat-data] resume embeddings sourceHash mismatch — expected ${sourceHash} but got ${embeddingIndex.meta.sourceHash}`
-      );
-    }
-  }
 
   return {
     async searchExperiences(query?: ResumeSearchQuery, searcherOptions?: ResumeSearcherOptions): Promise<ResumeEntry[]> {

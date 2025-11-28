@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { listPublishedPosts, InvalidBlogCursorError } from '@/server/blog/store';
-import { shouldReturnTestFixtures } from '@/lib/test-mode';
-import { TEST_BLOG_POSTS } from '@/lib/test-fixtures';
+import { BLOG_FIXTURE_RUNTIME_FLAG, shouldServeFixturesForRequest } from '@/lib/test-flags';
 
 export async function GET(req: Request) {
   // Return deterministic fixtures for E2E tests
-  if (shouldReturnTestFixtures(req.headers)) {
+  if (shouldServeFixturesForRequest(req.headers, { fixtureFlag: BLOG_FIXTURE_RUNTIME_FLAG })) {
+    const { TEST_BLOG_POSTS } = await import('@portfolio/test-support/fixtures');
     const published = TEST_BLOG_POSTS.filter((post) => post.status === 'published');
     return NextResponse.json({
       posts: published,

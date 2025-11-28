@@ -123,6 +123,7 @@ export class PortfolioStack extends Stack {
   private readonly blogMediaBucket: s3.Bucket;
   private readonly blogPublishFunction: lambda.Function;
   private readonly blogSchedulerRole: iam.Role;
+  private readonly chatCostTable: dynamodb.Table;
   private readonly alternateDomains: string[] = [];
   private readonly primaryDomainName?: string;
   private readonly validationMode: boolean;
@@ -182,6 +183,7 @@ export class PortfolioStack extends Stack {
     this.blogPublishFunction = this.createBlogPublishFunction();
     this.blogSchedulerRole = this.createBlogSchedulerRole(this.blogPublishFunction);
 
+    this.chatCostTable = this.createChatCostTable();
     this.revalidationTable = this.createRevalidationTable();
     this.revalidationQueue = this.createRevalidationQueue();
 
@@ -568,6 +570,17 @@ export class PortfolioStack extends Stack {
     });
   }
 
+  private createChatCostTable(): dynamodb.Table {
+    return new dynamodb.Table(this, 'ChatRuntimeCostTable', {
+      partitionKey: { name: 'owner_env', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'year_month', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
+      removalPolicy: RemovalPolicy.RETAIN,
+      tableName: `${Stack.of(this).stackName}-ChatRuntimeCost`,
+    });
+  }
+
   private createRevalidationTable(): dynamodb.Table {
     const table = new dynamodb.Table(this, 'RevalidationTable', {
       partitionKey: { name: 'tag', type: dynamodb.AttributeType.STRING },
@@ -575,6 +588,7 @@ export class PortfolioStack extends Stack {
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       removalPolicy: RemovalPolicy.DESTROY,
+      tableName: `${Stack.of(this).stackName}-Revalidation`,
     });
 
     table.addGlobalSecondaryIndex({
@@ -616,6 +630,7 @@ export class PortfolioStack extends Stack {
     env['CACHE_BUCKET_KEY_PREFIX'] = env['CACHE_BUCKET_KEY_PREFIX'] ?? '_cache';
     env['CACHE_BUCKET_REGION'] = region;
     env['CACHE_DYNAMO_TABLE'] = this.revalidationTable.tableName;
+    env['COST_TABLE_NAME'] = this.chatCostTable.tableName;
     env['REVALIDATION_QUEUE_URL'] = this.revalidationQueue.queueUrl;
     env['REVALIDATION_QUEUE_REGION'] = region;
     env['BUCKET_NAME'] = env['BUCKET_NAME'] ?? this.assetsBucket.bucketName;
@@ -1154,6 +1169,7 @@ export class PortfolioStack extends Stack {
     }
 
     this.revalidationTable.grantReadWriteData(grantable);
+    this.chatCostTable.grantReadWriteData(grantable);
 
     if (options.allowQueueSend !== false) {
       this.revalidationQueue.grantSendMessages(grantable);
@@ -1317,6 +1333,7 @@ export class PortfolioStack extends Stack {
       'CACHE_BUCKET_KEY_PREFIX',
       'CACHE_BUCKET_REGION',
       'CACHE_DYNAMO_TABLE',
+      'COST_TABLE_NAME',
       'REVALIDATION_QUEUE_URL',
       'REVALIDATION_QUEUE_REGION',
       'BUCKET_NAME',
