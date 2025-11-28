@@ -39,15 +39,13 @@ function extractUsageFromPayload(payload: unknown): (TokenTotals & { stage: stri
     return null;
   }
 
-  const prompt = toNumber((usageSource as Record<string, unknown>).prompt_tokens ?? (usageSource as Record<string, unknown>).promptTokens);
+  const prompt = toNumber((usageSource as Record<string, unknown>).input_tokens ?? (usageSource as Record<string, unknown>).inputTokens);
   const completion = toNumber(
-    (usageSource as Record<string, unknown>).completion_tokens ?? (usageSource as Record<string, unknown>).completionTokens
+    (usageSource as Record<string, unknown>).output_tokens ?? (usageSource as Record<string, unknown>).outputTokens
   );
-  const total =
-    toNumber((usageSource as Record<string, unknown>).total_tokens ?? (usageSource as Record<string, unknown>).totalTokens) ??
-    (prompt ?? 0) + (completion ?? 0);
+  const total = toNumber((usageSource as Record<string, unknown>).total_tokens ?? (usageSource as Record<string, unknown>).totalTokens);
 
-  if (prompt === null && completion === null && total === 0) {
+  if (prompt === null && completion === null && total === null) {
     return null;
   }
 
@@ -56,7 +54,7 @@ function extractUsageFromPayload(payload: unknown): (TokenTotals & { stage: stri
   return {
     prompt: prompt ?? 0,
     completion: completion ?? 0,
-    total: total ?? 0,
+    total: total ?? (prompt ?? 0) + (completion ?? 0),
     stage,
   };
 }

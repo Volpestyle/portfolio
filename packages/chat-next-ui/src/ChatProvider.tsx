@@ -54,6 +54,7 @@ interface ChatContextValue {
   reasoningTraces: Record<string, PartialReasoningTrace>;
   reasoningEnabled: boolean;
   completionTimes: Record<string, number>;
+  markMessageRendered: (messageId: string) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -68,7 +69,9 @@ export function ChatProvider({
   ownerId,
   reasoningOptIn = true,
 }: ChatProviderProps) {
-  const [resolvedOwnerId, setResolvedOwnerId] = useState<string>('portfolio-owner');
+  const [resolvedOwnerId, setResolvedOwnerId] = useState<string>(
+    () => ownerId ?? process.env.NEXT_PUBLIC_CHAT_OWNER_ID ?? 'portfolio-owner'
+  );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isBusy, setBusy] = useState(false);
   const [chatStarted, setChatStarted] = useState(false);
@@ -257,15 +260,13 @@ export function ChatProvider({
   );
 
   useEffect(() => {
-    if (typeof fetch !== 'function') {
-      return;
-    }
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
     let cancelled = false;
 
     (async () => {
       try {
-        const response = await fetch('/api/projects', { signal: controller?.signal });
+        const resolvedFetcher = resolveFetcher();
+        const response = await resolvedFetcher('/api/projects', { signal: controller?.signal });
         if (!response.ok) {
           throw new Error('Failed to fetch project list');
         }
@@ -284,18 +285,16 @@ export function ChatProvider({
       cancelled = true;
       controller?.abort();
     };
-  }, [cacheProjects]);
+  }, [cacheProjects, resolveFetcher]);
 
   useEffect(() => {
-    if (typeof fetch !== 'function') {
-      return;
-    }
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
     let cancelled = false;
 
     (async () => {
       try {
-        const response = await fetch('/api/resume', { signal: controller?.signal });
+        const resolvedFetcher = resolveFetcher();
+        const response = await resolvedFetcher('/api/resume', { signal: controller?.signal });
         if (!response.ok) {
           throw new Error('Failed to fetch resume entries');
         }
@@ -314,7 +313,7 @@ export function ChatProvider({
       cancelled = true;
       controller?.abort();
     };
-  }, [cacheExperiences]);
+  }, [cacheExperiences, resolveFetcher]);
 
   const applyBannerText = useCallback((text?: string | null) => {
     setBanner((prev) => {
@@ -327,35 +326,45 @@ export function ChatProvider({
       return prev;
     });
   }, []);
-  const applyReasoningTrace = useCallback((itemId?: string, trace?: PartialReasoningTrace) => {
-    if (!itemId) {
-      return;
-    }
-    setReasoningTraces((prev) => {
-      if (!trace) {
-        if (!(itemId in prev)) {
+  const applyReasoningTrace = useCallback(
+    (itemId?: string, trace?: PartialReasoningTrace) => {
+      if (!itemId) {
+        return;
+      }
+      setReasoningTraces((prev) => {
+        if (!trace) {
+          if (!(itemId in prev)) {
+            return prev;
+          }
+          const next = { ...prev };
+          delete next[itemId];
+          return next;
+        }
+        const existing = prev[itemId];
+        const merged = mergeReasoningTraces(existing, trace);
+        if (existing && merged === existing) {
           return prev;
         }
-        const next = { ...prev };
-        delete next[itemId];
-        return next;
-      }
-      const existing = prev[itemId];
-      const merged = mergeReasoningTraces(existing, trace);
-      if (existing && merged === existing) {
+        return { ...prev, [itemId]: merged };
+      });
+    },
+    [setReasoningTraces]
+  );
+
+  const markMessageRendered = useCallback((messageId: string) => {
+    if (!messageId) return;
+    // Mark completion timestamp if missing
+    setCompletionTimes((prev) => {
+      if (prev[messageId]) {
         return prev;
       }
-      return { ...prev, [itemId]: merged };
+      return { ...prev, [messageId]: Date.now() };
     });
-    if (trace?.answerMeta || trace?.error) {
-      setCompletionTimes((prev) => {
-        if (prev[itemId]) {
-          return prev;
-        }
-        return { ...prev, [itemId]: Date.now() };
-      });
-    }
-  }, []);
+    // Flip animated flag off for the rendered message
+    commitMessages((prev) =>
+      prev.map((msg) => (msg.id === messageId ? { ...msg, animated: false } : msg))
+    );
+  }, [commitMessages]);
 
   const streamAssistantResponse = useChatStream({
     replaceMessage,
@@ -363,17 +372,6 @@ export function ChatProvider({
     applyBannerText,
     applyReasoningTrace,
     applyAttachment: ingestAttachment,
-    markCompletedAt: (itemId?: string, timestamp?: number) => {
-      if (!itemId) {
-        return;
-      }
-      setCompletionTimes((prev) => {
-        if (prev[itemId]) {
-          return prev;
-        }
-        return { ...prev, [itemId]: timestamp ?? Date.now() };
-      });
-    },
   });
   useEffect(() => {
     const resolved = ownerId ?? process.env.NEXT_PUBLIC_CHAT_OWNER_ID ?? 'portfolio-owner';
@@ -418,7 +416,7 @@ export function ChatProvider({
         const assistantMessage: ChatMessage = {
           id: assistantMessageId,
           role: 'assistant',
-          parts: [],
+          parts: [{ kind: 'text', text: '', itemId: assistantMessageId }],
           createdAt: new Date().toISOString(),
           animated: true,
         };
@@ -499,6 +497,7 @@ export function ChatProvider({
       reasoningTraces,
       reasoningEnabled,
       completionTimes,
+      markMessageRendered,
     }),
     [
       messages,
@@ -513,6 +512,7 @@ export function ChatProvider({
       reasoningTraces,
       reasoningEnabled,
       completionTimes,
+      markMessageRendered,
     ]
   );
 

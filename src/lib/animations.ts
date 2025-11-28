@@ -27,9 +27,8 @@ export const springAnimations = {
 export const cardTransitions = {
     /** Layout transition for container height/size changes */
     layout: {
-        type: 'spring' as const,
-        stiffness: 300,
-        damping: 30,
+        duration: 1,
+        ease: [0.16, 1, 0.3, 1] as const,
     },
     /** Quick fade for overlapping content during state change */
     crossfade: {
@@ -37,4 +36,3 @@ export const cardTransitions = {
         ease: [0.4, 0, 0.2, 1] as const,
     },
 } as const;
-

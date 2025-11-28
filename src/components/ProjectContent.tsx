@@ -24,7 +24,6 @@ interface ProjectContentProps {
   breadcrumbsOverride?: BreadcrumbOverride[];
   variant?: 'page' | 'chat';
   onDocLinkClick?: (docPath: string, label?: string) => void;
-  layoutId?: string;
 }
 
 export function ProjectContent({
@@ -34,7 +33,6 @@ export function ProjectContent({
   breadcrumbsOverride,
   variant = 'page',
   onDocLinkClick,
-  layoutId,
 }: ProjectContentProps) {
   const isChat = variant === 'chat';
   const { allImages, carouselInitialIndex, isCarouselOpen, handleImageClick, closeCarousel } = useImageCarousel({
@@ -58,7 +56,6 @@ export function ProjectContent({
         <div className={cn('mb-6', isChat ? 'px-2' : '')}>
           <div className="mb-3 flex items-center">
             <motion.h1
-              layoutId={layoutId ? `${layoutId}-title` : undefined}
               className={cn('mr-4 font-bold', isChat ? 'text-lg' : 'text-3xl')}
             >
               {pid}

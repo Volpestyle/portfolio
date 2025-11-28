@@ -99,9 +99,10 @@ Your only decision here is whether to SUPPRESS all cards entirely.
 - "text" → suppress ALL cards, text answer only.
   - Attribute rollups: "what languages do you know?", "how many frameworks have you used?", "list the tools you've used"
   - Explicit "just list" / "no cards" phrasing.
+  - Self/bio/profile-centric asks where cards add no value: "tell me about yourself", "what are your passions?", "what's your background?"
   - Do NOT set "text" for capability checks or "have you used X?" questions.
 
-When in doubt, omit uiTarget. Only set "text" for pure rollup/count questions where cards add no value.
+When in doubt, omit uiTarget. Only set "text" for pure rollup/count questions or personal/bio questions where cards aren’t useful.
 
 --------------------
 Retrieval strategy
@@ -118,6 +119,7 @@ Guidelines:
 - Choose sources deliberately instead of defaulting to both:
   - Resume-only when the ask is employment/role/company-focused (“in your jobs”, “at <Company>”, “what roles used X?”).
   - Projects-only when the user explicitly references projects/repos/case studies or names a project.
+  - Self/bio/profile-centric asks (“tell me about yourself”, passions/background, location) → include profile; add resume/projects only if the user also wants work examples.
   - Otherwise prefer a mix of resume + projects so evidence can come from both.
 - Fact-check or enumerate about skills/tools/tech usually need both resume and projects:
   - resume: "Go language experience"

@@ -1,10 +1,12 @@
 'use client';
 
+import { useCallback, useEffect, useState } from 'react';
 import type { ChatMessage } from '@portfolio/chat-contract';
 import { cn } from '@/lib/utils';
 import { TypewriterMessage } from './TypewriterMessage';
 import { Markdown } from '@/components/Markdown';
 import { InlineUiPortalAnchor } from '@/components/chat/InlineUiPortal';
+import { useChat } from '@/context/ChatContext';
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
@@ -18,6 +20,24 @@ export function ChatMessageBubble({
   isLastAssistantMessage = false,
 }: ChatMessageBubbleProps) {
   const isUser = message.role === 'user';
+  const { markMessageRendered } = useChat();
+  const [shouldAnimate, setShouldAnimate] = useState<boolean>(() => isStreamingMessage && message.animated !== false);
+
+  useEffect(() => {
+    // Only START animation when streaming begins - let onDone handle stopping it
+    if (isStreamingMessage && message.animated !== false) {
+      setShouldAnimate(true);
+    }
+    // Only force-stop if explicitly marked as non-animated
+    if (message.animated === false) {
+      setShouldAnimate(false);
+    }
+  }, [isStreamingMessage, message.animated]);
+
+  const handleTypewriterDone = useCallback(() => {
+    setShouldAnimate(false);
+    markMessageRendered(message.id);
+  }, [markMessageRendered, message.id]);
 
   const wrapperClass = isUser
     ? 'w-full max-w-[85%] rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm text-white shadow-xl'
@@ -29,8 +49,9 @@ export function ChatMessageBubble({
     .filter((idx) => idx !== -1)
     .pop();
 
-  // Check if message has any content
-  const hasContent = message.parts.some((part) => part.kind === 'text' && part.text.trim().length > 0);
+  // Check if message has any content (allow empty during streaming so the placeholder still renders)
+  const hasContent =
+    isStreamingMessage || message.parts.some((part) => part.kind === 'text' && part.text.trim().length > 0);
 
   // Don't render completely empty messages
   if (!hasContent) {
@@ -45,7 +66,7 @@ export function ChatMessageBubble({
         {message.parts.map((part, index) => {
           if (part.kind === 'text') {
             // Skip empty text parts
-            if (!part.text.trim()) {
+            if (!part.text.trim() && !isStreamingMessage) {
               return null;
             }
 
@@ -59,17 +80,21 @@ export function ChatMessageBubble({
 
             const isLastTextPart = index === lastTextPartIndex;
 
-            const canAnimate = isStreamingMessage && message.animated !== false;
+            const renderTypewriter = !isUser && shouldAnimate;
+            const showCursor = shouldAnimate ? isLastTextPart : isLastAssistantMessage && isLastTextPart;
 
-            if (canAnimate) {
+            if (renderTypewriter) {
               return (
                 <TypewriterMessage
                   key={`${message.id}-text-${index}`}
                   text={part.text}
+                  messageId={message.id}
+                  itemId={part.itemId ?? message.id}
                   className="text-sm leading-relaxed"
-                  showCursor={isLastTextPart}
-                  streaming
+                  showCursor={showCursor}
+                  streaming={isStreamingMessage}
                   markdown
+                  onDone={handleTypewriterDone}
                 />
               );
             }

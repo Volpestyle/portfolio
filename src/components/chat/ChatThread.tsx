@@ -30,16 +30,22 @@ function ThinkingSpinner() {
 export function ChatThread({ messages, isBusy }: ChatThreadProps) {
   const { uiState, reasoningTraces, reasoningEnabled, completionTimes } = useChat();
   const surfaces = uiState.surfaces ?? [];
-  const lastAssistantMessageId = messages
+  const lastAssistantMessage = messages
     .slice()
     .reverse()
-    .find((msg) => msg.role === 'assistant')?.id;
-  const streamingAssistantMessageId = isBusy ? lastAssistantMessageId : undefined;
+    .find((msg) => msg.role === 'assistant');
+  const lastAssistantMessageId = lastAssistantMessage?.id;
+  const lastAssistantCompleted = lastAssistantMessageId ? Boolean(completionTimes[lastAssistantMessageId]) : false;
+  const lastAssistantAnimated = lastAssistantMessage?.animated !== false;
+  const streamingAssistantMessageId =
+    lastAssistantMessageId && (isBusy || lastAssistantAnimated || !lastAssistantCompleted)
+      ? lastAssistantMessageId
+      : undefined;
 
   // Show thinking spinner when busy and assistant hasn't started producing content
   const lastMessage = messages[messages.length - 1];
-  const lastAssistantMessage = lastMessage?.role === 'assistant' ? lastMessage : undefined;
-  const assistantHasContent = lastAssistantMessage?.parts?.some(
+  const lastMessageAssistant = lastMessage?.role === 'assistant' ? lastMessage : undefined;
+  const assistantHasContent = lastMessageAssistant?.parts?.some(
     (p) => p.kind === 'text' && p.text.trim().length > 0
   );
   const currentTrace = streamingAssistantMessageId

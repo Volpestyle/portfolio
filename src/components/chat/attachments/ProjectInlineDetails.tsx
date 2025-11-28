@@ -10,7 +10,6 @@ interface ProjectInlineDetailsProps {
   project?: ProjectDetail;
   breadcrumbsOverride?: { label: string; href?: string; onClick?: () => void }[];
   onDocLinkClick?: (path: string, label?: string) => void;
-  layoutId?: string;
 }
 
 export function ProjectInlineDetails({
@@ -18,7 +17,6 @@ export function ProjectInlineDetails({
   project,
   breadcrumbsOverride,
   onDocLinkClick,
-  layoutId,
 }: ProjectInlineDetailsProps) {
   const resolvedProject = detail?.project ?? project;
   const projectId = resolvedProject?.slug ?? resolvedProject?.name ?? '';
@@ -63,7 +61,6 @@ export function ProjectInlineDetails({
       variant="chat"
       breadcrumbsOverride={breadcrumbsOverride}
       onDocLinkClick={onDocLinkClick}
-      layoutId={layoutId}
     />
   );
 }

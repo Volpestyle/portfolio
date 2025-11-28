@@ -138,33 +138,49 @@ test.describe('API integration', () => {
 });
 
 type BaseSseEvent = {
-  type?: string;
+  type?: undefined;
+  [key: string]: unknown;
 };
 
-type TokenEvent = BaseSseEvent & { type: 'token'; token?: string; delta?: string };
-type StageEvent = BaseSseEvent & { type: 'stage'; stage?: string; status?: string };
-type ReasoningEvent = BaseSseEvent & { type: 'reasoning'; stage?: string; trace?: Record<string, unknown> };
-type UiEvent = BaseSseEvent & { type: 'ui'; ui?: Record<string, unknown> };
-type ChatSseEvent = BaseSseEvent & Partial<TokenEvent & StageEvent & ReasoningEvent & UiEvent>;
+type TokenEvent = { type: 'token'; token?: string; delta?: string };
+type StageEvent = { type: 'stage'; stage?: string; status?: string };
+type ReasoningEvent = { type: 'reasoning'; stage?: string; trace?: Record<string, unknown> };
+type UiEvent = { type: 'ui'; ui?: Record<string, unknown> };
+type DoneEvent = { type: 'done' };
+type ErrorEvent = { type: 'error'; error?: unknown };
+type ChatSseEvent = TokenEvent | StageEvent | ReasoningEvent | UiEvent | DoneEvent | ErrorEvent | BaseSseEvent;
 
 async function readSseEvents(response: APIResponse): Promise<ChatSseEvent[]> {
   const body = await response.text();
-  return body
-    .split('\n\n')
+  const chunks = body
+    .split(/\r?\n\r?\n/)
     .map((chunk) => chunk.trim())
-    .map((chunk) => {
-      if (!chunk.startsWith('data:')) {
-        return null;
-      }
-      const payload = chunk.replace(/^data:\s*/, '');
-      if (!payload || payload === '[DONE]') {
-        return null;
-      }
-      try {
-        return JSON.parse(payload) as ChatSseEvent;
-      } catch {
-        return null;
-      }
-    })
-    .filter((event): event is ChatSseEvent => Boolean(event));
+    .filter(Boolean);
+
+  const events: ChatSseEvent[] = [];
+
+  for (const chunk of chunks) {
+    const lines = chunk.split(/\r?\n/).map((line) => line.trim());
+    const dataLines = lines
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.replace(/^data:\s*/, ''))
+      .filter(Boolean);
+
+    if (!dataLines.length) {
+      continue;
+    }
+
+    const payload = dataLines.join('\n');
+    if (!payload || payload === '[DONE]') {
+      continue;
+    }
+
+    try {
+      events.push(JSON.parse(payload) as ChatSseEvent);
+    } catch {
+      // Ignore malformed frames; fixture streams should be well-formed.
+    }
+  }
+
+  return events;
 }

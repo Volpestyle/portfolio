@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import type { ProjectSummary, ResumeEntry } from '@portfolio/chat-contract';
 import type { ChatSurfaceState } from '@portfolio/chat-next-ui';
 import { useChat } from '@/hooks/useChat';
@@ -177,7 +177,7 @@ function SurfaceProjectCard({
   autoExpandToken?: string | null;
 }) {
   const projectId = project.slug ?? project.name;
-  const [isExpanded, setIsExpanded] = useState<boolean>(() => Boolean(autoExpandToken));
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [activeDoc, setActiveDoc] = useState<ActiveDocState>(null);
   const { data: detail, isLoading, isError } = useProjectDetail(projectId, { enabled: isExpanded });
   const { data: repoInfo } = useProjectRepo(projectId);
@@ -186,15 +186,16 @@ function SurfaceProjectCard({
     isLoading: isDocLoading,
     isError: docError,
   } = useProjectDocument(projectId, activeDoc?.path, { enabled: isExpanded && Boolean(activeDoc?.path) });
-  const autoExpandRef = useRef<string | null>(autoExpandToken ?? null);
+  const autoExpandRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [stableHeight, setStableHeight] = useState<number | null>(null);
+  const lastStableHeightRef = useRef<number | null>(null);
 
   const viewState: ViewState = !isExpanded ? 'card' : activeDoc ? 'document' : 'detail';
   const isLoadingState = (viewState === 'detail' && isLoading) || (viewState === 'document' && isDocLoading);
 
   useEffect(() => {
-    if (autoExpandToken && autoExpandToken !== autoExpandRef.current) {
+    if (autoExpandToken && (autoExpandToken !== autoExpandRef.current || !isExpanded)) {
       autoExpandRef.current = autoExpandToken;
       setIsExpanded(true);
       return;
@@ -204,7 +205,7 @@ function SurfaceProjectCard({
       autoExpandRef.current = null;
       setIsExpanded(false);
     }
-  }, [autoExpandToken]);
+  }, [autoExpandToken, isExpanded]);
 
   useEffect(() => {
     if (!isExpanded) {
@@ -214,10 +215,6 @@ function SurfaceProjectCard({
 
   // Track the last rendered height so layout animation skips the loading placeholder size.
   useLayoutEffect(() => {
-    if (isLoadingState) {
-      return;
-    }
-
     const node = containerRef.current;
     if (!node) {
       return;
@@ -228,13 +225,18 @@ function SurfaceProjectCard({
       return;
     }
 
-    setStableHeight((prev) => {
-      if (prev && Math.abs(prev - nextHeight) < 1) {
-        return prev;
+    if (!isLoadingState) {
+      if (!lastStableHeightRef.current || Math.abs(lastStableHeightRef.current - nextHeight) >= 1) {
+        lastStableHeightRef.current = nextHeight;
+        setStableHeight(nextHeight);
       }
-      return nextHeight;
-    });
-  }, [isLoadingState, viewState, detail, document, isError, docError]);
+      return;
+    }
+
+    if (lastStableHeightRef.current && (!stableHeight || Math.abs(stableHeight - lastStableHeightRef.current) >= 1)) {
+      setStableHeight(lastStableHeightRef.current);
+    }
+  }, [isLoadingState, viewState, detail, document, isError, docError, stableHeight]);
 
   const handleDocLinkClick = useCallback((path: string, label?: string) => {
     setActiveDoc({ path, label });
@@ -274,6 +276,7 @@ function SurfaceProjectCard({
   }, []);
 
   const layoutId = `project-${projectId}`;
+  const bodyLayoutId = `${layoutId}-body`;
 
   // Content variants - subtle opacity fade only
   const contentVariants = {
@@ -290,102 +293,105 @@ function SurfaceProjectCard({
   };
 
   return (
-    <motion.div
-      ref={containerRef}
-      className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm"
-      layout
-      initial={false}
-      transition={cardTransitions.layout}
-      style={{
-        minHeight: isLoadingState && stableHeight ? stableHeight : undefined,
-      }}
-    >
-      <AnimatePresence mode="wait" initial={false}>
-        {viewState === 'card' && (
-          <motion.div key="card" {...fadeMotionProps}>
-            <ProjectCard
-              project={project}
-              repo={repoForCard}
-              variant="chat"
-              onOpen={handleExpand}
-              isExpanded={isExpanded}
-              layoutId={layoutId}
-            />
-          </motion.div>
-        )}
+    <LayoutGroup id={layoutId}>
+      <motion.div
+        ref={containerRef}
+        className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm"
+        layout
+        initial={false}
+        transition={cardTransitions.layout}
+        style={{
+          minHeight: isLoadingState && stableHeight ? stableHeight : undefined,
+        }}
+      >
+        <AnimatePresence mode="popLayout" initial={false}>
+          {viewState === 'card' && (
+            <motion.div key="card" {...fadeMotionProps}>
+              <motion.div layoutId={bodyLayoutId} transition={cardTransitions.layout}>
+                <ProjectCard
+                  project={project}
+                  repo={repoForCard}
+                  variant="chat"
+                  onOpen={handleExpand}
+                  isExpanded={isExpanded}
+                  layoutId={layoutId}
+                />
+              </motion.div>
+            </motion.div>
+          )}
 
-        {viewState === 'detail' && (
-          <motion.div key="detail" {...fadeMotionProps}>
-            <AnimatePresence mode="wait" initial={false}>
-              {isLoading ? (
-                <motion.div
-                  key="detail-loading"
-                  className="flex min-h-[200px] items-center justify-center"
-                  {...fadeMotionProps}
-                >
-                  <Spinner size="md" variant="ring" />
-                </motion.div>
-              ) : isError || !detail ? (
-                <motion.div key="detail-error" className="p-4" {...fadeMotionProps}>
-                  <p className="text-sm text-white/70">Unable to load project details right now. Please try again.</p>
-                  <button
-                    onClick={collapseToCard}
-                    className="mt-2 text-xs uppercase tracking-wide text-white/60 transition hover:text-white"
+          {viewState === 'detail' && (
+            <motion.div key="detail" {...fadeMotionProps}>
+              <AnimatePresence mode="wait" initial={false}>
+                {isLoading ? (
+                  <div
+                    key="detail-loading"
+                    className="flex min-h-[200px] items-center justify-center"
+                    {...fadeMotionProps}
                   >
-                    Back to cards
-                  </button>
-                </motion.div>
-              ) : (
-                <motion.div key="detail-content" {...fadeMotionProps}>
-                  <ProjectInlineDetails
-                    detail={detail}
-                    breadcrumbsOverride={breadcrumbs}
-                    onDocLinkClick={handleDocLinkClick}
-                    layoutId={layoutId}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
+                    <Spinner size="md" variant="ring" />
+                  </div>
+                ) : isError || !detail ? (
+                  <motion.div key="detail-error" className="p-4" {...fadeMotionProps}>
+                    <p className="text-sm text-white/70">Unable to load project details right now. Please try again.</p>
+                    <button
+                      onClick={collapseToCard}
+                      className="mt-2 text-xs uppercase tracking-wide text-white/60 transition hover:text-white"
+                    >
+                      Back to cards
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div layoutId={bodyLayoutId} transition={cardTransitions.layout}>
+                    <ProjectInlineDetails
+                      detail={detail}
+                      breadcrumbsOverride={breadcrumbs}
+                      onDocLinkClick={handleDocLinkClick}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
 
-        {viewState === 'document' && (
-          <motion.div key={`doc-${activeDoc?.path ?? 'none'}`} {...fadeMotionProps}>
-            <AnimatePresence mode="wait" initial={false}>
-              {isDocLoading ? (
-                <motion.div
-                  key="doc-loading"
-                  className="flex min-h-[200px] items-center justify-center"
-                  {...fadeMotionProps}
-                >
-                  <Spinner size="md" variant="ring" />
-                </motion.div>
-              ) : docError || !document ? (
-                <motion.div key="doc-error" className="p-4" {...fadeMotionProps}>
-                  <p className="text-sm text-white/70">Unable to load that document. Please try another link.</p>
-                  <button
-                    onClick={backToDetail}
-                    className="mt-2 text-xs uppercase tracking-wide text-white/60 transition hover:text-white"
+          {viewState === 'document' && (
+            <motion.div key={`doc-${activeDoc?.path ?? 'none'}`} {...fadeMotionProps}>
+              <AnimatePresence mode="wait" initial={false}>
+                {isDocLoading ? (
+                  <motion.div
+                    key="doc-loading"
+                    className="flex min-h-[200px] items-center justify-center"
+                    {...fadeMotionProps}
                   >
-                    Back to project
-                  </button>
-                </motion.div>
-              ) : (
-                <motion.div key="doc-content" {...fadeMotionProps}>
-                  <DocumentInlinePanel
-                    repo={document.repoName}
-                    title={document.title}
-                    path={document.path}
-                    content={document.content}
-                    breadcrumbsOverride={docBreadcrumbs ?? undefined}
-                    onDocLinkClick={handleDocLinkClick}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+                    <Spinner size="md" variant="ring" />
+                  </motion.div>
+                ) : docError || !document ? (
+                  <motion.div key="doc-error" className="p-4" {...fadeMotionProps}>
+                    <p className="text-sm text-white/70">Unable to load that document. Please try another link.</p>
+                    <button
+                      onClick={backToDetail}
+                      className="mt-2 text-xs uppercase tracking-wide text-white/60 transition hover:text-white"
+                    >
+                      Back to project
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div key="doc-content" layoutId={bodyLayoutId} transition={cardTransitions.layout}>
+                    <DocumentInlinePanel
+                      repo={document.repoName}
+                      title={document.title}
+                      path={document.path}
+                      content={document.content}
+                      breadcrumbsOverride={docBreadcrumbs ?? undefined}
+                      onDocLinkClick={handleDocLinkClick}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </LayoutGroup>
   );
 }

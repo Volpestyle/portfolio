@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import type { ChatMessage, ChatTextPart, PartialReasoningTrace, ReasoningTraceError } from '@portfolio/chat-contract';
 import { parseChatStream, type ChatStreamEvent } from './chatStreamParser';
 import type { ApplyUiActionOptions } from './chatUiState';
+import { isTypewriterDebugEnabled, typewriterDebug, typewriterPreview } from './typewriterDebug';
 
 export type ChatAttachment = {
   type: 'project' | 'resume';
@@ -15,7 +16,6 @@ type StreamDependencies = {
   applyBannerText?: (text?: string | null) => void;
   applyReasoningTrace: (itemId?: string, trace?: PartialReasoningTrace) => void;
   applyAttachment?: (attachment: ChatAttachment) => void;
-  markCompletedAt?: (itemId?: string, timestamp?: number) => void;
 };
 
 type StreamRequest = {
@@ -29,7 +29,6 @@ export function useChatStream({
   applyBannerText,
   applyReasoningTrace,
   applyAttachment,
-  markCompletedAt,
 }: StreamDependencies) {
   return useCallback(
     async ({ response, assistantMessage }: StreamRequest) => {
@@ -135,10 +134,27 @@ export function useChatStream({
 
         if (event.type === 'token' && typeof (event as { token?: unknown }).token === 'string') {
           const itemId = typeof event.itemId === 'string' ? event.itemId : undefined;
+          const token = (event as { token: string }).token;
           registerItem(itemId);
+          const debugEnabled = isTypewriterDebugEnabled();
           applyAssistantChange((message) => {
             const textPart = ensureTextPart(message, itemId);
-            textPart.text += (event as { token: string }).token;
+            const prevLength = textPart.text.length;
+            textPart.text += token;
+            if (debugEnabled) {
+              const textParts = message.parts.filter((part) => part.kind === 'text') as ChatTextPart[];
+              const totalLength = textParts.reduce((sum, part) => sum + part.text.length, 0);
+              typewriterDebug('sse_token', {
+                messageId: mutableAssistant.id,
+                itemId: itemId ?? textPart.itemId,
+                tokenLength: token.length,
+                tokenPreview: typewriterPreview(token, 200),
+                prevLength,
+                nextLength: textPart.text.length,
+                totalTextLength: totalLength,
+                partCount: message.parts.length,
+              });
+            }
           });
           return;
         }
@@ -181,7 +197,6 @@ export function useChatStream({
               error: reasoningError,
             });
           }
-          markCompletedAt?.(itemId);
           const errorMessage =
             (event as { message?: string }).message ??
             (event as { error?: string }).error ??
@@ -194,25 +209,34 @@ export function useChatStream({
 
         if (event.type === 'done') {
           const itemId = typeof event.itemId === 'string' ? event.itemId : mutableAssistant.id;
-          registerItem(itemId);
           const totalDurationMs = typeof event.totalDurationMs === 'number' ? event.totalDurationMs : undefined;
-          markCompletedAt?.(itemId, totalDurationMs ? Date.now() : undefined);
+          if (isTypewriterDebugEnabled()) {
+            const textParts = mutableAssistant.parts.filter((part) => part.kind === 'text') as ChatTextPart[];
+            typewriterDebug('sse_done', {
+              messageId: mutableAssistant.id,
+              itemId,
+              totalDurationMs,
+              textParts: textParts.map((part) => ({
+                itemId: part.itemId,
+                length: part.text.length,
+                preview: typewriterPreview(part.text, 160),
+              })),
+            });
+          }
+          registerItem(itemId);
         }
       };
 
       for await (const event of parseChatStream(response.body, {
         onParseError: (err) => console.warn('Failed to parse chat event', err),
       })) {
+        handleEvent(event);
         if (event.type === 'done') {
-          applyAssistantChange((message) => {
-            message.animated = false;
-          });
           break;
         }
-        handleEvent(event);
       }
     },
-    [applyAttachment, applyBannerText, applyReasoningTrace, applyUiActions, markCompletedAt, replaceMessage]
+    [applyAttachment, applyBannerText, applyReasoningTrace, applyUiActions, replaceMessage]
   );
 }
 

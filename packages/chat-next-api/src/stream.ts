@@ -1,6 +1,5 @@
 import type OpenAI from 'openai';
 import type { ChatRequestMessage, PartialReasoningTrace, ReasoningStage, UiPayload } from '@portfolio/chat-contract';
-import { chunkText } from '@portfolio/chat-contract';
 import type { ChatApi, ChatbotResponse, RunOptions } from './index';
 
 export const SSE_HEADERS = {
@@ -9,6 +8,7 @@ export const SSE_HEADERS = {
   Connection: 'keep-alive',
 } as const;
 const DEFAULT_SOFT_TIMEOUT_MS = Number(process.env.CHAT_STREAM_TIMEOUT_MS ?? 65000);
+const STREAM_TOKEN_CHUNK_SIZE = 32;
 
 type StreamOptions = {
   anchorId?: string;
@@ -61,6 +61,29 @@ export function createChatSseStream(api: ChatApi, client: OpenAI, messages: Chat
       const sendEvent = (eventName: string, payload: unknown) => {
         controller.enqueue(encoder.encode(`event: ${eventName}\ndata: ${JSON.stringify(payload)}\n\n`));
       };
+      const chunkForStream = (value: string) => {
+        if (!value) {
+          return [] as string[];
+        }
+        if (value.length <= STREAM_TOKEN_CHUNK_SIZE) {
+          return [value];
+        }
+        const parts: string[] = [];
+        let cursor = 0;
+        while (cursor < value.length) {
+          parts.push(value.slice(cursor, cursor + STREAM_TOKEN_CHUNK_SIZE));
+          cursor += STREAM_TOKEN_CHUNK_SIZE;
+        }
+        return parts;
+      };
+      const emitChunked = (value: string, emit: (chunk: string) => void) => {
+        if (!value) return;
+        const chunks = chunkForStream(value);
+        for (const chunk of chunks) {
+          if (!chunk) continue;
+          emit(chunk);
+        }
+      };
       const sendErrorEvent = (code: string, message: string, retryable: boolean, retryAfterMs?: number) => {
         sendEvent('error', { type: 'error', anchorId, itemId: anchorId, code, message, retryable, retryAfterMs });
       };
@@ -107,13 +130,13 @@ export function createChatSseStream(api: ChatApi, client: OpenAI, messages: Chat
         const bufferToken = (token: string) => {
           if (!token) return;
           streamed = true;
-          bufferedTokens.push(token);
+          emitChunked(token, (chunk) => bufferedTokens.push(chunk));
           upstreamRunOptions?.onAnswerToken?.(token);
         };
         const streamToken = (token: string) => {
           if (!token) return;
           streamed = true;
-          enqueueToken(token);
+          emitChunked(token, enqueueToken);
           upstreamRunOptions?.onAnswerToken?.(token);
         };
         const result = await api.run(client, messages, {
@@ -210,9 +233,11 @@ export function createChatSseStream(api: ChatApi, client: OpenAI, messages: Chat
           }
 
           if (!streamed && result.message) {
-            chunkText(result.message).forEach((token) => {
-              enqueueToken(token);
-            });
+            for (const chunk of chunkForStream(result.message)) {
+              enqueueToken(chunk);
+              // Yield so tokens and the completion event are delivered in separate ticks.
+              await Promise.resolve();
+            }
             streamed = true;
           }
 
@@ -258,6 +283,8 @@ export function createChatSseStream(api: ChatApi, client: OpenAI, messages: Chat
         }
         const totalDurationMs = Date.now() - streamStartedAt;
         if (!errorEmitted) {
+          // Defer completion to avoid batching the final token and done in the same tick.
+          await Promise.resolve();
           sendEvent('done', {
             type: 'done',
             anchorId,

@@ -569,15 +569,19 @@ export function inferRetrievalFocus(
   resumeFacets?: ResumeFacet[] | null
 ): RetrievalFocus {
   if (intent === 'meta') return 'mixed';
-  const sources = new Set(
-    (Array.isArray(retrievalRequests) ? retrievalRequests : [])
-      .map((req) => req?.source)
-      .filter((source): source is 'projects' | 'resume' => source === 'projects' || source === 'resume')
-  );
-  if (sources.has('projects') && sources.has('resume')) return 'mixed';
-  if (sources.size === 1) {
-    return sources.has('resume') ? 'resume' : 'projects';
+  const requests = Array.isArray(retrievalRequests) ? retrievalRequests : [];
+  const sources = new Set(requests.map((req) => req?.source).filter(Boolean));
+  const hasProjects = sources.has('projects');
+  const hasResume = sources.has('resume');
+  const hasProfile = sources.has('profile');
+
+  // Any profile request should break resume-only focus; treat as mixed.
+  if ((hasProfile && (hasProjects || hasResume)) || (hasProjects && hasResume)) {
+    return 'mixed';
   }
+  if (hasProfile) return 'mixed';
+  if (hasResume) return 'resume';
+  if (hasProjects) return 'projects';
 
   const resumeFacetSet = new Set(resumeFacets ?? []);
   const hasResumeBias =

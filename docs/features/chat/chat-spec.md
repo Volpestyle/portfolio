@@ -1212,7 +1212,7 @@ type Intent = 'fact_check' | 'enumerate' | 'describe' | 'compare' | 'meta';
  * What the user wants to SEE in the UI (not just search).
  * - 'projects': show project cards only (user asks to see projects/repos)
  * - 'experiences': show experience cards only (user asks about jobs/roles)
- * - 'text': text-only list, no cards
+ * - 'text': text-only list, no cards (also use for self/bio/profile-centric questions where cards add no value)
  *
  * When omitted/undefined (preferred), show all relevant cards.
  */
@@ -1574,7 +1574,12 @@ function estimateTokens(text: string): number {
 }
 ```
 
-For production, consider using `tiktoken` or the model's actual tokenizer for accuracy.
+For production, use the model's tokenizer (`tiktoken` for o200k_base) to:
+
+- Apply sliding-window truncation and user-message guards before LLM calls.
+- Emit stage token counts (e.g., answer token count in stage events).
+
+Runtime cost/usage reporting comes from the Responses API `usage` fields (`input_tokens`, `output_tokens`, `total_tokens`); the local tokenizer is not the source of truth for billing metrics.
 
 **Truncation Behavior by Stage:**
 
@@ -2111,7 +2116,7 @@ done: {}
 
 ### 6.3 UI Derivation (Evidence‑Aligned)
 
-The planner should set `uiTarget` in a way that is steered by what the user is asking about. Preferred behavior should be to leave `uiTarget` undefined so cards can render. Reserve `uiTarget: "text"` for explicit text-only asks (e.g., "list the tools"), not for generic capability or describe questions.
+The planner should set `uiTarget` in a way that is steered by what the user is asking about. Preferred behavior should be to leave `uiTarget` undefined so cards can render. Use `uiTarget: "text"` for (a) explicit text-only asks (e.g., "list the tools") and (b) self/bio/profile-centric questions (passions, background, “tell me about yourself”) where cards don’t add value; otherwise keep it undefined.
 
 ```ts
 const MAX_DISPLAY_ITEMS = 10;
