@@ -18,8 +18,6 @@ env:
   GH_CLIENT_ID: ${{ vars.GH_CLIENT_ID }}
   GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
   NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-  BLOG_TEST_FIXTURES: 'true'
-  PORTFOLIO_TEST_FIXTURES: 'true'
 
 jobs:
   test:
@@ -64,6 +62,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           PORTFOLIO_GIST_ID: ${{ vars.PORTFOLIO_GIST_ID }}
+          SKIP_TEST_FIXTURES: 'true' # keep fixture guard off for production-mode build
+          POSTS_TABLE: mock-posts-table
+          CONTENT_BUCKET: mock-content-bucket
+          MEDIA_BUCKET: mock-media-bucket
+          GH_CLIENT_ID: ci-gh
+          GH_CLIENT_SECRET: ci-gh-secret
+          NEXTAUTH_SECRET: ci-nextauth-secret
         run: pnpm exec next build
 
       - name: Run Playwright tests
@@ -71,6 +76,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           PORTFOLIO_GIST_ID: ${{ vars.PORTFOLIO_GIST_ID }}
           CI: true
+          BLOG_TEST_FIXTURES: 'true'
+          PORTFOLIO_TEST_FIXTURES: 'true'
+          POSTS_TABLE: mock-posts-table
+          CONTENT_BUCKET: mock-content-bucket
+          MEDIA_BUCKET: mock-media-bucket
+          GH_CLIENT_ID: ci-gh
+          GH_CLIENT_SECRET: ci-gh-secret
+          NEXTAUTH_SECRET: ci-nextauth-secret
         run: pnpm test
 
       - name: Upload test results
