@@ -159,6 +159,9 @@ importers:
       '@playwright/test':
         specifier: ^1.49.0
         version: 1.56.1
+      '@portfolio/test-support':
+        specifier: workspace:*
+        version: link:packages/test-support
       '@tailwindcss/typography':
         specifier: ^0.5.19
         version: 0.5.19(tailwindcss@3.4.18(tsx@4.20.6)(yaml@2.8.1))
@@ -259,6 +262,15 @@ importers:
 
   packages/chat-next-api:
     dependencies:
+      '@aws-sdk/client-cloudwatch':
+        specifier: ^3.927.0
+        version: 3.934.0
+      '@aws-sdk/client-dynamodb':
+        specifier: ^3.927.0
+        version: 3.927.0
+      '@aws-sdk/client-sns':
+        specifier: ^3.940.0
+        version: 3.940.0
       '@portfolio/chat-contract':
         specifier: workspace:*
         version: link:../chat-contract
@@ -328,6 +340,15 @@ importers:
       '@portfolio/chat-contract':
         specifier: workspace:*
         version: link:../chat-contract
+
+  packages/test-support:
+    dependencies:
+      '@portfolio/chat-contract':
+        specifier: workspace:*
+        version: link:../chat-contract
+      '@portfolio/chat-next-api':
+        specifier: workspace:*
+        version: link:../chat-next-api
 
 packages:
 
