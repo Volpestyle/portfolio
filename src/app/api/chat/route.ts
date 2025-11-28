@@ -11,9 +11,8 @@ import { randomUUID } from 'crypto';
 import type { ChatPostBody } from '@/server/chat/requestValidation';
 import { resolveReasoningEnabled, validateChatPostBody } from '@/server/chat/requestValidation';
 import {
-  getRuntimeCostRedis,
+  getRuntimeCostClients,
   recordRuntimeCost,
-  resolveCostAlertEmailConfig,
   shouldThrottleForBudget,
 } from '@/server/chat/runtimeCost';
 
@@ -84,8 +83,48 @@ function buildFixtureResponse(headers: HeadersInit = {}): Response {
     },
     uiHintWarnings: [],
   };
+  const retrievalCounts = reasoningTrace.retrieval.reduce(
+    (acc, { source, numResults }) => {
+      acc.totalDocs += numResults;
+      if (!acc.sources.includes(source)) acc.sources.push(source);
+      return acc;
+    },
+    { totalDocs: 0, sources: [] as string[] },
+  );
+  const evidenceCount = reasoningTrace.evidence.selectedEvidence.length;
   const frames = [
-    { type: 'item', itemId: anchorId },
+    { type: 'item', itemId: anchorId, anchorId, kind: 'answer' },
+    { type: 'stage', itemId: anchorId, anchorId, stage: 'planner', status: 'start' },
+    {
+      type: 'stage',
+      itemId: anchorId,
+      anchorId,
+      stage: 'planner',
+      status: 'complete',
+      meta: { intent: reasoningTrace.plan.intent, topic: reasoningTrace.plan.topic },
+      durationMs: 220,
+    },
+    { type: 'stage', itemId: anchorId, anchorId, stage: 'retrieval', status: 'start' },
+    {
+      type: 'stage',
+      itemId: anchorId,
+      anchorId,
+      stage: 'retrieval',
+      status: 'complete',
+      meta: { docsFound: retrievalCounts.totalDocs, sources: retrievalCounts.sources },
+      durationMs: 140,
+    },
+    { type: 'stage', itemId: anchorId, anchorId, stage: 'evidence', status: 'start' },
+    {
+      type: 'stage',
+      itemId: anchorId,
+      anchorId,
+      stage: 'evidence',
+      status: 'complete',
+      meta: { highLevelAnswer: reasoningTrace.evidence.highLevelAnswer, evidenceCount },
+      durationMs: 260,
+    },
+    { type: 'stage', itemId: anchorId, anchorId, stage: 'answer', status: 'start' },
     {
       type: 'token',
       delta: "Here's a featured project from my portfolio.",
@@ -121,6 +160,7 @@ function buildFixtureResponse(headers: HeadersInit = {}): Response {
       trace: { plan: null, retrieval: null, evidence: null, answerMeta: reasoningTrace.answerMeta },
     },
     { type: 'ui_actions', itemId: anchorId, actions: [] },
+    { type: 'stage', itemId: anchorId, anchorId, stage: 'answer', status: 'complete', durationMs: 800 },
     { type: 'done' },
   ];
 
@@ -227,16 +267,19 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const runtimeCostRedis = await getRuntimeCostRedis();
-    const costAlertEmailConfig = resolveCostAlertEmailConfig();
-    if (runtimeCostRedis) {
+    const runtimeCostClients = await getRuntimeCostClients(ownerId);
+    if (runtimeCostClients) {
       try {
-        const costState = await shouldThrottleForBudget(runtimeCostRedis, chatLogger, costAlertEmailConfig ?? undefined);
+        const costState = await shouldThrottleForBudget(runtimeCostClients, chatLogger);
         if (costState.level === 'exceeded') {
-          return Response.json(
-            { error: { code: 'budget_exceeded', message: BUDGET_EXCEEDED_MESSAGE, retryable: false } },
-            { status: 503, headers: rateLimitHeaders }
-          );
+          return buildErrorSseResponse({
+            code: 'budget_exceeded',
+            message: BUDGET_EXCEEDED_MESSAGE,
+            retryable: false,
+            status: 503,
+            headers: rateLimitHeaders,
+            anchorId: responseAnchorId,
+          });
         }
       } catch (error) {
         logChatDebug('api.chat.cost_check_error', { error: String(error), correlationId });
@@ -269,7 +312,7 @@ export async function POST(request: NextRequest) {
           refusalMessage: MODERATION_REFUSAL_MESSAGE,
           refusalBanner: MODERATION_REFUSAL_BANNER,
         },
-        runtimeCost: runtimeCostRedis
+        runtimeCost: runtimeCostClients
           ? {
               budgetExceededMessage: BUDGET_EXCEEDED_MESSAGE,
               onResult: async (result) => {
@@ -278,7 +321,7 @@ export async function POST(request: NextRequest) {
                   : 0;
                 const costUsd = typeof result.totalCostUsd === 'number' ? result.totalCostUsd : fromUsage;
                 try {
-                  return await recordRuntimeCost(runtimeCostRedis, costUsd, chatLogger, costAlertEmailConfig ?? undefined);
+                  return await recordRuntimeCost(runtimeCostClients, costUsd, chatLogger);
                 } catch (error) {
                   logChatDebug('api.chat.cost_record_error', { error: String(error), correlationId });
                   return undefined;
