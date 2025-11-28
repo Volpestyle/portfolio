@@ -2,6 +2,7 @@ import 'server-only';
 
 import { CloudWatchClient, PutMetricDataCommand, StandardUnit } from '@aws-sdk/client-cloudwatch';
 import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
+import { PublishCommand, SNSClient } from '@aws-sdk/client-sns';
 
 export type CostLevel = 'ok' | 'warning' | 'critical' | 'exceeded';
 
@@ -22,7 +23,9 @@ type Logger = (event: string, payload: Record<string, unknown>) => void;
 type RuntimeCostClients = {
   dynamo: DynamoDBClient;
   cloudwatch: CloudWatchClient;
+  sns?: SNSClient;
   tableName: string;
+  alertTopicArn?: string;
   ownerId: string;
   env: string;
 };
@@ -148,11 +151,15 @@ export async function getRuntimeCostClients(ownerId: string): Promise<RuntimeCos
     return null;
   }
 
+  const alertTopicArn = process.env.COST_ALERT_TOPIC_ARN ?? process.env.CHAT_COST_ALERT_TOPIC_ARN;
+
   const env = resolveEnv();
   cachedClients = {
     dynamo: new DynamoDBClient({}),
     cloudwatch: new CloudWatchClient({}),
+    sns: alertTopicArn ? new SNSClient({}) : undefined,
     tableName,
+    alertTopicArn,
     ownerId,
     env,
   };
@@ -185,6 +192,7 @@ export async function recordRuntimeCost(
   costUsd: number,
   logger?: Logger
 ): Promise<RuntimeCostState> {
+  const previous = await getRuntimeCostState(clients);
   const increment = Number.isFinite(costUsd) && costUsd > 0 ? costUsd : 0;
   const now = new Date();
   const yearMonth = buildMonthKey(now);
@@ -216,6 +224,33 @@ export async function recordRuntimeCost(
     await publishCostMetrics(clients, { turnCostUsd: increment, monthTotalUsd: spendUsd, now });
   } catch (error) {
     logger?.('chat.cost.metrics_error', { error: String(error) });
+  }
+
+  if (clients.sns && clients.alertTopicArn) {
+    try {
+      const levels: CostLevel[] = ['ok', 'warning', 'critical', 'exceeded'];
+      const levelIncreased = levels.indexOf(state.level) > levels.indexOf(previous.level);
+      if (levelIncreased && (state.level === 'critical' || state.level === 'exceeded')) {
+        await clients.sns.send(
+          new PublishCommand({
+            TopicArn: clients.alertTopicArn,
+            Subject: `Chat runtime cost ${state.level}`,
+            Message: JSON.stringify({
+              ownerId: clients.ownerId,
+              env: clients.env,
+              level: state.level,
+              spendUsd: state.spendUsd,
+              budgetUsd: state.budgetUsd,
+              percentUsed: state.percentUsed,
+              estimatedTurnsRemaining: state.estimatedTurnsRemaining,
+              updatedAt: state.updatedAt,
+            }),
+          })
+        );
+      }
+    } catch (error) {
+      logger?.('chat.cost.alert_error', { error: String(error) });
+    }
   }
 
   return state;
