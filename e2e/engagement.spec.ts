@@ -95,7 +95,8 @@ test.describe('Engagement surfaces', () => {
     await expect(projectHeading).toBeVisible();
     const expandButton = page.getByRole('button', { name: /view details/i }).first();
     await expandButton.click();
-    await expect(page.getByTestId('markdown-viewer')).toBeVisible();
-    await expect(page.getByText(/inline documentation/i)).toBeVisible();
+    const markdownViewer = page.getByTestId('markdown-viewer');
+    await expect(markdownViewer).toBeVisible();
+    await expect(markdownViewer).toContainText(/surface inline documentation/i);
   });
 });
