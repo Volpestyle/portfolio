@@ -1,0 +1,50 @@
+%% Figure 2.2 -- Runtime Data Usage
+%% Output: portfolio-chat-runtime-data.png
+flowchart LR
+  %% === Config & Generated Artifacts ===
+  subgraph CONFIG["Static Config"]
+    OC["OwnerConfig\n(ownerId, ownerName,\ndomainLabel, pronouns)"]
+    MC["ModelConfig\n(planner/evidence/answer\n+ embeddingModel)"]
+    CHAT_YML["chat.config.yml"]
+  end
+
+  subgraph GENERATED["Generated Artifacts\n(from preprocess)"]
+    PROJ[(generated/projects.json)]
+    PROJ_EMB[(generated/projects-embeddings.json)]
+    RES[(generated/resume.json)]
+    RES_EMB[(generated/resume-embeddings.json)]
+    PROF[(generated/profile.json)]
+    PERS[(generated/persona.json\nPersonaSummary)]
+  end
+
+  %% === Data Providers & Retrieval ===
+  subgraph RUNTIME_DATA["Runtime DataProviders & Retrieval"]
+    DP["DataProviders\n(projects, resume,\nprofile, persona,\nembeddingIndexes)"]
+    REPO["Repositories & Rankers\n(project/experience/profile\n+ semantic rankers)"]
+  end
+
+  %% === Chat Runtime / API ===
+  subgraph RUNTIME["Chat Runtime"]
+    CHAT_API["createChatApi\n(packages/chat-next-api)"]
+    CHAT_RT["createChatRuntime\n(packages/chat-orchestrator)"]
+  end
+
+  %% wiring from generated -> providers
+  PROJ --> DP
+  PROJ_EMB --> DP
+  RES --> DP
+  RES_EMB --> DP
+  PROF --> DP
+  PERS --> DP
+
+  %% config into runtime
+  OC --> CHAT_API
+  MC --> CHAT_API
+  DP --> REPO
+  REPO --> CHAT_API
+
+  CHAT_API --> CHAT_RT
+
+  %% external entry
+  CLIENT[["Next.js /api/chat\nroute handler"]] --> CHAT_API
+  CHAT_RT -->|Planner / Retrieval / Evidence / Answer| CLIENT
