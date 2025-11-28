@@ -81,6 +81,15 @@ export function createChatSseStream(api: ChatApi, client: OpenAI, messages: Chat
         resetTimeout();
         sendEvent('reasoning', { type: 'reasoning', stage, trace, itemId: anchorId, anchorId });
       };
+      const enqueueStageEvent = (
+        stage: Parameters<NonNullable<StreamOptions['runOptions']>['onStageEvent']>[0],
+        status: Parameters<NonNullable<StreamOptions['runOptions']>['onStageEvent']>[1],
+        meta?: Record<string, unknown>,
+        durationMs?: number
+      ) => {
+        resetTimeout();
+        sendEvent('stage', { type: 'stage', stage, status, meta, durationMs, itemId: anchorId, anchorId });
+      };
       const enqueueUiEvent = (ui: UiPayload | undefined) => {
         if (!ui) {
           return;
@@ -125,6 +134,7 @@ export function createChatSseStream(api: ChatApi, client: OpenAI, messages: Chat
             upstreamRunOptions?.onUiEvent?.(ui);
           },
           onStageEvent: (stage, status, meta, durationMs) => {
+            enqueueStageEvent(stage, status, meta as Record<string, unknown> | undefined, durationMs);
             upstreamRunOptions?.onStageEvent?.(stage, status, meta as Record<string, unknown> | undefined, durationMs);
           },
         });

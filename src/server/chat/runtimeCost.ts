@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { Redis } from '@upstash/redis';
-import { resolveSecretValue } from '@/lib/secrets/manager';
+import { CloudWatchClient, PutMetricDataCommand, StandardUnit } from '@aws-sdk/client-cloudwatch';
+import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
 
 export type CostLevel = 'ok' | 'warning' | 'critical' | 'exceeded';
 
@@ -17,23 +17,22 @@ export type RuntimeCostState = {
   updatedAt: string;
 };
 
-export type CostAlertEmailConfig = {
-  to: string;
-  from: string;
-  levels?: CostLevel[];
-  apiKey?: string;
-};
-
 type Logger = (event: string, payload: Record<string, unknown>) => void;
 
-const TTL_SECONDS = 60 * 60 * 24 * 35; // 35 days
-const ALERT_COOLDOWN_SECONDS = 60 * 60; // 60 minutes
+type RuntimeCostClients = {
+  dynamo: DynamoDBClient;
+  cloudwatch: CloudWatchClient;
+  tableName: string;
+  ownerId: string;
+  env: string;
+};
+
+const TTL_GRACE_DAYS = 35;
 const DEFAULT_BUDGET_USD = 10;
 const WARNING_THRESHOLD = 80;
 const CRITICAL_THRESHOLD = 95;
 
-let cachedRedis: Redis | null = null;
-let redisPromise: Promise<Redis | null> | null = null;
+let cachedClients: RuntimeCostClients | null = null;
 
 function parseNumber(value: unknown): number {
   if (typeof value === 'number') return value;
@@ -44,10 +43,24 @@ function parseNumber(value: unknown): number {
   return 0;
 }
 
+function resolveEnv(): string {
+  const env = process.env.APP_ENV ?? process.env.NEXT_PUBLIC_APP_ENV ?? process.env.NODE_ENV ?? 'development';
+  if (env === 'production') return 'prod';
+  return env;
+}
+
+function resolveBudget(): number {
+  const parsed = Number.parseFloat(process.env.CHAT_MONTHLY_BUDGET_USD ?? '');
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return DEFAULT_BUDGET_USD;
+}
+
 function buildMonthKey(now = new Date()): string {
   const year = now.getUTCFullYear();
   const month = String(now.getUTCMonth() + 1).padStart(2, '0');
-  return `chat:cost:${year}-${month}`;
+  return `${year}-${month}`;
 }
 
 function evaluateCostState(spendUsd: number, turnCount: number, budgetUsd: number, now = new Date()): RuntimeCostState {
@@ -77,177 +90,154 @@ function evaluateCostState(spendUsd: number, turnCount: number, budgetUsd: numbe
   };
 }
 
-async function maybeSendCostEmail(state: RuntimeCostState, config: CostAlertEmailConfig, logger?: Logger): Promise<void> {
-  const allowedLevels = config.levels ?? ['warning', 'critical', 'exceeded'];
-  if (!allowedLevels.includes(state.level)) {
-    return;
-  }
-  const apiKey = config.apiKey ?? process.env.RESEND_API_KEY;
-  if (!apiKey || !config.to || !config.from) {
-    return;
-  }
-
-  const subject = `[Portfolio Chat] Cost Alert: ${state.level.toUpperCase()} - $${state.spendUsd.toFixed(2)}/${state.budgetUsd.toFixed(2)}`;
-  const body = [
-    'Portfolio Chat Runtime Cost Alert',
-    '================================',
-    '',
-    `Level: ${state.level.toUpperCase()}`,
-    `Current Spend: $${state.spendUsd.toFixed(4)}`,
-    `Monthly Budget: $${state.budgetUsd.toFixed(2)}`,
-    `Percent Used: ${state.percentUsed.toFixed(1)}%`,
-    `Remaining: $${state.remainingUsd.toFixed(4)}`,
-    `Estimated Turns Remaining: ${state.estimatedTurnsRemaining}`,
-    '',
-    `Timestamp: ${state.updatedAt}`,
-    '',
-    '---',
-    'This is an automated alert from your Portfolio Chat runtime.',
-  ].join('\n');
-
-  try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: config.from,
-        to: config.to,
-        subject,
-        text: body,
-      }),
-    });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Resend email failed (${response.status}): ${text}`);
-    }
-    logger?.('chat.cost.alert_email', { level: state.level, to: config.to });
-  } catch (error) {
-    logger?.('chat.cost.alert_email_error', { level: state.level, error: String(error) });
-  }
+function computeTtlSeconds(now = new Date()): number {
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const monthEnd = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
+  const ttlDate = new Date(monthEnd.getTime() + TTL_GRACE_DAYS * 24 * 60 * 60 * 1000);
+  return Math.floor(ttlDate.getTime() / 1000);
 }
 
-async function maybeSendAlert(
-  redis: Redis,
-  state: RuntimeCostState,
-  logger?: Logger,
-  emailConfig?: CostAlertEmailConfig
-): Promise<void> {
-  if (state.level === 'ok') {
-    return;
-  }
-  const alertKey = `${state.monthKey}:alert:${state.level}`;
-  const shouldAlert = await redis.set(alertKey, state.updatedAt, { nx: true, ex: ALERT_COOLDOWN_SECONDS });
-  if (shouldAlert !== 'OK') {
-    return;
-  }
-
-  logger?.('chat.cost.alert', {
-    level: state.level,
-    spendUsd: state.spendUsd,
-    budgetUsd: state.budgetUsd,
-    percentUsed: state.percentUsed,
-    remainingUsd: state.remainingUsd,
-    turnCount: state.turnCount,
-  });
-
-  if (emailConfig) {
-    await maybeSendCostEmail(state, emailConfig, logger);
-  }
+async function publishCostMetrics(
+  clients: RuntimeCostClients,
+  { turnCostUsd, monthTotalUsd, now = new Date() }: { turnCostUsd: number; monthTotalUsd: number; now?: Date }
+) {
+  const yearMonth = buildMonthKey(now);
+  await clients.cloudwatch.send(
+    new PutMetricDataCommand({
+      Namespace: 'PortfolioChat/Costs',
+      MetricData: [
+        {
+          MetricName: 'RuntimeCostTurnUsd',
+          Value: turnCostUsd,
+          Unit: StandardUnit.None,
+          StorageResolution: 60,
+          Dimensions: [
+            { Name: 'OwnerId', Value: clients.ownerId },
+            { Name: 'Env', Value: clients.env },
+            { Name: 'YearMonth', Value: yearMonth },
+          ],
+        },
+        {
+          MetricName: 'RuntimeCostMtdUsd',
+          Value: monthTotalUsd,
+          Unit: StandardUnit.None,
+          StorageResolution: 60,
+          Dimensions: [
+            { Name: 'OwnerId', Value: clients.ownerId },
+            { Name: 'Env', Value: clients.env },
+            { Name: 'YearMonth', Value: yearMonth },
+          ],
+        },
+      ],
+    })
+  );
 }
 
-export async function getRuntimeCostRedis(): Promise<Redis | null> {
-  if (cachedRedis) return cachedRedis;
-  if (redisPromise) return redisPromise;
-  redisPromise = (async () => {
-    try {
-      const [url, token] = await Promise.all([
-        resolveSecretValue('UPSTASH_REDIS_REST_URL', { scope: 'repo' }),
-        resolveSecretValue('UPSTASH_REDIS_REST_TOKEN', { scope: 'repo' }),
-      ]);
-      if (!url || !token) {
-        console.warn('[runtime-cost] Redis unavailable (missing credentials)');
-        return null;
-      }
-      cachedRedis = new Redis({ url, token });
-      return cachedRedis;
-    } catch (error) {
-      console.warn('[runtime-cost] Failed to initialize Redis', error);
-      return null;
-    } finally {
-      redisPromise = null;
-    }
-  })();
-  return redisPromise;
+function getOwnerEnvKey(ownerId: string, env: string): string {
+  return `${ownerId}|${env}`;
 }
 
-function resolveBudget(): number {
-  const parsed = Number.parseFloat(process.env.CHAT_MONTHLY_BUDGET_USD ?? '');
-  if (Number.isFinite(parsed) && parsed > 0) {
-    return parsed;
+export async function getRuntimeCostClients(ownerId: string): Promise<RuntimeCostClients | null> {
+  if (cachedClients && cachedClients.ownerId === ownerId) {
+    return cachedClients;
   }
-  return DEFAULT_BUDGET_USD;
-}
 
-export async function getRuntimeCostState(redis: Redis): Promise<RuntimeCostState> {
-  const monthKey = buildMonthKey();
-  const [spend, turns] = await Promise.all([redis.hget(monthKey, 'usd'), redis.hget(monthKey, 'turns')]);
-  const spendUsd = parseNumber(spend);
-  const turnCount = Math.max(0, Math.floor(parseNumber(turns)));
-  return evaluateCostState(spendUsd, turnCount, resolveBudget());
-}
-
-export function resolveCostAlertEmailConfig(): CostAlertEmailConfig | null {
-  const to = process.env.CHAT_COST_ALERT_TO ?? process.env.OPENAI_COST_ALERT_EMAIL;
-  const from = process.env.CHAT_COST_ALERT_FROM;
-  if (!to || !from) {
+  const tableName = process.env.COST_TABLE_NAME ?? process.env.CHAT_COST_TABLE_NAME;
+  if (!tableName) {
     return null;
   }
-  const levelsEnv = process.env.CHAT_COST_ALERT_LEVELS;
-  const levels = levelsEnv
-    ? levelsEnv
-      .split(',')
-      .map((entry) => entry.trim().toLowerCase())
-      .filter((entry): entry is CostLevel => entry === 'warning' || entry === 'critical' || entry === 'exceeded')
-    : undefined;
-  return {
-    to,
-    from,
-    levels: levels && levels.length ? levels : undefined,
-    apiKey: process.env.RESEND_API_KEY,
+
+  const env = resolveEnv();
+  cachedClients = {
+    dynamo: new DynamoDBClient({}),
+    cloudwatch: new CloudWatchClient({}),
+    tableName,
+    ownerId,
+    env,
   };
+  return cachedClients;
+}
+
+export async function getRuntimeCostState(clients: RuntimeCostClients): Promise<RuntimeCostState> {
+  const now = new Date();
+  const yearMonth = buildMonthKey(now);
+  const key = {
+    owner_env: { S: getOwnerEnvKey(clients.ownerId, clients.env) },
+    year_month: { S: yearMonth },
+  } as const;
+
+  const result = await clients.dynamo.send(
+    new GetItemCommand({
+      TableName: clients.tableName,
+      Key: key,
+      ProjectionExpression: 'monthTotalUsd, turnCount, updatedAt',
+    })
+  );
+
+  const spendUsd = parseNumber(result.Item?.monthTotalUsd?.N ?? 0);
+  const turnCount = Math.max(0, Math.floor(parseNumber(result.Item?.turnCount?.N ?? 0)));
+  return evaluateCostState(spendUsd, turnCount, resolveBudget(), now);
 }
 
 export async function recordRuntimeCost(
-  redis: Redis,
+  clients: RuntimeCostClients,
   costUsd: number,
-  logger?: Logger,
-  emailConfig?: CostAlertEmailConfig
+  logger?: Logger
 ): Promise<RuntimeCostState> {
-  const monthKey = buildMonthKey();
   const increment = Number.isFinite(costUsd) && costUsd > 0 ? costUsd : 0;
+  const now = new Date();
+  const yearMonth = buildMonthKey(now);
+  const key = {
+    owner_env: { S: getOwnerEnvKey(clients.ownerId, clients.env) },
+    year_month: { S: yearMonth },
+  } as const;
 
-  const spendResult = await redis.hincrbyfloat(monthKey, 'usd', increment);
-  const turnResult = await redis.hincrby(monthKey, 'turns', 1);
-  await redis.expire(monthKey, TTL_SECONDS);
+  const update = await clients.dynamo.send(
+    new UpdateItemCommand({
+      TableName: clients.tableName,
+      Key: key,
+      UpdateExpression: 'ADD monthTotalUsd :delta, turnCount :one SET updatedAt = :now, expiresAt = :ttl',
+      ExpressionAttributeValues: {
+        ':delta': { N: increment.toFixed(6) },
+        ':one': { N: '1' },
+        ':now': { S: now.toISOString() },
+        ':ttl': { N: computeTtlSeconds(now).toString() },
+      },
+      ReturnValues: 'UPDATED_NEW',
+    })
+  );
 
-  const state = evaluateCostState(parseNumber(spendResult), Math.max(0, Math.floor(parseNumber(turnResult))), resolveBudget());
-  await maybeSendAlert(redis, state, logger, emailConfig);
+  const spendUsd = parseNumber(update.Attributes?.monthTotalUsd?.N ?? 0);
+  const turnCount = Math.max(0, Math.floor(parseNumber(update.Attributes?.turnCount?.N ?? 0)));
+  const state = evaluateCostState(spendUsd, turnCount, resolveBudget(), now);
+
+  try {
+    await publishCostMetrics(clients, { turnCostUsd: increment, monthTotalUsd: spendUsd, now });
+  } catch (error) {
+    logger?.('chat.cost.metrics_error', { error: String(error) });
+  }
+
   return state;
 }
 
 export async function shouldThrottleForBudget(
-  redis: Redis,
-  logger?: Logger,
-  emailConfig?: CostAlertEmailConfig
+  clients: RuntimeCostClients,
+  logger?: Logger
 ): Promise<RuntimeCostState> {
-  const state = await getRuntimeCostState(redis);
-  if (state.level === 'ok' || state.level === 'warning') {
+  try {
+    const state = await getRuntimeCostState(clients);
+    if (state.level === 'critical' || state.level === 'exceeded') {
+      logger?.('chat.cost.budget_block', {
+        level: state.level,
+        spendUsd: state.spendUsd,
+        budgetUsd: state.budgetUsd,
+        percentUsed: state.percentUsed,
+      });
+    }
     return state;
+  } catch (error) {
+    logger?.('chat.cost.budget_check_error', { error: String(error) });
+    return evaluateCostState(0, 0, resolveBudget());
   }
-  // Send alert on critical/exceeded even when just checking.
-  await maybeSendAlert(redis, state, logger, emailConfig);
-  return state;
 }
