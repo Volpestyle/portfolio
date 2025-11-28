@@ -1,6 +1,15 @@
 ## Response Typewriter
 
 - The typewriter effect in the chat UI should keep up with the speed of our streamed SSE response, rather than a fixed delay like the other instances of our typewriter effect. If we recieve a huge chunk all at once from SSE, then we should still see some sort of gradual reveal typewriter effect, it just might be very fast, to better simulate how we recieve response from the server.
+- Architecture
+  - SSE tokens are appended to the streaming assistant message by `useChatStream` (packages/chat-next-ui/src/useChatStream.ts). Each token lands on a text `part` (per itemId) and keeps a single streaming message marked `animated: true` until done/error.
+  - Rendering uses `TypewriterMessage` (src/components/chat/TypewriterMessage.tsx) whenever `animated` is true. This component:
+    - Tracks the incoming target text and a backlog queue of grapheme clusters to render.
+    - Measures incoming token rate per frame; smooths into a stream rate clamped between ~12–480 chars/sec. Backlog is drained over a visible window (480–1600ms) so bursts still appear as a quick but gradual reveal instead of instant paint.
+    - Handles rewinds/edits: if the stream rewrites earlier text, it resets to the common prefix, rebuilds the queue, and continues animating.
+    - Continues draining after SSE end until the queue is empty, then snaps to the final target as a safety net if needed.
+    - Marks completion via `onDone`, which clears `animated` for that message so subsequent renders show static Markdown.
+  - Debugging: `NEXT_PUBLIC_DEBUG_TYPEWRITER=1` or `?debugTypewriter=1` logs `typewriter_*` and `sse_*` events (rate, backlog, previews) to the console to tune pacing vs SSE bursts.
 
 ## Project cards
 

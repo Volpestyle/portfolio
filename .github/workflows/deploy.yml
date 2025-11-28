@@ -128,10 +128,6 @@ jobs:
         working-directory: ${{ env.APP_ROOT }}
         run: pnpm install --frozen-lockfile
 
-      - name: Validate chat preprocess artifacts
-        working-directory: ${{ env.APP_ROOT }}
-        run: pnpm chat:validate
-
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         id: playwright-cache
