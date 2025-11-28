@@ -91,6 +91,7 @@ function buildFixtureResponse(headers: HeadersInit = {}): Response {
     },
     { totalDocs: 0, sources: [] as string[] },
   );
+  const evidenceCount = reasoningTrace.evidence.selectedEvidence.length;
   const frames = [
     { type: 'item', itemId: anchorId, anchorId, kind: 'answer' },
     { type: 'stage', itemId: anchorId, anchorId, stage: 'planner', status: 'start' },
@@ -120,7 +121,7 @@ function buildFixtureResponse(headers: HeadersInit = {}): Response {
       anchorId,
       stage: 'evidence',
       status: 'complete',
-      meta: { highLevelAnswer: reasoningTrace.evidence.highLevelAnswer, evidenceCount: 1 },
+      meta: { highLevelAnswer: reasoningTrace.evidence.highLevelAnswer, evidenceCount },
       durationMs: 260,
     },
     { type: 'stage', itemId: anchorId, anchorId, stage: 'answer', status: 'start' },
