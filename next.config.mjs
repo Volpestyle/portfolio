@@ -3,6 +3,13 @@ const nextConfig = {
   output: 'standalone',
   experimental: {
     externalDir: true,
+    outputFileTracingIncludes: {
+      '/api/chat': [
+        './generated/**/*',
+        './chat.config.*',
+        './chat-preprocess.config.*',
+      ],
+    },
   },
   transpilePackages: [
     '@portfolio/chat-contract',
