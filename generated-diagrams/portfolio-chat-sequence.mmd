@@ -1,0 +1,72 @@
+%% Figure 6.0 -- End-to-End Chat Turn Sequence
+%% Output: portfolio-chat-sequence.png
+sequenceDiagram
+    autonumber
+
+    participant U as User
+    participant F as Frontend\n(Next.js UI)
+    participant API as /api/chat\n(Next.js route)
+    participant MID as Rate-limit &\nBudget Middleware
+    participant ORC as Chat Orchestrator
+    participant RET as Retrieval & Data
+    participant OAI as OpenAI\nResponses / Embeddings
+
+    %% User sends message
+    U->>F: Type message & click "Send"
+    F->>API: HTTP POST /api/chat\nChatRequestPayload (ownerId, conversationId, messages, responseAnchorId)
+
+    %% Middleware / rate limiting
+    API->>MID: Check IP rate limits\n+ monthly budget
+    MID-->>API: allowed / 429 / 503
+    alt rate limited or budget exceeded
+        API-->>F: HTTP 429/503 JSON error\n(no SSE stream)
+    else allowed
+        API-->>F: Open SSE stream headers
+        F-->>F: Attach EventSource to /api/chat
+    end
+
+    %% Planner
+    API->>F: event: stage (planner_start)
+    API->>ORC: run() -- Planner
+    ORC->>OAI: Planner LLM call
+    OAI-->>ORC: RetrievalPlan JSON
+    ORC-->>API: Planner result
+    API->>F: event: stage (planner_complete)
+    API->>F: event: reasoning { plan }
+
+    %% Retrieval
+    API->>F: event: stage (retrieval_start)
+    ORC->>RET: Run retrieval\n(BM25 + embeddings + recency)
+    RET->>OAI: Embedding API calls
+    OAI-->>RET: Embedding vectors
+    RET-->>ORC: Retrieved docs + scores
+    ORC-->>API: RetrievalSummary[]
+    API->>F: event: stage (retrieval_complete)
+    API->>F: event: reasoning { plan, retrieval }
+
+    %% Evidence
+    API->>F: event: stage (evidence_start)
+    ORC->>OAI: Evidence LLM call\n(plan + retrieved docs)
+    OAI-->>ORC: EvidenceSummary JSON
+    ORC-->>API: EvidenceSummary
+    API->>F: event: stage (evidence_complete)
+    API->>F: event: reasoning { plan, retrieval, evidence }
+    API->>F: event: ui (UiPayload\nderived from Evidence)
+
+    %% Answer (streaming)
+    API->>F: event: stage (answer_start)
+    ORC->>OAI: Answer LLM call\n(streaming)
+    loop answer tokens
+        OAI-->>ORC: next answer token
+        ORC-->>API: token
+        API->>F: event: token { token }
+    end
+    OAI-->>ORC: final AnswerPayload JSON
+    ORC-->>API: AnswerMeta (token counts, etc.)
+    API->>F: event: stage (answer_complete)
+    API->>F: event: reasoning { plan, retrieval, evidence, answerMeta }
+
+    %% Completion
+    API->>F: event: done { totalDurationMs, truncationApplied? }
+    API-->>F: Close SSE stream
+    F-->>U: Final rendered answer + cards

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useChat } from '@/hooks/useChat';
 import { formatChatMessagesAsMarkdown } from '@/lib/chat-debug';
+import type { ChatDebugLogEntry } from '@portfolio/chat-next-api';
 
 const isDevEnvironment = process.env.NODE_ENV !== 'production';
 
@@ -30,7 +31,18 @@ export function ChatDevTools() {
     setErrorMessage(null);
 
     try {
-      const markdown = formatChatMessagesAsMarkdown(messages);
+      let debugLogs: ChatDebugLogEntry[] = [];
+      try {
+        const logsResponse = await fetch('/api/debug/chat-logs');
+        if (logsResponse.ok) {
+          const data = (await logsResponse.json()) as { logs?: ChatDebugLogEntry[] };
+          debugLogs = Array.isArray(data.logs) ? data.logs : [];
+        }
+      } catch {
+        // Ignore log fetch failures; still export the chat transcript.
+      }
+
+      const markdown = formatChatMessagesAsMarkdown(messages, debugLogs);
       const timestamp = new Date().toISOString().replace(/[:]/g, '-');
       const filename = `chat-debug-${timestamp}.md`;
       const response = await fetch('/api/debug/chat-export', {

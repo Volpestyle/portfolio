@@ -1,44 +1,46 @@
 'use client';
 
-import { Card } from '@/components/ui/card';
+import { useState, type ComponentType } from 'react';
 import Link from 'next/link';
-import { StarIcon } from '@/lib/svgs';
-import { formatDate } from '@/lib/utils';
 import {
   ArrowRight,
-  Code2,
-  Sparkles,
-  Rocket,
-  Database,
-  Globe,
-  Palette,
-  Server,
-  Cpu,
-  Zap,
-  Shield,
-  Cloud,
-  Package,
-  Terminal,
-  GitBranch,
-  Scissors,
-  MessagesSquare,
-  Rss,
   Briefcase,
+  Cloud,
+  Code2,
+  Cpu,
+  Database,
+  GitBranch,
+  Globe,
+  MessagesSquare,
+  Package,
+  Palette,
+  Rocket,
+  Rss,
+  Scissors,
+  Server,
+  Shield,
+  Sparkles,
+  Terminal,
+  Zap,
 } from 'lucide-react';
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { springAnimations } from '@/lib/animations';
+import { Card } from '@/components/ui/card';
 import { AnimatedExpandButton } from '@/components/ui/AnimatedExpandButton';
-import type { RepoData } from '@/lib/github-server';
 import { LanguageBar } from '@/components/LanguageBar';
+import { StarIcon } from '@/lib/svgs';
+import { formatDate } from '@/lib/utils';
+import type { ProjectSummary, RepoData } from '@portfolio/chat-contract';
+import { motion } from 'framer-motion';
 
 interface ProjectCardProps {
-  repo: RepoData;
+  project: ProjectSummary;
+  repo?: RepoData;
   variant?: 'default' | 'chat';
   onOpen?: () => void;
+  isExpanded?: boolean;
+  layoutId?: string;
 }
 
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+const iconMap: Record<string, ComponentType<{ className?: string }>> = {
   code: Code2,
   sparkles: Sparkles,
   rocket: Rocket,
@@ -59,22 +61,43 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   briefcase: Briefcase,
 };
 
-export function ProjectCard({ repo, variant = 'default', onOpen }: ProjectCardProps) {
+function buildProjectLink(project: ProjectSummary) {
+  const slug = project.slug ?? project.name;
+  return `/projects/${encodeURIComponent(slug)}`;
+}
+
+function resolveRepoKey(project: ProjectSummary) {
+  return (project.slug ?? project.name).toLowerCase();
+}
+
+export function ProjectCard({ project, repo, variant = 'default', onOpen, isExpanded }: ProjectCardProps) {
   const [isTitleHovered, setIsTitleHovered] = useState(false);
-  const Icon = repo.icon ? iconMap[repo.icon] || ArrowRight : ArrowRight;
+  const slug = project.slug ?? project.name;
   const isChat = variant === 'chat';
+
+  const Icon = repo?.icon ? iconMap[repo.icon] || ArrowRight : ArrowRight;
+  const summaryText = project.oneLiner || repo?.summary || repo?.description || 'Details coming soon.';
+  const createdDate = repo?.created_at ? formatDate(repo.created_at) : null;
+  const pushedDate = repo?.pushed_at
+    ? formatDate(repo.pushed_at)
+    : repo?.updated_at
+      ? formatDate(repo.updated_at)
+      : null;
+  const languagePercentages = repo?.languagePercentages?.length ? repo.languagePercentages : null;
+  const tags = (project.tags?.length ? project.tags : (repo?.tags ?? [])).slice(0, 6);
+  const projectLink = buildProjectLink(project);
 
   if (isChat) {
     return (
-      <Card className="group relative flex h-full flex-col overflow-hidden border-white bg-black/5 p-4 text-white backdrop-blur-sm transition-all duration-300 hover:border-white/60 hover:bg-black/20">
-        <h2 className="mb-2 flex items-center justify-between text-xl font-bold">
+      <Card className="group relative flex h-full flex-col overflow-hidden border-0 bg-transparent p-4 text-white">
+        <motion.h2 className="mb-2 flex items-center justify-between text-xl font-bold">
           <button
             onClick={(event) => {
               event.stopPropagation();
               onOpen?.();
             }}
             disabled={!onOpen}
-            className="group/title relative inline-flex items-center gap-2 rounded transition-all duration-300 hover:bg-white hover:text-black active:bg-white active:text-black disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-white"
+            className="group/title relative inline-flex items-center gap-2 rounded transition-all duration-200 hover:bg-white hover:text-black active:bg-white active:text-black disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-white"
             style={{
               paddingLeft: isTitleHovered ? '12px' : '0px',
               paddingRight: isTitleHovered ? '12px' : '0px',
@@ -84,42 +107,36 @@ export function ProjectCard({ repo, variant = 'default', onOpen }: ProjectCardPr
             onMouseEnter={() => setIsTitleHovered(true)}
             onMouseLeave={() => setIsTitleHovered(false)}
           >
-            {repo.name}
-            <motion.div
-              animate={{
-                x: isTitleHovered ? 0 : -8,
-                opacity: isTitleHovered ? 1 : 0,
-              }}
-              transition={springAnimations.iconText}
-            >
-              <Icon className="h-4 w-4" />
-            </motion.div>
+            {project.name}
+            <Icon className="h-4 w-4" />
           </button>
-          {repo.isStarred && <StarIcon />}
-        </h2>
+          {repo?.isStarred && <StarIcon />}
+        </motion.h2>
 
-        {repo.description && <p className="mb-4 text-sm opacity-90">{repo.description}</p>}
+        {summaryText && <p className="mb-4 text-sm opacity-90">{summaryText}</p>}
 
-        <p className="text-xs text-gray-400">
-          <span className="font-bold">Created:</span> {formatDate(repo.created_at)}
-        </p>
-        {repo.pushed_at && (
+        {createdDate && (
+          <p className="text-xs text-gray-400">
+            <span className="font-bold">Created:</span> {createdDate}
+          </p>
+        )}
+        {pushedDate && (
           <p className="mb-2 mt-1 text-xs text-gray-400">
-            <span className="font-bold">Last commit:</span> {formatDate(repo.pushed_at)}
+            <span className="font-bold">Last commit:</span> {pushedDate}
           </p>
         )}
 
-        {repo.languagePercentages && repo.languagePercentages.length > 0 && (
+        {languagePercentages && (
           <div className="mb-3 mt-3">
-            <LanguageBar languages={repo.languagePercentages} maxLabels={3} />
+            <LanguageBar languages={languagePercentages} maxLabels={3} />
           </div>
         )}
 
-        {repo.tags && repo.tags.length > 0 && (
+        {tags.length > 0 && (
           <div className="mb-4 mt-3 flex flex-wrap gap-2">
-            {repo.tags.slice(0, 6).map((tag) => (
+            {tags.map((tag) => (
               <span
-                key={tag}
+                key={`${resolveRepoKey(project)}-${tag}`}
                 className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80"
               >
                 {tag}
@@ -130,7 +147,7 @@ export function ProjectCard({ repo, variant = 'default', onOpen }: ProjectCardPr
 
         <AnimatedExpandButton
           icon={<ArrowRight className="h-5 w-5" />}
-          text="view details"
+          text={isExpanded ? 'hide details' : 'view details'}
           wrapperClassName="mt-auto"
           disabled={!onOpen}
           onClick={(event) => {
@@ -144,52 +161,48 @@ export function ProjectCard({ repo, variant = 'default', onOpen }: ProjectCardPr
 
   return (
     <Card className="relative flex h-full flex-col border-white bg-black/5 p-4 text-white backdrop-blur-sm">
-      <h2 className="mb-2 flex items-center justify-between text-xl font-bold">
+      <motion.h2 className="mb-2 flex items-center justify-between text-xl font-bold">
         <Link
-          href={`/projects/${repo.name}`}
-          className="group relative inline-flex items-center gap-2 rounded transition-all duration-300 hover:bg-white hover:text-black active:bg-white active:text-black"
+          href={projectLink}
+          className="group relative inline-flex items-center gap-2 rounded transition-all duration-200 hover:bg-white hover:text-black active:bg-white active:text-black"
           style={{
             paddingLeft: isTitleHovered ? '12px' : '0px',
             paddingRight: isTitleHovered ? '12px' : '0px',
-            paddingTop: '8px',
-            paddingBottom: '8px',
           }}
           onMouseEnter={() => setIsTitleHovered(true)}
           onMouseLeave={() => setIsTitleHovered(false)}
         >
-          {repo.name}
-          <motion.div
-            animate={{
-              x: isTitleHovered ? 0 : -8,
-              opacity: isTitleHovered ? 1 : 0,
-            }}
-            transition={springAnimations.iconText}
-          >
-            <Icon className="h-4 w-4" />
-          </motion.div>
+          {project.name}
+          <Icon className="h-4 w-4" />
         </Link>
-        {repo.isStarred && <StarIcon />}
-      </h2>
-      {repo.description && <p className="mb-4 text-sm opacity-90">{repo.description}</p>}
-      <p className="text-xs text-gray-400">
-        <span className="font-bold">Created:</span> {formatDate(repo.created_at)}
-      </p>
-      {repo.pushed_at && (
+        {repo?.isStarred && <StarIcon />}
+      </motion.h2>
+
+      {summaryText && <p className="mb-4 text-sm opacity-90">{summaryText}</p>}
+      {createdDate && (
+        <p className="text-xs text-gray-400">
+          <span className="font-bold">Created:</span> {createdDate}
+        </p>
+      )}
+      {pushedDate && (
         <p className="mb-2 mt-1 text-xs text-gray-400">
-          <span className="font-bold">Last commit:</span> {formatDate(repo.pushed_at)}
+          <span className="font-bold">Last commit:</span> {pushedDate}
         </p>
       )}
 
-      {repo.languagePercentages && repo.languagePercentages.length > 0 && (
+      {languagePercentages && (
         <div className="mb-3 mt-3">
-          <LanguageBar languages={repo.languagePercentages} maxLabels={3} />
+          <LanguageBar languages={languagePercentages} maxLabels={3} />
         </div>
       )}
 
-      {repo.tags && repo.tags.length > 0 && (
+      {tags.length > 0 && (
         <div className="mb-4 mt-3 flex flex-wrap gap-2">
-          {repo.tags.slice(0, 6).map((tag) => (
-            <span key={tag} className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80">
+          {tags.map((tag) => (
+            <span
+              key={`${slug}-tag-${tag}`}
+              className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80"
+            >
               {tag}
             </span>
           ))}
@@ -199,7 +212,7 @@ export function ProjectCard({ repo, variant = 'default', onOpen }: ProjectCardPr
         icon={<ArrowRight className="h-5 w-5" />}
         text="view details"
         wrapperClassName="mt-auto"
-        href={`/projects/${repo.name}`}
+        href={projectLink}
       />
     </Card>
   );

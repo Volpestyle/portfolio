@@ -1,0 +1,58 @@
+%% Figure 2.0 -- High-Level Runtime Architecture
+%% Output: portfolio-chat-architecture.png
+flowchart LR
+  %% === Client ===
+  subgraph CLIENT["Client"]
+    U[User]
+    UI["Portfolio Web UI\n(Next.js frontend)"]
+    U --> UI
+  end
+
+  %% === Next.js Server / API ===
+  subgraph SERVER["Next.js Server"]
+    API[/"POST /api/chat\n(SSE)"/]
+    MIDDLEWARE[["Rate-limit & Budget\nMiddleware"]]
+    ORCH["Chat Orchestrator\n(Planner -> Retrieval -> Evidence -> Answer)"]
+  end
+
+  %% === Data Layer & Retrieval ===
+  subgraph DATA["Portfolio Data & Retrieval"]
+    CORPORA[(generated/\nprojects.json\nresume.json\nprofile.json)]
+    EMBED_IDX[(generated/\nprojects-embeddings.json\nresume-embeddings.json)]
+    RETRIEVAL["Retrieval Engine\n(BM25 + embeddings + recency)"]
+  end
+
+  %% === OpenAI APIs ===
+  subgraph OPENAI["OpenAI APIs"]
+    LLM["Responses API\n(Planner / Evidence / Answer)"]
+    EMB["Embeddings API\n(text-embedding-3-large)"]
+  end
+
+  %% === Infra & Observability ===
+  subgraph INFRA["Infra & Observability"]
+    REDIS[(Upstash Redis\nrate limits)]
+    DDB[(DynamoDB\nruntime cost)]
+    CW[(CloudWatch + SNS\nmetrics & alarms)]
+  end
+
+  %% --- Client <-> Server ---
+  UI -->|ChatRequestPayload\nHTTP POST| API
+  API --> MIDDLEWARE
+  MIDDLEWARE -->|allowed| ORCH
+  MIDDLEWARE -->|429 / 503| UI
+
+  %% --- Orchestrator <-> Data & LLMs ---
+  ORCH --> RETRIEVAL
+  RETRIEVAL --> CORPORA
+  RETRIEVAL --> EMBED_IDX
+  RETRIEVAL -->|embed queries| EMB
+
+  ORCH -->|Planner/Evidence/Answer calls| LLM
+
+  %% --- SSE back to client ---
+  API -->|SSE: stage, reasoning,\nui, token, item, done, error| UI
+
+  %% --- Infra wiring ---
+  MIDDLEWARE --> REDIS
+  ORCH -->|per-turn cost| DDB
+  ORCH -->|usage & timings| CW

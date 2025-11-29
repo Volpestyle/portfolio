@@ -14,16 +14,16 @@ We support **two distinct test types** with one clear API:
 #### Layer 1: Runtime Fixture Flag (Infrastructure)
 
 - **What**: Determines whether blog APIs use mock fixtures or DynamoDB/S3
-- **When**: Only when `BLOG_TEST_FIXTURES=true` (Playwright/local dev opt-in)
-- **Function**: `isBlogFixtureRuntime()` - checks the explicit env flag
+- **When**: Only when `BLOG_TEST_FIXTURES=true` (Playwright/local dev opt-in) and never in production (flag causes a fail-fast)
+- **Function**: `shouldUseBlogFixtureRuntime()` - checks the explicit env flag
 
 #### Layer 2: Test Fixtures (Request-Scoped)
 
-- **What**: Returns deterministic fixtures for E2E tests
-- **When**: Any test that needs predictable data
-- **Function**: `shouldReturnTestFixtures()` - checks `x-portfolio-test-mode` header (ignored in production for safety)
+- **What**: Returns deterministic fixtures for E2E tests (via dynamic imports)
+- **When**: Any test that needs predictable data and has opted into fixture flags
+- **Function**: `shouldServeFixturesForRequest()` - requires a fixture flag and the `x-portfolio-test-mode` header (header is ignored in production)
 
-**Key Insight**: All APIs check `shouldReturnTestFixtures()` at the top and return fixtures if true. Local dev/CI runs can flip fixtures via header; production ignores the header so only explicit env flags (which are stripped there) can enable mocks.
+**Key Insight**: APIs call `shouldServeFixturesForRequest()` and only load fixtures via dynamic import when fixture flags are enabled. Playwright sets `PORTFOLIO_TEST_FIXTURES=true` and `BLOG_TEST_FIXTURES=true` when it boots the local dev server; production ignores headers entirely and will throw if a fixture flag leaks into prod.
 
 ## 🚀 Quick Start
 
@@ -51,7 +51,7 @@ pnpm test:report
 - ✅ **Projects + knowledge flows** – opening project cards, README rendering, doc breadcrumbs.
 - ✅ **Blog** – handles both "no posts yet" and published article paths.
 - ✅ **Contact** – native validation, success toast, and API error handling.
-- ✅ **Chat** – full message send using SSE streaming, project card attachments, README doc links, and document fetching.
+- ✅ **Chat** – full message send using SSE streaming, portfolio UI surfaces, README doc links, and document fetching.
 - ✅ **Error surfaces** – ensures users see actionable messaging without relying on real upstream services.
 
 ### Test Suites
@@ -89,7 +89,8 @@ e2e/
 ```typescript
 export async function GET(request: Request) {
   // Playwright sends 'x-portfolio-test-mode: e2e' header during local/CI mock runs
-  if (shouldReturnTestFixtures(request.headers)) {
+  if (shouldServeFixturesForRequest(request.headers)) {
+    const { TEST_FIXTURES } = await import('@portfolio/test-support/fixtures');
     return NextResponse.json(TEST_FIXTURES);
   }
   // Otherwise use real data
@@ -103,6 +104,7 @@ export async function GET(request: Request) {
 export async function fetchPortfolioRepos() {
   // When PORTFOLIO_TEST_FIXTURES is set (pnpm test), use deterministic data
   if (process.env.PORTFOLIO_TEST_FIXTURES === 'true') {
+    const { TEST_FIXTURES } = await import('@portfolio/test-support/fixtures');
     return TEST_FIXTURES;
   }
   return await fetchFromGitHub();
@@ -113,7 +115,7 @@ export async function fetchPortfolioRepos() {
 
 - **API routes** get request headers → can detect test mode per-request
 - **SSR pages** render at build time → no request headers, use environment instead
-- Both ensure: ✅ Tests get fixtures, ✅ Production gets real data
+- Both ensure: ✅ Tests get fixtures (only when flags are set), ✅ Production gets real data and fails fast if fixture flags are present
 
 ### What You Get
 
@@ -138,7 +140,7 @@ _\*Set `PORTFOLIO_TEST_FIXTURES=true` to opt into fixtures locally (Playwright d
 
 ## 🧪 E2E Tests (Fast & Reliable)
 
-Playwright automatically sends `x-portfolio-test-mode: e2e` header when running in mock mode (local dev/CI), making all APIs return predictable test data. Production deployments ignore this header entirely, so real traffic cannot opt into fixtures.
+Playwright automatically sends `x-portfolio-test-mode: e2e` header and sets the fixture flags when running in mock mode (local dev/CI), making all APIs return predictable test data. Production deployments ignore this header entirely and will fail fast if fixture flags are present, so real traffic cannot opt into mocks.
 
 **Benefits:**
 
@@ -200,7 +202,7 @@ Our GitHub Actions workflows use the unified testing architecture:
 import { test, expect } from '@playwright/test';
 
 test('displays blog posts correctly', async ({ page }) => {
-  // Playwright automatically injects x-portfolio-test-mode: e2e during local/CI mock runs
+  // Playwright injects x-portfolio-test-mode: e2e and starts dev with PORTFOLIO_TEST_FIXTURES/BLOG_TEST_FIXTURES
   // API will return TEST_BLOG_POSTS fixture
 
   await page.goto('/blog');

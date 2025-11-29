@@ -389,13 +389,16 @@ export function Markdown({
     return null;
   }
 
+  // Convert literal \n to actual newlines (model sometimes returns escaped newlines)
+  const processedContent = content.replace(/\\n/g, '\n');
+
   return (
     <div className={cn('max-w-none text-base leading-relaxed text-gray-200 [&>*:first-child]:mt-0', className)}>
       <ReactMarkdown
         rehypePlugins={[rehypeRaw, [rehypeSanitize, markdownSanitizeSchema], rehypeHighlight]}
         components={components}
       >
-        {content}
+        {processedContent}
       </ReactMarkdown>
     </div>
   );

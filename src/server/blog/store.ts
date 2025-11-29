@@ -1,12 +1,17 @@
 import { PutObjectCommand, GetObjectCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand, DeleteCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import type {
+  GetCommandOutput,
+  QueryCommandOutput,
+  ScanCommandOutput,
+  UpdateCommandOutput,
+} from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'node:crypto';
 import { blogConfig } from '@/server/blog/config';
-import * as mockStore from '@/server/blog/mock-store';
 import { getDocumentClient, getS3Client } from '@/server/blog/clients';
 import type { BlogPostRecord, BlogPostStatus, BlogPostSummary, BlogPostWithContent } from '@/types/blog';
-import { isBlogFixtureRuntime } from '@/lib/test-mode';
+import { assertNoFixtureFlagsInProd, shouldUseBlogFixtureRuntime } from '@/lib/test-flags';
 
 type RawBlogRecord = {
   slug: string;
@@ -25,8 +30,20 @@ type RawBlogRecord = {
   activeScheduleName?: string;
 };
 
-const useMockStore = () => isBlogFixtureRuntime();
+const useMockStore = () => shouldUseBlogFixtureRuntime();
+const loadMockStore = async () => {
+  assertNoFixtureFlagsInProd();
+  return import('@portfolio/test-support/blog/mock-store');
+};
+
 const docClient = getDocumentClient();
+const rawDocClient = docClient as unknown as { send: (command: unknown) => Promise<unknown> };
+
+// Preserve command outputs without tripping Smithy version skews.
+const sendDocumentCommand = async <Output>(command: unknown): Promise<Output> => {
+  return rawDocClient.send(command) as Promise<Output>;
+};
+
 const s3Client = getS3Client();
 const MAX_REVISIONS_PER_POST = 5;
 const REVISION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -223,7 +240,8 @@ export async function listPublishedPosts(
   cursor?: string
 ): Promise<PaginatedPosts> {
   if (useMockStore()) {
-    const { posts, hasMore, nextCursor } = await mockStore.listPublishedPosts(limit);
+    const store = await loadMockStore();
+    const { posts, hasMore, nextCursor } = await store.listPublishedPosts(limit);
     return { posts, hasMore, nextCursor };
   }
 
@@ -237,7 +255,7 @@ export async function listPublishedPosts(
     }
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<QueryCommandOutput>(
     new QueryCommand({
       TableName: blogConfig.tableName,
       IndexName: blogConfig.statusIndexName,
@@ -283,10 +301,11 @@ export async function listPublishedPosts(
 
 export async function listPosts(options: { status?: BlogPostStatus; search?: string } = {}): Promise<BlogPostRecord[]> {
   if (useMockStore()) {
-    return mockStore.listPosts(options);
+    const store = await loadMockStore();
+    return store.listPosts(options);
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<ScanCommandOutput>(
     new ScanCommand({
       TableName: blogConfig.tableName,
     })
@@ -321,10 +340,11 @@ export async function getPostWithContent(
   options: { includeDraft?: boolean } = {}
 ): Promise<BlogPostWithContent | null> {
   if (useMockStore()) {
-    return mockStore.getPostWithContent(slug, options);
+    const store = await loadMockStore();
+    return store.getPostWithContent(slug, options);
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<GetCommandOutput>(
     new GetCommand({
       TableName: blogConfig.tableName,
       Key: { slug },
@@ -370,11 +390,12 @@ export async function createPostRecord(input: {
   heroImageKey?: string;
 }): Promise<BlogPostRecord> {
   if (useMockStore()) {
-    return mockStore.createPostRecord(input);
+    const store = await loadMockStore();
+    return store.createPostRecord(input);
   }
 
   const now = new Date().toISOString();
-  await docClient.send(
+  await sendDocumentCommand(
     new PutCommand({
       TableName: blogConfig.tableName,
       Item: {
@@ -416,7 +437,8 @@ export async function saveDraftRecord(input: {
   expectedVersion: number;
 }): Promise<BlogPostWithContent> {
   if (useMockStore()) {
-    return mockStore.saveDraftRecord(input);
+    const store = await loadMockStore();
+    return store.saveDraftRecord(input);
   }
 
   const key = buildRevisionKey(input.slug, input.extension);
@@ -471,7 +493,7 @@ export async function saveDraftRecord(input: {
     values[':tags'] = input.tags;
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<UpdateCommandOutput>(
     new UpdateCommand({
       TableName: blogConfig.tableName,
       Key: { slug: input.slug },
@@ -516,13 +538,14 @@ export async function publishPostRecord(input: {
   expectedVersion: number;
 }): Promise<BlogPostRecord> {
   if (useMockStore()) {
-    return mockStore.publishPostRecord(input);
+    const store = await loadMockStore();
+    return store.publishPostRecord(input);
   }
 
   const publishedAt = input.publishedAt ?? new Date().toISOString();
   const nextVersion = input.expectedVersion + 1;
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<UpdateCommandOutput>(
     new UpdateCommand({
       TableName: blogConfig.tableName,
       Key: { slug: input.slug },
@@ -558,10 +581,11 @@ export async function publishPostRecord(input: {
 
 export async function archivePostRecord(input: { slug: string; expectedVersion: number }): Promise<BlogPostRecord> {
   if (useMockStore()) {
-    return mockStore.archivePostRecord(input);
+    const store = await loadMockStore();
+    return store.archivePostRecord(input);
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<UpdateCommandOutput>(
     new UpdateCommand({
       TableName: blogConfig.tableName,
       Key: { slug: input.slug },
@@ -601,10 +625,11 @@ export async function markScheduledRecord(input: {
   expectedVersion: number;
 }): Promise<BlogPostRecord> {
   if (useMockStore()) {
-    return mockStore.markScheduledRecord(input);
+    const store = await loadMockStore();
+    return store.markScheduledRecord(input);
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<UpdateCommandOutput>(
     new UpdateCommand({
       TableName: blogConfig.tableName,
       Key: { slug: input.slug },
@@ -646,10 +671,11 @@ export async function unmarkScheduledRecord(input: {
   expectedVersion: number;
 }): Promise<BlogPostRecord> {
   if (useMockStore()) {
-    return mockStore.unmarkScheduledRecord(input);
+    const store = await loadMockStore();
+    return store.unmarkScheduledRecord(input);
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<UpdateCommandOutput>(
     new UpdateCommand({
       TableName: blogConfig.tableName,
       Key: { slug: input.slug },
@@ -684,10 +710,11 @@ export async function unmarkScheduledRecord(input: {
 
 export async function deletePostRecord(slug: string): Promise<void> {
   if (useMockStore()) {
-    return mockStore.deletePostRecord(slug);
+    const store = await loadMockStore();
+    return store.deletePostRecord(slug);
   }
 
-  const existing = await docClient.send(
+  const existing = await sendDocumentCommand<GetCommandOutput>(
     new GetCommand({
       TableName: blogConfig.tableName,
       Key: { slug },
@@ -699,7 +726,7 @@ export async function deletePostRecord(slug: string): Promise<void> {
     return;
   }
 
-  await docClient.send(
+  await sendDocumentCommand(
     new DeleteCommand({
       TableName: blogConfig.tableName,
       Key: { slug },
@@ -711,10 +738,11 @@ export async function deletePostRecord(slug: string): Promise<void> {
 
 export async function getPostRecord(slug: string): Promise<BlogPostRecord | null> {
   if (useMockStore()) {
-    return mockStore.getPostRecord(slug);
+    const store = await loadMockStore();
+    return store.getPostRecord(slug);
   }
 
-  const response = await docClient.send(
+  const response = await sendDocumentCommand<GetCommandOutput>(
     new GetCommand({
       TableName: blogConfig.tableName,
       Key: { slug },
@@ -728,7 +756,8 @@ export async function generateMediaUploadUrl(input: {
   extension?: string;
 }): Promise<{ uploadUrl: string; key: string }> {
   if (useMockStore()) {
-    return mockStore.generateMediaUploadUrl(input);
+    const store = await loadMockStore();
+    return store.generateMediaUploadUrl(input);
   }
 
   const now = new Date();

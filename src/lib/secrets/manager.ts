@@ -1,5 +1,5 @@
 import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
-import { NodeHttpHandler } from '@smithy/node-http-handler';
+import { FetchHttpHandler } from '@smithy/fetch-http-handler';
 
 type SecretScope = 'env' | 'repo';
 
@@ -94,10 +94,12 @@ export class SecretsManagerCache {
     const client = new SecretsManagerClient({
       region,
       maxAttempts: 2,
-      requestHandler: new NodeHttpHandler({
-        requestTimeout: 2500,
-        connectionTimeout: 500,
-      }), // Edge-friendly timeouts with a bit more breathing room for slow networks.
+      // FetchHttpHandler works in both Node (>=18) and the Edge runtime, so we
+      // don't pull in the node-only http/https modules that Edge can't bundle.
+      requestHandler: new FetchHttpHandler({
+        requestTimeout: 2_500,
+        keepAlive: false,
+      }),
     });
     this.clients.set(region, client);
     return client;
@@ -314,20 +316,6 @@ export async function resolveSecretValue(
 
   return value;
 }
-
-export async function loadSecretObject(
-  secretId: string,
-  options: { ttlMs?: number; region?: string; fallbackRegion?: string } = {}
-): Promise<Record<string, string>> {
-  const cache = getCacheFor({ region: options.region, fallbackRegion: options.fallbackRegion });
-  return cache.getSecretObject(secretId, options.ttlMs);
-}
-
-export const secretsManagerCache = {
-  get instance() {
-    return getCacheFor();
-  },
-};
 
 declare global {
   var __portfolioSecretsCaches: Record<string, SecretsManagerCache> | undefined;

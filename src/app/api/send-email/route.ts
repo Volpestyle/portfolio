@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
-import { headerIncludesTestMode } from '@/lib/test-mode';
+import { headerIncludesTestMode } from '@/lib/test-flags';
 let cachedSes: SESClient | undefined;
 
 async function getSesClient(): Promise<SESClient> {

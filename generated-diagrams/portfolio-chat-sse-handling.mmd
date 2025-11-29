@@ -1,0 +1,56 @@
+%% Figure 6.1 -- Frontend SSE Event Handling
+%% Output: portfolio-chat-sse-handling.png
+flowchart LR
+  %% === SSE Source ===
+  SSE[/"SSE stream\nfrom /api/chat"/]
+
+  subgraph ROUTER["Event Router & State"]
+    ROUTE["EventSource.onmessage\n+ event-type router"]
+
+    subgraph CHAT_STATE["Chat Thread State"]
+      TOKENS["Append streamed tokens\nto active assistant message"]
+      MSGS["Messages list\n(history per conversationId)"]
+    end
+
+    subgraph UI_STATE["UI & Progress State"]
+      STAGE["Pipeline progress\n(planner / retrieval / evidence / answer)"]
+      CARDS["Cards state\n(showProjects, showExperiences)"]
+      ERR_STATE["Error state\n(code, message, retryable)"]
+      DONE_STATE["Done state\n(durations, truncationApplied)"]
+    end
+
+    subgraph DEVTOOLS["Optional Dev Reasoning UI"]
+      REASON["PartialReasoningTrace\n(plan, retrieval, evidence, answerMeta)"]
+    end
+  end
+
+  subgraph RENDER["React UI Components"]
+    CHAT_UI["Chat thread UI\n(bubbles, typing indicator)"]
+    CARDS_UI["Portfolio cards UI\n(projects & experiences)"]
+    PROGRESS_UI[Stage/progress indicator]
+    ERROR_UI[Error banner / retry button]
+    DEV_UI["Devtools panel\n(reasoning, metrics)"]
+  end
+
+  %% --- Wiring: SSE -> Router ---
+  SSE --> ROUTE
+
+  %% --- Routing by event type ---
+  ROUTE -->|event: token| TOKENS
+  TOKENS --> MSGS
+
+  ROUTE -->|event: stage| STAGE
+  ROUTE -->|event: ui| CARDS
+  ROUTE -->|event: reasoning| REASON
+  ROUTE -->|event: error| ERR_STATE
+  ROUTE -->|event: done| DONE_STATE
+
+  %% --- State -> UI ---
+  MSGS --> CHAT_UI
+  TOKENS --> CHAT_UI
+  STAGE --> PROGRESS_UI
+  CARDS --> CARDS_UI
+  ERR_STATE --> ERROR_UI
+  DONE_STATE --> PROGRESS_UI
+
+  REASON --> DEV_UI

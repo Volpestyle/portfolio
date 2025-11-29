@@ -1,107 +1,66 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import type { RepoData } from '@/lib/github-server';
 import { ProjectContent } from '@/components/ProjectContent';
-import { MarkdownViewer } from '@/components/MarkdownViewer';
-import { useRepoReadme } from '@/hooks/useRepoReadme';
-import { useRepoDocument } from '@/hooks/useRepoDocument';
+import { Spinner } from '@/components/ui/spinner';
+import type { ProjectDetail } from '@portfolio/chat-contract';
+import { useProjectDetail, type ProjectDetailPayload } from '@/hooks/useProjectDetail';
 
 interface ProjectInlineDetailsProps {
-  repo: RepoData;
-  readme: string;
+  detail?: ProjectDetailPayload;
+  project?: ProjectDetail;
   breadcrumbsOverride?: { label: string; href?: string; onClick?: () => void }[];
+  onDocLinkClick?: (path: string, label?: string) => void;
 }
 
-export function ProjectInlineDetails({ repo, readme, breadcrumbsOverride }: ProjectInlineDetailsProps) {
-  const [docView, setDocView] = useState<{ content: string; title: string; path: string } | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const { seedReadme } = useRepoReadme();
-  const { ensureDocument } = useRepoDocument();
+export function ProjectInlineDetails({
+  detail,
+  project,
+  breadcrumbsOverride,
+  onDocLinkClick,
+}: ProjectInlineDetailsProps) {
+  const resolvedProject = detail?.project ?? project;
+  const projectId = resolvedProject?.slug ?? resolvedProject?.name ?? '';
+  const shouldFetch = !detail && Boolean(projectId);
+  const {
+    data: fetchedDetail,
+    isLoading,
+    isError,
+  } = useProjectDetail(projectId, {
+    enabled: shouldFetch,
+  });
 
-  useEffect(() => {
-    const owner = repo.owner?.login;
-    if (owner) {
-      seedReadme(owner, repo.name, readme);
+  const finalDetail = detail ?? fetchedDetail;
+
+  if (!finalDetail) {
+    if (isLoading) {
+      return (
+        <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
+          <div className="flex items-center gap-3 text-sm text-white/70">
+            <Spinner size="sm" /> Loading project details…
+          </div>
+        </div>
+      );
     }
-  }, [repo.name, repo.owner?.login, readme, seedReadme]);
 
-  const handleDocLinkClick = useCallback(
-    async (path: string, label?: string) => {
-      const owner = repo.owner?.login;
-      if (!owner) {
-        console.warn('Cannot load document without owner information for repo:', repo.name);
-        return;
-      }
+    if (isError || !projectId) {
+      return (
+        <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
+          <p className="text-sm text-white/70">Unable to load project details right now. Please try again.</p>
+        </div>
+      );
+    }
 
-      setIsLoading(true);
-      try {
-        const document = await ensureDocument(owner, repo.name, path);
-        const filename = document.path.split('/').pop() || 'Document';
-        setDocView({
-          content: document.content,
-          title: label || filename,
-          path: document.path,
-        });
-      } catch (error) {
-        console.error('Error fetching document:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [ensureDocument, repo.name, repo.owner?.login]
-  );
-
-  // If showing a document, render it with breadcrumbs
-  if (docView) {
-    const breadcrumbs = [
-      {
-        label: 'Projects',
-        onClick: () => setDocView(null), // Make Projects clickable to go back to README
-      },
-      {
-        label: repo.name,
-        onClick: () => setDocView(null), // Make repo name clickable to go back to README
-      },
-      { label: docView.path },
-    ];
-
-    return (
-      <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-        <MarkdownViewer
-          content={docView.content}
-          pid={repo.name}
-          breadcrumbs={breadcrumbs}
-          variant="chat"
-          isLoading={isLoading}
-          onDocLinkClick={handleDocLinkClick}
-        />
-      </div>
-    );
+    return null;
   }
-
-  // Otherwise show the README
-  if (!readme || !readme.trim()) {
-    return (
-      <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
-        <p className="text-sm text-white/60">No README available for this project.</p>
-      </div>
-    );
-  }
-
-  // Use breadcrumbsOverride if provided, otherwise create default breadcrumbs
-  const defaultBreadcrumbs = [{ label: 'Projects' }, { label: repo.name }];
 
   return (
-    <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-      <ProjectContent
-        pid={repo.name}
-        readme={readme}
-        repoInfo={repo}
-        variant="chat"
-        breadcrumbsOverride={breadcrumbsOverride ?? defaultBreadcrumbs}
-        onDocLinkClick={handleDocLinkClick}
-      />
-    </div>
+    <ProjectContent
+      pid={finalDetail.project.slug ?? finalDetail.project.name}
+      repoInfo={finalDetail.repo}
+      readme={finalDetail.readme}
+      variant="chat"
+      breadcrumbsOverride={breadcrumbsOverride}
+      onDocLinkClick={onDocLinkClick}
+    />
   );
 }

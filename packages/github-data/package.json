@@ -1,0 +1,12 @@
+{
+  "name": "@portfolio/github-data",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@octokit/rest": "^21.1.0",
+    "@portfolio/chat-contract": "workspace:*"
+  }
+}

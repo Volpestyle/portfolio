@@ -18,7 +18,16 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@portfolio/chat-contract": ["./packages/chat-contract/src"],
+      "@portfolio/chat-data": ["./packages/chat-data/src"],
+      "@portfolio/chat-orchestrator": ["./packages/chat-orchestrator/src"],
+      "@portfolio/chat-preprocess-cli": ["./packages/chat-preprocess-cli/src"],
+      "@portfolio/chat-next-ui": ["./packages/chat-next-ui/src"],
+      "@portfolio/chat-next-api": ["./packages/chat-next-api/src"],
+      "@portfolio/github-data": ["./packages/github-data/src"],
+      "@portfolio/test-support": ["./packages/test-support/src"],
+      "@portfolio/test-support/*": ["./packages/test-support/src/*"]
     },
     "target": "ES2017"
   },

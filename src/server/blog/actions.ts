@@ -4,7 +4,7 @@ import { headers } from 'next/headers';
 import { auth } from '@/auth';
 import { isAdminEmail } from '@/lib/auth/allowlist';
 import { revalidateContent } from '@/server/revalidate';
-import { hasAdminBypass } from '@/lib/test-mode';
+import { hasAdminBypass } from '@/lib/test-flags';
 import type { BlogPostStatus } from '@/types/blog';
 import {
   createPostRecord,

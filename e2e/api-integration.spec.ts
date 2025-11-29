@@ -1,8 +1,7 @@
 import { test, expect, type APIResponse } from '@playwright/test';
-import { resolveTestRuntime, usingRealApis, buildProjectHeaders } from './utils/runtime-env';
+import { resolveTestRuntime, buildProjectHeaders } from './utils/runtime-env';
 
 const runtime = resolveTestRuntime();
-const useRealApis = usingRealApis(runtime);
 const baseUrl = runtime.baseUrl;
 const repoOwner = process.env.E2E_API_REPO_OWNER;
 const repoName = process.env.E2E_API_REPO_NAME;
@@ -34,6 +33,9 @@ test.describe('API integration', () => {
 
   test('document endpoint serves configured doc (optional)', async ({ request }) => {
     test.skip(!(repoOwner && repoName && docPath), 'Document path environment variables not set');
+    if (!docPath) {
+      throw new Error('Document path configuration is required for this test.');
+    }
     const encodedPath = docPath
       .split('/')
       .map((segment) => encodeURIComponent(segment))
@@ -48,12 +50,19 @@ test.describe('API integration', () => {
     expect(typeof payload.content).toBe('string');
   });
 
-  test('chat endpoint responds in integration mode without OpenAI', async ({ request }) => {
+  test('chat endpoint streams staged SSE frames', async ({ request }) => {
+    const baseHeaders = {
+      'Content-Type': 'application/json',
+      ...buildProjectHeaders('api', runtime),
+    };
+    // When running locally with fixtures, force the E2E header so the server returns the chat fixture stream
+    const headers =
+      runtime.mode === 'mock'
+        ? { ...baseHeaders, 'x-portfolio-test-mode': 'e2e' }
+        : baseHeaders;
+
     const response = await request.post(`${baseUrl}/api/chat`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...buildProjectHeaders('api', runtime),
-      },
+      headers,
       data: {
         messages: [
           {
@@ -61,27 +70,52 @@ test.describe('API integration', () => {
             content: 'integration ping',
           },
         ],
+        ownerId: process.env.CHAT_OWNER_ID ?? 'portfolio-owner',
+        responseAnchorId: 'integration-anchor',
+        conversationId: 'integration-conversation',
+        reasoningEnabled: true,
       },
     });
 
     expect(response.ok()).toBeTruthy();
 
-    if (useRealApis) {
-      const events = await readSseEvents(response);
-      expect(events.length, 'SSE stream should emit events').toBeGreaterThan(0);
-      const errorEvents = events.filter((event) => event.type === 'error');
-      expect(errorEvents.length, 'SSE stream should not include error frames').toBe(0);
-      const streamedText = events
-        .filter((event) => event.type === 'token' && typeof event.delta === 'string')
-        .map((event) => event.delta)
-        .join('')
-        .trim();
-      expect(streamedText.length, 'Chat response should return tokens from the real provider').toBeGreaterThan(0);
-      return;
-    }
+    const events = await readSseEvents(response);
+    expect(events.length, 'SSE stream should emit events').toBeGreaterThan(0);
 
-    const payload = await response.json();
-    expect(payload.message).toContain('integration');
+    const errorEvents = events.filter((event) => event.type === 'error');
+    expect(errorEvents.length, 'SSE stream should not include error frames').toBe(0);
+
+    const stageEvents = events.filter((event): event is StageEvent => event.type === 'stage');
+    const plannerComplete = stageEvents.find(
+      (event) => event.stage === 'planner' && event.status === 'complete'
+    );
+    const evidenceComplete = stageEvents.find(
+      (event) => event.stage === 'evidence' && event.status === 'complete'
+    );
+    expect(plannerComplete, 'Planner stage should complete').toBeDefined();
+    expect(evidenceComplete, 'Evidence stage should complete').toBeDefined();
+
+    const reasoningEvents = events.filter((event): event is ReasoningEvent => event.type === 'reasoning');
+    expect(
+      reasoningEvents.some((event) => event.stage === 'plan' && event.trace?.plan),
+      'Planner reasoning trace should stream'
+    ).toBeTruthy();
+
+    const uiEvents = events.filter((event): event is UiEvent => event.type === 'ui');
+    expect(uiEvents.length, 'UI hint event should be present').toBeGreaterThan(0);
+
+    const streamedText = events
+      .filter(
+        (event): event is TokenEvent =>
+          event.type === 'token' && (typeof event.token === 'string' || typeof event.delta === 'string')
+      )
+      .map((event) => event.token ?? event.delta ?? '')
+      .join('')
+      .trim();
+    expect(streamedText.length, 'Chat response should include streamed tokens').toBeGreaterThan(0);
+
+    const doneEvent = events.find((event) => event.type === 'done');
+    expect(doneEvent, 'Stream should finish with a done frame').toBeDefined();
   });
 
   test('send-email endpoint short-circuits in integration mode', async ({ request }) => {
@@ -103,29 +137,50 @@ test.describe('API integration', () => {
   });
 });
 
-type ChatSseEvent = {
-  type?: string;
-  delta?: string;
+type BaseSseEvent = {
+  type?: undefined;
+  [key: string]: unknown;
 };
+
+type TokenEvent = { type: 'token'; token?: string; delta?: string };
+type StageEvent = { type: 'stage'; stage?: string; status?: string };
+type ReasoningEvent = { type: 'reasoning'; stage?: string; trace?: Record<string, unknown> };
+type UiEvent = { type: 'ui'; ui?: Record<string, unknown> };
+type DoneEvent = { type: 'done' };
+type ErrorEvent = { type: 'error'; error?: unknown };
+type ChatSseEvent = TokenEvent | StageEvent | ReasoningEvent | UiEvent | DoneEvent | ErrorEvent | BaseSseEvent;
 
 async function readSseEvents(response: APIResponse): Promise<ChatSseEvent[]> {
   const body = await response.text();
-  return body
-    .split('\n\n')
+  const chunks = body
+    .split(/\r?\n\r?\n/)
     .map((chunk) => chunk.trim())
-    .map((chunk) => {
-      if (!chunk.startsWith('data:')) {
-        return null;
-      }
-      const payload = chunk.replace(/^data:\s*/, '');
-      if (!payload || payload === '[DONE]') {
-        return null;
-      }
-      try {
-        return JSON.parse(payload) as ChatSseEvent;
-      } catch {
-        return null;
-      }
-    })
-    .filter((event): event is ChatSseEvent => Boolean(event));
+    .filter(Boolean);
+
+  const events: ChatSseEvent[] = [];
+
+  for (const chunk of chunks) {
+    const lines = chunk.split(/\r?\n/).map((line) => line.trim());
+    const dataLines = lines
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.replace(/^data:\s*/, ''))
+      .filter(Boolean);
+
+    if (!dataLines.length) {
+      continue;
+    }
+
+    const payload = dataLines.join('\n');
+    if (!payload || payload === '[DONE]') {
+      continue;
+    }
+
+    try {
+      events.push(JSON.parse(payload) as ChatSseEvent);
+    } catch {
+      // Ignore malformed frames; fixture streams should be well-formed.
+    }
+  }
+
+  return events;
 }

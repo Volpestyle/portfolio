@@ -1,3 +1,4 @@
+import type { RepoData } from '@portfolio/chat-contract';
 import { GH_CONFIG } from './constants';
 import {
   createOctokit,
@@ -8,8 +9,9 @@ import {
 } from './github-api';
 import { unstable_cache } from 'next/cache';
 import { convertRelativeToAbsoluteUrls } from './readme-utils';
-import { TEST_REPO, TEST_README, TEST_DOC_CONTENT } from '@/lib/test-fixtures';
-import { isFixtureRuntime } from '@/lib/test-mode';
+import { assertNoFixtureFlagsInProd, shouldUseFixtureRuntime } from '@/lib/test-flags';
+
+export type { RepoData };
 
 /**
  * Check if SSR pages should use test fixtures. This is used for build-time
@@ -17,38 +19,9 @@ import { isFixtureRuntime } from '@/lib/test-mode';
  * runtime flag that the Playwright runner enables during `pnpm test`.
  */
 function shouldUseSSRFixtures(): boolean {
-  // Escape hatch
-  if (process.env.SKIP_TEST_FIXTURES) {
-    return false;
-  }
-
-  return isFixtureRuntime();
+  assertNoFixtureFlagsInProd();
+  return shouldUseFixtureRuntime();
 }
-
-export type RepoData = {
-  id?: number;
-  name: string;
-  full_name?: string;
-  description: string | null;
-  created_at: string;
-  pushed_at?: string | null;
-  updated_at?: string | null;
-  html_url?: string;
-  isStarred: boolean;
-  default_branch?: string;
-  private?: boolean;
-  icon?: string;
-  owner?: {
-    login: string;
-  };
-  homepage?: string | null;
-  language?: string | null;
-  topics?: string[];
-  summary?: string;
-  tags?: string[];
-  languagesBreakdown?: Record<string, number>;
-  languagePercentages?: Array<{ name: string; percent: number }>;
-};
 
 export type PortfolioReposResponse = {
   starred: RepoData[];
@@ -60,6 +33,7 @@ export type PortfolioReposResponse = {
 export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
   // Return fixtures for test builds (SSR during CI test runs)
   if (shouldUseSSRFixtures()) {
+    const { TEST_REPO } = await import('@portfolio/test-support/fixtures');
     return {
       starred: [TEST_REPO],
       normal: [],
@@ -74,7 +48,7 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
     throw new Error('Portfolio gist ID is not configured');
   }
 
-  const octokit = createOctokit(token);
+  const octokit = await createOctokit(token);
 
   try {
     const portfolioConfig = await getPortfolioConfig();
@@ -168,12 +142,13 @@ export const getPortfolioRepos = unstable_cache(
 export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.USERNAME): Promise<RepoData> {
   // Return fixtures for test builds
   if (shouldUseSSRFixtures()) {
+    const { TEST_REPO } = await import('@portfolio/test-support/fixtures');
     return { ...TEST_REPO, name: repo, owner: { login: owner } };
   }
 
   const token = await resolveGitHubToken();
   if (!token) throw new Error('GitHub token is not configured');
-  const octokit = createOctokit(token);
+  const octokit = await createOctokit(token);
 
   try {
     // First try to get from portfolio config for private repos
@@ -251,12 +226,15 @@ export const getRepoDetails = unstable_cache(
 export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.USERNAME): Promise<string> {
   // Return fixtures for test builds
   if (shouldUseSSRFixtures()) {
+    const { TEST_README } = await import('@portfolio/test-support/fixtures');
     return TEST_README;
   }
 
   const token = await resolveGitHubToken();
   if (!token) throw new Error('GitHub token is not configured');
-  const octokit = createOctokit(token);
+  const octokit = await createOctokit(token);
+
+  let actualRepoName = repo;
 
   try {
     // First check portfolio config for private repos
@@ -264,7 +242,6 @@ export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.US
     const repoConfig = portfolioConfig?.repositories?.find(r => r.name === repo);
 
     // Determine the actual repo name to fetch from
-    let actualRepoName = repo;
     if (repoConfig?.isPrivate) {
       actualRepoName = repoConfig.publicRepo || `${repo}-public`;
     }
@@ -272,7 +249,7 @@ export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.US
     // If we have inline README content for private repos
     if (repoConfig?.isPrivate && repoConfig.readme) {
       // Transform relative URLs to point to the public repo
-      return convertRelativeToAbsoluteUrls(repoConfig.readme, owner, actualRepoName);
+      return convertRelativeToAbsoluteUrls(repoConfig.readme, owner, actualRepoName, undefined, 'README.md');
     }
 
     // Fetch README from GitHub (public repo or public counterpart of private repo)
@@ -297,15 +274,18 @@ export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.US
       readmeContent,
       owner,
       actualRepoName,
-      branchFromDownloadUrl
+      branchFromDownloadUrl,
+      'README.md'
     );
   } catch (error) {
-    console.error('Error fetching readme:', error);
-
     if (isGithubNotFoundError(error)) {
+      console.warn(
+        `[github-server] README not found for ${owner}/${actualRepoName}. Using placeholder content.`
+      );
       return buildMissingReadmeMessage(repo);
     }
 
+    console.error('Error fetching readme:', error);
     throw error;
   }
 }
@@ -339,49 +319,6 @@ function extractBranchFromDownloadUrl(url?: string | null): string | undefined {
 }
 
 /**
- * Gets the GitHub raw URL for an image in a repository
- * Handles both public and private repos (via their public counterparts)
- * @param repo - The repository name
- * @param imagePath - Path to the image file
- * @param owner - GitHub username (defaults to GH_CONFIG.USERNAME)
- * @returns The raw GitHub URL for the image
- */
-export async function getGithubImageUrl(
-  repo: string,
-  imagePath: string,
-  owner: string = GH_CONFIG.USERNAME
-): Promise<string> {
-  // If path starts with /, it's a local public asset
-  if (imagePath.startsWith('/')) {
-    return imagePath;
-  }
-
-  // If it's an external URL, return as-is
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-
-  // Get repo details to determine if it's private and get the default branch
-  const repoDetails = await getRepoDetails(repo, owner);
-
-  // For private repos, use the public repo counterpart
-  let targetRepo = repo;
-  if (repoDetails.private) {
-    const portfolioConfig = await getPortfolioConfig();
-    const repoConfig = portfolioConfig?.repositories?.find(r => r.name === repo);
-    targetRepo = repoConfig?.publicRepo || `${repo}-public`;
-  }
-
-  const branch = repoDetails.default_branch || 'main';
-  const cleanPath = imagePath
-    .replace(/^(\.\/)+/, '')
-    .replace(/^\/+/, '')
-    .replace(/\?raw=true$/, '');
-
-  return `https://raw.githubusercontent.com/${owner}/${targetRepo}/${branch}/${cleanPath}`;
-}
-
-/**
  * Fetches document content from a repository
  * @param repo - The repository name
  * @param docPath - Path to the document
@@ -395,6 +332,7 @@ export async function fetchDocumentContent(
 ): Promise<{ content: string; projectName: string }> {
   // Return fixtures for test builds
   if (shouldUseSSRFixtures()) {
+    const { TEST_DOC_CONTENT } = await import('@portfolio/test-support/fixtures');
     return {
       content: TEST_DOC_CONTENT,
       projectName: repo,
@@ -403,7 +341,7 @@ export async function fetchDocumentContent(
 
   const token = await resolveGitHubToken();
   if (!token) throw new Error('GitHub token is not configured');
-  const octokit = createOctokit(token);
+  const octokit = await createOctokit(token);
 
   try {
     // Check portfolio config for private repos and document overrides
@@ -454,8 +392,16 @@ export async function fetchDocumentContent(
 
     if ('content' in response.data && response.data.type === 'file') {
       const content = Buffer.from(response.data.content, 'base64').toString();
-      return {
+      const branchFromDownloadUrl = extractBranchFromDownloadUrl(response.data.download_url);
+      const normalizedContent = convertRelativeToAbsoluteUrls(
         content,
+        owner,
+        repoToFetch,
+        branchFromDownloadUrl,
+        docPath
+      );
+      return {
+        content: normalizedContent,
         projectName: repo,
       };
     }
@@ -488,14 +434,6 @@ export async function getRepoByName(name: string): Promise<RepoData> {
     return match;
   }
   return getRepoDetails(name);
-}
-
-export async function getReadmeForRepo(repo: string, owner?: string) {
-  return getRepoReadme(repo, owner);
-}
-
-export async function getRawDoc(repo: string, path: string, owner?: string) {
-  return getDocumentContent(repo, path, owner);
 }
 
 type OctokitError = {

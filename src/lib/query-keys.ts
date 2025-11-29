@@ -2,11 +2,12 @@ import type { QueryKey } from '@tanstack/react-query';
 
 export const PROJECT_LIST_QUERY_KEY: QueryKey = ['project-list', 'all'];
 
-export const readmeQueryKey = (owner: string, repo: string): QueryKey => ['repo-readme', owner, repo];
+export const projectDetailQueryKey = (projectId: string): QueryKey => ['project-detail', projectId];
 
-export const documentQueryKey = (owner: string, repo: string, path: string): QueryKey => [
-  'repo-document',
-  owner,
-  repo,
-  path,
+export const projectDocumentQueryKey = (projectId: string, docPath: string): QueryKey => [
+  'project-document',
+  projectId,
+  docPath,
 ];
+
+export const projectRepoQueryKey = (projectId: string): QueryKey => ['project-repo', projectId];

@@ -1,4 +1,4 @@
-import { isBlogFixtureRuntime } from '@/lib/test-mode';
+import { assertNoFixtureFlagsInProd, shouldUseBlogFixtureRuntime } from '@/lib/test-flags';
 
 type BlogConfig = {
   region: string;
@@ -18,7 +18,8 @@ function requiredEnv(value: string | undefined, name: string): string {
 }
 
 function resolveEnv(value: string | undefined, name: string, mockFallback: string): string {
-  if (isBlogFixtureRuntime()) {
+  assertNoFixtureFlagsInProd();
+  if (shouldUseBlogFixtureRuntime()) {
     return value?.trim() ? value : mockFallback;
   }
   return requiredEnv(value, name);

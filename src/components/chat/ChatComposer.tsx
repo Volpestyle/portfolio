@@ -40,7 +40,7 @@ export function ChatComposer({ isBusy, hasMessages, onSend }: ChatComposerProps)
   const isSendDisabled = isBusy || !value.trim();
 
   return (
-    <form className={cn(hasMessages ? 'mt-12' : '')} onSubmit={handleSubmit}>
+    <form className={cn(hasMessages ? 'mt-2' : '')} onSubmit={handleSubmit}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <Textarea
           ref={textareaRef}

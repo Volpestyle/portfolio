@@ -1,0 +1,595 @@
+{
+  "generatedAt": "2025-11-27T10:47:19.628Z",
+  "projects": [
+    {
+      "id": "aed-sheets",
+      "slug": "aed-sheets",
+      "name": "AED-Sheets",
+      "githubUrl": "https://github.com/Volpestyle/AED-Sheets",
+      "oneLiner": "Built a MEAN-stack web app for NPR’s audio engineers to log, search, and track production issues, replacing an outdated internal tool.",
+      "description": "During a 2019 web software development internship at National Public Radio (NPR), I designed and implemented a new Audio Engineering Discrepancy Logger using the MEAN stack (MongoDB, Express.js, Angular, Node.js). The app lets audio engineers log technical issues, search incidents by multiple criteria, and manage personal and global subscriptions for email/text notifications when relevant logs are submitted. It also supports automatic account creation for NPR employees, user roles for administrative capabilities, and automatic I.T. ticket creation to streamline resolution workflows. I documented the full implementation for my team in Confluence, with an export included in the repository.",
+      "bullets": [
+        "log search and tracker created for NPR internal tooling",
+        "Stack highlights: MEAN stack, MongoDB, Express JS",
+        "Focus areas: NPR internal tooling, National Public Radio, NPR"
+      ],
+      "impactSummary": "Significantly modernized NPR’s internal audio engineering incident tracking by improving usability, automation, and discoverability of production issue logs.",
+      "sizeOrScope": "Solo-built as an intern-led project for NPR’s internal audio engineering and support teams.",
+      "techStack": [
+        "MEAN stack",
+        "MongoDB",
+        "Express JS",
+        "Express.js",
+        "Angular",
+        "Node JS",
+        "Node.js",
+        "Confluence"
+      ],
+      "languages": [
+        "TypeScript",
+        "HTML",
+        "JavaScript",
+        "SCSS",
+        "CSS"
+      ],
+      "tags": [
+        "NPR internal tooling",
+        "National Public Radio",
+        "NPR",
+        "Audio Engineering Discrepancy Logger",
+        "audio engineering",
+        "Confluence"
+      ],
+      "context": {
+        "type": "work",
+        "timeframe": {
+          "start": "2019-08-09",
+          "end": "2024-08-28"
+        }
+      },
+      "contextType": "work",
+      "readme": "# Audio Engineering Discrepancy Logger\nIn summer 2019 I interned at National Public Radio (NPR) as a web software developer, and ended up getting the opportunity to build them a whole new web app on a MEAN stack! (MongoDB, Express JS, Angular, Node JS)\n## Description\nAudio engineers at NPR like to keep track of all technical difficulties that are encountered during production. Before my\ntime at NPR, the system in place to log incidents was running on an outdated tech-stack and wasn't as elegant as many of the users would have liked. During my internship, it was my job to update and redesign this system to be more capable and user-friendly.\n\nSome of the main features included:\n- Automatic account creation for NPR employees.\n- Searching for logs that fit various criteria.\n- Log creation.\n- Personal subscriptions that send email or text notifications to a specific user when a log that fits certain critiera is submitted.\n- Global subscription that many users can subscribe to at once\n- Automatic I.T. ticket creation.\n- User roles (Administrative abilites, ability to create global subscription, etc.)\n\nThe full documentation of my implementation that I shared with my team can be found in pdf form inside this repo. (It was written in Confluence and upon \nexport has experienced some small formatting errors)\n\n## Screenshots\n![search](/screenshots/AED-sheets_screenshot1.png)\n![profile](/screenshots/AED-sheets_screenshot2.png)\n![manage lookups](/screenshots/AED-sheets_screenshot3.png)",
+      "embeddingId": "aed-sheets"
+    },
+    {
+      "id": "aws-iam-projects",
+      "slug": "aws-iam-projects",
+      "name": "AWS-IAM-Projects",
+      "githubUrl": "https://github.com/Volpestyle/AWS-IAM-Projects",
+      "oneLiner": "Built a React/TypeScript UX mock for an updated AWS Identity and Access Management (IAM) console, using AWS’s internal Polaris framework and IAM APIs to prototype a modernized user experience for IAM Users.",
+      "description": "Built a React/TypeScript UX mock for an updated AWS Identity and Access Management (IAM) console, using AWS’s internal Polaris framework and IAM APIs to prototype a modernized user experience for IAM Users.",
+      "bullets": [
+        "Empty repository for my portfolio website",
+        "Stack highlights: Polaris, AWS internal UI framework Polaris, React",
+        "Focus areas: Amazon Web Services, AWS, AWS Identity and Access Management"
+      ],
+      "impactSummary": "Improved clarity and usability of IAM user management workflows through a high-fidelity UX prototype grounded in real IAM API interactions.",
+      "sizeOrScope": "Individual design and implementation of a console UX mock focusing on the IAM Users section.",
+      "techStack": [
+        "Polaris",
+        "AWS internal UI framework Polaris",
+        "React",
+        "React-based console",
+        "AWS IAM APIs",
+        "IAM APIs",
+        "APIs"
+      ],
+      "languages": [],
+      "tags": [
+        "Amazon Web Services",
+        "AWS",
+        "AWS Identity and Access Management",
+        "AWS IAM",
+        "AWS Identity and Access Management Console",
+        "AWS IAM console",
+        "Identity and Access Management",
+        "IAM",
+        "AWS IAM APIs",
+        "IAM APIs",
+        "APIs"
+      ],
+      "context": {
+        "type": "personal",
+        "timeframe": {
+          "start": "2024-03-30",
+          "end": "2024-03-31"
+        }
+      },
+      "contextType": "personal",
+      "readme": "# AWS Projects\nAn empty repository which exists to provide context around my work at Amazon Web Services on the Identity and Access Management console team. \n\n## AWS Identity and Access Management Console\n### Console Redesign\nUtilized AWS's internal UI framework 'Polaris' along with the AWS IAM APIs to implement a UX mock for a new React-based console. This [demo](https://drive.google.com/file/d/1BNKPGXYAASANI5sNNY7UIebjXBa3zVtN/view?usp=share_link) shows off some of the basic features implemented for the 'Users' entity specifically. Created in React using Typescript.\n\n![The user details page](screenshot.png)",
+      "embeddingId": "aws-iam-projects"
+    },
+    {
+      "id": "ilikeyacut",
+      "slug": "ilikeyacut",
+      "name": "ilikeyacut",
+      "githubUrl": "https://github.com/Volpestyle/ilikeyacut",
+      "oneLiner": "Native iOS app and serverless backend for trying on different hairstyles using Gemini’s nano-banana (Flash Image 2.5).",
+      "description": "ilikeyacut is a native mobile app monorepo that lets users virtually try on new hairstyles powered by Gemini’s nano-banana / Flash Image 2.5 models. The project pairs a Swift-based iOS frontend with a Go-powered AWS Lambda backend to deliver image processing and hairstyle generation through a fully serverless architecture. Infrastructure is defined and deployed using AWS SAM templates, keeping the backend consistent and repeatable across environments. The repo also includes detailed design, API contract, iOS token lifecycle, and rate-limiting docs to guide development and integrations.",
+      "bullets": [
+        "native mobile app for hairstyling with gemini's nano banana",
+        "Stack highlights: Gemini nano-banana, Gemini nano banana, Gemini Flash Image 2.5",
+        "Focus areas: native mobile app, mobile hairstyling, hairstyle try-on"
+      ],
+      "impactSummary": "Delivered a full-stack, serverless-powered mobile experience that demonstrates real-time hairstyle try-on using Gemini’s image models.",
+      "sizeOrScope": "Personal side project monorepo spanning a Swift iOS client and a Go AWS Lambda backend.",
+      "techStack": [
+        "Gemini nano-banana",
+        "Gemini nano banana",
+        "Gemini Flash Image 2.5",
+        "Flash Image 2.5",
+        "AWS Lambda",
+        "AWS Lambdas",
+        "Serverless Application Model",
+        "AWS SAM",
+        "SAM templates",
+        "YouTube"
+      ],
+      "languages": [
+        "Swift",
+        "Go",
+        "Python",
+        "Shell",
+        "Makefile"
+      ],
+      "tags": [
+        "native mobile app",
+        "mobile hairstyling",
+        "hairstyle try-on",
+        "serverless backend",
+        "AWS Lambda",
+        "AWS Lambdas",
+        "Serverless Application Model",
+        "AWS SAM",
+        "SAM templates",
+        "YouTube"
+      ],
+      "context": {
+        "type": "personal",
+        "timeframe": {
+          "start": "2025-08-29",
+          "end": "2025-09-10"
+        }
+      },
+      "contextType": "personal",
+      "readme": "## ilikeyacut\nNative mobile app monorepo for trying on different hairstyles via Gemini's nano-banana (Flash Image 2.5)\n\n### Stack\n- ios frontend: Swift\n- serverless backend: GO AWS lambdas\n- deployment: [SAM](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html) templates\n\n### Docs\n   - [Design Document](docs/DESIGN.md)\n   - [API Contract](docs/API_CONTRACT.md)\n   - [ios token lifecycle](docs/iOS_TOKEN_LIFECYCLE.md)\n   - [rate limiting](docs/RATE_LIMITING.md)\n\n### Making of\n- [Vibe code timelapse and initial demo](https://www.youtube.com/watch?v=jkfCZ3o19Fc)\n- ![Demo GIF](docs/assets/demo1.gif)",
+      "embeddingId": "ilikeyacut"
+    },
+    {
+      "id": "improview",
+      "slug": "improview",
+      "name": "improview",
+      "githubUrl": "https://github.com/Volpestyle/improview",
+      "oneLiner": "Personal project exploring LeetCode-style problem solving and coding practice.",
+      "description": "Personal project exploring LeetCode-style problem solving and coding practice.",
+      "bullets": [
+        "i love leetcode"
+      ],
+      "impactSummary": "Helped the developer systematically practice and improve their coding interview and problem-solving skills.",
+      "sizeOrScope": "Solo personal practice project",
+      "techStack": [],
+      "languages": [
+        "TypeScript",
+        "Go",
+        "CSS",
+        "JavaScript",
+        "Shell",
+        "HTML"
+      ],
+      "tags": [],
+      "context": {
+        "type": "personal",
+        "timeframe": {
+          "start": "2025-10-08",
+          "end": "2025-10-24"
+        }
+      },
+      "contextType": "personal",
+      "readme": "i love leetcode",
+      "embeddingId": "improview"
+    },
+    {
+      "id": "jobseek",
+      "slug": "jobseek",
+      "name": "jobseek",
+      "githubUrl": "https://github.com/Volpestyle/jobseek",
+      "oneLiner": "Jobseek is a Next.js- and AWS-backed platform that automates job searches across major job boards using headless browser automation.",
+      "description": "Jobseek is a Next.js- and AWS-backed platform that automates job searches across major job boards using headless browser automation.",
+      "bullets": [
+        "automate the job search"
+      ],
+      "impactSummary": "Streamlined the job search workflow by automating repetitive job board browsing and providing a scalable, well-documented infrastructure for running searches across environments.",
+      "sizeOrScope": "Personal/small-team project with a single Next.js app and AWS CDK backend, designed to work across multiple external job boards via Wallcrawler automation.",
+      "techStack": [],
+      "languages": [
+        "TypeScript",
+        "Shell",
+        "JavaScript",
+        "CSS"
+      ],
+      "tags": [],
+      "context": {
+        "type": "personal",
+        "timeframe": {
+          "start": "2025-07-01",
+          "end": "2025-10-03"
+        }
+      },
+      "contextType": "personal",
+      "readme": "# Jobseek\n\nJobseek is a job search automation platform, designed to offload the repetitive nature of shifting through all the lame job slop on Linkedin, Monster, and other job boards, and help you find the jobs that are actually a good fit for you.\n\n## How?\n\n- Jobseek leverages [Wallcrawler](https://github.com/Volpestyle/wallcrawler) for headless browser automation and session management across job boards.\n\n- Packages\n  - `@wallcrawler/stagehand`: drives automated browsing, actions, and extraction in `lib/wallcrawler.server.ts`\n  - `@wallcrawler/sdk`: session retrieval, listing, and debug links in API routes\n- Local setup\n  - This repo references sibling packages via pnpm links:\n    - `@wallcrawler/sdk` → `../wallcrawler/packages/sdk-node`\n    - `@wallcrawler/components` → `../wallcrawler/packages/components`\n    - `@wallcrawler/stagehand` → `../wallcrawler/packages/stagehand`\n  - Clone the [Wallcrawler](https://github.com/Volpestyle/wallcrawler) repo adjacent to this directory so these links resolve:\n    - `…/web/wallcrawler` and `…/web/jobseek` should be siblings\n- Key API routes\n  - `POST /api/wallcrawler/search/start`: starts a search with Stagehand and returns `{ sessionId, debugUrl, jobs }`\n  - `POST /api/wallcrawler/search/stream`: server-sent events stream of search progress and results\n  - `GET|POST /api/wallcrawler/sessions`: lists active sessions filtered by the current user\n  - `GET /api/wallcrawler/sessions/[sessionId]`: returns session details and saved results (authz enforced)\n  - `POST /api/wallcrawler/search`: retrieves session status and debugger URLs (authz enforced)\n- Environment variables\n  - SDK: `WALLCRAWLER_API_URL`, `WALLCRAWLER_API_KEY`\n  - Stagehand: `WALLCRAWLER_PROJECT_ID`, `WALLCRAWLER_API_KEY`, `ANTHROPIC_API_KEY`\n\nThis is a Next.js application with AWS infrastructure managed via AWS CDK. This repository is a pnpm workspace containing:\n\n- `@jobseek/app`: the Next.js 15 application (app router) and API routes\n- `@jobseek/cdk`: infrastructure-as-code for backend and app deployment\n\nFor deeper details (architecture, auth, deployment, rate limiting), see the documents in `docs/` linked below.\n\n## Quick start\n\n- Install dependencies\n  ```bash\n  pnpm install\n  ```\n- Run the app locally\n  ```bash\n  pnpm dev\n  ```\n- Lint, build, and start\n  ```bash\n  pnpm lint\n  pnpm build\n  pnpm start\n  ```\n\nPrerequisites: Node.js 20+ and pnpm installed. Environment variables and service configuration are covered in the deployment guide.\n\n## Workspace layout\n\n- `app/` — Next.js app and API routes\n- `components/`, `hooks/`, `contexts/`, `lib/` — shared UI, hooks, context, utilities\n- `cdk/` — AWS CDK project (stacks, scripts, deployment helpers)\n- `docs/` — reference documentation\n- `public/`, `styles` (via `app/globals.css`) — assets and global styles\n\n## Infrastructure and deployment (CDK)\n\nCommon commands are exposed at the root for convenience and delegate to `@jobseek/cdk`:\n\n- Synthesize and diff\n  ```bash\n  pnpm cdk:synth\n  pnpm cdk:diff\n  ```\n- Deploy backend (all environments)\n  ```bash\n  pnpm deploy:backend:dev\n  pnpm deploy:backend:staging\n  pnpm deploy:backend:prod\n  ```\n- Deploy Next.js hosting (all environments)\n  ```bash\n  pnpm deploy:nextjs:dev\n  pnpm deploy:nextjs:staging\n  pnpm deploy:nextjs:prod\n  ```\n\nYou can also run any CDK scripts directly within the `cdk/` package:\n\n```bash\npnpm --filter @jobseek/cdk deploy:dev\npnpm --filter @jobseek/cdk deploy:staging\npnpm --filter @jobseek/cdk deploy:prod\n```\n\nEnvironment-specific configuration lives under `cdk/config/` (`dev.json`, `staging.json`, `prod.json`). Secrets and additional setup steps are covered in the deployment guide.\n\n## Documentation\n\n- Architecture overview — [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)\n- Authentication architecture — [`docs/AUTH_ARCHITECTURE.md`](docs/AUTH_ARCHITECTURE.md)\n- OAuth setup — [`docs/OAUTH_SETUP.md`](docs/OAUTH_SETUP.md)\n- JWT token lifecycle — [`docs/jwt-token-lifecycle.md`](docs/jwt-token-lifecycle.md)\n- Rate limiting — [`docs/RATE_LIMITING.md`](docs/RATE_LIMITING.md)\n- Deployment guide — [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md)\n- Architecture diagram — [`docs/architecture-diagram.png`](docs/architecture-diagram.png)",
+      "embeddingId": "jobseek"
+    },
+    {
+      "id": "parse-tree-calculator",
+      "slug": "parse-tree-calculator",
+      "name": "Parse-Tree-Calculator",
+      "githubUrl": "https://github.com/Volpestyle/Parse-Tree-Calculator",
+      "oneLiner": "A browser-based scientific calculator that parses user input into a token array and parse tree to correctly handle order of operations, parentheses, and basic trigonometry using vanilla JavaScript.",
+      "description": "A browser-based scientific calculator that parses user input into a token array and parse tree to correctly handle order of operations, parentheses, and basic trigonometry using vanilla JavaScript.",
+      "bullets": [
+        "Implemented a custom tokenizer that classifies each character as literals, operators, parentheses, or functions to produce a structured token array for expression evaluation.",
+        "Built a parse-tree-based evaluation engine that enforces order of operations by promoting operators and inserting literals at the lowest available nodes, including tree rotations to correct precedence.",
+        "Added recursive handling of nested parentheses by creating, evaluating, and reinserting subtree results, enabling complex grouped expressions such as 5(sin(5)+2).",
+        "Designed function handling for basic trigonometry using a stack mechanism that defers evaluation until the next literal is encountered, then inserts the computed result into the main parse tree.",
+        "Created an interactive calculator UI in HTML and SASS with button-only input, cursor repositioning for edits, and explicit user feedback for invalid or non-parseable expressions."
+      ],
+      "impactSummary": "Demonstrated a full custom expression parser and evaluator in the browser, showcasing understanding of tokenization, tree-based evaluation, and user-focused calculator behavior without relying on external libraries.",
+      "sizeOrScope": "Individual side project published as a single-page web calculator via GitHub Pages.",
+      "techStack": [
+        "HTML",
+        "SASS",
+        "SCSS",
+        "Vanilla JavaScript",
+        "JavaScript",
+        "console"
+      ],
+      "languages": [
+        "JavaScript",
+        "HTML",
+        "SCSS",
+        "CSS"
+      ],
+      "tags": [
+        "scientific calculator",
+        "calculator",
+        "parse tree",
+        "parse-tree",
+        "tokenizing",
+        "tokenization",
+        "token array",
+        "order of operations",
+        "expression evaluation",
+        "parse tree formation",
+        "HTML",
+        "SASS",
+        "SCSS",
+        "Vanilla JavaScript",
+        "JavaScript",
+        "console"
+      ],
+      "context": {
+        "type": "personal",
+        "timeframe": {
+          "start": "2019-02-24",
+          "end": "2024-09-03"
+        }
+      },
+      "contextType": "personal",
+      "readme": "# Parse-Tree-Calculator\n[Live here](https://volpestyle.github.io/Parse-Tree-Calculator/)   \nA basic scientific calculator built in HTML, SASS, and Vanilla JavaScript.  \n![parse-tree-calc](/doc-images/parse-tree-calc.jpg)\n\n## Usage\nThis calculator can perform all expected operations:\n- Basic Arithmetic\n- Decimals\n- Parenthesis to organize priority\n- Basic trigonometry (sin, cos, tan)\n#### Additonal Information\n- There is implied multiplication between opening parenthesis.  \n(e.g. 5(2+3) will evaluate to 5*(2+3))\n- When using trig functions, there is no implied multiplication, and you must place a '*' sign in between expressions.  \n(e.g., 5\\*sin(3) **not** 5sin3)\n- You can input negative numbers by simply placing a '-' before the number.\n- You can only input expressions with the buttons. \n- If there is data in the input field, the 'C' button will clear only input, otherwise it will clear the result field.\n- You can position the cursor to insert/delete at any place in the input field.\n\n#### Invalid Input\n- Input that cannot be evaluated, such as '2**', will return the user 'NaN'.\n- Input that does not allow the parse tree to be made, such as unclosed parenthesis, will log an error to the console, and return the user nothing.\n\n## Implementation Details\n### Tokenizing\nBefore an expression is evaluated, it must be tokenzed first so 'buildTree()' knows how to build the tree. \nEach component of the expression is typed as either a \"Literal\", \"Operator, \"Left Parenthesis\", \"Right Parenthesis, or \"Function\", and assigned a value. \\\nHere's an example of the token array of '5(sin(5)+2)':\n![token-array](doc-images/token-array.png?raw=true)\n\n### Parse Tree Formation\nThis calculator uses a parse tree to implement order of operations. The tree is built by pushing operators to the top of the tree, while inserting literals to the lowest free node. Below is an example.  \n**Expression: 5+2\\*6**.   \nInsert: '5':\n![parse-tree](doc-images/parse-tree.jpg?raw=true).   \nInsert: '+': \n![parse-tree](doc-images/parse-tree%20(1).jpg?raw=true).   \nInsert: '2': \n![parse-tree](doc-images/parse-tree%20(2).jpg?raw=true).   \nInsert: '\\*': \n![parse-tree](doc-images/parse-tree%20(3).jpg?raw=true).   \nNow you'll notice the order of expressions is incorrect. To fix this, we simply right rotate the tree:\n![parse-tree](doc-images/parse-tree%20(4).jpg?raw=true).    \nInsert '6':\n![parse-tree](doc-images/parse-tree%20(5).jpg?raw=true).   \n  \n#### Parenthesis\nParenthesis are handled by creating a new tree when an an opening parenthesis is found. When a closing parenthesis is found, the tree returned and evaluated, being inserted back into the tree as a number. Since this is done recursively, nested parenthesis work just fine.\n#### Functions\nWhen a trig function is encountered, it is put into a stack. It is popped from the stack when the next literal is encountered, and the result of function and the literal is inserted into the tree.",
+      "embeddingId": "parse-tree-calculator"
+    },
+    {
+      "id": "personal-website-v1",
+      "slug": "personal-website-v1",
+      "name": "personal-website-v1",
+      "githubUrl": "https://github.com/Volpestyle/personal-website-v1",
+      "oneLiner": "A first-generation personal portfolio site, built as a static website and deployed across GitHub Pages and AWS S3 + CloudFront.",
+      "description": "A first-generation personal portfolio site, built as a static website and deployed across GitHub Pages and AWS S3 + CloudFront.",
+      "bullets": [
+        "Built and maintained a static personal portfolio site to present projects and experience for internship applications.",
+        "Configured hosting via an AWS S3 bucket with CloudFront to provide CDN-backed delivery of static assets.",
+        "Deployed the site using GitHub Pages (github.io) as an alternative/public-facing hosting option.",
+        "Managed version-controlled website content in a GitHub repository to streamline updates and iteration."
+      ],
+      "impactSummary": "Provided a professional online portfolio that supported early career outreach and internship applications while demonstrating basic web hosting and deployment skills.",
+      "sizeOrScope": "Individual side project; publicly hosted on GitHub Pages and previously on an AWS S3 bucket behind CloudFront.",
+      "techStack": [
+        "AWS S3",
+        "Amazon S3",
+        "S3 bucket",
+        "AWS CloudFront",
+        "CloudFront",
+        "GitHub Pages",
+        "github.io"
+      ],
+      "languages": [
+        "CSS",
+        "HTML",
+        "JavaScript",
+        "PHP"
+      ],
+      "tags": [
+        "static website",
+        "AWS S3",
+        "Amazon S3",
+        "S3 bucket",
+        "AWS CloudFront",
+        "CloudFront",
+        "GitHub Pages",
+        "github.io"
+      ],
+      "context": {
+        "type": "personal",
+        "timeframe": {
+          "start": "2019-11-22",
+          "end": "2022-04-03"
+        }
+      },
+      "contextType": "personal",
+      "readme": "# personal-website-v1\nMy first personal website / portfolio. Made with the intent of getting my first internship!  \nDuring its lifetime was hosted as a static website via AWS S3 bucket + Cloudfront.  \n[https://volpestyle.github.io/personal-website-v1/](https://volpestyle.github.io/personal-website-v1/)",
+      "embeddingId": "personal-website-v1"
+    },
+    {
+      "id": "portfolio",
+      "slug": "portfolio",
+      "name": "portfolio",
+      "githubUrl": "https://github.com/Volpestyle/portfolio",
+      "oneLiner": "Full-stack Next.js 15 portfolio (jcvolpe.me) with an AI-powered chat assistant, blog CMS, and GitHub project integration, deployed to AWS via CDK and OpenNext.",
+      "description": "Full-stack Next.js 15 portfolio (jcvolpe.me) with an AI-powered chat assistant, blog CMS, and GitHub project integration, deployed to AWS via CDK and OpenNext.",
+      "bullets": [
+        "Designed and documented a full-stack Next.js 15 architecture with AWS CDK and OpenNext, including infrastructure overviews and deployment workflows.",
+        "Implemented an AI-powered “Ask My Portfolio” chat feature backed by OpenAI API, using precomputed GitHub repo summaries and embeddings for project-aware responses.",
+        "Built a blog CMS with Auth.js-based authentication, DynamoDB and S3-backed content storage, and an `/admin` UI for managing posts.",
+        "Configured project knowledge generation tooling (`pnpm generate:projects`) to produce and version control repo summaries and embeddings JSON artifacts.",
+        "Set up automated deployments with GitHub Actions, wiring secrets and environment variables for CDK, OpenNext, and AI integrations to push changes directly to AWS."
+      ],
+      "impactSummary": "Delivered a modern, AI-enhanced portfolio platform that automates deployment to AWS and provides rich, project-aware interactions for visitors.",
+      "sizeOrScope": "Individual developer side project serving the public jcvolpe.me domain with automated CI/CD to an AWS-backed production environment.",
+      "techStack": [
+        "Next.js",
+        "Next.js 15",
+        "Auth.js",
+        "AWS CDK",
+        "CDK",
+        "OpenNext",
+        "pnpm",
+        "GitHub Actions",
+        "CloudWatch",
+        "OpenAI API",
+        "GitHub",
+        "GH_TOKEN",
+        "PORTFOLIO_GIST_ID",
+        "OPENAI_API_KEY"
+      ],
+      "languages": [
+        "TypeScript",
+        "JavaScript",
+        "CSS"
+      ],
+      "tags": [
+        "jcvolpe.me",
+        "pnpm",
+        "GitHub Actions",
+        "CloudWatch",
+        "OpenAI API",
+        "GitHub",
+        "GH_TOKEN",
+        "PORTFOLIO_GIST_ID",
+        "OPENAI_API_KEY"
+      ],
+      "context": {
+        "type": "personal",
+        "timeframe": {
+          "start": "2024-08-18",
+          "end": "2025-11-21"
+        }
+      },
+      "contextType": "personal",
+      "readme": "# My portfolio website\n\nLive at [jcvolpe.me](https://jcvolpe.me).\n\n## Documentation\n\nComprehensive technical documentation is organized in the [`docs/`](docs/) folder by theme:\n\n### Architecture\n\nHigh-level infrastructure design and deployment guides:\n\n- **[Infrastructure Overview](docs/architecture/infra.md)** – Visual stack diagram and key components overview\n- **[CDK Stack Guide](docs/architecture/cdk.md)** – Deep dive on the AWS CDK stack, deployment workflows, and operations\n- **[OpenNext Integration](docs/architecture/opennext.md)** – How we deploy Next.js 15 to AWS using OpenNext artifacts\n\n### Features\n\nDocumentation for major product features:\n\n- **[Blog CMS](docs/features/blog.md)** – Blog content management system design using Auth.js, DynamoDB, and S3\n- **[Admin UI](docs/features/admin-ui.md)** – Admin interface for blog management at `/admin`\n- **[Ask My Portfolio](docs/features/ask-my-portfolio.md)** – Interactive chat interface for exploring projects\n- **[Chat Data Caching](docs/features/chat-data-caching.md)** – Caching strategy for chat interactions\n- **[Language Enrichment](docs/features/language-enrichment.md)** – Enhanced language detection and display\n\n### AI Integrations\n\nAI and machine learning feature documentation:\n\n- **[GPT-5 Nano Integration](docs/ai-integrations/gpt5-nano-integration.md)** – Integration guide for GPT-5 Nano capabilities\n\n### Operations\n\nOperational guides and troubleshooting resources:\n\n- **[Log Diving](docs/operations/log-diving.md)** – Guide to finding and analyzing CloudWatch logs for Lambda functions\n\n## About\n\nFull-stack Next.js 15 portfolio with an AI-powered chat assistant, blog CMS, and GitHub project integration. Deployed to AWS using CDK and OpenNext.\n\n## Quick Start\n\n```bash\n# Install dependencies\npnpm install\n\n# Run development server\npnpm dev\n```\n\nOpen [http://localhost:3000](http://localhost:3000) to view the site.\n\n### Generate Project Knowledge\n\nThe AI chat requires precomputed embeddings. Set `GH_TOKEN`, `PORTFOLIO_GIST_ID`, and `OPENAI_API_KEY`, then run:\n\n```bash\npnpm generate:projects\n```\n\nThis generates `generated/repo-summaries.json` and `generated/repo-embeddings.json`. Commit these files.\n\n## Deployment\n\nThe site deploys to AWS using CDK and OpenNext. See the [CDK Stack Guide](docs/architecture/cdk.md) for full deployment instructions.\n\n### Quick Deploy\n\n```bash\n# Build Next.js artifacts\npnpm run build:web\n\n# Deploy to AWS (must be us-east-1 for Lambda@Edge)\ncd infra/cdk\nexport CDK_DEFAULT_REGION=us-east-1\nexport CDK_DEFAULT_ACCOUNT=<your-account-id>\npnpm cdk deploy\n```\n\n### CI/CD\n\nGitHub Actions automatically deploys on `main` branch pushes. See [CDK Stack Guide](docs/architecture/cdk.md) for required secrets and environment variables.",
+      "embeddingId": "portfolio"
+    },
+    {
+      "id": "rubiks-cube",
+      "slug": "rubiks-cube",
+      "name": "rubiks-cube",
+      "githubUrl": "https://github.com/Volpestyle/rubiks-cube",
+      "liveUrl": "https://volpestyle.github.io/rubiks-cube/",
+      "oneLiner": "A Next.js + React app that models and visualizes Rubik’s cube state in a 2D layout, complete with rotation logic and test coverage.",
+      "description": "This personal project implements a dynamic, flattened 2D representation of a Rubik’s cube using React, TypeScript, Next.js, and Tailwind CSS. Each square tracks both its face color and immutable original coordinates, making it easier to debug how pieces move during rotations. Cube state is programmatically generated and manipulated via face-specific rotation logic that updates a shared data structure. Jest tests verify single and inverted rotations for all faces, and the UI can be cross-checked against the rubikscu.be online simulator.",
+      "bullets": [
+        "Rubiks cube state management",
+        "Stack highlights: React, React.js, Next.js",
+        "Focus areas: GitHub Pages, rubikscu.be simulator, Rubik's cube state management"
+      ],
+      "impactSummary": "Provided a testable, web-based Rubik’s cube state engine that makes it easier to reason about and validate cube rotations in a 2D representation.",
+      "sizeOrScope": "Solo side project, deployed as a public GitHub Pages app.",
+      "techStack": [
+        "React",
+        "React.js",
+        "Next.js",
+        "NextJS",
+        "create-next-app",
+        "TailwindCSS",
+        "Tailwind CSS",
+        "Jest",
+        "npm",
+        "yarn",
+        "pnpm",
+        "bun"
+      ],
+      "languages": [
+        "TypeScript",
+        "CSS",
+        "JavaScript"
+      ],
+      "tags": [
+        "GitHub Pages",
+        "rubikscu.be simulator",
+        "Rubik's cube state management",
+        "2D Rubik's cube representation",
+        "TailwindCSS",
+        "Tailwind CSS",
+        "Jest",
+        "npm",
+        "yarn",
+        "pnpm",
+        "bun"
+      ],
+      "context": {
+        "type": "personal",
+        "timeframe": {
+          "start": "2024-08-12",
+          "end": "2024-08-27"
+        }
+      },
+      "contextType": "personal",
+      "readme": "# Rubiks Cube State Management\n\n[Live here](https://volpestyle.github.io/rubiks-cube/)\n\nA React Typescript & TailwindCSS app to manage the state of a Rubik's cube in a 2D representation.\n\n## Overview\n\nThis is a dynamic representation of a flattened Rubik's cube where each square/cell is labeled with either U (up), L (left), F (front), R (right), B (back), or D (Down) as well as the coordinates relative to the face it's on. These coordinates do not change as the squares move around the cube since this is helpful during debugging to keep track of how each square is being rotated.\n\n#### Cube State\n\nInitial cube state is created using loops and a helper function, the output looks like this:\n\n```\nconst initialCubeState: CubeState = {\n  U: [\n    [{ color: \"U\", originalCoord: \"0,0\" }, { color: \"U\", originalCoord: \"0,1\" }, { color: \"U\", originalCoord: \"0,2\" }],\n    [{ color: \"U\", originalCoord: \"1,0\" }, { color: \"U\", originalCoord: \"1,1\" }, { color: \"U\", originalCoord: \"1,2\" }],\n    [{ color: \"U\", originalCoord: \"2,0\" }, { color: \"U\", originalCoord: \"2,1\" }, { color: \"U\", originalCoord: \"2,2\" }],\n  ],\n  // Repeat for other faces (L, F, R, B, D)\n};\n```\n\nEach object in the array represents a square and each key a face of the cube.\n\n#### Rotation Logic\n\nThe majority of rotation logic is handled in one `if elseif` statement (if face is 'U', handle accordingly) since each face rotation requires unique transformations to the cubeState data structure. This logic could be refactored to be less redudant and more modular, similar to how parts of the tests are structured.\n\n## Testing\n\n```bash\nnpm run test\n```\n\nI used Jest for testing. There is test coverage for a single rotation of all faces, and for an inverted rotation.\nThe tests are found under `components/__tests__`.\n\n#### Manual testing\n\nCan be proofed using https://rubikscu.be/#simulator\n\n## Running development server\n\nThis is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).\n\n```bash\nnpm run dev\n# or\nyarn dev\n# or\npnpm dev\n# or\nbun dev\n```\n\nOpen [http://localhost:3000](http://localhost:3000) with your browser to see the result.\n\n## Build static files and deploy to Github pages\n\n```bash\nnpm run build && npm run deploy\n```",
+      "embeddingId": "rubiks-cube"
+    },
+    {
+      "id": "slash-siege",
+      "slug": "slash-siege",
+      "name": "slash-siege",
+      "githubUrl": "https://github.com/Volpestyle/slash-siege",
+      "oneLiner": "A multiplayer stick-figure fighting game prototype with an online test build.",
+      "description": "slash-siege is a multiplayer stick-figure fighter focused on fast-paced, lightweight combat that can be tested directly in the browser. The project includes an online testing deployment, making it easy to iterate on gameplay and gather feedback. A shared Trello board tracks tasks and roadmap items, suggesting ongoing development and feature planning. This appears to be a personal or small-team side project exploring real-time multiplayer game mechanics.",
+      "bullets": [
+        "A multiplayer stick-figure fighter"
+      ],
+      "impactSummary": "Enabled rapid iteration on a browser-playable multiplayer fighting prototype with simple project management and live testing in place.",
+      "sizeOrScope": "Personal or small-team indie game prototype with a public web test build.",
+      "techStack": [],
+      "languages": [
+        "TypeScript",
+        "JavaScript",
+        "HTML"
+      ],
+      "tags": [],
+      "context": {
+        "type": "personal",
+        "timeframe": {
+          "start": "2024-10-25",
+          "end": "2024-12-06"
+        }
+      },
+      "contextType": "personal",
+      "readme": "# slash-siege\nA multiplayer stick-figure fighter. \\\n[Trello board](https://trello.com/invite/b/6725324ac8c66cffeda66ad3/ATTI7ead32a45530bb6463d915cc92af545c83ED797D/slash-siege)\n\n### Testing\nhttps://volpestyle.github.io/slash-siege/",
+      "embeddingId": "slash-siege"
+    },
+    {
+      "id": "wallcrawler",
+      "slug": "wallcrawler",
+      "name": "wallcrawler",
+      "githubUrl": "https://github.com/Volpestyle/wallcrawler",
+      "oneLiner": "Self‑hosted, AWS‑backed remote browser platform that exposes Browserbase‑compatible APIs and LLM‑powered browsing via a monorepo of infrastructure, backend services, SDKs, and UI components.",
+      "description": "Self‑hosted, AWS‑backed remote browser platform that exposes Browserbase‑compatible APIs and LLM‑powered browsing via a monorepo of infrastructure, backend services, SDKs, and UI components.",
+      "bullets": [
+        "Designed and organized a monorepo that cleanly separates infrastructure (`@wallcrawler/aws-cdk`), backend services (`@wallcrawler/backend-go`), SDKs (`@wallcrawler/sdk-node`, `@wallcrawler/stagehand`), and UI components (`@wallcrawler/components`).",
+        "Implemented an AWS CDK stack to provision API Gateway, Lambda, ECS/Fargate, EventBridge, DynamoDB, Redis, and S3, enabling a fully self‑hosted remote browser platform.",
+        "Built a Browserbase‑compatible REST API and Node.js SDK to simplify integration, including documented endpoints, request/response contracts, and streaming behavior.",
+        "Integrated a fork of Stagehand to power LLM‑driven browsing workflows and expose Stagehand‑specific endpoints within the Wallcrawler platform.",
+        "Defined session, project, API key, and browser context models in DynamoDB and S3, supporting multi‑tenant projects, API‑key allowlists, and project‑scoped browser profiles."
+      ],
+      "impactSummary": "Enables teams to deploy a production‑ready, AI‑powered remote browser platform into their own AWS accounts with compatible APIs, robust session management, and clear operational tooling.",
+      "sizeOrScope": "Developed as a multi‑package monorepo intended for team use, covering full infrastructure, backend, SDK, and UI layers of a self‑hosted remote browser platform.",
+      "techStack": [
+        "Wallcrawler",
+        "Wallcrawler Monorepo",
+        "Wallcrawler SDK",
+        "@wallcrawler/aws-cdk",
+        "@wallcrawler/backend-go",
+        "@wallcrawler/sdk-node",
+        "@wallcrawler/stagehand",
+        "@wallcrawler/components",
+        "Stagehand",
+        "Stagehand LLM browsing",
+        "Stagehand endpoints",
+        "Browserbase-compatible APIs",
+        "Browserbase APIs",
+        "REST API",
+        "LLM-powered browsing",
+        "AI-Powered Browser Automation Framework",
+        "remote browser platform",
+        "self-hosted remote browser platform",
+        "Vercel AI SDK",
+        "UI components",
+        "BrowserViewport",
+        "AWS CLI",
+        "Docker",
+        "Multi-Arch Docker",
+        "multi-arch images",
+        "pnpm",
+        "pnpm install:submodules",
+        "pnpm install",
+        "pnpm build",
+        "pnpm generate-env",
+        "pnpm deploy",
+        "pnpm lint",
+        "pnpm test",
+        "pnpm -r dev",
+        "pnpm cdk",
+        "CDK Toolkit",
+        "JWT",
+        "JWT Signing Key Flow",
+        "SHA-256"
+      ],
+      "languages": [
+        "Go",
+        "TypeScript",
+        "Shell",
+        "Makefile",
+        "Dockerfile",
+        "JavaScript"
+      ],
+      "tags": [
+        "browser automation",
+        "remote browser sessions",
+        "LLM browsing",
+        "LLM-powered browsing",
+        "AI-powered browsing",
+        "live browser sessions",
+        "session management",
+        "API keys management",
+        "multi-tenant projects",
+        "user-level isolation",
+        "browser contexts",
+        "browser profiles",
+        "persisted browser sessions",
+        "event-driven architecture",
+        "event systems",
+        "infrastructure as code",
+        "multi-arch builds",
+        "multi-architecture Docker images",
+        "logging best practices",
+        "AWS CLI",
+        "Docker",
+        "Multi-Arch Docker",
+        "multi-arch images",
+        "pnpm",
+        "pnpm install:submodules",
+        "pnpm install",
+        "pnpm build",
+        "pnpm generate-env",
+        "pnpm deploy",
+        "pnpm lint",
+        "pnpm test",
+        "pnpm -r dev",
+        "pnpm cdk",
+        "CDK Toolkit",
+        "JWT",
+        "JWT Signing Key Flow",
+        "SHA-256"
+      ],
+      "context": {
+        "type": "personal",
+        "timeframe": {
+          "start": "2025-06-10",
+          "end": "2025-10-03"
+        }
+      },
+      "contextType": "personal",
+      "readme": "### Wallcrawler Monorepo\n\nSelf‑hosted, AWS‑backed remote browser platform with Stagehand LLM browsing, compatible with Browserbase APIs. This monorepo contains the infrastructure, backend services, SDK, and UI components to run Wallcrawler in your own AWS account.\n\n### Quick links\n\n- **Architecture**: [docs/infra/ARCHITECTURE.md](docs/infra/ARCHITECTURE.md)\n- **Event Systems**: [docs/infra/EVENT_SYSTEMS_ARCHITECTURE.md](docs/infra/EVENT_SYSTEMS_ARCHITECTURE.md)\n- **DynamoDB Schema**: [docs/infra/DYNAMODB_SCHEMA.md](docs/infra/DYNAMODB_SCHEMA.md)\n- **Multi‑Arch Docker**: [docs/infra/MULTI_ARCH_DOCKER_SOLUTION.md](docs/infra/MULTI_ARCH_DOCKER_SOLUTION.md)\n- **Deployment Guide**: [docs/deploy/DEPLOYMENT_GUIDE.md](docs/deploy/DEPLOYMENT_GUIDE.md)\n- **API Endpoints Reference**: [docs/api/api-endpoints-reference.md](docs/api/api-endpoints-reference.md)\n- **SDK Integration Guide**: [docs/api/sdk-integration-guide.md](docs/api/sdk-integration-guide.md)\n- **Sessions**:\n  - JWT Signing Key Flow: [docs/api/sessions/jwt-signing-key-flow.md](docs/api/sessions/jwt-signing-key-flow.md)\n  - Container Lifecycle: [docs/api/sessions/wallcrawler-container-lifecycle.md](docs/api/sessions/wallcrawler-container-lifecycle.md)\n  - CloudWatch Logging Best Practices: [docs/api/sessions/cloudwatch-logging-best-practices.md](docs/api/sessions/cloudwatch-logging-best-practices.md)\n\n### Packages\n\n- `@wallcrawler/aws-cdk` — AWS CDK app defining all infrastructure (API Gateway, Lambda, ECS/Fargate, EventBridge, DynamoDB, Redis, etc.)\n  - Source: [packages/aws-cdk/](packages/aws-cdk/)\n  - See: [docs/infra/ARCHITECTURE.md](docs/infra/ARCHITECTURE.md) and [docs/deploy/DEPLOYMENT_GUIDE.md](docs/deploy/DEPLOYMENT_GUIDE.md)\n\n- `@wallcrawler/backend-go` — Go Lambda handlers and services for SDK‑compatible endpoints and orchestration\n  - Source: [packages/backend-go/](packages/backend-go/)\n  - README: [packages/backend-go/README.md](packages/backend-go/README.md)\n\n- `@wallcrawler/sdk-node` — TypeScript/Node client for Wallcrawler’s REST API (Browserbase‑compatible)\n  - Source: [packages/sdk-node/](packages/sdk-node/)\n  - README: [packages/sdk-node/README.md](packages/sdk-node/README.md)\n  - API: [packages/sdk-node/api.md](packages/sdk-node/api.md)\n\n- `@wallcrawler/stagehand` — Stagehand fork used by Wallcrawler for LLM‑powered browsing\n  - Source: [packages/stagehand/](packages/stagehand/)\n  - README: [packages/stagehand/README.md](packages/stagehand/README.md)\n\n- `@wallcrawler/components` — UI components (e.g., `BrowserViewport`) for embedding live sessions\n  - Source: [packages/components/](packages/components/)\n\n### Prerequisites\n\n- Node.js >= 18 and pnpm >= 8\n- Go >= 1.21 (for backend)\n- AWS CLI configured for your target account\n- Docker (for local builds and multi‑arch images)\n\n### Getting started\n\n```bash\n# 1) Initialize submodules (if any)\npnpm install:submodules\n\n# 2) Install dependencies\npnpm install\n\n# 3) Build everything\npnpm build\n\n# 4) Generate local env (CDK helpers)\npnpm generate-env\n\n# 5) Deploy (see Deployment Guide for environments/config)\npnpm deploy\n```\n\nAdditional scripts:\n\n- Lint: `pnpm lint`\n- Tests: `pnpm test`\n- Dev (package‑scoped): `pnpm -r dev`\n- CDK Toolkit: `pnpm cdk`\n\n### Configuration\n\nThe backend reads several environment variables at runtime:\n\n- `WALLCRAWLER_MAX_SESSION_TIMEOUT` — Maximum allowed session duration in seconds (defaults to 3600).\n- `PROJECTS_TABLE_NAME`, `API_KEYS_TABLE_NAME`, `CONTEXTS_TABLE_NAME` — Automatically injected by the CDK stack for the Lambda functions.\n- `CONTEXTS_BUCKET_NAME` — S3 bucket that stores browser context archives for persisted sessions.\n- `SESSIONS_TABLE_NAME` — Sessions table (`wallcrawler-sessions` by default).\n- Contexts (browser profiles) remain project-scoped. If you expose contexts to end users, ensure your application filters by both `projectId` and your own user identifier before forwarding requests to Wallcrawler.\n- API keys can be associated with multiple projects. When a key has more than one project, include `x-wc-project-id` on each request to select the target project; the authorizer denies access if the requested project is not in the key's allowlist.\n\n### Data Stores\n\n- **DynamoDB**\n  - `wallcrawler-sessions` — Session metadata, lifecycle history, and connection info.\n  - `wallcrawler-projects` — Project configuration (default timeout, concurrency limits, billing tier).\n  - `wallcrawler-api-keys` — SHA-256 hashed API keys mapped to one or more projects (`projectIds` attribute) with status flags.\n  - `wallcrawler-contexts` — Browser context metadata and S3 object keys. Add per-user ownership metadata in your app if you need user-level isolation.\n- **S3**\n  - `wallcrawler-contexts-*` — Stores compressed Chrome user data directories for persisted contexts.\n\n### API compatibility\n\nWallcrawler provides Browserbase‑compatible APIs and Stagehand endpoints. For exact routes, request/response shapes, and streaming behavior, see:\n\n- docs/api/api-endpoints-reference.md\n- docs/api/sdk-integration-guide.md\n\n### Architecture overview\n\nHigh‑level design, event flows, and data models are covered in the docs referenced above. For a visual, see [docs/infra/wallcrawler-aws-architecture.png](docs/infra/wallcrawler-aws-architecture.png).",
+      "embeddingId": "wallcrawler"
+    }
+  ]
+}

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDocumentContent } from '@/lib/github-server';
-import { shouldReturnTestFixtures } from '@/lib/test-mode';
-import { TEST_DOC_CONTENT, TEST_REPO } from '@/lib/test-fixtures';
+import { shouldServeFixturesForRequest } from '@/lib/test-flags';
 
 type RouteParams = {
   owner: string;
@@ -22,7 +21,8 @@ export async function GET(request: Request, context: { params: Promise<RoutePara
     }
 
     // Return deterministic fixtures for E2E tests
-    if (shouldReturnTestFixtures(request.headers)) {
+    if (shouldServeFixturesForRequest(request.headers)) {
+      const { TEST_DOC_CONTENT, TEST_REPO } = await import('@portfolio/test-support/fixtures');
       return NextResponse.json(
         {
           repo,

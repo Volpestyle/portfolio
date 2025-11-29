@@ -1,0 +1,21 @@
+owner:
+  ownerId: portfolio-owner
+  ownerName: James Volpe # replace with your name
+  domainLabel: software engineer # replace with your domain label (e.g. software engineer, designer, researcher, artist etc.)
+  portfolioKind: individual # one of: individual | team | organization
+  ownerPronouns: he/him
+
+models:
+  # planner/evidence/answer: OpenAI chat models (examples: gpt-5-nano-2025-06-01, gpt-5-nano-2025-08-07, gpt-4.1-nano-2025-04-14)
+  plannerModel: gpt-5-nano-2025-08-07
+  evidenceModel: gpt-5-nano-2025-08-07
+  answerModel: gpt-5-nano-2025-08-07
+  # reasoningEffort: minimal | low | medium | high (only applies to reasoning models like gpt-5* and o*)
+  reasoning:
+    planner: low
+    evidence: low
+    answer: minimal
+tokens:
+  planner: 16000 # per-stage soft token ceilings (spec: planner 16k, evidence 12k, answer 16k)
+  evidence: 12000
+  answer: 16000

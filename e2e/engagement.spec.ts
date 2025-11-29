@@ -68,7 +68,7 @@ test.describe('Engagement surfaces', () => {
     await expect(page.getByText(/failed to send message|server error/i)).toBeVisible();
   });
 
-  test('chat streams responses with project attachments', async ({ page }) => {
+  test('chat streams responses with portfolio surfaces', async ({ page }) => {
     if (!hitsRealApis) {
       await mockChatStream(page);
     }
@@ -82,14 +82,21 @@ test.describe('Engagement surfaces', () => {
     await expect(assistantMessages).toHaveCount(initialCount + 1, { timeout: 60_000 });
     const latestAssistant = assistantMessages.nth(initialCount);
 
+    await expect(latestAssistant).toBeVisible();
+
     if (hitsRealApis) {
-      await expect(latestAssistant).toBeVisible();
       const responseText = (await latestAssistant.innerText()).trim();
       expect(responseText.length).toBeGreaterThan(20);
-    } else {
-      await expect(page.getByRole('heading', { name: /sample-ai-app/i })).toBeVisible();
-      await page.getByRole('link', { name: 'API Contract' }).click();
-      await expect(page.getByRole('heading', { name: 'API Reference' })).toBeVisible({ timeout: 15000 });
+      return;
     }
+
+    // Mocked stream: verify surfaced project detail from UI hints.
+    const projectHeading = page.getByRole('heading', { name: /sample-ai-app/i }).first();
+    await expect(projectHeading).toBeVisible();
+    const expandButton = page.getByRole('button', { name: /view details/i }).first();
+    await expandButton.click();
+    const markdownViewer = page.getByTestId('markdown-viewer');
+    await expect(markdownViewer).toBeVisible();
+    await expect(markdownViewer).toContainText(/surface inline documentation/i);
   });
 });

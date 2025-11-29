@@ -3,15 +3,15 @@
 import { motion } from 'framer-motion';
 import { siLinkedin, siGithub, siYoutube, siSpotify, siX } from 'simple-icons/icons';
 import { useState } from 'react';
+import type { ProfileSocialLink } from '@portfolio/chat-contract';
 
-interface SocialLink {
-  name?: string;
-  icon: {
-    path: string;
-    hex: string;
-  };
-  url: string;
-}
+const ICONS: Record<string, { path: string; hex: string }> = {
+  x: siX,
+  github: siGithub,
+  youtube: siYoutube,
+  linkedin: siLinkedin,
+  spotify: siSpotify,
+};
 
 const SocialIcon: React.FC<{ icon: { path: string; hex: string } }> = ({ icon }) => (
   <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor">
@@ -19,40 +19,14 @@ const SocialIcon: React.FC<{ icon: { path: string; hex: string } }> = ({ icon })
   </svg>
 );
 
-export function SocialLinks() {
+export function SocialLinks({ links }: { links: readonly ProfileSocialLink[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const socialLinks: SocialLink[] = [
-    {
-      name: 'x',
-      icon: siX,
-      url: 'https://x.com/c0wboyboopbop',
-    },
-    {
-      name: 'github',
-      icon: siGithub,
-      url: 'https://github.com/Volpestyle',
-    },
-    {
-      name: 'youtube',
-      icon: siYoutube,
-      url: 'https://www.youtube.com/@vuhlp/videos',
-    },
-    {
-      name: 'linkedn',
-      icon: siLinkedin,
-      url: 'https://www.linkedin.com/in/james-volpe/',
-    },
-    {
-      name: 'spotify',
-      icon: siSpotify,
-      url: 'https://open.spotify.com/artist/1s7neYGdYg0kCnUizWy3bk?si=GMzqI3G0RfialSx1-1NjDg',
-    },
-  ];
 
   return (
     <div className="flex flex-row items-start justify-start gap-6">
-      {socialLinks.map((link, i) => {
+      {links.map((link, i) => {
         const isHovered = hoveredIndex === i;
+        const icon = ICONS[link.platform] ?? siGithub;
         return (
           <motion.div
             key={i}
@@ -96,7 +70,7 @@ export function SocialLinks() {
                   duration: 0.2,
                 }}
               >
-                <SocialIcon icon={link.icon} />
+                <SocialIcon icon={icon} />
               </motion.div>
             </motion.a>
             <motion.span
@@ -111,7 +85,7 @@ export function SocialLinks() {
                 ease: 'easeOut',
               }}
             >
-              {link.name}
+              {link.label || link.platform}
             </motion.span>
           </motion.div>
         );

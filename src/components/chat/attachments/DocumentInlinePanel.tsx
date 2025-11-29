@@ -1,8 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
 import { MarkdownViewer } from '@/components/MarkdownViewer';
-import { useRepoDocument } from '@/hooks/useRepoDocument';
 
 interface DocumentInlinePanelProps {
   repo: string;
@@ -10,73 +8,18 @@ interface DocumentInlinePanelProps {
   path: string;
   content: string;
   breadcrumbsOverride?: { label: string; href?: string; onClick?: () => void }[];
+  onDocLinkClick?: (nextPath: string, label?: string) => void;
 }
 
-export function DocumentInlinePanel({ repo, title, path, content, breadcrumbsOverride }: DocumentInlinePanelProps) {
-  const [currentDoc, setCurrentDoc] = useState({ content, title, path });
-  const [isLoading, setIsLoading] = useState(false);
-  const { ensureDocument, seedDocument } = useRepoDocument();
-
-  const { owner, repoName } = useMemo(() => parseRepoIdentifier(repo), [repo]);
-
-  useEffect(() => {
-    if (!owner || !repoName || !path) {
-      return;
-    }
-
-    seedDocument(owner, repoName, path, {
-      owner,
-      repo: repoName,
-      path,
-      content,
-      projectName: repoName,
-    });
-  }, [content, owner, path, repoName, seedDocument]);
-
-  const handleDocLinkClick = useCallback(
-    async (docPath: string, label?: string) => {
-      if (!owner || !repoName) {
-        console.warn('Missing repository information for document fetch:', repo);
-        return;
-      }
-
-      setIsLoading(true);
-      try {
-        const document = await ensureDocument(owner, repoName, docPath);
-        const filename = document.path.split('/').pop() || 'Document';
-        setCurrentDoc({
-          content: document.content,
-          title: label || filename,
-          path: document.path,
-        });
-      } catch (error) {
-        console.error('Error fetching document:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [ensureDocument, owner, repo, repoName]
-  );
-
-  const handleBackToOriginal = useCallback(() => {
-    setCurrentDoc({ content, title, path });
-  }, [content, path, title]);
-
-  // Use breadcrumbsOverride if provided, otherwise create consistent breadcrumbs
-  const isViewingOriginal = currentDoc.path === path;
-  const breadcrumbs = breadcrumbsOverride ?? [
-    {
-      label: 'Projects',
-      onClick: !isViewingOriginal ? handleBackToOriginal : undefined,
-    },
-    {
-      label: repoName,
-      onClick: !isViewingOriginal ? handleBackToOriginal : undefined,
-    },
-    { label: currentDoc.path },
-  ];
-
-  if (!currentDoc.content || !currentDoc.content.trim()) {
+export function DocumentInlinePanel({
+  repo,
+  title,
+  path,
+  content,
+  breadcrumbsOverride,
+  onDocLinkClick,
+}: DocumentInlinePanelProps) {
+  if (!content?.trim()) {
     return (
       <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
         <p className="text-sm text-white/60">No content available for this document.</p>
@@ -84,33 +27,15 @@ export function DocumentInlinePanel({ repo, title, path, content, breadcrumbsOve
     );
   }
 
+  const breadcrumbs = breadcrumbsOverride ?? [{ label: 'Projects' }, { label: repo }, { label: title || path }];
+
   return (
-    <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
-      <MarkdownViewer
-        content={currentDoc.content}
-        pid={repo}
-        breadcrumbs={breadcrumbs}
-        variant="chat"
-        isLoading={isLoading}
-        onDocLinkClick={handleDocLinkClick}
-      />
-    </div>
+    <MarkdownViewer
+      content={content}
+      pid={repo}
+      breadcrumbs={breadcrumbs}
+      variant="chat"
+      onDocLinkClick={onDocLinkClick}
+    />
   );
-}
-
-function parseRepoIdentifier(identifier: string) {
-  if (!identifier) {
-    return { owner: '', repoName: '' };
-  }
-
-  if (!identifier.includes('/')) {
-    return { owner: identifier, repoName: identifier };
-  }
-
-  const [owner, ...rest] = identifier.split('/');
-  const repoName = rest.join('/') || owner;
-  return {
-    owner: owner || identifier,
-    repoName,
-  };
 }

@@ -1,0 +1,67 @@
+%% Figure 5.0 -- Pipeline Stage Internals
+%% Output: portfolio-chat-pipeline-internals.png
+flowchart TB
+  %% === Inputs ===
+  USER_MSG["Latest user message\n+ recent conversation history"]
+  OWNER_CFG["OwnerConfig + Persona\n(identity context)"]
+  CORPORA[(Projects / Resume / Profile\n+ Embedding indexes)]
+
+  %% === Pipeline Stages ===
+  subgraph PLANNER["Planner (LLM)"]
+    P_IN["Inputs:\nsystem prompt,\nconversation window,\nlatest user message"]
+    P_OUT["RetrievalPlan\n(intent, topic,\nexperienceScope,\nretrievalRequests,\nanswerLengthHint,\nuiTarget)"]
+  end
+
+  subgraph RETR["Retrieval Engine"]
+    RET_BM25["BM25 search\n(MiniSearch)"]
+    RET_EMB["Embedding re-rank\n(cosine similarity)"]
+    RET_REC["Recency scoring"]
+    RET_COMB["Combined scoring &\nenumeration mode"]
+    RET_OUT["Retrieved docs\n(projects, resume, profile)"]
+  end
+
+  subgraph EVID["Evidence (LLM)"]
+    E_IN["Inputs:\nRetrievalPlan,\nuser message,\nretrieved docs"]
+    E_OUT["EvidenceSummary\n(highLevelAnswer,\nevidenceCompleteness,\nselectedEvidence,\nsemanticFlags,\nuiHints)"]
+  end
+
+  subgraph ANSWER["Answer (LLM, streaming)"]
+    A_IN["Inputs:\npersona + profile,\nRetrievalPlan,\nEvidenceSummary,\nconversation window"]
+    A_OUT["AnswerPayload\n(message + thoughts)"]
+  end
+
+  subgraph UI["UI Derivation"]
+    UI_DERIVE["deriveUi()\nvalidate uiHints IDs\nfilter/dedupe/truncate"]
+    UI_PAYLOAD["UiPayload\n(showProjects,\nshowExperiences,\ncoreEvidenceIds)"]
+  end
+
+  %% === Flow ===
+  USER_MSG --> P_IN
+  OWNER_CFG --> P_IN
+  P_IN --> P_OUT
+
+  P_OUT --> RET_BM25
+  CORPORA --> RET_BM25
+  P_OUT --> RET_EMB
+  CORPORA --> RET_EMB
+  RET_BM25 --> RET_COMB
+  RET_EMB --> RET_COMB
+  RET_COMB --> RET_REC
+  RET_REC --> RET_OUT
+
+  P_OUT --> E_IN
+  RET_OUT --> E_IN
+  E_IN --> E_OUT
+
+  P_OUT --> A_IN
+  E_OUT --> A_IN
+  OWNER_CFG --> A_IN
+  A_IN --> A_OUT
+
+  E_OUT --> UI_DERIVE
+  RET_OUT --> UI_DERIVE
+  UI_DERIVE --> UI_PAYLOAD
+
+  %% === SSE outputs ===
+  A_OUT -->|SSE token events| UI_CLIENT[[Frontend Chat UI]]
+  UI_PAYLOAD -->|SSE ui events| UI_CLIENT

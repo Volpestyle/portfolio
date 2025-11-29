@@ -1,5 +1,5 @@
 import { ProjectContent } from '@/components/ProjectContent';
-import { getRepoDetails, getRepoReadme, getPortfolioRepos } from '@/lib/github-server';
+import { getRepoByName, getRepoReadme, getPortfolioRepos } from '@/lib/github-server';
 import { augmentRepoWithKnowledge } from '@/server/project-knowledge';
 import type { Metadata } from 'next';
 
@@ -8,7 +8,7 @@ type PageContext = { params: Promise<ProjectParams> };
 
 export async function generateMetadata({ params }: PageContext): Promise<Metadata> {
   const { pid } = await params;
-  const repoInfo = await getRepoDetails(pid);
+  const repoInfo = await getRepoByName(pid);
 
   return {
     title: `${pid} - JCV's Portfolio`,
@@ -32,10 +32,10 @@ export async function generateStaticParams() {
 
 export default async function ProjectDetail({ params }: PageContext) {
   const { pid } = await params;
-  const [repoInfo, readme] = await Promise.all([getRepoDetails(pid), getRepoReadme(pid)]);
+  const [repoInfo, readme] = await Promise.all([getRepoByName(pid), getRepoReadme(pid)]);
 
   // Augment repo with knowledge (tags, summary, etc.)
-  const enrichedRepoInfo = augmentRepoWithKnowledge(repoInfo);
+  const enrichedRepoInfo = await augmentRepoWithKnowledge(repoInfo);
 
   return (
     <div className="-mx-8 -my-8 bg-black/10 backdrop-blur-sm">

@@ -2,16 +2,16 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
-import { RESUME_CONFIG } from '@/lib/constants';
 import Modal from './ui/modal';
 import { motion } from 'framer-motion';
 
 interface ResumeModalProps {
+  resumeFilename: string;
   isOpen: boolean;
   onClose: () => void;
 }
 
-const ResumeModal: React.FC<ResumeModalProps> = ({ isOpen, onClose }) => {
+const ResumeModal: React.FC<ResumeModalProps> = ({ resumeFilename, isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
@@ -32,7 +32,7 @@ const ResumeModal: React.FC<ResumeModalProps> = ({ isOpen, onClose }) => {
               </Button>
             </motion.div>
           </div>
-          <iframe src={`/resume/${RESUME_CONFIG.RESUME_FILENAME}`} className="w-full grow bg-white" title="Resume" />
+          <iframe src={`/resume/${resumeFilename}`} className="w-full grow bg-white" title="Resume" />
         </div>
       </div>
     </Modal>

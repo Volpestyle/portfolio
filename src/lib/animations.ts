@@ -21,3 +21,18 @@ export const springAnimations = {
     },
 } as const;
 
+/**
+ * Transition presets for card state changes (card <-> detail <-> doc)
+ */
+export const cardTransitions = {
+    /** Layout transition for container height/size changes */
+    layout: {
+        duration: 1,
+        ease: [0.16, 1, 0.3, 1] as const,
+    },
+    /** Quick fade for overlapping content during state change */
+    crossfade: {
+        duration: 0.2,
+        ease: [0.4, 0, 0.2, 1] as const,
+    },
+} as const;
