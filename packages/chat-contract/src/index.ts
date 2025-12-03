@@ -372,8 +372,8 @@ export const PlannerLLMOutputSchema: z.ZodType<PlannerLLMOutput, z.ZodTypeDef, u
   scope: z.enum(['employment_only', 'any_experience']).default('any_experience'),
   retrievalRequests: z.array(RetrievalRequestSchema).default([]),
   resumeFacets: z.array(z.enum(RESUME_FACET_VALUES)).default([]),
-  cardsEnabled: z.boolean().nullable().default(null),
-  topic: z.string().nullable().default(null),
+  cardsEnabled: z.boolean().optional(),
+  topic: z.string().nullable().optional(),
 });
 
 /**

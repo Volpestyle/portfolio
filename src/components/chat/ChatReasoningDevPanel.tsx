@@ -215,7 +215,7 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                           </div>
                         </div>
                       )}
-                      {evidence.semanticFlags.length > 0 && (
+                      {evidence.semanticFlags && evidence.semanticFlags.length > 0 && (
                         <div>
                           <p className="mb-2 text-xs font-medium text-purple-300">semanticFlags:</p>
                           <div className="space-y-2">

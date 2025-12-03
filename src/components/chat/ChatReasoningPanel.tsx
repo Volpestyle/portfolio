@@ -512,21 +512,6 @@ function getVerdictColor(verdict: string): string {
   }
 }
 
-function getHighLevelAnswerColor(answer: string): string {
-  switch (answer) {
-    case 'yes':
-      return 'text-green-300';
-    case 'no':
-      return 'text-red-300';
-    case 'partial':
-      return 'text-yellow-300';
-    case 'unknown':
-      return 'text-gray-300';
-    default:
-      return 'text-white/70';
-  }
-}
-
 type StreamingStage = 'planning' | 'searching' | 'evidence' | 'drafting';
 
 function inferStreamingStage(trace: PartialReasoningTrace): StreamingStage | null {
