@@ -6,6 +6,10 @@ import type {
   AnswerPayload,
   EvidenceUiHints,
   ExperienceScope,
+  EnumerationMode,
+  QuestionType,
+  Confidence,
+  Verdict,
   ResumeFacet,
   UiPayload,
   PersonaSummary,
@@ -24,14 +28,12 @@ import type {
 import {
   DEFAULT_CHAT_HISTORY_LIMIT,
   AnswerPayloadSchema,
-  ANSWER_LENGTH_VALUES,
   EvidenceSummarySchema,
-  INTENT_VALUES,
+  ENUMERATION_VALUES,
+  QUESTION_TYPE_VALUES,
   RESUME_FACET_VALUES,
-  UI_TARGET_VALUES,
   RETRIEVAL_REQUEST_TOPK_MAX,
   PlannerLLMOutputSchema,
-  deriveFromIntent as deriveFromIntentContract,
   parseUsage,
   estimateCostUsd,
   FALLBACK_NORMALIZED_PRICING,
@@ -113,16 +115,20 @@ export type ChatRuntimeOptions = {
   persona?: PersonaSummary;
   identityContext?: IdentityContext;
   logger?: (event: string, payload: Record<string, unknown>) => void;
+  logPrompts?: boolean;
 };
 
 export type PipelineStage = 'planner' | 'retrieval' | 'evidence' | 'answer';
 export type StageStatus = 'start' | 'complete';
 export type StageMeta = {
-  intent?: RetrievalPlan['intent'];
+  questionType?: RetrievalPlan['questionType'];
+  enumeration?: RetrievalPlan['enumeration'];
+  scope?: RetrievalPlan['scope'];
   topic?: RetrievalPlan['topic'];
   docsFound?: number;
   sources?: RetrievalSummary['source'][];
-  highLevelAnswer?: EvidenceSummary['highLevelAnswer'];
+  verdict?: EvidenceSummary['verdict'];
+  confidence?: EvidenceSummary['confidence'];
   evidenceCount?: number;
   tokenCount?: number;
 };
@@ -136,6 +142,7 @@ export type RunChatPipelineOptions = {
   reasoningEnabled?: boolean;
   onStageEvent?: (stage: PipelineStage, status: StageStatus, meta?: StageMeta, durationMs?: number) => void;
   onUiEvent?: (ui: UiPayload) => void;
+  logPrompts?: boolean;
 };
 
 export type StageUsage = {
@@ -160,6 +167,7 @@ type JsonResponseArgs<T> = {
   maxTokens?: number;
   onUsage?: (stage: string, model: string, usage: unknown) => void;
   reasoning?: Reasoning;
+  temperature?: number;
 };
 
 const DEFAULT_MAX_CONTEXT = DEFAULT_CHAT_HISTORY_LIMIT;
@@ -184,7 +192,6 @@ const TOTAL_EVIDENCE_DOC_LIMIT = 12;
 const MAX_SELECTED_EVIDENCE = 6;
 const MAX_DISPLAY_ITEMS = 10;
 const ZERO_EVIDENCE_BANNER = 'I could not find any matching portfolio evidence for that question.';
-
 function extractResponseOutputText(response: { output_text?: string; output?: unknown[] } | null | undefined): string {
   if (!response) return '';
   if (typeof response.output_text === 'string' && response.output_text.trim().length) {
@@ -473,6 +480,13 @@ function clampPlanTopK(value: unknown): number {
   return MIN_PLAN_TOPK;
 }
 
+function normalizeTemperature(value?: number): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined;
+  }
+  return Math.min(2, Math.max(0, value));
+}
+
 function resolveModelConfig(options?: ChatRuntimeOptions): ModelConfig {
   const normalizeModel = (value?: string) => {
     if (typeof value !== 'string') return undefined;
@@ -485,6 +499,7 @@ function resolveModelConfig(options?: ChatRuntimeOptions): ModelConfig {
   const evidenceModel = normalizeModel(options?.modelConfig?.evidenceModel) ?? answerModel;
   const evidenceModelDeepDive = normalizeModel(options?.modelConfig?.evidenceModelDeepDive) ?? evidenceModel;
   const embeddingModel = normalizeModel(options?.modelConfig?.embeddingModel);
+  const answerTemperature = normalizeTemperature(options?.modelConfig?.answerTemperature);
 
   const missing = [
     answerModel ? null : 'answerModel (models.answerModel)',
@@ -507,6 +522,7 @@ function resolveModelConfig(options?: ChatRuntimeOptions): ModelConfig {
     evidenceModelDeepDive: evidenceModelDeepDive ?? evidenceModel!,
     answerModel: answerModel!,
     embeddingModel: embeddingModel!,
+    answerTemperature,
   };
 }
 
@@ -535,9 +551,8 @@ export function shouldUseEvidenceDeepDive(plan: RetrievalPlan, retrieved: Retrie
     (retrieved.awards?.length ?? 0) +
     (retrieved.skills?.length ?? 0);
   const topicLength = plan.topic?.trim().length ?? 0;
-  const lowConfidenceLongTopic = plan.plannerConfidence < 0.45 && topicLength >= 18;
-  const highDocVolume = docCount >= 12 || (plan.enumerateAllRelevant && docCount >= 8);
-  return plan.intent !== 'meta' && (lowConfidenceLongTopic || highDocVolume);
+  const highDocVolume = docCount >= 12 || (plan.enumeration === 'all_relevant' && docCount >= 8);
+  return plan.questionType !== 'meta' && (topicLength >= 18 || highDocVolume);
 }
 
 function selectEvidenceModel(plan: RetrievalPlan, retrieved: RetrievalResult, modelConfig: ModelConfig): string {
@@ -547,28 +562,15 @@ function selectEvidenceModel(plan: RetrievalPlan, retrieved: RetrievalResult, mo
   return modelConfig.evidenceModel;
 }
 
-type DerivedBehavior = {
-  answerMode: RetrievalPlan['answerMode'];
-  enumerateAllRelevant: boolean;
-};
-
-/**
- * Derives answerMode and enumerateAllRelevant from intent.
- * Delegates to the contract's deriveFromIntent function (per spec §4.2).
- */
-function deriveFromIntent(intent: RetrievalPlan['intent']): DerivedBehavior {
-  return deriveFromIntentContract(intent);
-}
-
 export type RetrievalFocus = 'resume' | 'projects' | 'mixed';
 
 export function inferRetrievalFocus(
   retrievalRequests: RetrievalPlan['retrievalRequests'],
-  intent: RetrievalPlan['intent'],
-  experienceScope?: ExperienceScope | null,
+  questionType: RetrievalPlan['questionType'],
+  scope?: ExperienceScope | null,
   resumeFacets?: ResumeFacet[] | null
 ): RetrievalFocus {
-  if (intent === 'meta') return 'mixed';
+  if (questionType === 'meta') return 'mixed';
   const requests = Array.isArray(retrievalRequests) ? retrievalRequests : [];
   const sources = new Set(requests.map((req) => req?.source).filter(Boolean));
   const hasProjects = sources.has('projects');
@@ -585,7 +587,7 @@ export function inferRetrievalFocus(
 
   const resumeFacetSet = new Set(resumeFacets ?? []);
   const hasResumeBias =
-    experienceScope === 'employment_only' ||
+    scope === 'employment_only' ||
     resumeFacetSet.has('experience') ||
     resumeFacetSet.has('skill');
 
@@ -594,51 +596,45 @@ export function inferRetrievalFocus(
   return 'mixed';
 }
 
-export function normalizeRetrievalPlan(plan: RetrievalPlan): RetrievalPlan {
-  let intent = (INTENT_VALUES as readonly string[]).includes(plan.intent) ? plan.intent : 'describe';
-  if (intent !== 'meta' && plan.enumerateAllRelevant) {
-    intent = 'enumerate';
-  }
-  const derivedFromIntent = deriveFromIntent(intent);
+export function normalizeRetrievalPlan(plan: RetrievalPlan, logger?: ChatRuntimeOptions['logger']): RetrievalPlan {
+  const questionType: QuestionType = (QUESTION_TYPE_VALUES as readonly string[]).includes(plan.questionType)
+    ? plan.questionType
+    : 'narrative';
+  const enumeration: EnumerationMode = (ENUMERATION_VALUES as readonly string[]).includes(plan.enumeration)
+    ? plan.enumeration
+    : 'sample';
   const topic = plan.topic?.trim() ?? null;
-  const plannerConfidence =
-    typeof plan.plannerConfidence === 'number' && Number.isFinite(plan.plannerConfidence)
-      ? Math.max(0, Math.min(1, plan.plannerConfidence))
-      : 0.5;
-  const experienceScope =
-    plan.experienceScope && plan.experienceScope !== null && (['employment_only', 'any_experience'] as const).includes(plan.experienceScope)
-      ? plan.experienceScope
-      : null;
-  const enumerateAllRelevant =
-    intent === 'meta'
-      ? false
-      : derivedFromIntent.enumerateAllRelevant || plan.enumerateAllRelevant === true;
-  const answerMode = derivedFromIntent.answerMode;
-  const answerLengthHint = (ANSWER_LENGTH_VALUES as readonly string[]).includes(plan.answerLengthHint)
-    ? plan.answerLengthHint
-    : 'medium';
-  const resumeFacets = Array.isArray(plan.resumeFacets)
+  const scope: ExperienceScope =
+    plan.scope && plan.scope !== null && (['employment_only', 'any_experience'] as const).includes(plan.scope)
+      ? plan.scope
+      : 'any_experience';
+  let resumeFacets = Array.isArray(plan.resumeFacets)
     ? plan.resumeFacets.filter((facet): facet is ResumeFacet =>
       (RESUME_FACET_VALUES as readonly string[]).includes(facet as ResumeFacet)
     )
     : [];
-  const isUiTargetValid = (UI_TARGET_VALUES as readonly string[]).includes(plan.uiTarget ?? '');
-  const uiTarget = isUiTargetValid ? plan.uiTarget : null;
+  if (scope === 'employment_only') {
+    // Keep employment-focus aligned: drop education facets when scope is employment_only.
+    resumeFacets = resumeFacets.filter((facet) => facet !== 'education');
+  }
+  const cardsEnabled = plan.cardsEnabled == null ? true : Boolean(plan.cardsEnabled);
 
   const normalizedRequests: RetrievalPlan['retrievalRequests'] = [];
   const seenKeys = new Set<string>();
   const plannerRequests = Array.isArray(plan.retrievalRequests) ? plan.retrievalRequests : [];
+  const plannerProvidedRequests = plan.retrievalRequests !== undefined && plan.retrievalRequests !== null;
+  const plannerExplicitNoRetrieval = plannerProvidedRequests && plannerRequests.length === 0;
 
   // Respect explicit no-retrieval plans (planner may decide persona/history is enough).
-  const allowMetaRequests = intent === 'meta' && plannerRequests.length > 0;
-  if ((plannerRequests.length > 0 && intent !== 'meta') || allowMetaRequests) {
+  const allowMetaRequests = questionType === 'meta' && plannerRequests.length > 0;
+  if ((plannerRequests.length > 0 && questionType !== 'meta') || allowMetaRequests) {
     for (const request of plannerRequests) {
       if (!request || typeof request !== 'object') continue;
       if (!(request.source === 'projects' || request.source === 'resume' || request.source === 'profile')) {
         continue;
       }
       // For meta/chit-chat, only honor profile lookups to keep behavior lightweight.
-      if (intent === 'meta' && request.source !== 'profile') {
+      if (questionType === 'meta' && request.source !== 'profile') {
         continue;
       }
 
@@ -657,11 +653,12 @@ export function normalizeRetrievalPlan(plan: RetrievalPlan): RetrievalPlan {
   }
 
   const topicFallback = topic ?? '';
+  const backfillSources: Array<'projects' | 'resume'> = [];
   const ensureRequest = (source: 'projects' | 'resume') => {
     const queryText = topicFallback;
     const dedupeKey = `${source}:${queryText.toLowerCase()}`;
     if (seenKeys.has(dedupeKey)) {
-      return;
+      return false;
     }
     seenKeys.add(dedupeKey);
     normalizedRequests.push({
@@ -669,12 +666,17 @@ export function normalizeRetrievalPlan(plan: RetrievalPlan): RetrievalPlan {
       queryText,
       topK: MIN_PLAN_TOPK,
     });
+    backfillSources.push(source);
+    return true;
   };
 
-  const focus = inferRetrievalFocus(normalizedRequests, intent, experienceScope, resumeFacets);
-  const hasSource = (source: 'projects' | 'resume') => normalizedRequests.some((req) => req.source === source);
+  const profileOnlyPlan = normalizedRequests.length > 0 && normalizedRequests.every((request) => request.source === 'profile');
+  const shouldBackfill = !plannerExplicitNoRetrieval && !profileOnlyPlan && questionType !== 'meta';
 
-  if (intent !== 'meta') {
+  if (shouldBackfill) {
+    const focus = inferRetrievalFocus(normalizedRequests, questionType, scope, resumeFacets);
+    const hasSource = (source: 'projects' | 'resume') => normalizedRequests.some((req) => req.source === source);
+
     if (focus === 'resume' && !hasSource('resume')) {
       ensureRequest('resume');
     } else if (focus === 'projects' && !hasSource('projects')) {
@@ -685,18 +687,31 @@ export function normalizeRetrievalPlan(plan: RetrievalPlan): RetrievalPlan {
     }
   }
 
+  logger?.('chat.pipeline.plan.backfill', {
+    applied: backfillSources.length > 0,
+    sourcesAdded: backfillSources,
+    skipReason: plannerExplicitNoRetrieval
+      ? 'planner_no_retrieval'
+      : profileOnlyPlan
+        ? 'profile_only'
+        : questionType === 'meta'
+          ? 'meta'
+          : null,
+    plannerProvided: plannerProvidedRequests,
+    plannerRequestCount: plannerRequests.length,
+    normalizedRequestCount: normalizedRequests.length,
+    questionType,
+  });
+
   return {
     ...plan,
-    intent,
+    questionType,
+    enumeration,
     topic,
-    plannerConfidence,
-    experienceScope,
+    scope,
     retrievalRequests: normalizedRequests,
     resumeFacets,
-    uiTarget,
-    answerMode,
-    answerLengthHint,
-    enumerateAllRelevant,
+    cardsEnabled,
   };
 }
 
@@ -716,19 +731,50 @@ function summarizeRetrievalRequests(requests: RetrievalPlan['retrievalRequests']
   }));
 }
 
+const isRetrievalSource = (value: unknown): value is RetrievalPlan['retrievalRequests'][number]['source'] =>
+  value === 'projects' || value === 'resume' || value === 'profile';
+
+function summarizeBackfill(rawPlan: RetrievalPlan, normalizedPlan: RetrievalPlan): {
+  applied: boolean;
+  addedSources: RetrievalPlan['retrievalRequests'][number]['source'][];
+  skipReason: 'planner_no_retrieval' | 'profile_only' | 'meta' | null;
+  profileOnly: boolean;
+  plannerExplicitNoRetrieval: boolean;
+} {
+  const rawRequests = Array.isArray(rawPlan.retrievalRequests) ? rawPlan.retrievalRequests : [];
+  const normalizedRequests = Array.isArray(normalizedPlan.retrievalRequests) ? normalizedPlan.retrievalRequests : [];
+  const rawSources = new Set(rawRequests.map((req) => (isRetrievalSource(req?.source) ? req.source : null)).filter(Boolean));
+  const normalizedSources = new Set(normalizedRequests.map((req) => req.source));
+  const addedSources = Array.from(normalizedSources).filter((source) => !rawSources.has(source));
+  const profileOnly = normalizedRequests.length > 0 && normalizedRequests.every((req) => req.source === 'profile');
+  const plannerExplicitNoRetrieval = rawPlan.retrievalRequests !== undefined && rawPlan.retrievalRequests !== null && rawRequests.length === 0;
+  const skipReason = plannerExplicitNoRetrieval
+    ? 'planner_no_retrieval'
+    : profileOnly
+      ? 'profile_only'
+      : normalizedPlan.questionType === 'meta'
+        ? 'meta'
+        : null;
+
+  return {
+    applied: addedSources.length > 0,
+    addedSources,
+    skipReason,
+    profileOnly,
+    plannerExplicitNoRetrieval,
+  };
+}
+
 function buildPlanAdjustments(rawPlan: RetrievalPlan, normalizedPlan: RetrievalPlan): PlanAdjustment[] {
   const adjustments: PlanAdjustment[] = [];
   const comparableFields: (keyof RetrievalPlan)[] = [
-    'intent',
     'topic',
-    'plannerConfidence',
-    'experienceScope',
-    'answerMode',
-    'answerLengthHint',
+    'questionType',
+    'enumeration',
+    'scope',
+    'cardsEnabled',
     'resumeFacets',
-    'enumerateAllRelevant',
-    'debugNotes',
-    'uiTarget',
+    'topic',
   ];
   for (const field of comparableFields) {
     const before = rawPlan[field];
@@ -758,6 +804,7 @@ function logPlanNormalization(
   if (!logger) return;
   const adjustments = buildPlanAdjustments(rawPlan, normalizedPlan);
   const topKs = normalizedPlan.retrievalRequests.map((request) => request.topK);
+  const backfill = summarizeBackfill(rawPlan, normalizedPlan);
   const stats = {
     requestCount: normalizedPlan.retrievalRequests.length,
     sources: normalizedPlan.retrievalRequests.reduce<Record<string, number>>((acc, request) => {
@@ -776,18 +823,18 @@ function logPlanNormalization(
     source,
     adjustments,
     stats,
-    intent: normalizedPlan.intent,
-    experienceScope: normalizedPlan.experienceScope ?? null,
-    answerMode: normalizedPlan.answerMode,
-    enumerateAllRelevant: normalizedPlan.enumerateAllRelevant,
-    uiTarget: normalizedPlan.uiTarget ?? null,
+    questionType: normalizedPlan.questionType,
+    enumeration: normalizedPlan.enumeration,
+    scope: normalizedPlan.scope,
+    cardsEnabled: normalizedPlan.cardsEnabled,
+    backfill,
   });
 }
 function resolveTopK(plan: RetrievalPlan, requestedTopK?: number, source?: RetrievalPlan['retrievalRequests'][number]['source']): {
   effectiveTopK: number;
   reason: string;
 } {
-  if (plan.enumerateAllRelevant) {
+  if (plan.enumeration === 'all_relevant') {
     const effectiveTopK = MAX_ENUMERATION_DOCS;
     return {
       effectiveTopK,
@@ -796,23 +843,18 @@ function resolveTopK(plan: RetrievalPlan, requestedTopK?: number, source?: Retri
   }
   const requested = clampTopK(requestedTopK, MAX_TOPK);
   const baseline = Math.min(requested ?? MAX_TOPK, EVIDENCE_TOPK_CAP);
-  const confidence = plan.plannerConfidence;
   const topicLength = plan.topic?.trim().length ?? 0;
   const isVagueTopic = !plan.topic || topicLength < 8;
-  const isConciseTopic = topicLength <= 18;
 
   let effectiveTopK = baseline;
   let reason = 'baseline';
 
-  if (plan.intent === 'meta') {
+  if (plan.questionType === 'meta') {
     effectiveTopK = Math.min(baseline, 4);
     reason = 'meta';
-  } else if (confidence < 0.35 || isVagueTopic) {
+  } else if (isVagueTopic) {
     effectiveTopK = baseline + 2;
-    reason = confidence < 0.35 ? 'low_confidence' : 'vague_topic';
-  } else if (confidence > 0.8 && !isVagueTopic && baseline > 4 && isConciseTopic) {
-    effectiveTopK = baseline - 2;
-    reason = 'high_confidence';
+    reason = 'vague_topic';
   }
 
   const clamped = Math.max(1, Math.min(Math.round(effectiveTopK), EVIDENCE_TOPK_CAP));
@@ -837,6 +879,7 @@ async function runJsonResponse<T>({
   maxTokens,
   onUsage,
   reasoning,
+  temperature,
 }: JsonResponseArgs<T>): Promise<T> {
   let attempt = 0;
   let lastError: unknown = null;
@@ -876,6 +919,7 @@ async function runJsonResponse<T>({
             ? { max_output_tokens: Math.floor(maxTokens) }
             : {}),
           ...(reasoning ? { reasoning } : {}),
+          ...(typeof temperature === 'number' && Number.isFinite(temperature) ? { temperature } : {}),
         },
         signal ? { signal } : undefined
       );
@@ -997,6 +1041,7 @@ async function runStreamingJsonResponse<T>({
   onTextDelta,
   onUsage,
   reasoning,
+  temperature,
 }: JsonResponseArgs<T> & { onTextDelta?: (delta: string) => void; onUsage?: (stage: string, model: string, usage: unknown) => void }): Promise<T> {
   let attempt = 0;
   let lastError: unknown = null;
@@ -1080,6 +1125,7 @@ async function runStreamingJsonResponse<T>({
             ? { max_output_tokens: Math.floor(maxTokens) }
             : {}),
           ...(reasoning ? { reasoning } : {}),
+          ...(typeof temperature === 'number' && Number.isFinite(temperature) ? { temperature } : {}),
         },
         signal ? { signal } : undefined
       );
@@ -1321,6 +1367,7 @@ function buildExperienceEvidenceSnippet(experience: ExperienceDoc): string | und
   const combined = [
     experience.title,
     experience.company,
+    experience.location,
     experience.impactSummary,
     experience.sizeOrScope,
     experience.summary,
@@ -1406,6 +1453,7 @@ function buildEvidenceUserContent(input: {
         id: exp.id,
         company: exp.company,
         title: exp.title,
+        location: exp.location,
         impactSummary: exp.impactSummary,
         sizeOrScope: exp.sizeOrScope,
         bullets: (exp.bullets ?? []).slice(0, 6),
@@ -1417,7 +1465,7 @@ function buildEvidenceUserContent(input: {
         evidenceSnippet: buildExperienceEvidenceSnippet(exp),
         bodySnippet: experienceBodyIds.has(exp.id)
           ? normalizeSnippet(
-            [exp.title, exp.company, exp.impactSummary, exp.sizeOrScope, ...(exp.bullets ?? [])].join(' '),
+            [exp.title, exp.company, exp.location, exp.impactSummary, exp.sizeOrScope, ...(exp.bullets ?? [])].join(' '),
             MAX_BODY_SNIPPET_CHARS
           )
           : undefined,
@@ -1486,11 +1534,11 @@ function buildEvidenceUserContent(input: {
     `Profile (if any): ${JSON.stringify(retrieved.profile ?? null, null, 2)}`,
     '',
     'selectedEvidence must cite the IDs from the retrieved docs and include { source, id, title, snippet, relevance }.',
-    `Intent: ${plan.intent}. enumerateAllRelevant: ${plan.enumerateAllRelevant ? 'true' : 'false'}.`,
-    '- Populate uiHints.projects / uiHints.experiences with ordered IDs from the retrieved docs only.',
-    '- For intent=fact_check keep uiHints to the strongest supporting examples; for intent=enumerate include all clearly relevant projects/experiences (ordered).',
-    '- If evidenceCompleteness is "none", set highLevelAnswer to "unknown" or "not_applicable", selectedEvidence to [], and uiHints to empty arrays.',
-    'Return ONLY the EvidenceSummary JSON with keys highLevelAnswer, evidenceCompleteness, reasoning, selectedEvidence, semanticFlags, uiHints.',
+    `Plan axes: questionType=${plan.questionType}. enumeration=${plan.enumeration}. scope=${plan.scope}. cardsEnabled=${plan.cardsEnabled === false ? 'false' : 'true'}.`,
+    '- Populate uiHints.projects / uiHints.experiences with ordered IDs from the retrieved docs only (respect scope).',
+    '- For questionType="binary" keep uiHints to the strongest supporting examples; for questionType="list" with enumeration="all_relevant" include all clearly relevant projects/experiences (ordered).',
+    '- If there is no evidence for a non-meta question, set verdict to "unknown" or "n/a", confidence to "low", selectedEvidence to [], and uiHints to empty arrays.',
+    'Return ONLY the EvidenceSummary JSON with keys verdict, confidence, reasoning, selectedEvidence, semanticFlags, uiHints.',
   ].join('\n');
 }
 
@@ -1504,13 +1552,26 @@ type BuildAnswerUserContentInput = {
 };
 
 export function buildAnswerSystemPrompt(persona?: PersonaSummary, owner?: OwnerConfig): string {
-  const sections: string[] = [applyOwnerTemplate(answerSystemPrompt, owner)];
+  const sections: string[] = [];
+
+  if (persona?.voiceExamples?.length) {
+    sections.push(
+      [
+        '**IMPORTANT - VOICE EXAMPLES** — Treat these "USER:" and "YOU:" examples as your base programming. You would respond in the same way as "YOU". Reuse these exact responses when you can:',
+        ...persona.voiceExamples.map((example) => `- ${example}`),
+      ].join('\n')
+    );
+  }
+
+  sections.push(applyOwnerTemplate(answerSystemPrompt, owner));
+
   if (persona?.systemPersona) {
-    sections.push(`Persona:\n${persona.systemPersona}`);
+    sections.push(`**PERSONA (background info)**:\n${persona.systemPersona}`);
   }
   if (persona?.styleGuidelines?.length) {
-    sections.push(['Style guidelines:', ...persona.styleGuidelines.map((rule) => `- ${rule}`)].join('\n'));
+    sections.push(['**STYLE GUIDELINES (let these guide you in addition to the voicing examples)**:', ...persona.styleGuidelines.map((rule) => `- ${rule}`)].join('\n'));
   }
+
   return sections.filter(Boolean).join('\n\n');
 }
 
@@ -1523,75 +1584,53 @@ function resolveIdentityDetails(profile?: ProfileDoc | null, persona?: PersonaSu
   };
 }
 
-function buildMetaIntro(identityDetails?: IdentityContext, persona?: PersonaSummary): string {
-  const shortAbout = (identityDetails?.shortAbout ?? persona?.shortAbout)?.trim();
-  const invitation = 'Ask me about my projects or experience.';
-  if (shortAbout) {
-    const match = shortAbout.match(/[^.!?]+[.!?]?/);
-    const firstSentence = (match?.[0] ?? shortAbout).trim();
-    const normalized = firstSentence.endsWith('.') ? firstSentence : `${firstSentence}.`;
-    return `${normalized} ${invitation}`;
-  }
-
-  const firstName = identityDetails?.fullName?.split(' ')?.[0]?.trim();
-  const headline = identityDetails?.headline?.trim();
-  if (firstName && headline) {
-    return `I'm ${firstName}, ${headline}. ${invitation}`;
-  }
-  if (firstName) {
-    return `I'm ${firstName}. ${invitation}`;
-  }
-  if (headline) {
-    return `I'm a ${headline}. ${invitation}`;
-  }
-  return 'I can answer questions about my projects, experience, and skills.';
-}
-
 export function buildAnswerUserContent(input: BuildAnswerUserContentInput): string {
-  const { userMessage, conversationSnippet, plan, evidence, identityDetails, persona } = input;
+  const { userMessage, conversationSnippet, plan, evidence } = input;
 
-  if (plan.intent === 'meta') {
-    const metaIntro = buildMetaIntro(identityDetails, persona);
-    const identityBlock = {
-      metaIntro,
-      shortAbout: identityDetails?.shortAbout,
-      fullName: identityDetails?.fullName,
-      headline: identityDetails?.headline,
-      location: identityDetails?.location,
-    };
-    return [
-      `Conversation:\n${conversationSnippet}`,
-      '',
-      `Latest user turn: ${userMessage}`,
-      '',
-      'You are answering a quick meta/greeting turn as the portfolio owner. Respond in first-person, keep it to 1-2 warm sentences, and invite them to ask about projects or experience.',
-      'If you already introduced yourself earlier in the conversation, avoid repeating the exact intro—acknowledge their new message instead.',
-      `Identity context (for grounding):\n${JSON.stringify(identityBlock, null, 2)}`,
-      '',
-      'Do not cite projects or resume entries unless the user explicitly asked about them.',
-      'Return strict JSON matching AnswerPayload: {"message": string, "thoughts": string[]}.',
-      '- message: exactly the assistant reply text for the user.',
-      '- thoughts (optional): 1-3 short bullet-style sentences explaining how you approached the greeting.',
-    ].join('\n');
-  }
-
-  const retrievalFocus = inferRetrievalFocus(plan.retrievalRequests, plan.intent, plan.experienceScope, plan.resumeFacets);
+  const retrievalFocus = inferRetrievalFocus(plan.retrievalRequests, plan.questionType, plan.scope, plan.resumeFacets);
   const planSummary = {
-    intent: plan.intent,
-    experienceScope: plan.experienceScope ?? null,
+    questionType: plan.questionType,
+    enumeration: plan.enumeration,
+    scope: plan.scope,
     retrievalFocus,
-    answerMode: plan.answerMode,
-    answerLengthHint: plan.answerLengthHint,
     topic: plan.topic,
     resumeFacets: plan.resumeFacets ?? [],
-    enumerateAllRelevant: plan.enumerateAllRelevant,
+    cardsEnabled: plan.cardsEnabled,
   };
-  const trimmedEvidence = {
-    highLevelAnswer: evidence.highLevelAnswer,
-    evidenceCompleteness: evidence.evidenceCompleteness,
+  const selectedEvidenceForAnswer = (evidence.selectedEvidence ?? []).map((item) => ({
+    source: item.source,
+    id: item.id,
+    title: item.title,
+    snippet: normalizeSnippet(item.snippet, 220),
+    relevance: item.relevance,
+  }));
+  const evidenceCounts = {
+    selectedEvidence: {
+      total: selectedEvidenceForAnswer.length,
+      bySource: {
+        project: selectedEvidenceForAnswer.filter((item) => item.source === 'project').length,
+        resume: selectedEvidenceForAnswer.filter((item) => item.source === 'resume').length,
+        profile: selectedEvidenceForAnswer.filter((item) => item.source === 'profile').length,
+      },
+    },
+    uiHints: {
+      projects: evidence.uiHints?.projects?.length ?? 0,
+      experiences: evidence.uiHints?.experiences?.length ?? 0,
+    },
+  };
+  const answerEvidence = {
+    verdict: evidence.verdict,
+    confidence: evidence.confidence,
     reasoning: evidence.reasoning,
     semanticFlags: evidence.semanticFlags,
+    selectedEvidence: selectedEvidenceForAnswer,
     uiHints: evidence.uiHints ?? { projects: [], experiences: [] },
+  };
+
+  const cardsGate = {
+    cardsEnabled: plan.cardsEnabled !== false,
+    uiHintsProjects: evidence.uiHints?.projects?.length ?? 0,
+    uiHintsExperiences: evidence.uiHints?.experiences?.length ?? 0,
   };
 
   return [
@@ -1601,14 +1640,18 @@ export function buildAnswerUserContent(input: BuildAnswerUserContentInput): stri
     '',
     `Planner summary:\n${JSON.stringify(planSummary, null, 2)}`,
     '',
-    `Evidence summary:\n${JSON.stringify(trimmedEvidence, null, 2)}`,
+    `Evidence summary:\n${JSON.stringify(answerEvidence, null, 2)}`,
+    '',
+    `Evidence counts:\n${JSON.stringify(evidenceCounts, null, 2)}`,
+    '',
+    `Cards rendering gate:\n${JSON.stringify(cardsGate, null, 2)}`,
     '',
     'You do NOT have access to raw documents—only the fields inside EvidenceSummary plus persona/profile/plan metadata.',
     '',
-    'Return strict JSON matching AnswerPayload: {"message": string, "thoughts": string[], "uiHints"?: {"projects": string[], "experiences": string[]}}.',
-    '- message: final assistant reply text grounded in the evidence/profile. Use selectedEvidence as the named examples; treat uiHints.projects / uiHints.experiences as the full set of relevant items (especially when enumerateAllRelevant=true) and acknowledge that the UI will show all of them.',
+    'Return strict JSON matching AnswerPayload: {"message": string, "thoughts"?: string[]}.',
+    '- message: final assistant reply text grounded in the evidence/profile. Use selectedEvidence as the named examples; treat uiHints.projects / uiHints.experiences as the full set of relevant items when enumeration="all_relevant" and acknowledge the UI will show them.',
     "- thoughts (optional): ordered list (2-5 items) explaining how you interpreted the evidence and uiHints. Keep each thought to <=160 characters and don't mention tool internals.",
-    '- uiHints (optional): If your answer explicitly references specific projects or experiences, you may refine uiHints to match exactly what you mention. Only include IDs that appear in the evidence uiHints. Omit this field to use the evidence stage uiHints as-is.',
+    '- If cardsEnabled=false OR both uiHints lists are empty, do NOT mention cards/lists/tiles in the message.',
   ].join('\n');
 }
 
@@ -1699,20 +1742,17 @@ function logPipelineSummary(params: {
   if (!params.logger) return;
   const retrievalFocus = inferRetrievalFocus(
     params.plan.retrievalRequests,
-    params.plan.intent,
-    params.plan.experienceScope,
+    params.plan.questionType,
+    params.plan.scope,
     params.plan.resumeFacets
   );
   params.logger('chat.pipeline.summary', {
     plan: {
-      intent: params.plan.intent,
-      experienceScope: params.plan.experienceScope ?? null,
+      questionType: params.plan.questionType,
+      enumeration: params.plan.enumeration,
+      scope: params.plan.scope ?? null,
       retrievalFocus,
-      answerMode: params.plan.answerMode,
-      answerLengthHint: params.plan.answerLengthHint,
-      plannerConfidence: params.plan.plannerConfidence,
-      enumerateAllRelevant: params.plan.enumerateAllRelevant,
-      uiTarget: params.plan.uiTarget ?? null,
+      cardsEnabled: params.plan.cardsEnabled,
       retrievalRequests: params.plan.retrievalRequests.map((request) => ({
         source: request.source,
         topK: request.topK,
@@ -1724,10 +1764,10 @@ function logPipelineSummary(params: {
       evidenceInput: summarizeRetrievalResult(params.evidenceInput),
     },
     evidence: {
-      highLevelAnswer: params.evidence.highLevelAnswer,
-      evidenceCompleteness: params.evidence.evidenceCompleteness,
+      verdict: params.evidence.verdict,
+      confidence: params.evidence.confidence,
       selectedCount: params.evidence.selectedEvidence.length,
-      semanticFlags: params.evidence.semanticFlags.map((flag) => flag.type),
+      semanticFlags: (params.evidence.semanticFlags ?? []).map((flag) => flag.type),
       uiHints: {
         projects: params.evidence.uiHints?.projects?.length ?? 0,
         experiences: params.evidence.uiHints?.experiences?.length ?? 0,
@@ -1775,7 +1815,10 @@ export function buildUiArtifacts(params: BuildUiArtifactsParams): UiPayload {
       .map((exp) => normalizeDocId(exp.id))
       .filter((id): id is string => Boolean(id))
   );
-  const filteredUiHints = params.evidence.uiHints ?? { projects: [], experiences: [] };
+  const filteredUiHints = {
+    projects: params.evidence.uiHints?.projects ?? [],
+    experiences: params.evidence.uiHints?.experiences ?? [],
+  };
   if (params.evidence.uiHintWarnings?.length) {
     params.logger?.('chat.pipeline.uihint.warnings', { warnings: params.evidence.uiHintWarnings });
   }
@@ -1805,7 +1848,7 @@ export function buildUiArtifacts(params: BuildUiArtifactsParams): UiPayload {
 
   let projectIds: string[];
   let experienceIds: string[];
-  if (params.plan.enumerateAllRelevant) {
+  if (params.plan.enumeration === 'all_relevant') {
     projectIds = hintedProjects;
     experienceIds = hintedExperiences;
   } else {
@@ -1813,40 +1856,25 @@ export function buildUiArtifacts(params: BuildUiArtifactsParams): UiPayload {
     experienceIds = hintedExperiences.length ? hintedExperiences : fallbackExperiences;
   }
 
-  // Apply uiTarget suppression: only 'text' suppresses cards
-  // Evidence stage's uiHints determines WHICH cards to show (projects vs experiences)
-  if (params.plan.uiTarget === 'text') {
-    // User wants text answer only, suppress all cards
+  // Apply cards toggle: when cards are disabled or meta, suppress all cards
+  if (params.plan.cardsEnabled === false || params.plan.questionType === 'meta') {
     projectIds = [];
     experienceIds = [];
   }
-  // Otherwise, trust evidence stage's uiHints (default behavior)
 
   let bannerText = params.bannerOverride;
-
-  const suppressCards =
-    (params.evidence.highLevelAnswer === 'no' || params.evidence.highLevelAnswer === 'unknown') &&
-    (params.plan.intent === 'meta' || params.plan.answerMode === 'meta_chitchat');
-
-  if (suppressCards) {
-    projectIds = [];
-    experienceIds = [];
-    if (!bannerText) {
-      bannerText = ZERO_EVIDENCE_BANNER;
-    }
-  }
 
   const originalProjectCount = projectIds.length;
   const originalExperienceCount = experienceIds.length;
 
-  if (params.plan.enumerateAllRelevant && !projectIds.length && !experienceIds.length && !bannerText) {
+  if (params.plan.enumeration === 'all_relevant' && !projectIds.length && !experienceIds.length && !bannerText) {
     bannerText = ZERO_EVIDENCE_BANNER;
   }
 
-  if (params.plan.answerMode === 'binary_with_evidence') {
+  if (params.plan.questionType === 'binary') {
     projectIds = projectIds.slice(0, maxDisplayItems);
     experienceIds = experienceIds.slice(0, Math.max(0, maxDisplayItems - projectIds.length));
-  } else if (params.plan.enumerateAllRelevant) {
+  } else if (params.plan.enumeration === 'all_relevant') {
     const truncatedProjects = projectIds.slice(0, maxDisplayItems);
     const truncatedExperiences = experienceIds.slice(0, Math.max(0, maxDisplayItems - truncatedProjects.length));
     const remaining =
@@ -1955,15 +1983,15 @@ function capEnumerationDocs(retrieved: RetrievalResult, maxDocs = MAX_ENUMERATIO
 }
 
 function limitEvidenceDocs(retrieved: RetrievalResult, plan: RetrievalPlan): RetrievalResult {
-  if (plan.enumerateAllRelevant) {
+  if (plan.enumeration === 'all_relevant') {
     return capEnumerationDocs(retrieved);
   }
   const resumeFacetSet = new Set(plan.resumeFacets ?? []);
-  const focus = inferRetrievalFocus(plan.retrievalRequests, plan.intent, plan.experienceScope, plan.resumeFacets);
+  const focus = inferRetrievalFocus(plan.retrievalRequests, plan.questionType, plan.scope, plan.resumeFacets);
   const wantsResumeFocus = focus === 'resume';
   const wantsProjectFocus = focus === 'projects';
   const wantsMixedFocus = focus === 'mixed';
-  const scopeBias = plan.experienceScope === 'employment_only' ? 0.8 : 0;
+  const scopeBias = plan.scope === 'employment_only' ? 0.8 : 0;
   const mixedBias = wantsMixedFocus ? 0.4 : 0;
 
   const prioritize = (value: number): number => Math.max(0, value);
@@ -2199,11 +2227,11 @@ function validateAndFilterUiHints(
 export function buildEvidenceCandidates(plan: RetrievalPlan, retrieved: RetrievalResult): EvidenceCandidate[] {
   const candidates: EvidenceCandidate[] = [];
   const resumeFacetSet = new Set(plan.resumeFacets ?? []);
-  const focus = inferRetrievalFocus(plan.retrievalRequests, plan.intent, plan.experienceScope, plan.resumeFacets);
+  const focus = inferRetrievalFocus(plan.retrievalRequests, plan.questionType, plan.scope, plan.resumeFacets);
   const wantsResumeFocus = focus === 'resume';
   const wantsProjectFocus = focus === 'projects';
   const wantsMixedFocus = focus === 'mixed';
-  const scopeBias = plan.experienceScope === 'employment_only' ? 0.6 : 0;
+  const scopeBias = plan.scope === 'employment_only' ? 0.6 : 0;
   const mixedBias = wantsMixedFocus ? 0.25 : 0;
 
   retrieved.projects.forEach((proj, index) => {
@@ -2372,8 +2400,8 @@ export function normalizeEvidenceSummaryPayload(
   retrieved: RetrievalResult,
   logger?: ChatRuntimeOptions['logger']
 ): EvidenceSummary {
-  const isMeta = plan.intent === 'meta' || plan.answerMode === 'meta_chitchat';
-  const isEnumerate = plan.intent === 'enumerate';
+  const isMeta = plan.questionType === 'meta';
+  const isEnumerate = plan.enumeration === 'all_relevant';
   const retrievedProjectIds = new Set(retrieved.projects.map((proj) => normalizeDocId(proj.id)).filter(Boolean));
   const retrievedExperienceIds = new Set(retrieved.experiences.map((exp) => normalizeDocId(exp.id)).filter(Boolean));
   const { filtered: normalizedUiHints, warnings: uiHintWarnings } = validateAndFilterUiHints(
@@ -2382,14 +2410,20 @@ export function normalizeEvidenceSummaryPayload(
     retrievedExperienceIds,
     logger
   );
+  const normalizedHints: EvidenceUiHints = {
+    projects: normalizedUiHints.projects ?? [],
+    experiences: normalizedUiHints.experiences ?? [],
+  };
 
   if (isMeta) {
     const normalizedMeta: EvidenceSummary = {
       ...summary,
-      highLevelAnswer: 'not_applicable',
-      evidenceCompleteness: 'none',
+      verdict: 'n/a',
+      confidence: 'low',
       selectedEvidence: [],
       uiHints: { projects: [], experiences: [] },
+      semanticFlags: summary.semanticFlags ?? [],
+      uiHintWarnings,
     };
     logger?.('chat.pipeline.evidence.selection', {
       meta: true,
@@ -2429,34 +2463,47 @@ export function normalizeEvidenceSummaryPayload(
     }
   }
 
-  const uiHintsEmpty = normalizedUiHints.projects.length + normalizedUiHints.experiences.length === 0;
+  const uiHintsEmpty = (normalizedHints.projects?.length ?? 0) + (normalizedHints.experiences?.length ?? 0) === 0;
 
-  let evidenceCompleteness = summary.evidenceCompleteness;
-  let highLevelAnswer = summary.highLevelAnswer;
+  let verdict: Verdict =
+    summary.verdict && (['yes', 'no', 'partial', 'unknown', 'n/a'] as const).includes(summary.verdict)
+      ? summary.verdict
+      : 'unknown';
+  let confidence: Confidence =
+    summary.confidence && (['high', 'medium', 'low'] as const).includes(summary.confidence) ? summary.confidence : 'low';
 
-  if (evidenceCompleteness === 'none') {
-    highLevelAnswer = highLevelAnswer === 'not_applicable' ? 'not_applicable' : 'unknown';
-  } else if (filteredSelected.length === 0 && uiHintsEmpty) {
-    evidenceCompleteness = 'none';
-    highLevelAnswer = highLevelAnswer === 'not_applicable' ? 'not_applicable' : 'unknown';
-  } else if (filteredSelected.length === 0) {
-    evidenceCompleteness = 'weak';
+  if (filteredSelected.length === 0 && uiHintsEmpty) {
+    verdict = verdict === 'n/a' ? 'n/a' : 'unknown';
+    confidence = 'low';
   }
 
-  const suppressUiHints =
-    isEnumerate && highLevelAnswer === 'no'
-      ? true
-      : evidenceCompleteness !== 'strong' && (highLevelAnswer === 'no' || highLevelAnswer === 'unknown');
-  const finalUiHints =
-    evidenceCompleteness === 'none' || suppressUiHints ? { projects: [], experiences: [] } : normalizedUiHints;
+  let finalUiHints: EvidenceUiHints = isEnumerate
+    ? {
+      projects: normalizedHints.projects?.filter((id) => retrievedProjectIds.has(id)) ?? [],
+      experiences: normalizedHints.experiences?.filter((id) => retrievedExperienceIds.has(id)) ?? [],
+    }
+    : normalizedHints;
 
-  const finalSelected =
-    evidenceCompleteness === 'none' ? [] : filteredSelected.slice(0, MAX_SELECTED_EVIDENCE);
+  const finalSelected = filteredSelected.slice(0, MAX_SELECTED_EVIDENCE);
+  const hasEvidence = finalSelected.length > 0;
+  const selectedIds = new Set(finalSelected.map((item) => item.id));
+
+  if ((verdict === 'unknown' || verdict === 'n/a') && !hasEvidence) {
+    finalUiHints = { projects: [], experiences: [] };
+  }
+
+  // Keep uiHints aligned to selected evidence for binary questions to avoid off-topic cards.
+  if (plan.questionType === 'binary' && hasEvidence) {
+    finalUiHints = {
+      projects: (finalUiHints.projects ?? []).filter((id) => selectedIds.has(id)),
+      experiences: (finalUiHints.experiences ?? []).filter((id) => selectedIds.has(id)),
+    };
+  }
 
   const finalSummary: EvidenceSummary = {
     ...summary,
-    highLevelAnswer,
-    evidenceCompleteness,
+    verdict,
+    confidence,
     selectedEvidence: finalSelected,
     uiHints: finalUiHints,
     semanticFlags: summary.semanticFlags ?? [],
@@ -2466,9 +2513,9 @@ export function normalizeEvidenceSummaryPayload(
   logger?.('chat.pipeline.evidence.selection', {
     rawCount: (summary.selectedEvidence ?? []).length,
     normalizedCount: finalSelected.length,
-    uiHints: { projects: finalUiHints.projects.length, experiences: finalUiHints.experiences.length },
-    evidenceCompleteness: finalSummary.evidenceCompleteness,
-    suppressedUiHints: suppressUiHints,
+    uiHints: { projects: finalUiHints.projects?.length ?? 0, experiences: finalUiHints.experiences?.length ?? 0 },
+    verdict: finalSummary.verdict,
+    confidence: finalSummary.confidence,
   });
   if (uiHintWarnings.length) {
     logger?.('chat.pipeline.uihint.warnings', { warnings: uiHintWarnings });
@@ -2495,7 +2542,7 @@ export async function executeRetrievalPlan(
   let profileHandled = false;
 
   const hasRetrievalRequests = Array.isArray(plan.retrievalRequests) && plan.retrievalRequests.length > 0;
-  const autoIncludeProfile = plan.intent === 'describe' || plan.intent === 'meta';
+  const autoIncludeProfile = plan.questionType === 'narrative' || plan.questionType === 'meta';
 
   if (!hasRetrievalRequests && !autoIncludeProfile) {
     return {
@@ -2505,7 +2552,8 @@ export async function executeRetrievalPlan(
   }
 
   const hasSkillFacetOnly = (plan.resumeFacets ?? []).length > 0 && (plan.resumeFacets ?? []).every((facet) => facet === 'skill');
-  const isSkillEnumerate = plan.intent === 'enumerate' && hasSkillFacetOnly;
+  const isSkillEnumerate =
+    plan.questionType === 'list' && plan.enumeration === 'all_relevant' && hasSkillFacetOnly;
   const GENERIC_SKILL_REGEX = /\b(skill|skills|tech\s*stack|techstack|programming\s+languages?|languages?)\b/i;
 
   const getCacheKey = (
@@ -2520,9 +2568,9 @@ export async function executeRetrievalPlan(
       query: query.toLowerCase().trim(),
       limit,
       facets: facets ?? [],
-      scope: plan.experienceScope,
-      intent: plan.intent,
-      enumerateAllRelevant: plan.enumerateAllRelevant,
+      scope: plan.scope,
+      questionType: plan.questionType,
+      enumeration: plan.enumeration,
     });
   const cacheWithEviction = <T>(map: Map<string, T> | undefined, key: string, value: T, maxSize = 24) => {
     if (!map) return;
@@ -2565,9 +2613,7 @@ export async function executeRetrievalPlan(
       requestedTopK: request.topK,
       effectiveTopK,
       reason: topkReason,
-      plannerConfidence: plan.plannerConfidence,
       topicLength: plan.topic?.length ?? 0,
-      enumerateAllRelevant: plan.enumerateAllRelevant,
       skipped: false,
     });
     const cache = options?.cache;
@@ -2587,7 +2633,7 @@ export async function executeRetrievalPlan(
 
       recordCacheHit('miss', 'projects', cacheKey ?? 'nocache');
       const results = await retrieval.searchProjectsByText(query, effectiveTopK, {
-        scope: plan.experienceScope ?? undefined,
+        scope: plan.scope ?? undefined,
       });
       if (cacheKey && cache) {
         cacheWithEviction(cache.projects, cacheKey, results);
@@ -2626,8 +2672,8 @@ export async function executeRetrievalPlan(
       const results = genericSkillQuery
         ? await retrieval.searchExperiencesByText('', effectiveTopK, { facets: ['skill'] })
         : await retrieval.searchExperiencesByText(query, effectiveTopK, {
-            facets: resumeFacets,
-          });
+          facets: resumeFacets,
+        });
       if (cacheKey && cache) {
         cacheWithEviction(cache.resume, cacheKey, results);
       }
@@ -2689,11 +2735,11 @@ export async function executeRetrievalPlan(
     awards: filterResumeByFacets(dedupAwards, resumeFacets),
     skills: filterResumeByFacets(dedupSkills, resumeFacets),
   };
-  const scopedResumeDocs = applyExperienceScopeFilter(resumeDocs, plan.experienceScope);
+  const scopedResumeDocs = applyExperienceScopeFilter(resumeDocs, plan.scope);
 
   // Resolve linked projects for employment-only to surface associated work context.
   if (
-    plan.experienceScope === 'employment_only' &&
+    plan.scope === 'employment_only' &&
     scopedResumeDocs.experiences.length > 0
   ) {
     const linkedProjectIds = new Set<string>();
@@ -2715,11 +2761,11 @@ export async function executeRetrievalPlan(
     profile,
   };
 
-  const retrievalFocus = inferRetrievalFocus(plan.retrievalRequests, plan.intent, plan.experienceScope, plan.resumeFacets);
+  const retrievalFocus = inferRetrievalFocus(plan.retrievalRequests, plan.questionType, plan.scope, plan.resumeFacets);
   options?.logger?.('chat.pipeline.retrieval', {
-    intent: plan.intent,
+    questionType: plan.questionType,
     retrievalFocus,
-    enumerateAllRelevant: plan.enumerateAllRelevant,
+    enumeration: plan.enumeration,
     projectCount: projectsWithLinks.length,
     experienceCount: resumeDocs.experiences.length,
     educationCount: resumeDocs.education.length,
@@ -2740,6 +2786,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
   const logger = options?.logger;
   const runtimePersona = options?.persona;
   const runtimeIdentity = options?.identityContext;
+  const baseLogPrompts = options?.logPrompts ?? false;
   const plannerCache = new Map<string, RetrievalPlan>();
   const retrievalCache: RetrievalCache = {
     projects: new Map(),
@@ -2747,6 +2794,18 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
     profile: new Map(),
   };
   const buildPlannerCacheKey = (snippet: string, owner: string) => JSON.stringify({ ownerId: owner, snippet });
+  const logPrompt = (stage: string, model: string, systemPrompt: string, userContent: string, enable: boolean) => {
+    if (!logger || !enable) return;
+    const truncate = (text: string) => (text.length > 6000 ? `${text.slice(0, 6000)}...[truncated]` : text);
+    logger('chat.pipeline.prompt', {
+      stage,
+      model,
+      systemPrompt: truncate(systemPrompt),
+      userContent: truncate(userContent),
+      systemLength: systemPrompt.length,
+      userLength: userContent.length,
+    });
+  };
 
   const createAbortSignal = (runOptions?: RunChatPipelineOptions): { signal: AbortSignal; cleanup: () => void; timedOut: () => boolean } => {
     const controller = new AbortController();
@@ -2788,7 +2847,8 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
     signal?: AbortSignal,
     maxTokens?: number,
     onUsage?: JsonResponseArgs<PlannerLLMOutput>['onUsage'],
-    reasoning?: Reasoning
+    reasoning?: Reasoning,
+    logPrompts?: boolean
   ): Promise<RetrievalPlan> {
     const userText = extractUserText(messages);
     const userContent = [
@@ -2797,11 +2857,13 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       `Latest user message: "${userText}"`,
       'Return ONLY the RetrievalPlan JSON.',
     ].join('\n');
+    const systemPrompt = buildPlannerSystemPrompt(owner);
+    logPrompt('planner', plannerModel, systemPrompt, userContent, Boolean(logPrompts));
     // Parse LLM output using PlannerLLMOutputSchema (per spec §4.2)
     const llmOutput = await runJsonResponse<PlannerLLMOutput>({
       client,
       model: plannerModel,
-      systemPrompt: buildPlannerSystemPrompt(owner),
+      systemPrompt,
       userContent,
       schema: PlannerLLMOutputSchema,
       throwOnFailure: true,
@@ -2813,12 +2875,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       onUsage,
       reasoning,
     });
-    // Add derived fields (per spec §4.2 - answerMode and enumerateAllRelevant derived from intent)
-    const derived = deriveFromIntent(llmOutput.intent);
-    return {
-      ...llmOutput,
-      ...derived,
-    };
+    return llmOutput;
   }
 
   async function summarizeEvidence(
@@ -2831,13 +2888,16 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
     signal?: AbortSignal,
     maxTokens?: number,
     onUsage?: JsonResponseArgs<EvidenceSummary>['onUsage'],
-    reasoning?: Reasoning
+    reasoning?: Reasoning,
+    logPrompts?: boolean
   ): Promise<EvidenceSummary> {
     const userContent = buildEvidenceUserContent({ userMessage, plan, retrieved });
+    const systemPrompt = buildEvidenceSystemPrompt(owner);
+    logPrompt('evidence', model, systemPrompt, userContent, Boolean(logPrompts));
     return runJsonResponse<EvidenceSummary>({
       client,
       model,
-      systemPrompt: buildEvidenceSystemPrompt(owner),
+      systemPrompt,
       userContent,
       schema: EvidenceSummarySchema,
       throwOnFailure: true,
@@ -2867,6 +2927,8 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
     maxTokens?: number;
     onUsage?: JsonResponseArgs<AnswerPayload>['onUsage'];
     reasoning?: Reasoning;
+    logPrompts?: boolean;
+    temperature?: number;
   };
 
   async function generateAnswerPayload({
@@ -2885,6 +2947,8 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
     maxTokens,
     onUsage,
     reasoning,
+    logPrompts,
+    temperature,
   }: GenerateAnswerPayloadArgs): Promise<AnswerPayload> {
     const identityDetails = resolveIdentityDetails(retrieved.profile, persona, identityContext);
     const userContent = buildAnswerUserContent({
@@ -2896,6 +2960,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       persona,
     });
     const systemPrompt = buildAnswerSystemPrompt(persona, owner);
+    logPrompt('answer', model, systemPrompt, userContent, Boolean(logPrompts));
     const answer = await runStreamingJsonResponse<AnswerPayload>({
       client,
       model,
@@ -2911,6 +2976,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       onTextDelta: onToken,
       onUsage,
       reasoning,
+      temperature,
     });
     return answer;
   }
@@ -2935,6 +3001,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           costUsd: typeof costUsd === 'number' && Number.isFinite(costUsd) ? costUsd : undefined,
         });
       };
+      const logPrompts = runOptions?.logPrompts ?? baseLogPrompts;
       const buildStreamError = (
         code: ChatStreamError['code'],
         errorMessage: string,
@@ -3019,10 +3086,11 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
             runSignal,
             tokenLimits.planner,
             recordUsage,
-            plannerReasoning
+            plannerReasoning,
+            logPrompts
           );
         }
-        plan = normalizeRetrievalPlan(rawPlan);
+        plan = normalizeRetrievalPlan(rawPlan, logger);
         logPlanNormalization(rawPlan, plan, logger, planSource);
         const cacheKeys = new Set<string>();
         cacheKeys.add(plannerKey);
@@ -3038,7 +3106,12 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           }
         }
         timings.planMs = performance.now() - tPlan;
-        emitStageEvent('planner', 'complete', { intent: plan.intent, topic: plan.topic }, timings.planMs);
+        emitStageEvent(
+          'planner',
+          'complete',
+          { questionType: plan.questionType, enumeration: plan.enumeration, scope: plan.scope, topic: plan.topic },
+          timings.planMs
+        );
       } catch (error) {
         cleanupAborters();
         logger?.('chat.pipeline.error', { stage: 'plan', error: formatLogValue(error) });
@@ -3055,7 +3128,8 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
 
       emitReasoningUpdate('plan', buildPartialReasoningTrace({ plan }));
 
-      const isMetaPlan = plan.intent === 'meta';
+      const isMetaPlan = plan.questionType === 'meta';
+      const hasRetrievalRequests = Array.isArray(plan.retrievalRequests) && plan.retrievalRequests.length > 0;
       let fastPathReason: 'no_docs' | 'meta' | null = isMetaPlan ? 'meta' : null;
       let evidenceModelUsed = isMetaPlan ? 'synthesized:meta' : modelConfig.evidenceModel;
       let retrieved: RetrievalResult = createEmptyRetrievalResult();
@@ -3063,7 +3137,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       let evidenceDocs: RetrievalResult = retrieved;
       let forcedUiBanner: string | undefined;
 
-      if (!isMetaPlan) {
+      if (!isMetaPlan && hasRetrievalRequests) {
         emitStageEvent('retrieval', 'start');
         let executedRetrieval: ExecutedRetrievalResult;
         try {
@@ -3107,11 +3181,29 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           (evidenceDocs.profile ? 1 : 0);
 
         evidenceModelUsed = selectEvidenceModel(plan, retrieved, modelConfig);
-        const hasRetrievalRequests = Array.isArray(plan.retrievalRequests) && plan.retrievalRequests.length > 0;
-        const allowNoDocFastPath = plan.intent !== 'meta' && plan.answerMode !== 'meta_chitchat';
-        if (allowNoDocFastPath && hasRetrievalRequests && evidenceDocCount === 0) {
+        const allowNoDocFastPath = plan.questionType !== 'meta';
+        if (allowNoDocFastPath && evidenceDocCount === 0) {
           fastPathReason = 'no_docs';
         }
+      } else if (!isMetaPlan) {
+        emitStageEvent('retrieval', 'start');
+        emitReasoningUpdate('retrieval', buildPartialReasoningTrace({ retrieval: [] }));
+        timings.retrievalMs = 0;
+        logger?.('chat.pipeline.retrieval.handoff', {
+          retrieved: summarizeRetrievalResult(retrieved),
+          evidenceInput: summarizeRetrievalResult(evidenceDocs),
+          skipped: 'no_retrieval_requests',
+        });
+        emitStageEvent(
+          'retrieval',
+          'complete',
+          {
+            docsFound: 0,
+            sources: [],
+          },
+          timings.retrievalMs
+        );
+        fastPathReason = 'no_docs';
       } else if (!retrieved.profile) {
         try {
           retrieved.profile = await retrieval.getProfileDoc();
@@ -3141,7 +3233,8 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
             runSignal,
             tokenLimits.evidence,
             recordUsage,
-            evidenceReasoning
+            evidenceReasoning,
+            logPrompts
           );
         }
         timings.evidenceMs = performance.now() - tEvidence;
@@ -3150,7 +3243,8 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           'evidence',
           'complete',
           {
-            highLevelAnswer: evidence.highLevelAnswer,
+            verdict: evidence.verdict,
+            confidence: evidence.confidence,
             evidenceCount: evidence.selectedEvidence.length,
           },
           timings.evidenceMs
@@ -3171,7 +3265,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
 
       emitReasoningUpdate(
         'evidence',
-        buildPartialReasoningTrace({ evidence, uiHintWarnings: evidence.uiHintWarnings ?? null })
+        buildPartialReasoningTrace({ evidence })
       );
 
       const projectMap = new Map(retrieved.projects.map((p) => [normalizeDocId(p.id), p]));
@@ -3227,6 +3321,8 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           maxTokens: tokenLimits.answer,
           onUsage: recordUsage,
           reasoning: answerReasoning,
+          logPrompts,
+          temperature: modelConfig.answerTemperature,
         });
       } catch (error) {
         cleanupAborters();
@@ -3247,8 +3343,11 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       const answerThoughts = Array.isArray(answer.thoughts) && answer.thoughts.length ? answer.thoughts : undefined;
       const answerMeta: ReasoningTrace['answerMeta'] = {
         model: answerModelUsed,
-        answerMode: plan.answerMode,
-        answerLengthHint: plan.answerLengthHint,
+        questionType: plan.questionType,
+        enumeration: plan.enumeration,
+        scope: plan.scope,
+        verdict: evidence.verdict,
+        confidence: evidence.confidence,
         thoughts: answerThoughts,
       };
 
@@ -3262,34 +3361,12 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         performance.now() - tAnswer
       );
 
-      // If answer model refined uiHints, rebuild UI with those hints
-      let finalUi = ui;
-      if (answer.uiHints && (answer.uiHints.projects.length > 0 || answer.uiHints.experiences.length > 0)) {
-        const refinedEvidence: EvidenceSummary = {
-          ...evidence,
-          uiHints: answer.uiHints,
-        };
-        finalUi = buildUiArtifacts({
-          plan,
-          evidence: refinedEvidence,
-          projectMap,
-          resumeMaps,
-          retrieval: retrieved,
-          bannerOverride: forcedUiBanner,
-          logger,
-        });
-        logger?.('chat.pipeline.answer.uiHintsRefined', {
-          original: { projects: ui.showProjects.length, experiences: ui.showExperiences.length },
-          refined: { projects: finalUi.showProjects.length, experiences: finalUi.showExperiences.length },
-        });
-      }
-
-      const attachments = buildAttachmentPayloads(finalUi, projectMap, resumeMaps);
+      const attachments = buildAttachmentPayloads(ui, projectMap, resumeMaps);
 
       logger?.('chat.pipeline.answer', {
         plan,
         evidence,
-        ui: finalUi,
+        ui,
       });
 
       timings.totalMs = performance.now() - tStart;
@@ -3327,7 +3404,6 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
             retrieval: retrievalSummaries,
             evidence,
             answerMeta,
-            uiHintWarnings: evidence.uiHintWarnings ?? [],
           }
           : undefined;
 
@@ -3339,7 +3415,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
 
       return {
         message: answerMessage,
-        ui: finalUi,
+        ui,
         reasoningTrace,
         answerThoughts,
         attachments: attachments.length ? attachments : undefined,
@@ -3397,14 +3473,12 @@ function buildPartialReasoningTrace({
   retrieval,
   evidence,
   answerMeta,
-  uiHintWarnings,
   error,
 }: {
   plan?: RetrievalPlan | null;
   retrieval?: RetrievalSummary[] | null;
   evidence?: EvidenceSummary | null;
   answerMeta?: ReasoningTrace['answerMeta'] | null;
-  uiHintWarnings?: UiHintValidationWarning[] | null;
   error?: ReasoningTraceError | null;
 } = {}): PartialReasoningTrace {
   return {
@@ -3412,7 +3486,6 @@ function buildPartialReasoningTrace({
     retrieval: retrieval ?? null,
     evidence: evidence ?? null,
     answerMeta: answerMeta ?? null,
-    uiHintWarnings: uiHintWarnings ?? null,
     error: error ?? null,
   };
 }
@@ -3426,7 +3499,6 @@ function mergeReasoningTraces(
     retrieval: incoming.retrieval ?? current.retrieval ?? null,
     evidence: incoming.evidence ?? current.evidence ?? null,
     answerMeta: incoming.answerMeta ?? current.answerMeta ?? null,
-    uiHintWarnings: incoming.uiHintWarnings ?? current.uiHintWarnings ?? null,
     error: incoming.error ?? current.error ?? null,
   };
 }
@@ -3434,23 +3506,21 @@ function mergeReasoningTraces(
 function synthesizeEvidenceSummary(reason: 'meta' | 'no_docs'): EvidenceSummary {
   if (reason === 'meta') {
     return {
-      highLevelAnswer: 'not_applicable',
-      evidenceCompleteness: 'none',
+      verdict: 'n/a',
+      confidence: 'low',
       reasoning: 'Meta or chit-chat turn; no evidence required.',
       selectedEvidence: [],
       semanticFlags: [],
       uiHints: { projects: [], experiences: [] },
-      uiHintWarnings: [],
     };
   }
 
   return {
-    highLevelAnswer: 'unknown',
-    evidenceCompleteness: 'none',
+    verdict: 'unknown',
+    confidence: 'low',
     reasoning: 'No relevant documents were retrieved for this question.',
     selectedEvidence: [],
     semanticFlags: [{ type: 'off_topic', reason: 'No docs matched the query.' }],
     uiHints: { projects: [], experiences: [] },
-    uiHintWarnings: [],
   };
 }

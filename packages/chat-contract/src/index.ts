@@ -171,6 +171,10 @@ export type ProfileSummary = {
   currentRole?: string;
   about: string[] | string;
   topSkills: string[];
+  systemPersona?: string;
+  shortAbout?: string;
+  styleGuidelines?: string[];
+  voiceExamples?: string[];
   featuredExperiences?: ExperienceRecord[];
   socialLinks?: ProfileSocialLink[];
 };
@@ -179,6 +183,7 @@ export type PersonaSummary = {
   systemPersona: string;
   shortAbout: string;
   styleGuidelines: string[];
+  voiceExamples?: string[];
   generatedAt?: string;
 };
 
@@ -204,8 +209,7 @@ export type ModelConfig = {
   evidenceModelDeepDive?: string;
   answerModel: string;
   embeddingModel: string;
-  /** @deprecated Use stageReasoning for per-stage control */
-  reasoningEffort?: ReasoningEffort;
+  answerTemperature?: number;
   stageReasoning?: StageReasoningConfig;
 };
 
@@ -253,6 +257,8 @@ export type ChatRequestMessage = {
 };
 
 // Chat pipeline contract (planner/evidence/answer)
+export type QuestionType = 'binary' | 'list' | 'narrative' | 'meta';
+export type EnumerationMode = 'sample' | 'all_relevant';
 export type RetrievalSource = 'projects' | 'resume' | 'profile';
 
 export type ExperienceScope = 'employment_only' | 'any_experience';
@@ -265,74 +271,25 @@ export type RetrievalRequest = {
   topK: number;
 };
 
-export type AnswerMode = 'binary_with_evidence' | 'overview_list' | 'narrative_with_examples' | 'meta_chitchat';
-
-export type AnswerLengthHint = 'short' | 'medium' | 'detailed';
-
-export type Intent = 'fact_check' | 'enumerate' | 'describe' | 'compare' | 'meta';
-
-/**
- * What the user wants to SEE in the UI.
- * - 'text': text answer only, suppress all cards (e.g., "what languages have you used?", "how many frameworks do you know?")
- *
- * When omitted/undefined, cards are shown based on evidence stage's uiHints (default behavior).
- * The evidence stage decides WHICH cards (projects vs experiences) to show.
- */
-export type UiTarget = 'text';
-
-/**
- * What the Planner LLM outputs directly (per spec §4.2).
- * Does NOT include derived fields like answerMode or enumerateAllRelevant.
- */
 export type PlannerLLMOutput = {
-  intent: Intent;
-  topic: string | null;
-  plannerConfidence: number;
-  experienceScope?: ExperienceScope | null;
+  // Core axes
+  questionType: QuestionType;
+  enumeration: EnumerationMode;
+  scope: ExperienceScope;
+
+  // Retrieval instructions
   retrievalRequests: RetrievalRequest[];
   resumeFacets?: ResumeFacet[];
-  answerLengthHint: AnswerLengthHint;
-  /**
-   * What the user wants to SEE in the UI.
-   * - 'text': text answer only, suppress all cards (rollup questions like "what languages?", "how many frameworks?")
-   * - null/omit: show cards based on evidence stage's uiHints (default - evidence decides which cards)
-   */
-  uiTarget?: UiTarget | null;
-  debugNotes?: string | null;
+
+  // UI / presentation hints
+  cardsEnabled?: boolean;
+
+  // Telemetry only
+  topic?: string | null;
 };
 
-/**
- * Derived behavior computed from intent (per spec §4.2).
- * These are NOT LLM outputs - they are computed by the orchestrator.
- */
-type DerivedPlanBehavior = {
-  answerMode: AnswerMode;
-  enumerateAllRelevant: boolean;
-};
-
-/**
- * Derives answerMode and enumerateAllRelevant from intent (per spec §4.2).
- */
-export function deriveFromIntent(intent: Intent): DerivedPlanBehavior {
-  switch (intent) {
-    case 'fact_check':
-      return { answerMode: 'binary_with_evidence', enumerateAllRelevant: false };
-    case 'enumerate':
-      return { answerMode: 'overview_list', enumerateAllRelevant: true };
-    case 'describe':
-      return { answerMode: 'narrative_with_examples', enumerateAllRelevant: false };
-    case 'compare':
-      return { answerMode: 'narrative_with_examples', enumerateAllRelevant: false };
-    case 'meta':
-      return { answerMode: 'meta_chitchat', enumerateAllRelevant: false };
-  }
-}
-
-/**
- * Full RetrievalPlan = LLM output + derived fields.
- * Used throughout the pipeline after the orchestrator computes derived behavior.
- */
-export type RetrievalPlan = PlannerLLMOutput & DerivedPlanBehavior;
+// Full RetrievalPlan (identical to planner output; kept as a separate alias for clarity)
+export type RetrievalPlan = PlannerLLMOutput;
 
 type EvidenceItemSource = 'project' | 'resume' | 'profile';
 
@@ -344,11 +301,11 @@ export type EvidenceItem = {
   relevance: 'high' | 'medium' | 'low';
 };
 
-export type HighLevelAnswer = 'yes' | 'no' | 'partial' | 'unknown' | 'not_applicable';
+export type Verdict = 'yes' | 'no' | 'partial' | 'unknown' | 'n/a';
 
-export type EvidenceCompleteness = 'strong' | 'weak' | 'none';
+export type Confidence = 'high' | 'medium' | 'low';
 
-type SemanticFlagType = 'uncertain' | 'ambiguous' | 'multi_topic' | 'off_topic' | 'needs_clarification';
+type SemanticFlagType = 'multi_topic' | 'ambiguous' | 'needs_clarification' | 'off_topic';
 
 export type SemanticFlag = {
   type: SemanticFlagType;
@@ -360,20 +317,20 @@ export type EvidenceUiHints = {
    * Project IDs chosen by the Evidence stage, ordered by priority.
    * Must be a subset of retrieved project doc ids.
    */
-  projects: string[];
+  projects?: string[];
   /**
    * Resume experience IDs chosen by the Evidence stage, ordered by priority.
    * Must be a subset of retrieved resume experience doc ids.
    */
-  experiences: string[];
+  experiences?: string[];
 };
 
 export type EvidenceSummary = {
-  highLevelAnswer: HighLevelAnswer;
-  evidenceCompleteness: EvidenceCompleteness;
+  verdict: Verdict;
+  confidence: Confidence;
   reasoning: string;
   selectedEvidence: EvidenceItem[];
-  semanticFlags: SemanticFlag[];
+  semanticFlags?: SemanticFlag[];
   uiHints?: EvidenceUiHints | null;
   uiHintWarnings?: UiHintValidationWarning[];
 };
@@ -387,18 +344,17 @@ export type UiPayload = {
 
 export type AnswerPayload = {
   message: string;
-  thoughts: string[] | null;
-  uiHints: EvidenceUiHints | null;
+  thoughts?: string[] | null;
 };
 
 export const RETRIEVAL_SOURCE_VALUES = ['projects', 'resume', 'profile'] as const;
-export const ANSWER_MODE_VALUES = ['binary_with_evidence', 'overview_list', 'narrative_with_examples', 'meta_chitchat'] as const;
-export const ANSWER_LENGTH_VALUES = ['short', 'medium', 'detailed'] as const;
-export const INTENT_VALUES = ['fact_check', 'enumerate', 'describe', 'compare', 'meta'] as const;
-export const UI_TARGET_VALUES = ['text'] as const;
+export const QUESTION_TYPE_VALUES = ['binary', 'list', 'narrative', 'meta'] as const;
+export const ENUMERATION_VALUES = ['sample', 'all_relevant'] as const;
+export const VERDICT_VALUES = ['yes', 'no', 'partial', 'unknown', 'n/a'] as const;
+export const CONFIDENCE_VALUES = ['high', 'medium', 'low'] as const;
 export const RESUME_FACET_VALUES = ['experience', 'education', 'award', 'skill'] as const;
 export const EVIDENCE_SOURCE_VALUES = ['project', 'resume', 'profile'] as const;
-export const SEMANTIC_FLAG_VALUES = ['uncertain', 'ambiguous', 'multi_topic', 'off_topic', 'needs_clarification'] as const;
+export const SEMANTIC_FLAG_VALUES = ['multi_topic', 'ambiguous', 'needs_clarification', 'off_topic'] as const;
 export const RETRIEVAL_REQUEST_TOPK_MAX = 10;
 
 const RetrievalRequestSchema: z.ZodType<RetrievalRequest, z.ZodTypeDef, unknown> = z.object({
@@ -409,23 +365,19 @@ const RetrievalRequestSchema: z.ZodType<RetrievalRequest, z.ZodTypeDef, unknown>
 
 /**
  * Schema for parsing raw Planner LLM output (per spec §4.2).
- * Does NOT include derived fields - those are computed by the orchestrator.
  */
 export const PlannerLLMOutputSchema: z.ZodType<PlannerLLMOutput, z.ZodTypeDef, unknown> = z.object({
-  intent: z.enum(INTENT_VALUES).default('describe'),
-  topic: z.string().nullable().default(null),
-  plannerConfidence: z.number().min(0).max(1).default(0.6),
-  experienceScope: z.enum(['employment_only', 'any_experience']).nullable().default(null),
+  questionType: z.enum(QUESTION_TYPE_VALUES).default('narrative'),
+  enumeration: z.enum(ENUMERATION_VALUES).default('sample'),
+  scope: z.enum(['employment_only', 'any_experience']).default('any_experience'),
   retrievalRequests: z.array(RetrievalRequestSchema).default([]),
   resumeFacets: z.array(z.enum(RESUME_FACET_VALUES)).default([]),
-  answerLengthHint: z.enum(ANSWER_LENGTH_VALUES).default('medium'),
-  uiTarget: z.enum(UI_TARGET_VALUES).nullable().default(null),
-  debugNotes: z.string().max(600).nullable().default(null),
+  cardsEnabled: z.boolean().nullable().default(null),
+  topic: z.string().nullable().default(null),
 });
 
 /**
- * Schema for full RetrievalPlan (LLM output + derived fields + optional extras).
- * Used after the orchestrator has computed derived behavior.
+ * Schema for EvidenceSummary and related data.
  */
 const EvidenceItemSchema: z.ZodType<EvidenceItem, z.ZodTypeDef, unknown> = z.object({
   source: z.enum(EVIDENCE_SOURCE_VALUES),
@@ -453,8 +405,7 @@ const EvidenceUiHintsSchema: z.ZodType<EvidenceUiHints, z.ZodTypeDef, unknown> =
 
 export const AnswerPayloadSchema: z.ZodType<AnswerPayload, z.ZodTypeDef, unknown> = z.object({
   message: z.string(),
-  thoughts: z.array(z.string()).nullable(),
-  uiHints: EvidenceUiHintsSchema.nullable(),
+  thoughts: z.array(z.string()).optional().nullable(),
 });
 
 export type UiHintValidationWarning = {
@@ -464,12 +415,12 @@ export type UiHintValidationWarning = {
 };
 
 export const EvidenceSummarySchema: z.ZodType<EvidenceSummary, z.ZodTypeDef, unknown> = z.object({
-  highLevelAnswer: z.enum(['yes', 'no', 'partial', 'unknown', 'not_applicable']).default('unknown'),
-  evidenceCompleteness: z.enum(['strong', 'weak', 'none']).default('none'),
+  verdict: z.enum(VERDICT_VALUES).default('unknown'),
+  confidence: z.enum(CONFIDENCE_VALUES).default('low'),
   reasoning: z.string().default(''),
   selectedEvidence: z.array(EvidenceItemSchema).default([]),
   semanticFlags: z.array(SemanticFlagSchema).default([]),
-  uiHints: EvidenceUiHintsSchema.default({ projects: [], experiences: [] }),
+  uiHints: EvidenceUiHintsSchema.default({ projects: [], experiences: [] }).nullable(),
   uiHintWarnings: z.array(UiHintValidationWarningSchema).default([]),
 });
 
@@ -493,8 +444,11 @@ export type ReasoningTraceError = {
 
 type ReasoningAnswerMeta = {
   model: string;
-  answerMode: AnswerMode;
-  answerLengthHint: AnswerLengthHint;
+  questionType: QuestionType;
+  enumeration: EnumerationMode;
+  scope: ExperienceScope;
+  verdict: Verdict;
+  confidence: Confidence;
   thoughts?: string[];
 };
 
@@ -503,7 +457,6 @@ export type PartialReasoningTrace = {
   retrieval: RetrievalSummary[] | null;
   evidence: EvidenceSummary | null;
   answerMeta: ReasoningAnswerMeta | null;
-  uiHintWarnings?: UiHintValidationWarning[] | null;
   error?: ReasoningTraceError | null;
 };
 
