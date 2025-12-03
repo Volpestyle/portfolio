@@ -23,27 +23,24 @@ export function buildChatFixtureResponse({
   const projectId = project.slug ?? project.name;
   const reasoningTrace = {
     plan: {
-      intent: 'describe',
+      questionType: 'narrative',
+      enumeration: 'sample',
+      scope: 'any_experience',
       topic: 'featured project',
-      plannerConfidence: 0.86,
-      experienceScope: null,
       retrievalRequests: [
         { source: 'projects', topK: 5, queryText: 'featured project highlights' },
         { source: 'resume', topK: 4, queryText: 'supporting resume context' },
       ],
       resumeFacets: [],
-      answerMode: 'narrative_with_examples',
-      answerLengthHint: 'medium',
-      enumerateAllRelevant: false,
-      debugNotes: null,
+      cardsEnabled: true,
     },
     retrieval: [
       { source: 'projects', queryText: 'featured project highlights', requestedTopK: 5, effectiveTopK: 5, numResults: 3 },
       { source: 'resume', queryText: 'supporting resume context', requestedTopK: 4, effectiveTopK: 4, numResults: 2 },
     ],
     evidence: {
-      highLevelAnswer: 'yes',
-      evidenceCompleteness: 'strong',
+      verdict: 'yes',
+      confidence: 'high',
       reasoning: 'Highlighted the featured project and related resume examples to explain the impact.',
       selectedEvidence: [
         { source: 'project', id: projectId, title: project.name, snippet: project.oneLiner, relevance: 'high' },
@@ -53,11 +50,13 @@ export function buildChatFixtureResponse({
     },
     answerMeta: {
       model: answerModel,
-      answerMode: 'narrative_with_examples',
-      answerLengthHint: 'medium',
+      questionType: 'narrative',
+      enumeration: 'sample',
+      scope: 'any_experience',
+      verdict: 'yes',
+      confidence: 'high',
       thoughts: ['Introduce the project and why it stands out', 'Invite the user to explore the card for more context'],
     },
-    uiHintWarnings: [],
   };
   const retrievalCounts = reasoningTrace.retrieval.reduce(
     (acc, { source, numResults }) => {
@@ -77,7 +76,12 @@ export function buildChatFixtureResponse({
       anchorId,
       stage: 'planner',
       status: 'complete',
-      meta: { intent: reasoningTrace.plan.intent, topic: reasoningTrace.plan.topic },
+      meta: {
+        questionType: reasoningTrace.plan.questionType,
+        enumeration: reasoningTrace.plan.enumeration,
+        scope: reasoningTrace.plan.scope,
+        topic: reasoningTrace.plan.topic,
+      },
       durationMs: 220,
     },
     { type: 'stage', itemId: anchorId, anchorId, stage: 'retrieval', status: 'start' },
@@ -97,7 +101,7 @@ export function buildChatFixtureResponse({
       anchorId,
       stage: 'evidence',
       status: 'complete',
-      meta: { highLevelAnswer: reasoningTrace.evidence.highLevelAnswer, evidenceCount },
+      meta: { verdict: reasoningTrace.evidence.verdict, confidence: reasoningTrace.evidence.confidence, evidenceCount },
       durationMs: 260,
     },
     { type: 'stage', itemId: anchorId, anchorId, stage: 'answer', status: 'start' },

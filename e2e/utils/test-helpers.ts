@@ -22,18 +22,16 @@ export async function mockChatStream(page: Page) {
       stage: 'plan',
       trace: {
         plan: {
-          intent: 'describe',
+          questionType: 'narrative',
+          enumeration: 'sample',
+          scope: 'any_experience',
           topic: 'featured project',
-          plannerConfidence: 0.86,
           retrievalRequests: [
             { source: 'projects', topK: 5, queryText: 'featured project highlights' },
             { source: 'resume', topK: 3, queryText: 'supporting experience context' },
           ],
           resumeFacets: [],
-          answerMode: 'narrative_with_examples',
-          answerLengthHint: 'medium',
-          enumerateAllRelevant: false,
-          debugNotes: null,
+          cardsEnabled: true,
         },
       },
       itemId: anchorId,
@@ -43,7 +41,12 @@ export async function mockChatStream(page: Page) {
       type: 'stage',
       stage: 'planner',
       status: 'complete',
-      meta: { intent: 'describe', topic: 'featured project' },
+      meta: {
+        questionType: 'narrative',
+        enumeration: 'sample',
+        scope: 'any_experience',
+        topic: 'featured project',
+      },
       durationMs: 180,
       itemId: anchorId,
       anchorId,
@@ -76,8 +79,8 @@ export async function mockChatStream(page: Page) {
       stage: 'evidence',
       trace: {
         evidence: {
-          highLevelAnswer: 'yes',
-          evidenceCompleteness: 'strong',
+          verdict: 'yes',
+          confidence: 'high',
           reasoning: 'Highlighted the featured project and invited the user to open the inline docs.',
           selectedEvidence: [
             { source: 'project', id: project.slug, title: project.name, snippet: project.oneLiner, relevance: 'high' },
@@ -93,7 +96,7 @@ export async function mockChatStream(page: Page) {
       type: 'stage',
       stage: 'evidence',
       status: 'complete',
-      meta: { highLevelAnswer: 'yes', evidenceCount: 1 },
+      meta: { verdict: 'yes', confidence: 'high', evidenceCount: 1 },
       durationMs: 220,
       itemId: anchorId,
       anchorId,
@@ -123,8 +126,11 @@ export async function mockChatStream(page: Page) {
       trace: {
         answerMeta: {
           model: 'gpt-5-nano-2025-08-07',
-          answerMode: 'narrative_with_examples',
-          answerLengthHint: 'medium',
+          questionType: 'narrative',
+          enumeration: 'sample',
+          scope: 'any_experience',
+          verdict: 'yes',
+          confidence: 'high',
           thoughts: ['Introduce the featured project', 'Invite the user to open the inline docs'],
         },
       },
