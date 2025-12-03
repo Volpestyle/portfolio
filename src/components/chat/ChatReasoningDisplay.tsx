@@ -36,10 +36,7 @@ export function ChatReasoningDisplay({
   // Only render once we have planner output (or later stages) so meta/greeting turns don't flash a user panel.
   const hasTraceContent =
     trace && (trace.plan || trace.retrieval || trace.evidence || trace.answerMeta || trace.error);
-  const isMetaTurn =
-    trace?.plan?.intent === 'meta' ||
-    trace?.plan?.answerMode === 'meta_chitchat' ||
-    trace?.answerMeta?.answerMode === 'meta_chitchat';
+  const isMetaTurn = trace?.plan?.questionType === 'meta' || trace?.answerMeta?.questionType === 'meta';
   const planReady = Boolean(trace?.plan);
   const streamingHasPlan = Boolean(isStreaming && trace && planReady);
   const shouldRenderTrace = Boolean(hasTraceContent || streamingHasPlan);

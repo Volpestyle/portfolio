@@ -52,10 +52,7 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
     ? reasoningTraces[streamingAssistantMessageId]
     : null;
   // Meta/chitchat turns hide the reasoning panel, so we need spinner to persist
-  const isMetaTurn =
-    currentTrace?.plan?.intent === 'meta' ||
-    currentTrace?.plan?.answerMode === 'meta_chitchat' ||
-    currentTrace?.answerMeta?.answerMode === 'meta_chitchat';
+  const isMetaTurn = currentTrace?.plan?.questionType === 'meta' || currentTrace?.answerMeta?.questionType === 'meta';
   const hasRenderableTrace =
     currentTrace &&
     (currentTrace.plan || currentTrace.retrieval || currentTrace.evidence || currentTrace.answerMeta || currentTrace.error);

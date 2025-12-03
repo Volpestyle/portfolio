@@ -21,10 +21,12 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
   const answerMeta = trace.answerMeta ?? null;
   const traceError = trace.error ?? null;
   const hasEvidenceItems = Boolean(evidence && evidence.selectedEvidence.length > 0);
-  const isMetaTurn = plan?.intent === 'meta' || plan?.answerMode === 'meta_chitchat';
+  const isMetaTurn = plan?.questionType === 'meta' || answerMeta?.questionType === 'meta';
   const retrievalFocus = plan ? inferPlanFocus(plan) : null;
   const failureStage = traceError ? traceError.stage ?? inferFailedStage(trace, isMetaTurn) : null;
   const hasError = Boolean(traceError);
+  const streamingStage = isStreaming ? inferStreamingStage(trace) : null;
+  const streamingTitle = streamingStage ? formatStreamingStageLabel(streamingStage) : 'Thinking...';
 
   if (isMetaTurn) {
     return null;
@@ -45,7 +47,7 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
       ? `Stopped after ${formatDuration(durationMs)}`
       : 'Reasoning failed'
     : isStreaming
-      ? 'Thinking...'
+      ? streamingTitle
       : durationMs
         ? `Thought for ${formatDuration(durationMs)}`
         : 'How I answered';
@@ -134,23 +136,14 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
               >
                 {plan ? (
                   <div className="space-y-2">
-                    <InfoRow label="Intent" value={formatIntent(plan.intent)} />
+                    <InfoRow label="Question Type" value={formatQuestionType(plan.questionType)} />
                     {retrievalFocus && <InfoRow label="Focus" value={formatFocus(retrievalFocus)} />}
                     <InfoRow
                       label="Enumeration"
-                      value={plan.enumerateAllRelevant ? 'Show all relevant items' : 'Examples mode'}
+                      value={plan.enumeration === 'all_relevant' ? 'All relevant items' : 'Sample / examples'}
                     />
-                    <InfoRow label="Answer Mode" value={formatAnswerMode(plan.answerMode)} />
-                    {plan.experienceScope && (
-                      <InfoRow label="Scope" value={formatExperienceScope(plan.experienceScope)} />
-                    )}
-                    {plan.plannerConfidence !== undefined && (
-                      <InfoRow
-                        label="Confidence"
-                        value={`${Math.round(plan.plannerConfidence * 100)}%`}
-                        badge={getConfidenceBadge(plan.plannerConfidence)}
-                      />
-                    )}
+                    {plan.scope && <InfoRow label="Scope" value={formatExperienceScope(plan.scope)} />}
+                    {plan.cardsEnabled === false && <InfoRow label="Cards" value="Disabled (text-only)" />}
                   </div>
                 ) : hasError ? (
                   <ErrorState status="Planning failed before completing." />
@@ -202,22 +195,21 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
                   <div className="space-y-2">
                     <div className="mb-2 flex items-center gap-2">
                       <span className="text-xs text-white/60">Decision:</span>
-                      <span className={cn('text-xs font-medium', getHighLevelAnswerColor(evidence.highLevelAnswer))}>
-                        {formatHighLevelAnswer(evidence.highLevelAnswer)}
+                      <span className={cn('text-xs font-medium', getVerdictColor(evidence.verdict))}>
+                        {formatVerdict(evidence.verdict)}
                       </span>
                       <span className="text-xs text-white/40">•</span>
-                      <span className="text-xs text-white/60">
-                        {formatEvidenceCompleteness(evidence.evidenceCompleteness)} evidence
-                      </span>
+                      <ConfidenceBadge level={evidence.confidence} />
                     </div>
                     {evidence.uiHints && (
                       <div className="flex gap-3 text-[11px] text-white/50">
                         <span>
-                          UI hints: {evidence.uiHints.projects.length} project{evidence.uiHints.projects.length === 1 ? '' : 's'}
+                          UI hints: {evidence.uiHints.projects?.length ?? 0} project
+                          {(evidence.uiHints.projects?.length ?? 0) === 1 ? '' : 's'}
                         </span>
                         <span>
-                          {evidence.uiHints.experiences.length} experience
-                          {evidence.uiHints.experiences.length === 1 ? '' : 's'}
+                          {evidence.uiHints.experiences?.length ?? 0} experience
+                          {(evidence.uiHints.experiences?.length ?? 0) === 1 ? '' : 's'}
                         </span>
                       </div>
                     )}
@@ -285,9 +277,9 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
               ) : null}
 
               {/* Semantic Flags */}
-              {evidence && evidence.semanticFlags.length > 0 && (
+              {evidence && (evidence.semanticFlags?.length ?? 0) > 0 && (
                 <div className="flex flex-wrap gap-1.5 pt-1">
-                  {evidence.semanticFlags.map((flag, idx) => (
+                  {(evidence.semanticFlags ?? []).map((flag, idx) => (
                     <div
                       key={idx}
                       className="rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 text-[10px] text-yellow-300"
@@ -476,7 +468,7 @@ function inferPlanFocus(plan?: PartialReasoningTrace['plan'] | null): PlanFocus 
   if (hasResume && hasProjects) return 'mixed';
   if (hasResume) return 'resume';
   if (hasProjects) return 'projects';
-  if (plan.experienceScope === 'employment_only' || (plan.resumeFacets ?? []).includes('experience')) return 'resume';
+  if (plan.scope === 'employment_only' || (plan.resumeFacets ?? []).includes('experience')) return 'resume';
   return 'mixed';
 }
 
@@ -485,8 +477,8 @@ function formatFocus(focus: PlanFocus): string {
   return focus === 'resume' ? 'Resume-first' : 'Projects-first';
 }
 
-function formatAnswerMode(mode: string): string {
-  return mode.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+function formatQuestionType(questionType: string): string {
+  return questionType.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
 function formatExperienceScope(scope: string): string {
@@ -497,26 +489,27 @@ function formatSource(source: string): string {
   return source.charAt(0).toUpperCase() + source.slice(1);
 }
 
-function formatHighLevelAnswer(answer: string): string {
-  return answer.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-}
-
-function formatEvidenceCompleteness(completeness: string): string {
-  return completeness.charAt(0).toUpperCase() + completeness.slice(1);
+function formatVerdict(verdict: string): string {
+  return verdict.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
 function formatSemanticFlag(flag: string): string {
   return flag.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
-function formatIntent(intent: string): string {
-  return intent.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-}
-
-function getConfidenceBadge(confidence: number): 'high' | 'medium' | 'low' {
-  if (confidence >= 0.8) return 'high';
-  if (confidence >= 0.5) return 'medium';
-  return 'low';
+function getVerdictColor(verdict: string): string {
+  switch (verdict) {
+    case 'yes':
+      return 'text-green-300';
+    case 'no':
+      return 'text-red-300';
+    case 'partial':
+      return 'text-yellow-300';
+    case 'n/a':
+      return 'text-white/60';
+    default:
+      return 'text-white/50';
+  }
 }
 
 function getHighLevelAnswerColor(answer: string): string {
@@ -531,5 +524,38 @@ function getHighLevelAnswerColor(answer: string): string {
       return 'text-gray-300';
     default:
       return 'text-white/70';
+  }
+}
+
+type StreamingStage = 'planning' | 'searching' | 'evidence' | 'drafting';
+
+function inferStreamingStage(trace: PartialReasoningTrace): StreamingStage | null {
+  if (!trace?.plan) {
+    return 'planning';
+  }
+  if (!trace.retrieval) {
+    return 'searching';
+  }
+  if (!trace.evidence) {
+    return 'evidence';
+  }
+  if (!trace.answerMeta) {
+    return 'drafting';
+  }
+  return null;
+}
+
+function formatStreamingStageLabel(stage: StreamingStage): string {
+  switch (stage) {
+    case 'planning':
+      return 'Planning...';
+    case 'searching':
+      return 'Searching...';
+    case 'evidence':
+      return 'Evaluating evidence...';
+    case 'drafting':
+      return 'Drafting answer...';
+    default:
+      return 'Thinking...';
   }
 }

@@ -34,7 +34,7 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
   const evidence = trace.evidence ?? null;
   const answerMeta = trace.answerMeta ?? null;
   const planFocus = inferPlanFocus(plan);
-  const isMetaTurn = plan.intent === 'meta' || plan.answerMode === 'meta_chitchat';
+  const isMetaTurn = plan.questionType === 'meta';
   const retrievalExpected = !isMetaTurn && (plan.retrievalRequests?.length ?? 0) > 0;
 
   return (
@@ -74,19 +74,19 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                 icon={<Brain className="h-4 w-4" />}
                 title="Planner Output"
                 sectionKey="plan"
-                isExpanded={expandedSections.plan}
-                onToggle={() => toggleSection('plan')}
-              >
-                <div className="space-y-3">
-                  <KeyValue label="answerMode" value={plan.answerMode} />
-                  <KeyValue label="answerLengthHint" value={plan.answerLengthHint} />
-                  <KeyValue label="plannerConfidence" value={plan.plannerConfidence.toFixed(3)} />
-                  {planFocus && <KeyValue label="retrievalFocus" value={planFocus} />}
-                  {plan.topic && <KeyValue label="topic" value={plan.topic} />}
-                  {plan.experienceScope && <KeyValue label="experienceScope" value={plan.experienceScope} />}
-                  {plan.resumeFacets && plan.resumeFacets.length > 0 && (
-                    <KeyValue label="resumeFacets" value={plan.resumeFacets} />
-                  )}
+              isExpanded={expandedSections.plan}
+              onToggle={() => toggleSection('plan')}
+            >
+              <div className="space-y-3">
+                <KeyValue label="questionType" value={plan.questionType} />
+                <KeyValue label="enumeration" value={plan.enumeration} />
+                <KeyValue label="scope" value={plan.scope} />
+                {planFocus && <KeyValue label="retrievalFocus" value={planFocus} />}
+                {plan.cardsEnabled === false && <KeyValue label="cardsEnabled" value="false" />}
+                {plan.topic && <KeyValue label="topic" value={plan.topic} />}
+                {plan.resumeFacets && plan.resumeFacets.length > 0 && (
+                  <KeyValue label="resumeFacets" value={plan.resumeFacets} />
+                )}
                   {plan.retrievalRequests.length > 0 && (
                     <div className="mt-2">
                       <p className="mb-2 text-xs font-medium text-purple-300">retrievalRequests:</p>
@@ -174,8 +174,8 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                 {evidence ? (
                   <>
                     <div className="space-y-3">
-                      <KeyValue label="highLevelAnswer" value={evidence.highLevelAnswer} />
-                      <KeyValue label="evidenceCompleteness" value={evidence.evidenceCompleteness} />
+                      <KeyValue label="verdict" value={evidence.verdict} />
+                      <KeyValue label="confidence" value={evidence.confidence} />
                       <div>
                         <p className="mb-1 text-xs font-medium text-purple-300">reasoning:</p>
                         <p className="text-xs leading-relaxed text-purple-200">{evidence.reasoning}</p>
@@ -254,8 +254,11 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                   <>
                     <div className="space-y-3">
                       <KeyValue label="model" value={answerMeta.model} />
-                      <KeyValue label="answerMode" value={answerMeta.answerMode} />
-                      <KeyValue label="answerLengthHint" value={answerMeta.answerLengthHint} />
+                      <KeyValue label="questionType" value={answerMeta.questionType} />
+                      <KeyValue label="enumeration" value={answerMeta.enumeration} />
+                      <KeyValue label="scope" value={answerMeta.scope} />
+                      <KeyValue label="verdict" value={answerMeta.verdict} />
+                      <KeyValue label="confidence" value={answerMeta.confidence} />
                       {answerMeta.thoughts && answerMeta.thoughts.length > 0 && (
                         <div>
                           <p className="mb-2 text-xs font-medium text-purple-300">
@@ -342,7 +345,7 @@ function inferPlanFocus(plan?: PartialReasoningTrace['plan'] | null): 'resume' |
   if (hasResume && hasProjects) return 'mixed';
   if (hasResume) return 'resume';
   if (hasProjects) return 'projects';
-  if (plan.experienceScope === 'employment_only' || (plan.resumeFacets ?? []).includes('experience')) return 'resume';
+  if (plan.scope === 'employment_only' || (plan.resumeFacets ?? []).includes('experience')) return 'resume';
   return 'mixed';
 }
 
