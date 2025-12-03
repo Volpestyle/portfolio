@@ -10,6 +10,9 @@ pnpm chat:preprocess [--config path/to/config.(json|yaml|js)] [--env extra.env]
 
 - `--config` points to a JSON/YAML/JS module that exports a `ChatPreprocessConfig`. Override paths like `generatedDir`, `resumePdf`, or the env-file list without touching the script.
 - `--env` may be repeated to append preprocess-specific `.env` files. When omitted the CLI tries `scripts/chat-preprocess.env`, `.env.local`, and `.env` in that order.
+- `--seeOutput` prints the contents of each task artifact to stdout after it is written (useful for debugging; note that embeddings files can be very large).
+
+Persona generation is deterministic and sourced from `data/chat/profile.json` fields (`systemPersona`, `shortAbout`, `styleGuidelines`, `voiceExamples`). No OpenAI call is made for persona.
 
 ## Config Highlights
 
@@ -30,13 +33,13 @@ paths:
   resumePdf: public/resume/resume.pdf # defaults to chat-preprocess.config.yml resume.filename (falls back to resume.pdf)
   resumeJson: generated/resume-raw.json # default; point to a curated file to bypass PDF extraction
 
-repos:
-  gistId: d3adb33f1234 # overrides PORTFOLIO_GIST_ID
-  include:
-    - my-org/flagship-app
-    - marketing-site
-  exclude:
-    - my-org/legacy-monolith
+  repos:
+    gistId: d3adb33f1234 # overrides PORTFOLIO_GIST_ID
+    include:
+      - my-org/flagship-app
+      - marketing-site
+    exclude:
+      - my-org/archive-app
 
 artifacts:
   writers:

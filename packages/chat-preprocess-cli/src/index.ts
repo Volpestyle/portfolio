@@ -35,6 +35,7 @@ const INFO_PREFIX = '\ud83d\udd0d';
 type ParsedCliArgs = {
   configPath?: string;
   envFiles?: string[];
+  seeOutput?: boolean;
 };
 
 const DEFAULT_CONFIG_PATHS = [
@@ -64,12 +65,14 @@ function parseCliArgs(argv: string[]): ParsedCliArgs {
     options: {
       config: { type: 'string' },
       env: { type: 'string', multiple: true },
+      seeOutput: { type: 'boolean' },
     },
   });
 
   return {
     configPath: values.config,
     envFiles: values.env ? (Array.isArray(values.env) ? values.env : [values.env]) : undefined,
+    seeOutput: values.seeOutput,
   };
 }
 
@@ -89,6 +92,7 @@ type TaskSummary = {
 type RunPreprocessCliOptions = {
   argv?: string[];
   config?: ChatPreprocessConfig;
+  seeOutput?: boolean;
 };
 
 function buildTaskList(): CliTask[] {
@@ -100,6 +104,56 @@ function buildTaskList(): CliTask[] {
     { name: 'profile', label: 'Profile builder (bio & featured experiences)', run: runProfileTask },
     { name: 'persona', label: 'Persona builder (profile + resume → persona summary)', run: runPersonaTask },
   ];
+}
+
+function resolveTaskArtifacts(taskName: string, paths: PreprocessPaths): string[] {
+  switch (taskName) {
+    case 'project-knowledge':
+      return [paths.projectsOutput, paths.projectsEmbeddingsOutput];
+    case 'resume-pdf':
+      return [paths.resumeJson];
+    case 'resume':
+      return [paths.experiencesOutput];
+    case 'resume-embeddings':
+      return [paths.resumeEmbeddingsOutput];
+    case 'profile':
+      return [paths.profileOutput];
+    case 'persona':
+      return [paths.personaOutput];
+    default:
+      return [];
+  }
+}
+
+function collectArtifactsForTasks(tasks: CliTask[], paths: PreprocessPaths): string[] {
+  const seen = new Set<string>();
+  const targets: string[] = [];
+  for (const task of tasks) {
+    for (const artifactPath of resolveTaskArtifacts(task.name, paths)) {
+      if (!artifactPath || seen.has(artifactPath)) continue;
+      seen.add(artifactPath);
+      targets.push(artifactPath);
+    }
+  }
+  return targets;
+}
+
+async function printArtifactOutputs(
+  artifacts: PreprocessTaskResult['artifacts'],
+  rootDir: string
+): Promise<void> {
+  if (!artifacts?.length) return;
+  for (const artifact of artifacts) {
+    const absolutePath = path.isAbsolute(artifact.path) ? artifact.path : path.resolve(rootDir, artifact.path);
+    const relativePath = path.relative(rootDir, absolutePath);
+    try {
+      const contents = await fsPromises.readFile(absolutePath, 'utf-8');
+      console.log(`   • output ${relativePath}:`);
+      console.log(contents);
+    } catch (error) {
+      console.warn(`${INFO_PREFIX} Failed to print artifact ${artifact.path}`, error);
+    }
+  }
 }
 
 async function resetGeneratedDir(paths: PreprocessPaths): Promise<void> {
@@ -118,9 +172,44 @@ async function resetGeneratedDir(paths: PreprocessPaths): Promise<void> {
   await fsPromises.mkdir(generatedDir, { recursive: true });
 }
 
+async function cleanTaskArtifacts(
+  paths: PreprocessPaths,
+  tasksToRun: CliTask[],
+  allTasks: CliTask[]
+): Promise<void> {
+  if (tasksToRun.length === allTasks.length) {
+    await resetGeneratedDir(paths);
+    return;
+  }
+
+  const artifacts = collectArtifactsForTasks(tasksToRun, paths);
+  console.log(
+    `${INFO_PREFIX} Cleaning artifacts for selected tasks (${tasksToRun.map((task) => task.name).join(', ')})`
+  );
+  await fsPromises.mkdir(paths.generatedDir, { recursive: true });
+
+  if (!artifacts.length) {
+    console.log('   • no known artifacts to clean');
+    return;
+  }
+
+  const rootDir = path.resolve(paths.rootDir);
+  for (const artifactPath of artifacts) {
+    const relative = path.relative(rootDir, artifactPath);
+    if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+      console.warn(`${INFO_PREFIX} Skipping cleanup for ${artifactPath} (outside root)`);
+      continue;
+    }
+
+    await fsPromises.rm(artifactPath, { recursive: true, force: true });
+    console.log(`   • removed ${relative}`);
+  }
+}
+
 export async function runPreprocessCli(options?: RunPreprocessCliOptions): Promise<void> {
   const argv = options?.argv ?? process.argv.slice(2);
   const cliArgs = parseCliArgs(argv);
+  const seeOutput = cliArgs.seeOutput ?? options?.seeOutput ?? false;
   const configPath = cliArgs.configPath ?? findDefaultConfigPath();
   const fileConfig = configPath ? await loadConfigFile(configPath) : undefined;
   const mergedConfig = mergeConfigs([fileConfig, options?.config]);
@@ -140,7 +229,27 @@ export async function runPreprocessCli(options?: RunPreprocessCliOptions): Promi
   }
 
   const resolvedConfig = resolvePreprocessConfig(mergedConfig);
-  await resetGeneratedDir(resolvedConfig.paths);
+
+  const tasks = buildTaskList();
+  const summaries: TaskSummary[] = [];
+
+  const requestedTasksEnv = process.env.CHAT_PREPROCESS_TASKS ?? process.env.CHAT_PREPROCESS_TASK;
+  const requestedTasks = requestedTasksEnv
+    ? requestedTasksEnv
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : null;
+  const tasksToRun =
+    requestedTasks && requestedTasks.length
+      ? tasks.filter((task) => requestedTasks.includes(task.name))
+      : tasks;
+
+  if (requestedTasks && requestedTasks.length && !tasksToRun.length) {
+    throw new Error(`No preprocess tasks matched ${requestedTasks.join(', ')}`);
+  }
+
+  await cleanTaskArtifacts(resolvedConfig.paths, tasksToRun, tasks);
 
   if (resolvedConfig.repos.gistId) {
     process.env.PORTFOLIO_GIST_ID = resolvedConfig.repos.gistId;
@@ -166,25 +275,6 @@ export async function runPreprocessCli(options?: RunPreprocessCliOptions): Promi
     metrics,
   };
 
-  const tasks = buildTaskList();
-  const summaries: TaskSummary[] = [];
-
-  const requestedTasksEnv = process.env.CHAT_PREPROCESS_TASKS ?? process.env.CHAT_PREPROCESS_TASK;
-  const requestedTasks = requestedTasksEnv
-    ? requestedTasksEnv
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean)
-    : null;
-  const tasksToRun =
-    requestedTasks && requestedTasks.length
-      ? tasks.filter((task) => requestedTasks.includes(task.name))
-      : tasks;
-
-  if (requestedTasks && requestedTasks.length && !tasksToRun.length) {
-    throw new Error(`No preprocess tasks matched ${requestedTasks.join(', ')}`);
-  }
-
   let metricsPath: string | null = null;
   try {
     for (const task of tasksToRun) {
@@ -204,6 +294,9 @@ export async function runPreprocessCli(options?: RunPreprocessCliOptions): Promi
         for (const artifact of result.artifacts ?? []) {
           const note = artifact.note ? ` (${artifact.note})` : '';
           console.log(`   • wrote ${artifact.path}${note}`);
+        }
+        if (seeOutput) {
+          await printArtifactOutputs(result.artifacts, resolvedConfig.paths.rootDir);
         }
       } catch (error) {
         console.error(`${FAIL_PREFIX} ${task.label} failed`);

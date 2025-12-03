@@ -12,6 +12,10 @@ type ProfileSource = {
   currentRole?: string;
   about: string | string[];
   topSkills?: string[];
+  systemPersona?: string;
+  shortAbout?: string;
+  styleGuidelines?: string[] | string;
+  voiceExamples?: string[] | string;
   featuredExperienceIds?: string[];
   socialLinks?: Array<{
     platform: string;
@@ -110,6 +114,18 @@ export async function runProfileTask(context: PreprocessContext): Promise<Prepro
     profileSource.currentRole?.trim();
 
   const aboutString = about.join('\n\n');
+  const styleGuidelineList = Array.isArray(profileSource.styleGuidelines)
+    ? profileSource.styleGuidelines
+    : typeof profileSource.styleGuidelines === 'string'
+      ? [profileSource.styleGuidelines]
+      : [];
+  const styleGuidelines = normalizeDistinctStrings(styleGuidelineList);
+  const voiceExampleList = Array.isArray(profileSource.voiceExamples)
+    ? profileSource.voiceExamples
+    : typeof profileSource.voiceExamples === 'string'
+      ? [profileSource.voiceExamples]
+      : [];
+  const voiceExamples = normalizeDistinctStrings(voiceExampleList);
 
   const profile = {
     updatedAt: profileSource.updatedAt ?? 'unspecified',
@@ -119,6 +135,10 @@ export async function runProfileTask(context: PreprocessContext): Promise<Prepro
     currentRole: currentExperience || undefined,
     about: aboutString,
     topSkills: normalizeDistinctStrings(profileSource.topSkills),
+    systemPersona: profileSource.systemPersona?.trim() || undefined,
+    shortAbout: profileSource.shortAbout?.trim() || undefined,
+    styleGuidelines: styleGuidelines.length ? styleGuidelines : undefined,
+    voiceExamples: voiceExamples.length ? voiceExamples : undefined,
     featuredExperiences,
     socialLinks: Array.isArray(profileSource.socialLinks)
       ? profileSource.socialLinks
@@ -142,6 +162,8 @@ export async function runProfileTask(context: PreprocessContext): Promise<Prepro
     description: 'Wrote normalized profile payload',
     counts: [
       { label: 'Top skills', value: profile.topSkills.length },
+      { label: 'Style guidelines', value: styleGuidelines.length },
+      { label: 'Voice examples', value: voiceExamples.length },
       { label: 'Featured experiences', value: featuredExperiences.length },
     ],
     artifacts: [{ path: artifact.relativePath, note: profile.updatedAt }],
