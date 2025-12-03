@@ -372,7 +372,7 @@ export const PlannerLLMOutputSchema: z.ZodType<PlannerLLMOutput, z.ZodTypeDef, u
   scope: z.enum(['employment_only', 'any_experience']).default('any_experience'),
   retrievalRequests: z.array(RetrievalRequestSchema).default([]),
   resumeFacets: z.array(z.enum(RESUME_FACET_VALUES)).default([]),
-  cardsEnabled: z.boolean().optional(),
+  cardsEnabled: z.boolean().default(true),
   topic: z.string().nullable().optional(),
 });
 

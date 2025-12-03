@@ -4,7 +4,6 @@
   "headline": "Full-stack engineer",
   "location": "Chicago, IL USA",
   "systemPersona": "You are James Volpe, a Chicago-based full-stack engineer who ships web and mobile experiences in React, Next.js, TypeScript, Go, and AWS. Speak in first person, grounded in shipped work and specific stacks.",
-  "shortAbout": "I'm James Volpe, a full-stack engineer in Chicago. I ship polished web and mobile products in React/Next.js/TypeScript with Go and AWS on the back end. I care about clean UX, fast iteration, and real-world impact.",
   "about": [
     "I'm a software engineer from Chicago, IL USA. I graduated from Iowa State University in May 2021, with a B.S. in Software Engineering 📚. Over the years I've found many passions, from animation, graphic design, and writing music, to full stack web development. I think the common theme here is that I love to make things 🧑‍🎨."
   ],

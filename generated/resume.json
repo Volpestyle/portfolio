@@ -1,31 +1,67 @@
 {
-  "snapshotDate": "2025-12-02",
+  "snapshotDate": "2025-12-03",
   "experiences": [
     {
       "type": "experience",
       "id": "lowes-software-engineer",
-      "slug": "lowes-software-engineer",
-      "company": "Lowes",
+      "slug": "lowe-s-software-engineer",
+      "company": "Lowe's",
       "title": "Software Engineer",
       "location": "Charlotte, NC",
       "startDate": "2025-03-01",
       "endDate": null,
       "isCurrent": true,
       "experienceType": "full_time",
-      "summary": "Lead engineer driving micro frontend architecture and new UX implementation for the Lowes Returns Android app.",
+      "summary": "Lead engineer on micro-frontend architecture and BFF services for Lowe's Returns Android and web applications.",
       "bullets": [
-        "Lead the adoption of a micro frontend architecture for the Lowes Returns Android app to improve scalability and developer velocity.",
-        "Implement new user experiences in React, Ionic, and Capacitor for the Lowes Returns Android app used by sales floor associates."
+        "Led adoption of a micro-frontend architecture for the Lowe’s Returns Android app to improve scalability and developer velocity.",
+        "Implemented new UX flows in React, Ionic, and Capacitor for the Returns Android application used by sales-floor associates.",
+        "Built and maintained a Node.js + Fastify Backend-for-Frontend (BFF) service powering the Returns Android and web apps, including optimized REST APIs, request validation, and cross-service orchestration."
       ],
       "skills": [
-        "Micro frontends",
+        "Micro-frontend architecture",
         "React",
         "Ionic",
         "Capacitor",
+        "Node.js",
+        "Fastify",
+        "REST APIs",
+        "Backend-for-Frontend (BFF)",
         "Android"
       ],
       "linkedProjects": [],
       "monthsOfExperience": null
+    },
+    {
+      "type": "experience",
+      "id": "freelance-full-stack",
+      "slug": "freelance-full-stack-web-developer",
+      "company": "Freelance",
+      "title": "Full-stack Web Developer",
+      "location": "Remote",
+      "startDate": "2023-01-01",
+      "endDate": "2025-02-01",
+      "isCurrent": false,
+      "experienceType": "full_time",
+      "summary": "Delivered end-to-end full-stack web applications for startups and SMBs, from scoping through deployment and CI/CD.",
+      "bullets": [
+        "Delivered end-to-end web applications for startups and SMBs sourced through Upwork, including scoping, architecture, and full-stack development.",
+        "Developed applications using Next.js, Node.js, and Go.",
+        "Deployed workloads to AWS using custom CDK stacks and implemented CI/CD pipelines using GitHub Actions."
+      ],
+      "skills": [
+        "Next.js",
+        "Node.js",
+        "Go",
+        "AWS",
+        "AWS CDK",
+        "GitHub Actions",
+        "Full-stack development",
+        "Architecture",
+        "CI/CD"
+      ],
+      "linkedProjects": [],
+      "monthsOfExperience": 26
     },
     {
       "type": "experience",
@@ -38,28 +74,27 @@
       "endDate": "2023-01-01",
       "isCurrent": false,
       "experienceType": "full_time",
-      "summary": "Implemented and launched React experiences for the AWS IAM Console and supported production through on-call operations.",
+      "summary": "Implemented and launched new React experiences for the AWS IAM Console and supported production operations.",
       "bullets": [
-        "Led implementation and launch of new React user experiences on the AWS Identity and Access Management Console, impacting thousands of customers, and monitored and remediated incoming customer issues.",
-        "Participated in monthly on-call rotation for the IAM console, resolving customer and operational issues and presenting weekly status to the broader Identity team.",
-        "Wrote extensive unit and integration tests using React Testing Library, Enzyme, and Cypress.",
-        "Voluntarily left role, not affected by layoffs, to relocate closer to family in Chicago, IL."
+        "Led implementation and launch of new React user experiences on the AWS Identity and Access Management (IAM) Console, impacting thousands of customers.",
+        "Participated in a monthly on-call rotation resolving customer issues, triaging CloudWatch alarms, and debugging service degradations in collaboration with backend teams.",
+        "Presented weekly operational status updates to the broader Identity organization.",
+        "Voluntarily left AWS to relocate closer to family in Chicago and was not affected by layoffs."
       ],
       "skills": [
         "React",
-        "AWS",
-        "Identity and Access Management",
-        "React Testing Library",
-        "Enzyme",
-        "Cypress",
-        "On-call"
+        "Front-end development",
+        "AWS IAM",
+        "CloudWatch",
+        "On-call operations",
+        "Incident triage"
       ],
       "linkedProjects": [],
       "monthsOfExperience": 19
     },
     {
       "type": "experience",
-      "id": "workiva-software-engineer-intern",
+      "id": "workiva-intern",
       "slug": "workiva-software-engineer-intern",
       "company": "Workiva",
       "title": "Software Engineer Intern",
@@ -68,27 +103,25 @@
       "endDate": "2020-08-01",
       "isCurrent": false,
       "experienceType": "internship",
-      "summary": "Contributed front-end features and tests to a Dart + React web application within an Agile team.",
+      "summary": "Contributed to a Dart and React-based web application using Agile practices and automated testing.",
       "bullets": [
-        "Developed front-end features for a Dart + React based web application, Wdesk.",
-        "Implemented an improved modal to manage XBRL profiles in Wdesk.",
-        "Worked with Agile development methodologies, participated in code reviews, and wrote unit and functional tests."
+        "Contributed to development of a Dart- and React-based web application (Wdesk).",
+        "Worked within Agile development methodologies, participating in code reviews and writing unit and integration tests."
       ],
       "skills": [
         "Dart",
         "React",
         "Agile",
         "Unit testing",
-        "Functional testing",
-        "Code review",
-        "XBRL"
+        "Integration testing",
+        "Code review"
       ],
       "linkedProjects": [],
       "monthsOfExperience": 4
     },
     {
       "type": "experience",
-      "id": "npr-web-software-developer-intern",
+      "id": "npr-intern",
       "slug": "npr-web-software-developer-intern",
       "company": "NPR",
       "title": "Web Software Developer Intern",
@@ -97,11 +130,10 @@
       "endDate": "2019-08-01",
       "isCurrent": false,
       "experienceType": "internship",
-      "summary": "Built and containerized a full-stack discrepancy logger application for NPR Audio Engineering.",
+      "summary": "Developed a full-stack discrepancy logger web application and containerized it for CI/CD.",
       "bullets": [
-        "Developed an Audio Engineering discrepancy logger web application using the MEAN stack (MongoDB, Express.js, Angular, Node.js) as the sole developer.",
-        "Containerized the application with Docker for CI/CD.",
-        "Used Jira and other project management tools for task tracking and collaboration."
+        "Developed an Audio Engineering discrepancy logger web application using MongoDB, Express.js, Angular, and Node.js as the sole developer.",
+        "Containerized the application with Docker to support CI/CD."
       ],
       "skills": [
         "MongoDB",
@@ -109,9 +141,8 @@
         "Angular",
         "Node.js",
         "Docker",
-        "CI/CD",
-        "Jira",
-        "Full stack development"
+        "Full-stack development",
+        "CI/CD"
       ],
       "linkedProjects": [],
       "monthsOfExperience": 4
@@ -120,17 +151,17 @@
   "education": [
     {
       "type": "education",
-      "id": "iowa-state-university-bs-software-engineering",
+      "id": "isu-bs-se",
       "institution": "Iowa State University",
       "degree": "B.S.",
       "field": "Software Engineering",
-      "location": "Ames, Iowa",
+      "location": "Ames, IA",
       "startDate": "2017-08-01",
       "endDate": "2021-05-01",
       "isCurrent": false,
       "summary": "Bachelor of Science in Software Engineering with a 3.01 GPA.",
       "bullets": [
-        "3.01 GPA"
+        "GPA: 3.01"
       ],
       "skills": []
     }
@@ -142,45 +173,40 @@
       "title": "Technical Education Senior Award",
       "date": "2021-05-01",
       "summary": "Awarded for outstanding work and dedication in the area of Technical Education.",
-      "bullets": [
-        "Awarded to students who exhibited outstanding work and dedication in the area of Technical Education."
-      ],
+      "bullets": [],
       "skills": []
     },
     {
       "type": "award",
-      "id": "wsc-logo-design-award",
+      "id": "wsc-logo-design",
       "title": "WSC Logo Design",
       "issuer": "Wheaton Sport Center",
       "date": "2017-05-01",
-      "summary": "Won first place in a logo design competition hosted by the Wheaton Sport Center in Wheaton, IL.",
-      "bullets": [
-        "Won 1st place prize of $1,000 for a logo design competition hosted by the Wheaton Sport Center in Wheaton, IL."
-      ],
-      "skills": [
-        "Graphic design"
-      ]
+      "summary": "Won 1st place prize of $1,000 in a logo design competition hosted by the Wheaton Sport Center in Wheaton, IL.",
+      "bullets": [],
+      "skills": []
     }
   ],
   "skills": [
     {
       "type": "skill",
       "id": "languages-frameworks",
-      "name": "Languages and Frameworks",
-      "category": "Technical",
+      "name": "Languages & Frameworks",
+      "category": "technical",
       "skills": [
         "React",
-        "Typescript",
-        "Javascript",
+        "TypeScript",
+        "JavaScript",
         "Svelte",
-        "NextJS",
+        "Next.js",
         "TailwindCSS",
-        "Tanstack",
-        "Zustand",
-        "Redux",
+        "TanStack",
+        "Go",
         "Java",
+        "Spring Boot",
+        "Node.js",
+        "Fastify",
         "Swift",
-        "GO",
         "Python",
         "PyTorch"
       ]
@@ -189,41 +215,27 @@
       "type": "skill",
       "id": "platforms",
       "name": "Platforms",
-      "category": "Technical",
+      "category": "technical",
       "skills": [
         "AWS",
         "Google Vertex AI",
         "RAG",
         "Hadoop ecosystem",
         "Druid",
-        "Big Query"
+        "BigQuery"
       ]
     },
     {
       "type": "skill",
       "id": "databases",
-      "name": "Databases and APIs",
-      "category": "Technical",
+      "name": "Databases & Data APIs",
+      "category": "technical",
       "skills": [
         "MongoDB",
         "GraphQL",
         "DynamoDB",
         "Redis",
         "PostgreSQL"
-      ]
-    },
-    {
-      "type": "skill",
-      "id": "personal-projects",
-      "name": "Personal Projects",
-      "category": "Projects",
-      "summary": "Full stack web and native mobile applications incorporating machine learning and AI.",
-      "skills": [
-        "Full stack development",
-        "iOS",
-        "Android",
-        "Machine learning",
-        "AI"
       ]
     }
   ]

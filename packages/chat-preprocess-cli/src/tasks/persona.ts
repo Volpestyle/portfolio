@@ -24,6 +24,11 @@ function coercePersona(value: Partial<PersonaSummary>, fallback: PersonaSummary)
   };
 }
 
+function extractAboutParagraphs(about: ProfileSummary['about']): string[] {
+  const paragraphs = Array.isArray(about) ? about : typeof about === 'string' ? about.split(/\n\s*\n/) : [];
+  return paragraphs.map((paragraph) => paragraph.trim()).filter(Boolean);
+}
+
 function buildPersonaFromProfile(profile: ProfileSummary): PersonaSummary {
   const headline = profile.headline ? `, ${profile.headline}` : '';
   const location = profile.location ? ` in ${profile.location}` : '';
@@ -34,22 +39,13 @@ function buildPersonaFromProfile(profile: ProfileSummary): PersonaSummary {
     profile.systemPersona?.trim() ||
     `You are ${profile.fullName}${headline}${role}${location}. Speak in first-person, grounded in real projects and experience.${skillClause}`;
 
-  const aboutString =
-    typeof profile.about === 'string' ? profile.about : profile.about?.find((p) => p?.trim())?.trim() ?? '';
+  const aboutParagraphs = extractAboutParagraphs(profile.about);
+  const shortAboutFromProfile = aboutParagraphs.slice(0, 3).join(' ').trim();
   const shortAbout =
-    profile.shortAbout?.trim() ||
-    (aboutString
-      ? aboutString
-      : `I'm ${profile.fullName}, ${profile.headline}. I ship polished products with modern JavaScript and cloud tooling.`);
+    shortAboutFromProfile ||
+    `I'm ${profile.fullName}, ${profile.headline}. I ship polished products with modern JavaScript and cloud tooling.`;
 
   const styleGuidelines = normalizeDistinctStrings(profile.styleGuidelines);
-  const fallbackGuidelines = [
-    'Keep the tone warm, direct, and confident.',
-    'Favor concrete technologies and shipped outcomes over buzzwords.',
-    'Ground claims in real work (projects, roles, launches).',
-    'Stay concise; prefer crisp sentences.',
-    'Acknowledge limits instead of speculating.',
-  ];
 
   const voiceExamples = normalizeDistinctStrings(profile.voiceExamples);
   const fallbackVoiceExamples = [
@@ -62,7 +58,7 @@ function buildPersonaFromProfile(profile: ProfileSummary): PersonaSummary {
   return {
     systemPersona,
     shortAbout,
-    styleGuidelines: styleGuidelines.length ? styleGuidelines : fallbackGuidelines,
+    styleGuidelines,
     voiceExamples: voiceExamples.length ? voiceExamples : fallbackVoiceExamples,
   };
 }

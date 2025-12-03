@@ -68,6 +68,7 @@ The provider automatically:
 | `fetcher`          | `(input, init) => Promise<Response>`                | `globalThis.fetch`       | Optional injection point for custom fetch implementations (tests, polyfills).                                 |
 | `requestFormatter` | `(messages: ChatMessage[]) => ChatRequestMessage[]` | Default `flatten` helper | Override the request content transformation before calling the API.                                           |
 | `onError`          | `(error: Error) => void`                            | `undefined`              | Notified whenever streaming or network errors occur.                                                          |
+| `reasoningOptIn`   | `boolean`                                           | `true`                   | Set to `false` to opt out of requesting reasoning traces; forwarded as `reasoningEnabled` in the request body. |
 
 ## `useChat` return value
 
@@ -82,7 +83,12 @@ type UseChat = {
   bannerState: BannerState; // UI hint for the chat dock/header (idle, thinking, hover).
   error: string | null | undefined; // Present when the last request failed.
   uiState: ChatUiState; // Contains the per-message surfaces for inline UI portals.
-  projectCache: Record<string, ProjectSummary>; // Projects keyed by slug or normalized name.
+  projectCache: Record<string, ProjectSummary | ProjectDetail>; // Projects keyed by slug or normalized name.
+  experienceCache: Record<string, ResumeEntry>; // Experiences keyed by id/slug/title (normalized).
+  reasoningTraces: Record<string, PartialReasoningTrace>; // Streaming planner/retrieval/evidence/answer metadata by item id.
+  reasoningEnabled: boolean; // Echo of the provider flag so the UI can show/hide traces.
+  completionTimes: Record<string, number>; // Epoch millis when an assistant message first finished rendering.
+  markMessageRendered: (messageId: string) => void; // Marks an assistant turn as rendered + records completion time.
 };
 ```
 

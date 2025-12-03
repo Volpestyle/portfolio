@@ -12,7 +12,7 @@ pnpm chat:preprocess [--config path/to/config.(json|yaml|js)] [--env extra.env]
 - `--env` may be repeated to append preprocess-specific `.env` files. When omitted the CLI tries `scripts/chat-preprocess.env`, `.env.local`, and `.env` in that order.
 - `--seeOutput` prints the contents of each task artifact to stdout after it is written (useful for debugging; note that embeddings files can be very large).
 
-Persona generation is deterministic and sourced from `data/chat/profile.json` fields (`systemPersona`, `shortAbout`, `styleGuidelines`, `voiceExamples`). No OpenAI call is made for persona.
+Persona generation is deterministic and sourced from `data/chat/profile.json` fields (`systemPersona`, first three `about` entries for `shortAbout`, `styleGuidelines`, `voiceExamples`). No OpenAI call is made for persona.
 
 ## Config Highlights
 
