@@ -46,6 +46,7 @@ const REDIS_RATE_LIMIT_PREFIX = 'chat:ratelimit';
 let chatRateLimiters: RateLimiterInstance[] | null = null;
 let chatRateLimiterPromise: Promise<RateLimiterInstance[] | null> | null = null;
 let lastInitAttempt = 0;
+let lastInitReason: 'missing_credentials' | 'init_error' | null = null;
 
 async function initRateLimiters(): Promise<RateLimiterInstance[] | null> {
   try {
@@ -56,9 +57,11 @@ async function initRateLimiters(): Promise<RateLimiterInstance[] | null> {
 
     if (!url || !token) {
       console.warn('Rate limiting disabled (Upstash credentials missing).');
+      lastInitReason = 'missing_credentials';
       return null;
     }
 
+    lastInitReason = null;
     const redis = new Redis({
       url,
       token,
@@ -77,6 +80,7 @@ async function initRateLimiters(): Promise<RateLimiterInstance[] | null> {
     }));
   } catch (error) {
     console.warn('Rate limiting disabled (failed to initialize Upstash client).', error);
+    lastInitReason = 'init_error';
     return null;
   }
 }
@@ -162,7 +166,8 @@ export async function enforceChatRateLimit(req: NextRequest): Promise<RateLimitR
 
   const limiters = await getRateLimiters();
   if (!limiters || limiters.length === 0) {
-    if (process.env.NODE_ENV !== 'production') {
+    const missingCreds = lastInitReason === 'missing_credentials';
+    if (process.env.NODE_ENV !== 'production' && missingCreds) {
       return {
         success: true,
         reason: 'Rate limiting disabled (Upstash credentials missing)',
@@ -204,7 +209,18 @@ export async function enforceChatRateLimit(req: NextRequest): Promise<RateLimitR
       }
     }
 
-    const primary = results.find((check) => check.name === 'per-hour') ?? results[results.length - 1];
+    const primary =
+      results.reduce((tightest, candidate) => {
+        const tightestRatio =
+          typeof tightest.limit === 'number' && tightest.limit > 0
+            ? (tightest.remaining ?? 0) / tightest.limit
+            : Number.POSITIVE_INFINITY;
+        const candidateRatio =
+          typeof candidate.limit === 'number' && candidate.limit > 0
+            ? candidate.remaining / candidate.limit
+            : Number.POSITIVE_INFINITY;
+        return candidateRatio < tightestRatio ? candidate : tightest;
+      }, results[0]) ?? results[results.length - 1];
     return {
       success: true,
       limit: primary?.limit,

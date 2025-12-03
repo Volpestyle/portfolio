@@ -59,3 +59,4 @@ export {
   type CostLevel,
 } from './runtimeCost';
 export { createNextChatHandler, type NextChatHandlerOptions } from './nextHandler';
+export { createRateLimitEnforcer, type RateLimitResult } from './rateLimit';

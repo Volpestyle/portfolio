@@ -13,14 +13,7 @@ import {
 import type { ChatApi } from './index';
 import type { ChatRuntimeOptions } from '@portfolio/chat-orchestrator';
 import type { RuntimeCostClients, RuntimeCostState } from './runtimeCost';
-
-type RateLimitResult = {
-  success: boolean;
-  reason?: string;
-  reset?: number;
-  headers?: HeadersInit;
-  status?: number;
-};
+import type { RateLimitResult } from './rateLimit';
 
 type FixtureResponder = (options: { answerModel: string; headers?: HeadersInit }) => Promise<Response> | Response;
 
