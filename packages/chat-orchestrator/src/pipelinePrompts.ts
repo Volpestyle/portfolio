@@ -43,7 +43,7 @@ retrievalRequests (array of { source, queryText, topK [, resumeFacets] }):
   - profile for high-level bio; add resume/projects if they also want work examples.
   - otherwise mix resume + projects.
 - If scope="employment_only", do not include education facets; if scope="any_experience", education facets are allowed.
-- Location presence: always include resume (optionally profile); queryText should use specific city/state ("Denver CO", "Boston MA"); avoid vague "location".
+- Location presence: only when the user asks about location/presence; include resume (optionally profile). Use the city/state the user provides; do NOT inject new cities or examples; avoid vague "location".
 - Skills/tools: often need both resume and projects (e.g. "TypeScript experience" vs "React usage in projects").
 - TopK heuristics (caller may clamp):
   - binary ~5 per source.
