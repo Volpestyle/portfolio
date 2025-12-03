@@ -118,12 +118,12 @@ In addition, the Planner MAY set `retrievalRequests = []` when:
 ### 1.3 Non‑Functional Requirements
 
 - **Latency**
-  - Planner / Evidence / Answer all use nano-class models.
+  - Planner / Evidence use nano-class models; Answer uses nano or mini (mini recommended for voice adherence).
   - Answer streams tokens as soon as they're available.
   - Target: time-to-first-visible-activity < 500ms, full response < 3s for typical turns.
   - Note: Traditional TTFT (time-to-first-answer-token) is less critical here because the reasoning trace provides continuous visible feedback throughout the pipeline. Users see plan → retrieval summary → evidence summary → answer tokens as each stage completes. This progressive disclosure keeps perceived latency low even though multiple LLM calls run sequentially before the answer streams.
 - **Cost**
-  - Runtime: Planner, Evidence, Answer → nano-class models.
+  - Runtime: Planner, Evidence → nano; Answer → nano or mini.
   - Preprocessing (offline): full-size models (e.g., gpt‑5.1‑2025‑11‑13) and text‑embedding‑3‑large for one‑time work.
   - Track tokens & estimated USD cost for both preprocessing and runtime.
   - See `docs/features/chat/rate-limits-and-cost-guards.md` for cost alarms and rate limiting.
@@ -225,7 +225,7 @@ type ModelConfig = {
   plannerModel: string; // nano model id, e.g., "gpt-5-nano-2025-08-07"
   evidenceModel: string; // nano model id (default)
   evidenceModelDeepDive?: string; // optional mini model id, e.g., "gpt-5-mini-2025-08-07" for complex queries
-  answerModel: string; // nano model id, e.g., "gpt-5-nano-2025-08-07"
+  answerModel: string; // nano or mini model id (mini recommended for voice adherence)
   embeddingModel: string; // "text-embedding-3-large"
   stageReasoning?: {
     planner?: ReasoningEffort; // minimal | low | medium | high (reasoning-capable models only)
@@ -259,7 +259,7 @@ type DataProviders = {
 models:
   plannerModel: gpt-5-nano-2025-08-07
   evidenceModel: gpt-5-nano-2025-08-07
-  answerModel: gpt-5-nano-2025-08-07
+  answerModel: gpt-5-mini-2025-08-07  # mini recommended for better voice/persona adherence
   embeddingModel: text-embedding-3-large
   reasoning:
     planner: minimal
@@ -314,7 +314,7 @@ Quick at-a-glance view of purpose, inputs/outputs, and primary tech. See §5 for
 | Planner   | Normalize ask into structured intent + retrieval strategy      | Latest user message + short history; OwnerConfig + persona baked into system prompt     | RetrievalPlan (questionType, enumeration, scope, cardsEnabled, retrievalRequests, topic) | OpenAI Responses API (json schema) with `ModelConfig.plannerModel` (nano, e.g., gpt-5-nano-2025-08-07)                               |
 | Retrieval | Turn plan into ranked document sets                            | RetrievalPlan.retrievalRequests + corpora (projects/resume/profile) + embedding indexes | Retrieved docs per source (scored and filtered)                                          | MiniSearch BM25 + text-embedding-3-large re-rank + recency scoring (projects/resume); profile short-circuited                        |
 | Evidence  | Decide truth/confidence; own UI hints as source of truth       | RetrievalPlan + retrieved docs + latest user message                                    | EvidenceSummary (verdict, confidence, selectedEvidence, uiHints, semanticFlags)          | OpenAI Responses API with `ModelConfig.evidenceModel` (nano) or `evidenceModelDeepDive` (mini, e.g., gpt-5-mini-2025-08-07) when set |
-| Answer    | Turn evidence into first-person text without re-deciding truth | RetrievalPlan + EvidenceSummary + persona/profile + short history                       | AnswerPayload (message + optional thoughts)                                              | OpenAI Responses API with `ModelConfig.answerModel` (nano, e.g., gpt-5-nano-2025-08-07), streaming tokens                            |
+| Answer    | Turn evidence into first-person text without re-deciding truth | RetrievalPlan + EvidenceSummary + persona/profile + short history                       | AnswerPayload (message + optional thoughts)                                              | OpenAI Responses API with `ModelConfig.answerModel` (nano or mini; mini recommended for voice adherence), streaming tokens           |
 
 ---
 
@@ -1035,7 +1035,8 @@ All LLM interactions use the OpenAI Responses API with:
 All runtime model IDs are read from `chat.config.yml`. We use three model classes: nano (e.g., gpt‑5‑nano‑2025‑08‑07) for low cost/latency, mini (e.g., gpt‑5‑mini‑2025‑08‑07) for deeper reasoning when needed, and full-size (e.g., gpt‑5.1‑2025‑11‑13) for strongest quality.
 
 - Offline (preprocess) – full-size model (e.g., gpt‑5.1‑2025‑11‑13) for enrichment & persona + text-embedding-3-large for embeddings.
-- Online (Planner/Evidence/Answer) – nano by default for cost/latency; Evidence may opt into a mini model for deep dives when configured.
+- Online (Planner/Evidence) – nano by default for cost/latency; Evidence may opt into a mini model for deep dives when configured.
+- Online (Answer) – nano or mini. Mini is recommended when voice examples are important, as it adheres to persona/voice guidelines more reliably than nano. Trade-off is slightly higher cost/latency.
 
 #### 5.0.1 Token Budgets & Sliding Window
 
