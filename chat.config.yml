@@ -6,14 +6,17 @@ owner:
   ownerPronouns: he/him
 
 models:
-  # planner/evidence/answer: OpenAI chat models (examples: gpt-5-nano-2025-06-01, gpt-5-nano-2025-08-07, gpt-4.1-nano-2025-04-14)
+  # planner/evidence/answer: OpenAI chat models (examples: gpt-5-mini-2025-08-07, gpt-5-nano-2025-08-07, gpt-4.1-nano-2025-04-14)
   plannerModel: gpt-5-nano-2025-08-07
   evidenceModel: gpt-5-nano-2025-08-07
-  answerModel: gpt-5-nano-2025-08-07
-  # reasoningEffort: minimal | low | medium | high (only applies to reasoning models like gpt-5* and o*)
+  # evidenceModelDeepDive: gpt-5-mini-2025-08-07 # enable for broad/complex evidence passes
+  answerModel: gpt-5-mini-2025-08-07
+  # Optional: clamp 0-2; lower is more deterministic/closer to voice examples.
+  # answerTemperature: 0.2
+  embeddingModel: text-embedding-3-large
   reasoning:
-    planner: low
-    evidence: low
+    planner: minimal
+    evidence: minimal
     answer: minimal
 tokens:
   planner: 16000 # per-stage soft token ceilings (spec: planner 16k, evidence 12k, answer 16k)

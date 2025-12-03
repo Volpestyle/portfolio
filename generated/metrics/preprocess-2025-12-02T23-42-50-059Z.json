@@ -1,0 +1,45 @@
+{
+  "runId": "2025-12-02T23-42-50-059Z",
+  "ownerId": "portfolio-owner",
+  "startedAt": "2025-12-02T23:42:50.060Z",
+  "finishedAt": "2025-12-02T23:42:56.860Z",
+  "totals": {
+    "calls": 1,
+    "ok": 1,
+    "inputTokens": 1892,
+    "outputTokens": 415,
+    "totalTokens": 2307,
+    "costUsdEstimate": 0.006515,
+    "withCost": 1
+  },
+  "stageTotals": {
+    "persona_generation": {
+      "stage": "persona_generation",
+      "calls": 1,
+      "ok": 1,
+      "inputTokens": 1892,
+      "outputTokens": 415,
+      "totalTokens": 2307,
+      "costUsdEstimate": 0.006515,
+      "models": [
+        "gpt-5.1-2025-11-13"
+      ]
+    }
+  },
+  "calls": [
+    {
+      "stage": "persona_generation",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 1892,
+      "outputTokens": 415,
+      "totalTokens": 2307,
+      "costUsdEstimate": 0.006515,
+      "durationMs": 6794.616875000001,
+      "status": "ok",
+      "meta": {
+        "profile": "James Volpe"
+      },
+      "startedAt": "2025-12-02T23:42:50.063Z"
+    }
+  ]
+}

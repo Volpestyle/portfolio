@@ -1,0 +1,561 @@
+{
+  "runId": "2025-12-02T23-31-27-209Z",
+  "ownerId": "portfolio-owner",
+  "startedAt": "2025-12-02T23:31:27.210Z",
+  "finishedAt": "2025-12-02T23:32:29.261Z",
+  "totals": {
+    "calls": 36,
+    "ok": 36,
+    "inputTokens": 24105,
+    "outputTokens": 8264,
+    "totalTokens": 32369,
+    "costUsdEstimate": 0.107239,
+    "withCost": 36
+  },
+  "stageTotals": {
+    "project_enrichment": {
+      "stage": "project_enrichment",
+      "calls": 33,
+      "ok": 33,
+      "inputTokens": 20757,
+      "outputTokens": 6686,
+      "totalTokens": 27443,
+      "costUsdEstimate": 0.08822099999999997,
+      "models": [
+        "gpt-5.1-2025-11-13",
+        "text-embedding-3-large"
+      ]
+    },
+    "other": {
+      "stage": "other",
+      "calls": 2,
+      "ok": 2,
+      "inputTokens": 2061,
+      "outputTokens": 1108,
+      "totalTokens": 3169,
+      "costUsdEstimate": 0.012709000000000002,
+      "models": [
+        "gpt-5.1-2025-11-13",
+        "text-embedding-3-large"
+      ]
+    },
+    "persona_generation": {
+      "stage": "persona_generation",
+      "calls": 1,
+      "ok": 1,
+      "inputTokens": 1287,
+      "outputTokens": 470,
+      "totalTokens": 1757,
+      "costUsdEstimate": 0.006309,
+      "models": [
+        "gpt-5.1-2025-11-13"
+      ]
+    }
+  },
+  "calls": [
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 100,
+      "outputTokens": 42,
+      "totalTokens": 142,
+      "costUsdEstimate": 0.000545,
+      "durationMs": 1576.023792,
+      "status": "ok",
+      "meta": {
+        "repo": "improview"
+      },
+      "startedAt": "2025-12-02T23:31:31.945Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 290,
+      "outputTokens": 185,
+      "totalTokens": 475,
+      "costUsdEstimate": 0.002213,
+      "durationMs": 3723.919833,
+      "status": "ok",
+      "meta": {
+        "repo": "ilikeyacut"
+      },
+      "startedAt": "2025-12-02T23:31:31.948Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 185,
+      "outputTokens": 195,
+      "totalTokens": 380,
+      "costUsdEstimate": 0.002181,
+      "durationMs": 3668.4454159999996,
+      "status": "ok",
+      "meta": {
+        "repo": "improview"
+      },
+      "startedAt": "2025-12-02T23:31:33.522Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "text-embedding-3-large",
+      "inputTokens": 140,
+      "outputTokens": 0,
+      "totalTokens": 140,
+      "costUsdEstimate": 0.000018,
+      "durationMs": 415.75879200000054,
+      "status": "ok",
+      "meta": {
+        "repo": "improview"
+      },
+      "startedAt": "2025-12-02T23:31:37.191Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 1438,
+      "outputTokens": 344,
+      "totalTokens": 1782,
+      "costUsdEstimate": 0.005237,
+      "durationMs": 6402.069833,
+      "status": "ok",
+      "meta": {
+        "repo": "wallcrawler"
+      },
+      "startedAt": "2025-12-02T23:31:31.995Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 1208,
+      "outputTokens": 375,
+      "totalTokens": 1583,
+      "costUsdEstimate": 0.00526,
+      "durationMs": 4488.5482919999995,
+      "status": "ok",
+      "meta": {
+        "repo": "jobseek"
+      },
+      "startedAt": "2025-12-02T23:31:37.963Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 1626,
+      "outputTokens": 515,
+      "totalTokens": 2141,
+      "costUsdEstimate": 0.007182,
+      "durationMs": 7026.4165410000005,
+      "status": "ok",
+      "meta": {
+        "repo": "wallcrawler"
+      },
+      "startedAt": "2025-12-02T23:31:38.397Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "text-embedding-3-large",
+      "inputTokens": 535,
+      "outputTokens": 0,
+      "totalTokens": 535,
+      "costUsdEstimate": 0.00007,
+      "durationMs": 390.70937499999854,
+      "status": "ok",
+      "meta": {
+        "repo": "wallcrawler"
+      },
+      "startedAt": "2025-12-02T23:31:45.423Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 1407,
+      "outputTokens": 429,
+      "totalTokens": 1836,
+      "costUsdEstimate": 0.006049,
+      "durationMs": 5811.473582999999,
+      "status": "ok",
+      "meta": {
+        "repo": "jobseek"
+      },
+      "startedAt": "2025-12-02T23:31:42.452Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "text-embedding-3-large",
+      "inputTokens": 527,
+      "outputTokens": 0,
+      "totalTokens": 527,
+      "costUsdEstimate": 0.000069,
+      "durationMs": 325.10549999999785,
+      "status": "ok",
+      "meta": {
+        "repo": "jobseek"
+      },
+      "startedAt": "2025-12-02T23:31:48.263Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 712,
+      "outputTokens": 181,
+      "totalTokens": 893,
+      "costUsdEstimate": 0.0027,
+      "durationMs": 2337.2112500000003,
+      "status": "ok",
+      "meta": {
+        "repo": "rubiks-cube"
+      },
+      "startedAt": "2025-12-02T23:31:48.803Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 422,
+      "outputTokens": 342,
+      "totalTokens": 764,
+      "costUsdEstimate": 0.003948,
+      "durationMs": 15808.141792,
+      "status": "ok",
+      "meta": {
+        "repo": "ilikeyacut"
+      },
+      "startedAt": "2025-12-02T23:31:35.673Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "text-embedding-3-large",
+      "inputTokens": 274,
+      "outputTokens": 0,
+      "totalTokens": 274,
+      "costUsdEstimate": 0.000036,
+      "durationMs": 248.22612500000105,
+      "status": "ok",
+      "meta": {
+        "repo": "ilikeyacut"
+      },
+      "startedAt": "2025-12-02T23:31:51.481Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 1945,
+      "outputTokens": 646,
+      "totalTokens": 2591,
+      "costUsdEstimate": 0.008891,
+      "durationMs": 6873.190416000001,
+      "status": "ok",
+      "meta": {
+        "repo": "portfolio"
+      },
+      "startedAt": "2025-12-02T23:31:46.122Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 247,
+      "outputTokens": 145,
+      "totalTokens": 392,
+      "costUsdEstimate": 0.001759,
+      "durationMs": 1663.3661250000005,
+      "status": "ok",
+      "meta": {
+        "repo": "AWS-IAM-Projects"
+      },
+      "startedAt": "2025-12-02T23:31:51.958Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 837,
+      "outputTokens": 337,
+      "totalTokens": 1174,
+      "costUsdEstimate": 0.004416,
+      "durationMs": 4684.482709,
+      "status": "ok",
+      "meta": {
+        "repo": "rubiks-cube"
+      },
+      "startedAt": "2025-12-02T23:31:51.140Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "text-embedding-3-large",
+      "inputTokens": 332,
+      "outputTokens": 0,
+      "totalTokens": 332,
+      "costUsdEstimate": 0.000043,
+      "durationMs": 333.7608330000003,
+      "status": "ok",
+      "meta": {
+        "repo": "rubiks-cube"
+      },
+      "startedAt": "2025-12-02T23:31:55.825Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 371,
+      "outputTokens": 382,
+      "totalTokens": 753,
+      "costUsdEstimate": 0.004284,
+      "durationMs": 5426.212625,
+      "status": "ok",
+      "meta": {
+        "repo": "AWS-IAM-Projects"
+      },
+      "startedAt": "2025-12-02T23:31:53.621Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 180,
+      "outputTokens": 84,
+      "totalTokens": 264,
+      "costUsdEstimate": 0.001065,
+      "durationMs": 2885.2905420000025,
+      "status": "ok",
+      "meta": {
+        "repo": "slash-siege"
+      },
+      "startedAt": "2025-12-02T23:31:56.442Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "text-embedding-3-large",
+      "inputTokens": 300,
+      "outputTokens": 0,
+      "totalTokens": 300,
+      "costUsdEstimate": 0.000039,
+      "durationMs": 435.3992920000019,
+      "status": "ok",
+      "meta": {
+        "repo": "AWS-IAM-Projects"
+      },
+      "startedAt": "2025-12-02T23:31:59.048Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 2202,
+      "outputTokens": 637,
+      "totalTokens": 2839,
+      "costUsdEstimate": 0.009123,
+      "durationMs": 8305.441333000002,
+      "status": "ok",
+      "meta": {
+        "repo": "portfolio"
+      },
+      "startedAt": "2025-12-02T23:31:52.995Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 421,
+      "outputTokens": 226,
+      "totalTokens": 647,
+      "costUsdEstimate": 0.002786,
+      "durationMs": 2293.4373750000013,
+      "status": "ok",
+      "meta": {
+        "repo": "AED-Sheets"
+      },
+      "startedAt": "2025-12-02T23:31:59.727Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "text-embedding-3-large",
+      "inputTokens": 822,
+      "outputTokens": 0,
+      "totalTokens": 822,
+      "costUsdEstimate": 0.000107,
+      "durationMs": 1060.7558340000032,
+      "status": "ok",
+      "meta": {
+        "repo": "portfolio"
+      },
+      "startedAt": "2025-12-02T23:32:01.301Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 276,
+      "outputTokens": 261,
+      "totalTokens": 537,
+      "costUsdEstimate": 0.002955,
+      "durationMs": 3652.4447500000024,
+      "status": "ok",
+      "meta": {
+        "repo": "slash-siege"
+      },
+      "startedAt": "2025-12-02T23:31:59.327Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "text-embedding-3-large",
+      "inputTokens": 189,
+      "outputTokens": 0,
+      "totalTokens": 189,
+      "costUsdEstimate": 0.000025,
+      "durationMs": 224.46704200000386,
+      "status": "ok",
+      "meta": {
+        "repo": "slash-siege"
+      },
+      "startedAt": "2025-12-02T23:32:02.980Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 173,
+      "outputTokens": 111,
+      "totalTokens": 284,
+      "costUsdEstimate": 0.001326,
+      "durationMs": 1544.7430000000022,
+      "status": "ok",
+      "meta": {
+        "repo": "personal-website-v1"
+      },
+      "startedAt": "2025-12-02T23:32:03.427Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 831,
+      "outputTokens": 197,
+      "totalTokens": 1028,
+      "costUsdEstimate": 0.003009,
+      "durationMs": 2900.3732919999966,
+      "status": "ok",
+      "meta": {
+        "repo": "Parse-Tree-Calculator"
+      },
+      "startedAt": "2025-12-02T23:32:02.591Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 560,
+      "outputTokens": 393,
+      "totalTokens": 953,
+      "costUsdEstimate": 0.00463,
+      "durationMs": 5677.021165999999,
+      "status": "ok",
+      "meta": {
+        "repo": "AED-Sheets"
+      },
+      "startedAt": "2025-12-02T23:32:02.021Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "text-embedding-3-large",
+      "inputTokens": 296,
+      "outputTokens": 0,
+      "totalTokens": 296,
+      "costUsdEstimate": 0.000038,
+      "durationMs": 488.614625000002,
+      "status": "ok",
+      "meta": {
+        "repo": "AED-Sheets"
+      },
+      "startedAt": "2025-12-02T23:32:07.701Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 286,
+      "outputTokens": 272,
+      "totalTokens": 558,
+      "costUsdEstimate": 0.003078,
+      "durationMs": 5042.281083000002,
+      "status": "ok",
+      "meta": {
+        "repo": "personal-website-v1"
+      },
+      "startedAt": "2025-12-02T23:32:04.972Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "text-embedding-3-large",
+      "inputTokens": 264,
+      "outputTokens": 0,
+      "totalTokens": 264,
+      "costUsdEstimate": 0.000034,
+      "durationMs": 398.28454200000124,
+      "status": "ok",
+      "meta": {
+        "repo": "personal-website-v1"
+      },
+      "startedAt": "2025-12-02T23:32:10.015Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 945,
+      "outputTokens": 387,
+      "totalTokens": 1332,
+      "costUsdEstimate": 0.005051,
+      "durationMs": 5365.521457999996,
+      "status": "ok",
+      "meta": {
+        "repo": "Parse-Tree-Calculator"
+      },
+      "startedAt": "2025-12-02T23:32:05.492Z"
+    },
+    {
+      "stage": "project_enrichment",
+      "model": "text-embedding-3-large",
+      "inputTokens": 416,
+      "outputTokens": 0,
+      "totalTokens": 416,
+      "costUsdEstimate": 0.000054,
+      "durationMs": 280.3054589999956,
+      "status": "ok",
+      "meta": {
+        "repo": "Parse-Tree-Calculator"
+      },
+      "startedAt": "2025-12-02T23:32:10.857Z"
+    },
+    {
+      "stage": "other",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 1215,
+      "outputTokens": 1108,
+      "totalTokens": 2323,
+      "costUsdEstimate": 0.012599,
+      "durationMs": 8902.435166999996,
+      "status": "ok",
+      "meta": {
+        "pdf": "jcvolpe-resume.pdf"
+      },
+      "startedAt": "2025-12-02T23:32:12.675Z"
+    },
+    {
+      "stage": "other",
+      "model": "text-embedding-3-large",
+      "inputTokens": 846,
+      "outputTokens": 0,
+      "totalTokens": 846,
+      "costUsdEstimate": 0.00011,
+      "durationMs": 917.0452080000032,
+      "status": "ok",
+      "meta": {
+        "batchSize": 11
+      },
+      "startedAt": "2025-12-02T23:32:21.582Z"
+    },
+    {
+      "stage": "persona_generation",
+      "model": "gpt-5.1-2025-11-13",
+      "inputTokens": 1287,
+      "outputTokens": 470,
+      "totalTokens": 1757,
+      "costUsdEstimate": 0.006309,
+      "durationMs": 6745.778624999999,
+      "status": "ok",
+      "meta": {
+        "profile": "James Volpe"
+      },
+      "startedAt": "2025-12-02T23:32:22.514Z"
+    }
+  ]
+}

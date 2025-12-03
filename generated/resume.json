@@ -1,5 +1,5 @@
 {
-  "snapshotDate": "2025-11-27",
+  "snapshotDate": "2025-12-02",
   "experiences": [
     {
       "type": "experience",
@@ -12,18 +12,17 @@
       "endDate": null,
       "isCurrent": true,
       "experienceType": "full_time",
-      "summary": "Leading frontend architecture and UX implementation for the Lowe's Returns Android application used by sales floor associates.",
+      "summary": "Lead engineer driving micro frontend architecture and new UX implementation for the Lowes Returns Android app.",
       "bullets": [
         "Lead the adoption of a micro frontend architecture for the Lowes Returns Android app to improve scalability and developer velocity.",
-        "Implement new React, Ionic, and Capacitor user experiences for the Lowes Returns Android app used by sales floor associates."
+        "Implement new user experiences in React, Ionic, and Capacitor for the Lowes Returns Android app used by sales floor associates."
       ],
       "skills": [
-        "Micro Frontends",
+        "Micro frontends",
         "React",
         "Ionic",
         "Capacitor",
-        "Android",
-        "Frontend Architecture"
+        "Android"
       ],
       "linkedProjects": [],
       "monthsOfExperience": null
@@ -39,25 +38,21 @@
       "endDate": "2023-01-01",
       "isCurrent": false,
       "experienceType": "full_time",
-      "summary": "Developed and supported React-based user experiences for the AWS Identity and Access Management (IAM) Console at scale.",
+      "summary": "Implemented and launched React experiences for the AWS IAM Console and supported production through on-call operations.",
       "bullets": [
         "Led implementation and launch of new React user experiences on the AWS Identity and Access Management Console, impacting thousands of customers, and monitored and remediated incoming customer issues.",
-        "Participated in a monthly on-call rotation for the IAM console, resolving customer and operational issues and presenting weekly status to the broader Identity team.",
+        "Participated in monthly on-call rotation for the IAM console, resolving customer and operational issues and presenting weekly status to the broader Identity team.",
         "Wrote extensive unit and integration tests using React Testing Library, Enzyme, and Cypress.",
-        "Left role voluntarily to relocate closer to family in Chicago, IL; was not affected by layoffs."
+        "Voluntarily left role, not affected by layoffs, to relocate closer to family in Chicago, IL."
       ],
       "skills": [
         "React",
-        "JavaScript",
-        "TypeScript",
         "AWS",
-        "IAM",
+        "Identity and Access Management",
         "React Testing Library",
         "Enzyme",
         "Cypress",
-        "On-call Support",
-        "Monitoring",
-        "Customer Support"
+        "On-call"
       ],
       "linkedProjects": [],
       "monthsOfExperience": 19
@@ -73,21 +68,19 @@
       "endDate": "2020-08-01",
       "isCurrent": false,
       "experienceType": "internship",
-      "summary": "Contributed front-end features and tests to a Dart and React-based web application (Wdesk).",
+      "summary": "Contributed front-end features and tests to a Dart + React web application within an Agile team.",
       "bullets": [
-        "Developed front-end features for a Dart and React based web application, Wdesk.",
-        "Built an improved modal to manage XBRL profiles in Wdesk.",
-        "Collaborated within an Agile team, participating in code review and writing unit and functional tests."
+        "Developed front-end features for a Dart + React based web application, Wdesk.",
+        "Implemented an improved modal to manage XBRL profiles in Wdesk.",
+        "Worked with Agile development methodologies, participated in code reviews, and wrote unit and functional tests."
       ],
       "skills": [
         "Dart",
         "React",
-        "JavaScript",
-        "Front-end Development",
         "Agile",
-        "Unit Testing",
-        "Functional Testing",
-        "Code Review",
+        "Unit testing",
+        "Functional testing",
+        "Code review",
         "XBRL"
       ],
       "linkedProjects": [],
@@ -104,22 +97,21 @@
       "endDate": "2019-08-01",
       "isCurrent": false,
       "experienceType": "internship",
-      "summary": "Sole developer for a full-stack discrepancy logger web application for NPR Audio Engineering.",
+      "summary": "Built and containerized a full-stack discrepancy logger application for NPR Audio Engineering.",
       "bullets": [
-        "Developed an Audio Engineering discrepancy logger web application using MongoDB, Express.js, Angular, and Node.js as the sole developer.",
-        "Containerized the application with Docker to support CI/CD workflows.",
-        "Used Jira and related tools for project management and tracking."
+        "Developed an Audio Engineering discrepancy logger web application using the MEAN stack (MongoDB, Express.js, Angular, Node.js) as the sole developer.",
+        "Containerized the application with Docker for CI/CD.",
+        "Used Jira and other project management tools for task tracking and collaboration."
       ],
       "skills": [
         "MongoDB",
         "Express.js",
         "Angular",
         "Node.js",
-        "Full-stack Development",
         "Docker",
         "CI/CD",
         "Jira",
-        "Project Management"
+        "Full stack development"
       ],
       "linkedProjects": [],
       "monthsOfExperience": 4
@@ -128,7 +120,7 @@
   "education": [
     {
       "type": "education",
-      "id": "isu-bs-software-engineering",
+      "id": "iowa-state-university-bs-software-engineering",
       "institution": "Iowa State University",
       "degree": "B.S.",
       "field": "Software Engineering",
@@ -136,9 +128,9 @@
       "startDate": "2017-08-01",
       "endDate": "2021-05-01",
       "isCurrent": false,
-      "summary": "Bachelor of Science in Software Engineering.",
+      "summary": "Bachelor of Science in Software Engineering with a 3.01 GPA.",
       "bullets": [
-        "GPA: 3.01"
+        "3.01 GPA"
       ],
       "skills": []
     }
@@ -149,22 +141,24 @@
       "id": "technical-education-senior-award",
       "title": "Technical Education Senior Award",
       "date": "2021-05-01",
-      "summary": "Awarded to students who exhibited outstanding work and dedication in the area of Technical Education.",
-      "bullets": [],
+      "summary": "Awarded for outstanding work and dedication in the area of Technical Education.",
+      "bullets": [
+        "Awarded to students who exhibited outstanding work and dedication in the area of Technical Education."
+      ],
       "skills": []
     },
     {
       "type": "award",
-      "id": "wsc-logo-design",
-      "title": "WSC Logo Design - 1st Place",
+      "id": "wsc-logo-design-award",
+      "title": "WSC Logo Design",
       "issuer": "Wheaton Sport Center",
       "date": "2017-05-01",
-      "summary": "Won 1st place prize of $1,000 in a logo design competition hosted by the Wheaton Sport Center in Wheaton, IL.",
-      "bullets": [],
+      "summary": "Won first place in a logo design competition hosted by the Wheaton Sport Center in Wheaton, IL.",
+      "bullets": [
+        "Won 1st place prize of $1,000 for a logo design competition hosted by the Wheaton Sport Center in Wheaton, IL."
+      ],
       "skills": [
-        "Graphic Design",
-        "Logo Design",
-        "Creativity"
+        "Graphic design"
       ]
     }
   ],
@@ -223,12 +217,12 @@
       "id": "personal-projects",
       "name": "Personal Projects",
       "category": "Projects",
-      "summary": "Full-stack web and native mobile applications leveraging machine learning and AI.",
+      "summary": "Full stack web and native mobile applications incorporating machine learning and AI.",
       "skills": [
-        "Full-stack Development",
+        "Full stack development",
         "iOS",
         "Android",
-        "Machine Learning",
+        "Machine learning",
         "AI"
       ]
     }
