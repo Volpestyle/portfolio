@@ -301,6 +301,8 @@ chatApi.run(openaiClient, messages, {
 
 Model IDs for Planner/Evidence/Answer/Embeddings come from `chat.config.yml`; the strings in this spec are illustrative snapshots, not hardcoded defaults.
 
+Planner quality note: on reasoning-capable models, set `stageReasoning.planner` to `low` or higher—`minimal` tends to reduce plan accuracy and produces less inclusive retrieval coverage.
+
 Reasoning emission is a per-run option (`reasoningEnabled`), not part of the runtime config.
 
 Placeholders note: In prompts (Appendix B) we use `{{OWNER_NAME}}` and `{{DOMAIN_LABEL}}` as template placeholders. Runtime must replace those using `OwnerConfig.ownerName` and `OwnerConfig.domainLabel` before sending prompts to the LLM.

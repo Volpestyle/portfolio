@@ -296,7 +296,7 @@ function SurfaceProjectCard({
     <LayoutGroup id={layoutId}>
       <motion.div
         ref={containerRef}
-        className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm"
+        className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/20 backdrop-blur-sm transition-colors duration-300 hover:border-white/20 hover:bg-black/40"
         layout
         initial={false}
         transition={cardTransitions.layout}
