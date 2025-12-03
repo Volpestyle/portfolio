@@ -2,52 +2,62 @@
 %% Output: portfolio-chat-pipeline-internals.png
 flowchart TB
   %% === Inputs ===
-  USER_MSG["Latest user message\n+ recent conversation history"]
-  OWNER_CFG["OwnerConfig + Persona\n(identity context)"]
-  CORPORA[(Projects / Resume / Profile\n+ Embedding indexes)]
+  USER_MSG["Latest user message\n+ sliding-window conversation history"]
+  ID_CONTEXT["Identity context\n(OwnerConfig + ProfileDoc)"]
+  PERSONA["PersonaSummary\n(from preprocess)"]
+  CORPORA[(Projects / Resume / Profile\ncorpora + embedding indexes)]
 
   %% === Pipeline Stages ===
   subgraph PLANNER["Planner (LLM)"]
     P_IN["Inputs:\nsystem prompt,\nconversation window,\nlatest user message"]
-    P_OUT["RetrievalPlan\n(intent, topic,\nexperienceScope,\nretrievalRequests,\nanswerLengthHint,\nuiTarget)"]
+    P_OUT["RetrievalPlan\n(questionType, enumeration, scope,\nretrievalRequests, resumeFacets?,\ncardsEnabled?, topic?)"]
   end
 
   subgraph RETR["Retrieval Engine"]
-    RET_BM25["BM25 search\n(MiniSearch)"]
+    RET_BM25["BM25 shortlist"]
     RET_EMB["Embedding re-rank\n(cosine similarity)"]
     RET_REC["Recency scoring"]
-    RET_COMB["Combined scoring &\nenumeration mode"]
-    RET_OUT["Retrieved docs\n(projects, resume, profile)"]
+    RET_ENUM["Enumeration mode\n(boost topK, cap 50 docs)"]
+    RET_PROFILE["Profile auto-include\nfor narrative/meta"]
+    RET_OUT["Retrieved docs +\nRetrievalSummary[]"]
   end
 
   subgraph EVID["Evidence (LLM)"]
     E_IN["Inputs:\nRetrievalPlan,\nuser message,\nretrieved docs"]
-    E_OUT["EvidenceSummary\n(highLevelAnswer,\nevidenceCompleteness,\nselectedEvidence,\nsemanticFlags,\nuiHints)"]
+    E_OUT["EvidenceSummary\n(verdict, confidence,\nreasoning, selectedEvidence,\nsemanticFlags, uiHints,\nrespects cardsEnabled)"]
   end
 
   subgraph ANSWER["Answer (LLM, streaming)"]
-    A_IN["Inputs:\npersona + profile,\nRetrievalPlan,\nEvidenceSummary,\nconversation window"]
-    A_OUT["AnswerPayload\n(message + thoughts)"]
+    A_IN["Inputs:\npersona + identity context,\nRetrievalPlan,\nEvidenceSummary,\nconversation window"]
+    A_OUT["AnswerPayload\n(streamed message,\noptional thoughts)"]
+    A_META["AnswerMeta\n(model, questionType,\nenumeration, scope,\nverdict, confidence,\nthoughts?)"]
   end
 
   subgraph UI["UI Derivation"]
-    UI_DERIVE["deriveUi()\nvalidate uiHints IDs\nfilter/dedupe/truncate"]
-    UI_PAYLOAD["UiPayload\n(showProjects,\nshowExperiences,\ncoreEvidenceIds)"]
+    UI_DERIVE["deriveUi()\nvalidate uiHints IDs\nrespect cardsEnabled & enumeration\nfilter/dedupe/truncate"]
+    UI_PAYLOAD["UiPayload\n(showProjects,\nshowExperiences,\ncoreEvidenceIds,\nbannerText?)"]
   end
+
+  REASON["PartialReasoningTrace\n(plan, retrieval, evidence,\nanswerMeta)"]
 
   %% === Flow ===
   USER_MSG --> P_IN
-  OWNER_CFG --> P_IN
+  ID_CONTEXT --> P_IN
+  CORPORA --> ID_CONTEXT
   P_IN --> P_OUT
 
-  P_OUT --> RET_BM25
   CORPORA --> RET_BM25
-  P_OUT --> RET_EMB
   CORPORA --> RET_EMB
-  RET_BM25 --> RET_COMB
-  RET_EMB --> RET_COMB
-  RET_COMB --> RET_REC
-  RET_REC --> RET_OUT
+  P_OUT --> RET_BM25
+  P_OUT --> RET_EMB
+  RET_BM25 --> RET_EMB
+  RET_EMB --> RET_REC
+  P_OUT --> RET_ENUM
+  RET_REC --> RET_ENUM
+  RET_ENUM --> RET_OUT
+  P_OUT --> RET_PROFILE
+  CORPORA --> RET_PROFILE
+  RET_PROFILE --> RET_OUT
 
   P_OUT --> E_IN
   RET_OUT --> E_IN
@@ -55,13 +65,23 @@ flowchart TB
 
   P_OUT --> A_IN
   E_OUT --> A_IN
-  OWNER_CFG --> A_IN
+  PERSONA --> A_IN
+  ID_CONTEXT --> A_IN
   A_IN --> A_OUT
+  A_OUT --> A_META
 
+  P_OUT --> UI_DERIVE
   E_OUT --> UI_DERIVE
   RET_OUT --> UI_DERIVE
   UI_DERIVE --> UI_PAYLOAD
 
+  P_OUT --> REASON
+  RET_OUT --> REASON
+  E_OUT --> REASON
+  A_META --> REASON
+
   %% === SSE outputs ===
-  A_OUT -->|SSE token events| UI_CLIENT[[Frontend Chat UI]]
+  UI_CLIENT[[Frontend Chat UI]]
+  A_OUT -->|SSE token events| UI_CLIENT
   UI_PAYLOAD -->|SSE ui events| UI_CLIENT
+  REASON -->|SSE reasoning events| UI_CLIENT

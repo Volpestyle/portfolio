@@ -9,7 +9,7 @@ sequenceDiagram
     participant MID as Rate-limit &\nBudget Middleware
     participant ORC as Chat Orchestrator
     participant RET as Retrieval & Data
-    participant OAI as OpenAI\nResponses / Embeddings
+    participant OAI as OpenAI\nResponses / Embeddings / Moderations
 
     %% User sends message
     U->>F: Type message & click "Send"
@@ -21,8 +21,13 @@ sequenceDiagram
     alt rate limited or budget exceeded
         API-->>F: HTTP 429/503 JSON error\n(no SSE stream)
     else allowed
-        API-->>F: Open SSE stream headers
-        F-->>F: Attach EventSource to /api/chat
+        API->>OAI: Input moderation check\n(OpenAI Moderations)
+        alt input flagged
+            API-->>F: HTTP 200 JSON refusal\n(no SSE stream)
+        else clean
+            API-->>F: Open SSE stream headers
+            F-->>F: Attach EventSource to /api/chat
+        end
     end
 
     %% Planner
@@ -52,21 +57,47 @@ sequenceDiagram
     API->>F: event: stage (evidence_complete)
     API->>F: event: reasoning { plan, retrieval, evidence }
     API->>F: event: ui (UiPayload\nderived from Evidence)
+    opt host UI actions or downloads
+        API->>F: event: ui_actions { actions }\n(optional highlight/scroll/filter)
+        API->>F: event: attachment { ... }\n(optional download payloads)
+    end
 
     %% Answer (streaming)
     API->>F: event: stage (answer_start)
     ORC->>OAI: Answer LLM call\n(streaming)
-    loop answer tokens
-        OAI-->>ORC: next answer token
-        ORC-->>API: token
-        API->>F: event: token { token }
+    alt output moderation disabled
+        loop answer tokens
+            OAI-->>ORC: next answer token
+            ORC-->>API: token
+            API->>F: event: token { token }
+        end
+    else output moderation enabled
+        loop buffer tokens
+            OAI-->>ORC: next answer token
+            ORC-->>API: buffer token
+        end
     end
     OAI-->>ORC: final AnswerPayload JSON
     ORC-->>API: AnswerMeta (token counts, etc.)
     API->>F: event: stage (answer_complete)
     API->>F: event: reasoning { plan, retrieval, evidence, answerMeta }
+    alt output moderation enabled
+        API->>OAI: Output moderation check\n(buffered text)
+        alt flagged
+            API->>F: event: error { code: 'output_moderated' }\n(no tokens streamed)
+        else clean
+            API->>F: replay buffered token events
+        end
+    end
+    opt non-token payloads
+        API->>F: event: item { kind: 'answer' }\n(reserved for future blocks)
+    end
 
     %% Completion
-    API->>F: event: done { totalDurationMs, truncationApplied? }
-    API-->>F: Close SSE stream
+    alt pipeline success (no errors emitted)
+        API->>F: event: done { totalDurationMs, truncationApplied? }
+        API-->>F: Close SSE stream
+    else error emitted mid-stream (LLM / output moderation / network)
+        API-->>F: Close SSE stream
+    end
     F-->>U: Final rendered answer + cards

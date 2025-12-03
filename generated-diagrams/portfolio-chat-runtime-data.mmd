@@ -21,12 +21,13 @@ flowchart LR
   subgraph RUNTIME_DATA["Runtime DataProviders & Retrieval"]
     DP["DataProviders\n(projects, resume,\nprofile, persona,\nembeddingIndexes)"]
     REPO["Repositories & Rankers\n(project/experience/profile\n+ semantic rankers)"]
+    IDENTITY["IdentityContext\n(owner + profile)"]
   end
 
   %% === Chat Runtime / API ===
   subgraph RUNTIME["Chat Runtime"]
-    CHAT_API["createChatApi\n(packages/chat-next-api)"]
-    CHAT_RT["createChatRuntime\n(packages/chat-orchestrator)"]
+    CHAT_API["createChatApi\n(runtimeOptions: owner, modelConfig,\npersona, identityContext)"]
+    CHAT_RT["createChatRuntime\n(Planner → Retrieval → Evidence → Answer)"]
   end
 
   %% wiring from generated -> providers
@@ -36,11 +37,16 @@ flowchart LR
   RES_EMB --> DP
   PROF --> DP
   PERS --> DP
+  PROF --> IDENTITY
+  OC --> IDENTITY
 
   %% config into runtime
   OC --> CHAT_API
   MC --> CHAT_API
+  CHAT_YML --> MC
   DP --> REPO
+  DP --> CHAT_API
+  IDENTITY --> CHAT_API
   REPO --> CHAT_API
 
   CHAT_API --> CHAT_RT

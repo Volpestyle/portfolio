@@ -5,18 +5,21 @@ flowchart LR
   SSE[/"SSE stream\nfrom /api/chat"/]
 
   subgraph ROUTER["Event Router & State"]
-    ROUTE["EventSource.onmessage\n+ event-type router"]
+    ROUTE["EventSource handlers\nswitch(event)"]
 
     subgraph CHAT_STATE["Chat Thread State"]
       TOKENS["Append streamed tokens\nto active assistant message"]
+      ITEMS["Non-token items\n(event: item)"]
       MSGS["Messages list\n(history per conversationId)"]
     end
 
     subgraph UI_STATE["UI & Progress State"]
-      STAGE["Pipeline progress\n(planner / retrieval / evidence / answer)"]
+      STAGE["Pipeline progress + meta\n(planner / retrieval / evidence / answer)"]
       CARDS["Cards state\n(showProjects, showExperiences)"]
+      ACTIONS["UI actions queue\n(ui_actions events)"]
+      ATTACH["Attachments/downloads\n(event: attachment)"]
       ERR_STATE["Error state\n(code, message, retryable)"]
-      DONE_STATE["Done state\n(durations, truncationApplied)"]
+      DONE_STATE["Done state\n(duration, truncationApplied)"]
     end
 
     subgraph DEVTOOLS["Optional Dev Reasoning UI"]
@@ -27,6 +30,8 @@ flowchart LR
   subgraph RENDER["React UI Components"]
     CHAT_UI["Chat thread UI\n(bubbles, typing indicator)"]
     CARDS_UI["Portfolio cards UI\n(projects & experiences)"]
+    ACTIONS_UI["Host UI actions\n(highlight/scroll/filter)"]
+    ATTACH_UI["Attachments/download UI"]
     PROGRESS_UI[Stage/progress indicator]
     ERROR_UI[Error banner / retry button]
     DEV_UI["Devtools panel\n(reasoning, metrics)"]
@@ -37,10 +42,14 @@ flowchart LR
 
   %% --- Routing by event type ---
   ROUTE -->|event: token| TOKENS
+  ROUTE -->|event: item| ITEMS
   TOKENS --> MSGS
+  ITEMS --> MSGS
 
   ROUTE -->|event: stage| STAGE
   ROUTE -->|event: ui| CARDS
+  ROUTE -->|event: ui_actions| ACTIONS
+  ROUTE -->|event: attachment| ATTACH
   ROUTE -->|event: reasoning| REASON
   ROUTE -->|event: error| ERR_STATE
   ROUTE -->|event: done| DONE_STATE
@@ -48,8 +57,11 @@ flowchart LR
   %% --- State -> UI ---
   MSGS --> CHAT_UI
   TOKENS --> CHAT_UI
+  ITEMS --> CHAT_UI
   STAGE --> PROGRESS_UI
   CARDS --> CARDS_UI
+  ACTIONS --> ACTIONS_UI
+  ATTACH --> ATTACH_UI
   ERR_STATE --> ERROR_UI
   DONE_STATE --> PROGRESS_UI
 

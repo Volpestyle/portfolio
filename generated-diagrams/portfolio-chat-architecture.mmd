@@ -12,13 +12,15 @@ flowchart LR
   subgraph SERVER["Next.js Server"]
     API[/"POST /api/chat\n(SSE)"/]
     MIDDLEWARE[["Rate-limit & Budget\nMiddleware"]]
-    ORCH["Chat Orchestrator\n(Planner -> Retrieval -> Evidence -> Answer)"]
+    MOD_IN["Input Moderation\n(OpenAI Moderations)"]
+    ORCH["Chat Orchestrator\n(Planner -> Retrieval -> Evidence -> Answer)\n+ UiPayload + ReasoningTrace"]
   end
 
   %% === Data Layer & Retrieval ===
   subgraph DATA["Portfolio Data & Retrieval"]
     CORPORA[(generated/\nprojects.json\nresume.json\nprofile.json)]
     EMBED_IDX[(generated/\nprojects-embeddings.json\nresume-embeddings.json)]
+    PERSONA[(generated/\npersona.json\npersona summary)]
     RETRIEVAL["Retrieval Engine\n(BM25 + embeddings + recency)"]
   end
 
@@ -26,6 +28,7 @@ flowchart LR
   subgraph OPENAI["OpenAI APIs"]
     LLM["Responses API\n(Planner / Evidence / Answer)"]
     EMB["Embeddings API\n(text-embedding-3-large)"]
+    MOD_API["Moderations API\n(input/output checks)"]
   end
 
   %% === Infra & Observability ===
@@ -38,19 +41,24 @@ flowchart LR
   %% --- Client <-> Server ---
   UI -->|ChatRequestPayload\nHTTP POST| API
   API --> MIDDLEWARE
-  MIDDLEWARE -->|allowed| ORCH
+  MIDDLEWARE -->|allowed| MOD_IN
   MIDDLEWARE -->|429 / 503| UI
+  MOD_IN -->|flagged 200 refusal| UI
+  MOD_IN -->|clean| ORCH
 
   %% --- Orchestrator <-> Data & LLMs ---
   ORCH --> RETRIEVAL
   RETRIEVAL --> CORPORA
   RETRIEVAL --> EMBED_IDX
   RETRIEVAL -->|embed queries| EMB
+  PERSONA --> ORCH
 
   ORCH -->|Planner/Evidence/Answer calls| LLM
+  MOD_IN -->|screen input| MOD_API
+  API -->|output moderation| MOD_API
 
   %% --- SSE back to client ---
-  API -->|SSE: stage, reasoning,\nui, token, item, done, error| UI
+  API -->|SSE: stage, reasoning,\nui, token, item, attachment,\nui_actions, done, error\nbuffered + moderated when enabled| UI
 
   %% --- Infra wiring ---
   MIDDLEWARE --> REDIS
