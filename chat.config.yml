@@ -15,7 +15,7 @@ models:
   # answerTemperature: 0.2
   embeddingModel: text-embedding-3-large
   reasoning:
-    planner: minimal
+    planner: low
     evidence: minimal
     answer: minimal
 tokens:
