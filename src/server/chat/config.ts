@@ -2,20 +2,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
 import type { ChatRuntimeOptions } from '@portfolio/chat-orchestrator';
-import type { OwnerConfig, ModelConfig, ReasoningEffort, StageReasoningConfig } from '@portfolio/chat-contract';
+import type { OwnerConfig, ModelConfig, StageReasoningConfig } from '@portfolio/chat-contract';
 
 export type ChatConfig = {
   owner?: OwnerConfig;
   models?: {
     default?: string;
-    planner?: string;
+    plannerModel?: string;
     evidenceModel?: string;
+    evidenceModelDeepDive?: string;
     answerModel?: string;
-    evidenceDeepDive?: string;
-    embedding?: string;
-    /** @deprecated Use reasoning.* for per-stage control */
-    reasoningEffort?: ReasoningEffort;
+    embeddingModel?: string;
     reasoning?: StageReasoningConfig;
+    answerTemperature?: number;
   };
   tokens?: {
     planner?: number;
@@ -73,12 +72,23 @@ function loadPreprocessConfig(): PreprocessConfig | undefined {
   return undefined;
 }
 
+function normalizeTemperature(value?: number): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined;
+  }
+  const clamped = Math.min(2, Math.max(0, value));
+  return clamped;
+}
+
 function trimModelConfig(config?: Partial<ModelConfig>): Partial<ModelConfig> | undefined {
   if (!config) return undefined;
   const entries = Object.entries(config).filter(([key, value]) => {
     // Keep non-empty strings for model names
     if (typeof value === 'string') {
       return value.trim().length > 0;
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return true;
     }
     // Keep stageReasoning object if it has any defined values
     if (key === 'stageReasoning' && value && typeof value === 'object') {
@@ -97,8 +107,8 @@ export function resolveChatModelConfig(config?: ChatConfig): Partial<ModelConfig
   const base = config.models.default;
   const preprocess = loadPreprocessConfig();
   const resolveEmbedding = (): string | undefined => {
-    const explicit = config.models?.embedding;
-    if (explicit && explicit.trim().length) {
+    const explicit = config.models?.embeddingModel;
+    if (explicit?.trim()) {
       return explicit.trim();
     }
     if (preprocess?.models?.embeddingModel?.trim()) {
@@ -116,21 +126,17 @@ export function resolveChatModelConfig(config?: ChatConfig): Partial<ModelConfig
   if (!answerModel?.trim()) {
     throw new Error('chat.config.yml is missing models.answerModel');
   }
-  const plannerModel = config.models.planner ?? answerModel;
+  const plannerModel = config.models.plannerModel ?? answerModel;
   const evidenceModel = config.models.evidenceModel ?? answerModel;
-  const evidenceModelDeepDive = config.models.evidenceDeepDive;
+  const evidenceModelDeepDive = config.models.evidenceModelDeepDive;
 
-  // Build stageReasoning from new per-stage config, falling back to legacy reasoningEffort
-  const legacyEffort = config.models.reasoningEffort;
   const stageReasoning: StageReasoningConfig | undefined = config.models.reasoning
     ? {
         planner: config.models.reasoning.planner,
         evidence: config.models.reasoning.evidence,
         answer: config.models.reasoning.answer,
       }
-    : legacyEffort
-      ? { planner: legacyEffort, evidence: legacyEffort, answer: legacyEffort }
-      : undefined;
+    : undefined;
 
   return trimModelConfig({
     plannerModel,
@@ -139,6 +145,7 @@ export function resolveChatModelConfig(config?: ChatConfig): Partial<ModelConfig
     answerModel,
     embeddingModel: resolveEmbedding(),
     stageReasoning,
+    answerTemperature: normalizeTemperature(config.models.answerTemperature),
   });
 }
 
@@ -147,6 +154,9 @@ export function resolveChatRuntimeOptions(config?: ChatConfig): ChatRuntimeOptio
   const modelConfig = resolveChatModelConfig(config);
   const tokenLimits = config.tokens;
   const runtime: ChatRuntimeOptions = {};
+  if (process.env.CHAT_LOG_PROMPTS === '1' || process.env.CHAT_LOG_PROMPTS === 'true') {
+    runtime.logPrompts = true;
+  }
   if (modelConfig) {
     runtime.modelConfig = modelConfig;
   }

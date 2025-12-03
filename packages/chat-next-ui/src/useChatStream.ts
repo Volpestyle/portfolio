@@ -193,7 +193,6 @@ export function useChatStream({
               retrieval: null,
               evidence: null,
               answerMeta: null,
-              uiHintWarnings: null,
               error: reasoningError,
             });
           }

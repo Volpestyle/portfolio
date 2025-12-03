@@ -91,7 +91,7 @@ pnpm chat:preprocess
 ```
 
 This orchestrates every ingestion step (project summaries + embeddings, resume parser, profile builder) and writes refreshed artifacts to `generated/` (`projects.json`, `projects-embeddings.json`, `resume.json`, `resume-embeddings.json`, `profile.json`).
-Inputs you need in the repo: `data/chat/profile.json` and a resume PDF at `public/resume/` (defaults to `resume.filename` in `chat-preprocess.config.yml`, falling back to `resume.pdf` when omitted). The raw resume JSON now defaults to `generated/resume-raw.json` and is produced from the PDF, so you don't need to check in `data/chat/resume.json` unless you want to supply a handcrafted source via `paths.resumeJson`.
+Inputs you need in the repo: `data/chat/profile.json` and a resume PDF at `public/resume/` (defaults to `resume.filename` in `chat-preprocess.config.yml`, falling back to `resume.pdf` when omitted). The raw resume JSON now defaults to `generated/resume-raw.json` and is produced from the PDF, so you don't need to check in `data/chat/resume.json` unless you want to supply a handcrafted source via `paths.resumeJson`. Persona output is now static and comes directly from `profile.json` fields (`systemPersona`, `shortAbout`, `styleGuidelines`, `voiceExamples`).
 
 ## Ask My Portfolio (Chat)
 

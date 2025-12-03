@@ -27,7 +27,7 @@ const chatHandler = createNextChatHandler({
     return buildChatFixtureResponse({ answerModel, headers });
   },
   inputModeration: {
-    enabled: true,
+    enabled: false,
   },
   outputModeration: {
     enabled: true,

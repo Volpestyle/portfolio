@@ -622,7 +622,6 @@ function mergeReasoningTraces(
     retrieval: incoming.retrieval ?? existing?.retrieval ?? null,
     evidence: incoming.evidence ?? existing?.evidence ?? null,
     answerMeta: incoming.answerMeta ?? existing?.answerMeta ?? null,
-    uiHintWarnings: incoming.uiHintWarnings ?? existing?.uiHintWarnings ?? null,
     error: mergeReasoningErrors(
       existing?.error,
       incoming.error,
@@ -646,7 +645,6 @@ function reasoningTracesEqual(a: PartialReasoningTrace, b: PartialReasoningTrace
     a.retrieval === b.retrieval &&
     a.evidence === b.evidence &&
     a.answerMeta === b.answerMeta &&
-    a.uiHintWarnings === b.uiHintWarnings &&
     a.error === b.error
   );
 }

@@ -169,6 +169,10 @@ export const profileSummarySchema: z.ZodType<ProfileSummary> = z.object({
   currentRole: z.string().optional(),
   about: z.union([z.array(z.string()), z.string()]),
   topSkills: z.array(z.string()),
+  systemPersona: z.string().optional(),
+  shortAbout: z.string().optional(),
+  styleGuidelines: z.array(z.string()).optional(),
+  voiceExamples: z.array(z.string()).optional(),
   featuredExperiences: z.array(experienceRecordSchema).optional(),
   socialLinks: z
     .array(

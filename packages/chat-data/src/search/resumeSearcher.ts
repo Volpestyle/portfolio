@@ -240,12 +240,17 @@ export function buildResumeSearchIndex(records: ResumeEntry[]) {
             : record.type === 'skill'
               ? record.name
               : experienceRecord?.title;
+      const locationLike =
+        'location' in record && typeof (record as { location?: string }).location === 'string'
+          ? (record as { location?: string }).location
+          : undefined;
       const bullets = record.type === 'skill' ? [] : record.bullets ?? [];
 
       const tokens = tokenizeWeighted([
         { value: companyLike, weight: 3 },
         { value: titleLike, weight: 3 },
         { value: record.summary ?? '', weight: 2 },
+        { value: locationLike, weight: 2 },
         { value: bullets, weight: 2 },
         { value: record.skills ?? [], weight: 2 },
       ]);

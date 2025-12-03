@@ -19,7 +19,7 @@ export interface ProjectRepository {
   getProjectBySlug(slug: string): Promise<ProjectRecord | undefined>;
 
   /**
-   * Resolve a project by friendly name for backward compatibility with the existing tools.
+   * Resolve a project by friendly name alongside slug lookups.
    */
   getProjectByName(name: string): Promise<ProjectRecord | undefined>;
 
