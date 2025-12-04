@@ -1,11 +1,10 @@
 'use client';
 
-import { createPortal } from 'react-dom';
 import type { ChatMessage, PartialReasoningTrace } from '@portfolio/chat-contract';
 import type { ChatSurfaceState } from '@portfolio/chat-next-ui';
 import { ChatMessageBubble } from '@/components/chat/ChatMessageBubble';
 import { ChatActionSurface } from '@/components/chat/ChatActionSurface';
-import { InlineUiPortalAnchor, InlineUiPortalProvider, useInlineUiPortal } from '@/components/chat/InlineUiPortal';
+import { InlineUiPortal, InlineUiPortalAnchor, InlineUiPortalProvider } from '@/components/chat/InlineUiPortal';
 import { useChat } from '@/hooks/useChat';
 import { ChatReasoningDisplay } from '@/components/chat/ChatReasoningDisplay';
 
@@ -139,25 +138,12 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
         <InlineUiPortalAnchor anchorId={fallbackAnchorId} />
       </div>
       {actionableSurfaces.map((surface) => (
-        <ChatActionSurfacePortal key={surface.anchorId} surface={surface} fallbackAnchorId={fallbackAnchorId} />
+        <InlineUiPortal key={surface.anchorId} anchorId={surface.anchorId} fallbackAnchorId={fallbackAnchorId}>
+          <ChatActionSurface surface={surface} />
+        </InlineUiPortal>
       ))}
     </InlineUiPortalProvider>
   );
-}
-
-function ChatActionSurfacePortal({
-  surface,
-  fallbackAnchorId,
-}: {
-  surface: ChatSurfaceState;
-  fallbackAnchorId: string;
-}) {
-  const { getAnchor } = useInlineUiPortal();
-  const target = getAnchor(surface.anchorId) || getAnchor(fallbackAnchorId);
-  if (!target) {
-    return null;
-  }
-  return createPortal(<ChatActionSurface surface={surface} />, target);
 }
 
 function hasSurfacePayload(surface: ChatSurfaceState) {
