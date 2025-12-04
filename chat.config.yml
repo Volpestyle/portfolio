@@ -16,7 +16,7 @@ models:
   embeddingModel: text-embedding-3-large
   reasoning:
     planner: low
-    evidence: minimal
+    evidence: low
     answer: minimal
 tokens:
   planner: 16000 # per-stage soft token ceilings (spec: planner 16k, evidence 12k, answer 16k)
