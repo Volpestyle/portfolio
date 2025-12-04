@@ -29,9 +29,31 @@ export type ChatApi = {
   run(client: OpenAI, messages: ChatRequestMessage[], options?: RunOptions): Promise<ChatbotResponse>;
 };
 
+const normalizeMinRelevanceScore = (value?: number): number | undefined => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined;
+  }
+  if (value <= 0) return 0;
+  if (value >= 1) return 1;
+  return value;
+};
+
 export function createChatApi(config: ChatApiConfig): ChatApi {
   const retrieval = createRetrieval(config.retrieval);
-  const runtime = createChatRuntime(retrieval, config.runtimeOptions);
+  const runtimeOptions: ChatRuntimeOptions = {
+    ...(config.runtimeOptions ?? {}),
+  };
+  const normalizedMinRelevance = normalizeMinRelevanceScore(
+    config.retrieval.minRelevanceScore ?? config.runtimeOptions?.retrieval?.minRelevanceScore
+  );
+  if (normalizedMinRelevance !== undefined) {
+    runtimeOptions.retrieval = {
+      ...(runtimeOptions.retrieval ?? {}),
+      minRelevanceScore: normalizedMinRelevance,
+    };
+  }
+
+  const runtime = createChatRuntime(retrieval, runtimeOptions);
   return {
     run(client, messages, options) {
       return runtime.run(client, messages, options);

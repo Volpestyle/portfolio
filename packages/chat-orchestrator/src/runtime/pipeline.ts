@@ -97,6 +97,9 @@ export type ChatRuntimeOptions = {
     planner?: number;
     answer?: number;
   };
+  retrieval?: {
+    minRelevanceScore?: number;
+  };
   persona?: PersonaSummary;
   identityContext?: IdentityContext;
   logger?: (event: string, payload: Record<string, unknown>) => void;
@@ -168,6 +171,7 @@ const MAX_BODY_SNIPPET_CHARS = 480;
 const PROJECT_BODY_SNIPPET_COUNT = 4;
 const EXPERIENCE_BODY_SNIPPET_COUNT = 4;
 const MAX_DISPLAY_ITEMS = 10;
+const DEFAULT_MIN_RELEVANCE_SCORE = 0.5; // 50% of top normalized score
 
 // --- Utilities ---
 
@@ -588,6 +592,19 @@ function trimRetrievedDocs(result: RetrievalResult, maxTotal: number): Retrieval
     education: buckets[2]!.items as EducationDoc[],
     awards: buckets[3]!.items as AwardDoc[],
     skills: buckets[4]!.items as SkillDoc[],
+  };
+}
+
+function filterByRelevanceScore(result: RetrievalResult, minScore: number): RetrievalResult {
+  const passesThreshold = <T extends { _score?: number }>(doc: T): boolean => (doc._score ?? 0) >= minScore;
+
+  return {
+    ...result,
+    projects: result.projects.filter(passesThreshold),
+    experiences: result.experiences.filter(passesThreshold),
+    education: result.education.filter(passesThreshold),
+    awards: result.awards.filter(passesThreshold),
+    skills: result.skills.filter(passesThreshold),
   };
 }
 
@@ -1150,7 +1167,7 @@ function normalizeDocId(id: string): string {
 async function executeRetrievalPlan(
   retrieval: RetrievalDrivers,
   plan: RetrievalPlan,
-  options?: { logger?: ChatRuntimeOptions['logger']; cache?: RetrievalCache; ownerId?: string; embeddingModel?: string; onQueryResult?: (summary: RetrievalSummary) => void }
+  options?: { logger?: ChatRuntimeOptions['logger']; cache?: RetrievalCache; ownerId?: string; embeddingModel?: string; minRelevanceScore?: number; onQueryResult?: (summary: RetrievalSummary) => void }
 ): Promise<ExecutedRetrievalResult> {
   const cache = options?.cache;
   const ownerKey = options?.ownerId ?? 'default';
@@ -1236,18 +1253,17 @@ async function executeRetrievalPlan(
   const resumeSplit = splitResumeDocs(resumeDocs);
   const profile = parts.find((p) => p.profile)?.profile;
 
-  // Include profile for meta/bio/greeting turns where planner emitted no queries.
-  const cappedResult = trimRetrievedDocs(
-    {
-      projects,
-      experiences: Array.from(resumeSplit.experience.values()),
-      education: Array.from(resumeSplit.education.values()),
-      awards: Array.from(resumeSplit.award.values()),
-      skills: Array.from(resumeSplit.skill.values()),
-      profile,
-    },
-    12
-  );
+  // Filter out low-relevance docs, then cap total count.
+  const unfilteredResult: RetrievalResult = {
+    projects,
+    experiences: Array.from(resumeSplit.experience.values()),
+    education: Array.from(resumeSplit.education.values()),
+    awards: Array.from(resumeSplit.award.values()),
+    skills: Array.from(resumeSplit.skill.values()),
+    profile,
+  };
+  const relevantResult = filterByRelevanceScore(unfilteredResult, options?.minRelevanceScore ?? DEFAULT_MIN_RELEVANCE_SCORE);
+  const cappedResult = trimRetrievedDocs(relevantResult, 12);
 
   const summaries: RetrievalSummary[] = plan.queries.map((query) => ({
     source: query.source,
@@ -1306,6 +1322,7 @@ function buildAnswerUserContent(input: {
     JSON.stringify(
       retrieved.projects.map((p) => ({
         id: p.id,
+        relevance: p._score ?? 0,
         name: p.name,
         oneLiner: p.oneLiner,
         description: normalizeSnippet(p.description),
@@ -1325,6 +1342,7 @@ function buildAnswerUserContent(input: {
     JSON.stringify(
       retrieved.experiences.map((e) => ({
         id: e.id,
+        relevance: e._score ?? 0,
         company: e.company,
         title: e.title,
         location: e.location,
@@ -1587,6 +1605,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
   const embeddingModel = modelConfig.embeddingModel;
   const stageReasoning = options?.modelConfig?.reasoning;
   const tokenLimits = options?.tokenLimits ?? {};
+  const minRelevanceScore = Math.max(0, Math.min(1, options?.retrieval?.minRelevanceScore ?? DEFAULT_MIN_RELEVANCE_SCORE));
   const logger = options?.logger;
   const runtimePersona = options?.persona;
   const baseLogPrompts = options?.logPrompts ?? false;
@@ -1860,6 +1879,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
             cache: retrievalCache,
             ownerId: effectiveOwnerId,
             embeddingModel,
+            minRelevanceScore,
             onQueryResult: (summary) => emitReasoning({ stage: 'retrieval', notes: `${summary.source}: ${summary.numResults} results` }),
           });
           retrieved = executed.result;

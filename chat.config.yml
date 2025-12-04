@@ -21,3 +21,10 @@ retrieval:
   # Increase or decrease retrieval fan-out; clamped to the contract max (10).
   defaultTopK: 8
   maxTopK: 10
+  # Minimum relevance (0-1) to keep a doc; 0.5 = keep docs scoring at least 50% of the top match.
+  minRelevanceScore: 0.5
+  # Adjust how retrieval combines lexical, semantic, and recency signals (non-negative, capped at 5).
+  weights:
+    textWeight: 0.3
+    semanticWeight: 0.5
+    recencyLambda: 0.2

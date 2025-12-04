@@ -258,4 +258,5 @@ export {
   type SearcherOptions,
   type SearchLogPayload,
   type SearchContext,
+  type SearchWeights,
 } from './search/createSearcher';

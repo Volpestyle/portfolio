@@ -12,6 +12,7 @@ import {
   type ResumeSearchLogPayload,
   type ResumeSearcher,
   type SemanticRanker,
+  type SearchWeights,
 } from '@portfolio/chat-data';
 import type {
   AwardRecord,
@@ -56,7 +57,9 @@ export type RetrievalOptions = {
   experienceSemanticRanker?: ExperienceSemanticRanker | null;
   defaultTopK?: number;
   maxTopK?: number;
+  minRelevanceScore?: number;
   logger?: (event: string, payload: Record<string, unknown>) => void;
+  weights?: SearchWeights;
 };
 
 const DEFAULT_TOPK = 8;
@@ -104,6 +107,7 @@ export function createRetrieval(options: RetrievalOptions): RetrievalDrivers {
           defaultLimit: defaultTopK,
           minLimit: 1,
           maxLimit: maxTopK,
+          weights: options.weights,
           logger: logger ? (payload: ProjectSearchLogPayload) => logger('retrieval.projects', payload) : undefined,
         });
       })();
@@ -121,6 +125,7 @@ export function createRetrieval(options: RetrievalOptions): RetrievalDrivers {
           defaultLimit: defaultTopK,
           minLimit: 1,
           maxLimit: maxTopK,
+          weights: options.weights,
           searchIndex,
           logger: logger ? (payload: ResumeSearchLogPayload) => logger('retrieval.resume', payload) : undefined,
         });

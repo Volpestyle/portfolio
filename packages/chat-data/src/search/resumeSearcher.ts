@@ -1,6 +1,12 @@
 import type { ResumeEntry, ExperienceRecord, ResumeFacet } from '@portfolio/chat-contract';
 import { normalizeValue, includesText } from './utils';
-import { createSearcher, type SearchLogPayload, type SearchSpec, type SearchContext } from './createSearcher';
+import {
+  createSearcher,
+  type SearchLogPayload,
+  type SearchSpec,
+  type SearchContext,
+  type SearchWeights,
+} from './createSearcher';
 import type { ExperienceSemanticRanker } from './experienceSemantic';
 import { tokenizeWeighted } from './tokens';
 import { createMiniSearchIndex, runMiniSearch } from './minisearch';
@@ -37,6 +43,8 @@ export type ResumeSearchLogPayload = ResumeSearchLogFilters & {
   expandedCandidates: number;
   usedSemantic: boolean;
   topScore?: number;
+  topRawScore?: number;
+  normalizationFactor?: number;
   recencyLambda?: number;
   freshestTimestamp?: number | null;
   topRecencyScore?: number;
@@ -57,6 +65,7 @@ export type ResumeSearcherOptions = {
   maxLimit?: number;
   logger?: (payload: ResumeSearchLogPayload) => void;
   getNow?: () => number;
+  weights?: SearchWeights;
 };
 
 const normalizeFacets = (facets?: ResumeFacet[]) =>
@@ -318,6 +327,7 @@ export function createResumeSearcher(records: ResumeEntry[], options?: ResumeSea
       maxLimit,
       getLimit: (input) => input?.limit,
       getNow: options?.getNow,
+      weights: options?.weights,
       logger: logger
         ? (payload: SearchLogPayload<NormalizedResumeFilters>) => {
             const described = describeFilters(payload.filters);
@@ -333,6 +343,8 @@ export function createResumeSearcher(records: ResumeEntry[], options?: ResumeSea
               expandedCandidates: payload.expandedCandidates,
               usedSemantic: payload.usedSemantic,
               topScore: payload.topScore,
+              topRawScore: payload.topRawScore,
+              normalizationFactor: payload.normalizationFactor,
               recencyLambda: payload.recencyLambda,
               freshestTimestamp: payload.freshestTimestamp ?? null,
               topRecencyScore: payload.topRecencyScore,

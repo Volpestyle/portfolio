@@ -26,7 +26,10 @@ export type FilesystemChatProviderOptions = {
 export type ChatBootstrapOptions = FilesystemChatProviderOptions & {
   getEmbeddingClient?: () => Promise<OpenAI | null>;
   runtimeOptions?: ChatApiConfig['runtimeOptions'];
-  retrievalOverrides?: Pick<ChatApiConfig['retrieval'], 'defaultTopK' | 'maxTopK' | 'logger'>;
+  retrievalOverrides?: Pick<
+    ChatApiConfig['retrieval'],
+    'defaultTopK' | 'maxTopK' | 'minRelevanceScore' | 'logger' | 'weights'
+  >;
   personaFile?: unknown;
   owner?: OwnerConfig;
   ownerId?: string;
@@ -99,7 +102,9 @@ export function createPortfolioChatServer(options: ChatBootstrapOptions): Bootst
       experienceSemanticRanker,
       defaultTopK: options.retrievalOverrides?.defaultTopK,
       maxTopK: options.retrievalOverrides?.maxTopK,
+      minRelevanceScore: options.retrievalOverrides?.minRelevanceScore,
       logger: options.retrievalOverrides?.logger,
+      weights: options.retrievalOverrides?.weights,
     },
     runtimeOptions,
   });
