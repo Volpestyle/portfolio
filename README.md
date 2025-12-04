@@ -31,7 +31,7 @@ The AI-powered "Ask My Portfolio" chat experience:
 - **[Chat Logging & Visibility](docs/features/chat/chat-logging.md)** – Debug levels, structured events, CloudWatch integration, and local export tools
 - **[Rate Limits & Cost Guardrails](docs/features/chat/rate-limits-and-cost-guards.md)** – Upstash rate limiting (fail-closed) and OpenAI cost tracking with 30-day alarms
 
-Chat models must be set in `chat.config.yml` (planner/evidence/answer); the embedding model defaults from `chat-preprocess.config.yml` unless you override it in `chat.config.yml`. The runtime will error at startup if any required model is missing after those fallbacks.
+Chat models must be set in `chat.config.yml` (planner/answer); the embedding model defaults from `chat-preprocess.config.yml` unless you override it in `chat.config.yml`. The runtime will error at startup if any required model is missing after those fallbacks.
 
 ### Operations
 
@@ -58,7 +58,7 @@ This workspace uses pnpm workspaces to organize domain logic into focused packag
 - **`@portfolio/chat-data`** – Data access layer: project/resume/profile repositories, BM25 + semantic search
 - **`@portfolio/chat-next-api`** – Server-side chat API: streaming SSE, embeddings, cost metrics, debug logging
 - **`@portfolio/chat-next-ui`** – React components and hooks: `ChatProvider`, `useChat`, streaming state management
-- **`@portfolio/chat-orchestrator`** – Core chat pipeline: planner → retrieval → evidence → answer with prompt templates
+- **`@portfolio/chat-orchestrator`** – Core chat pipeline: planner → retrieval → answer with prompt templates
 - **`@portfolio/chat-preprocess-cli`** – CLI for preprocessing chat data (project knowledge, resume parsing, embeddings)
 
 ### Utilities
@@ -97,13 +97,13 @@ Inputs you need in the repo: `data/chat/profile.json` and a resume PDF at `publi
 
 The chat experience runs on a multi-stage orchestrator pipeline:
 
-- **Planner → Retrieval → Evidence → Answer** pipeline in `packages/chat-orchestrator`; UI is derived from Evidence.uiHints, never directly from retrieval.
+- **Planner → Retrieval → Answer** pipeline in `packages/chat-orchestrator`; UI cards come from `AnswerPayload.uiHints`, never directly from retrieval.
 - **Retrieval** is in-process BM25 + embeddings over the precomputed snapshots in `generated/` (projects, resume, profile) loaded via `src/server/chat/dataProviders.ts`; no external vector DB.
 - **Streaming** via `/api/chat` route emits SSE events (`stage`, `reasoning`, `ui`, `token`, `item`, `attachment`, `ui_actions`, `done`, `error`) using `@portfolio/chat-next-api`; the front-end consumes them through `ChatProvider` from `@portfolio/chat-next-ui`.
 - **Answer payload** is structured JSON: the Answer stage streams `AnswerPayload.message` tokens and also returns optional `thoughts` for dev-only reasoning.
 - **Configuration** supports model overrides, token limits, semantic ranking weights, and debug levels (see [config-notes.md](docs/features/chat/config-notes.md)).
 - **Observability** includes structured logging with correlation IDs, CloudWatch integration, cost metrics, and local debug export (see [chat-logging.md](docs/features/chat/chat-logging.md)).
-- **Safety** enforces rate limits (5/min, 40/hr, 120/day) that fail-closed and a $10/month runtime cost alarm with warning/critical/exceeded thresholds for planner/evidence/answer + embedding calls (see [rate-limits-and-cost-guards.md](docs/features/chat/rate-limits-and-cost-guards.md)).
+- **Safety** enforces rate limits (5/min, 40/hr, 120/day) that fail-closed and a $10/month runtime cost alarm with warning/critical/exceeded thresholds for planner/answer + embedding calls (see [rate-limits-and-cost-guards.md](docs/features/chat/rate-limits-and-cost-guards.md)).
 
 Detailed prompts, JSON schemas, and UI contract examples live in [docs/features/chat/chat-spec.md](docs/features/chat/chat-spec.md).
 

@@ -534,6 +534,17 @@ type PersonaSummary = {
   shortAbout: string; // 1‑2 line self‑intro
   styleGuidelines: string[]; // writing style instructions
   voiceExamples?: string[]; // example user/chatbot exchanges showing desired tone
+  profile?: {
+    updatedAt?: string;
+    fullName?: string;
+    headline?: string;
+    location?: string;
+    currentRole?: string;
+    about?: string[];
+    topSkills?: string[];
+    socialLinks?: string[]; // URL-only list
+    featuredExperienceIds?: string[];
+  };
   generatedAt: string;
 };
 ```
@@ -923,7 +934,7 @@ Processing steps:
 - BM25 shortlist → embedding re-rank → recency weighting → combined score.
 - Profile is short-circuited (no embeddings) and included when requested or when the question is clearly bio/meta.
 - Per-turn results may be reused when the same query repeats within the sliding window.
-- Keep total retrieved docs bounded to avoid Answer prompt bloat (implementation default ~12 docs across sources).
+- Keep total retrieved docs bounded to avoid Answer prompt bloat (implementation default ~12 docs across sources). Profile is only fetched when the planner requests it.
 
 **Query sanitization**
 

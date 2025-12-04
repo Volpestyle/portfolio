@@ -4,7 +4,7 @@ flowchart LR
   %% === Config & Generated Artifacts ===
   subgraph CONFIG["Static Config"]
     OC["OwnerConfig\n(ownerId, ownerName,\ndomainLabel, pronouns)"]
-    MC["ModelConfig\n(planner/evidence/answer\n+ embeddingModel)"]
+    MC["ModelConfig\n(planner/answer\n+ embeddingModel)"]
     CHAT_YML["chat.config.yml"]
   end
 
@@ -27,7 +27,7 @@ flowchart LR
   %% === Chat Runtime / API ===
   subgraph RUNTIME["Chat Runtime"]
     CHAT_API["createChatApi\n(runtimeOptions: owner, modelConfig,\npersona, identityContext)"]
-    CHAT_RT["createChatRuntime\n(Planner → Retrieval → Evidence → Answer)"]
+    CHAT_RT["createChatRuntime\n(Planner → Retrieval → Answer)"]
   end
 
   %% wiring from generated -> providers
@@ -53,4 +53,4 @@ flowchart LR
 
   %% external entry
   CLIENT[["Next.js /api/chat\nroute handler"]] --> CHAT_API
-  CHAT_RT -->|Planner / Retrieval / Evidence / Answer| CLIENT
+  CHAT_RT -->|Planner / Retrieval / Answer| CLIENT
