@@ -8,7 +8,7 @@ owner:
 models:
   plannerModel: gpt-5-nano-2025-08-07
   answerModel: gpt-5-mini-2025-08-07
-  answerModelNoRetrieval: gpt-5-nano-2025-08-07
+  # answerModelNoRetrieval: gpt-5-nano-2025-08-07
   embeddingModel: text-embedding-3-large
   reasoning:
     planner: low
