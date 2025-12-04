@@ -97,7 +97,7 @@ Per chat turn, the engine MUST:
   - A high‑level verdict and confidence:
 
     ```ts
-    type Verdict = 'yes' | 'no' | 'partial' | 'unknown' | 'n/a';
+    type Verdict = 'yes' | 'no_evidence' | 'partial_evidence' | 'n/a';
     type Confidence = 'high' | 'medium' | 'low';
     ```
 
@@ -181,7 +181,7 @@ _Figure 2.0: High-level runtime architecture showing the flow between client, se
 - **Orchestrator (packages/chat-orchestrator)**
   - Pure implementation of Planner → Retrieval → Evidence → Answer.
   - Assembles ReasoningTrace and UiPayload.
-  - Enforces invariants (e.g. no evidence → unknown answer).
+  - Enforces invariants (e.g. no evidence → no_evidence answer).
   - Handles retrieval reuse within the sliding window where applicable.
   - Derives UI exclusively from Evidence (uiHints or selectedEvidence), never from retrieval “extras”.
 - **Retrieval & Data Layer (packages/chat-data)**
@@ -882,7 +882,7 @@ type EnumerationMode = 'sample' | 'all_relevant';
 type ExperienceScope = 'employment_only' | 'any_experience';
 
 // Evidence axes
-type Verdict = 'yes' | 'no' | 'partial' | 'unknown' | 'n/a';
+type Verdict = 'yes' | 'no_evidence' | 'partial_evidence' | 'n/a';
 type Confidence = 'high' | 'medium' | 'low';
 
 // Shared sources
@@ -998,7 +998,7 @@ type EvidenceSummary = {
 Constraints:
 
 - Semantic flags are only for shape issues: `multi_topic`, `ambiguous`, `needs_clarification`, `off_topic`. Do not encode uncertainty there; use `confidence`.
-- For non‑meta questions, if there is truly no evidence, use `verdict = "unknown"`, `confidence = "low"`, and empty `selectedEvidence`/`uiHints`.
+- For non‑meta questions, if there is truly no evidence, use `verdict = "no_evidence"`, `confidence = "low"`, and empty `selectedEvidence`/`uiHints`.
 - For `questionType = "meta"`, verdict is typically `"n/a"`, confidence `"low"`, and evidence/uiHints stay empty.
 - Respect `cardsEnabled`: when false, uiHints may be left empty or populated for internal use, but the UI will suppress cards.
 
@@ -1170,10 +1170,10 @@ Implementation details (scoring weights, MiniSearch BM25 usage, recency decay, s
 
 **Verdict + confidence**
 
-- `verdict`: "yes" | "no" | "partial" | "unknown" | "n/a".
+- `verdict`: "yes" | "no_evidence" | "partial_evidence" | "n/a".
 - `confidence`: "high" | "medium" | "low".
 - If `questionType !== "meta"` and there is truly no relevant evidence (see §5.5):
-  - verdict = "unknown"
+  - verdict = "no_evidence"
   - confidence = "low"
   - selectedEvidence = []
   - uiHints empty or omitted.
@@ -1227,8 +1227,8 @@ Implementation details (scoring weights, MiniSearch BM25 usage, recency decay, s
 - Stay grounded in EvidenceSummary/Profile/Persona; never contradict `verdict`.
 - Infer answer style/length from `questionType`, `enumeration`, user phrasing, and `confidence` (no answerMode/answerLengthHint fields).
 - Map verdict → tone:
-  - yes/no/partial: first sentence states it clearly; back up with selectedEvidence examples.
-  - unknown: explicitly say the portfolio doesn't show it; optional adjacent context.
+  - yes/partial_evidence: first sentence states it clearly; back up with selectedEvidence examples (for partial_evidence, acknowledge gaps).
+  - no_evidence: explicitly say the portfolio doesn't show it; optional adjacent context.
   - n/a: meta/out-of-scope; answer the meta ask or explain portfolio scope.
 - Use `confidence` to hedge (medium/low) or be direct (high).
 
@@ -1251,7 +1251,7 @@ Implementation details (scoring weights, MiniSearch BM25 usage, recency decay, s
 - Cards:
   - If `cardsEnabled = false`, do not reference cards/lists.
   - Otherwise it’s fine to imply additional items are shown in cards.
-- If verdict is "no" or "unknown" for a list ask, be explicit that nothing relevant was found and keep uiHints empty when appropriate.
+- If verdict is "no_evidence" for a list ask, be explicit that nothing relevant was found and keep uiHints empty when appropriate.
 
 ### 5.5 Meta, No‑Retrieval & Zero‑Evidence Behavior
 
@@ -1262,7 +1262,7 @@ Implementation details (scoring weights, MiniSearch BM25 usage, recency decay, s
 - No‑retrieval path (`retrievalRequests = []`):
   - Orchestrator skips retrieval; Evidence sees empty docs and sets verdict/confidence accordingly.
 - Zero‑evidence fast path (canonical):
-  - If retrieval returns nothing for a non-meta ask, Evidence MUST return verdict = "unknown", confidence = "low", and empty evidence/uiHints (optionally with an `off_topic` flag).
+  - If retrieval returns nothing for a non-meta ask, Evidence MUST return verdict = "no_evidence", confidence = "low", and empty evidence/uiHints (optionally with an `off_topic` flag).
 
 ---
 
@@ -1553,14 +1553,14 @@ const factCheckSuite: ChatEvalSuite = {
       },
     },
     {
-      id: 'fc-unknown-rust',
+      id: 'fc-no-evidence-rust',
       name: 'Skill absent',
       category: 'binary',
       input: { userMessage: 'Have you used Rust?' },
       expected: {
         questionType: 'binary',
         enumeration: 'sample',
-        verdict: 'unknown',
+        verdict: 'no_evidence',
         uiHintsProjectsMaxCount: 0,
       },
     },
@@ -1684,7 +1684,7 @@ export type ExperienceScope =
   | 'employment_only' // jobs + internships only
   | 'any_experience'; // jobs + side projects + coursework, etc.
 
-export type Verdict = 'yes' | 'no' | 'partial' | 'unknown' | 'n/a'; // meta or non-booleanable question
+export type Verdict = 'yes' | 'no_evidence' | 'partial_evidence' | 'n/a'; // meta or non-booleanable question
 
 export type Confidence = 'high' | 'medium' | 'low';
 
@@ -1789,7 +1789,7 @@ export interface EvidenceSummary {
 
   /**
    * Small set of core evidence items that best support the verdict.
-   * 2–6 items typical. For verdict="unknown"/"n/a" with confidence="low",
+   * 2–6 items typical. For verdict="no_evidence"/"n/a" with confidence="low",
    * this can legitimately be an empty array.
    */
   selectedEvidence: SelectedEvidenceItem[];
@@ -1836,7 +1836,7 @@ export interface AnswerPayload {
 Canonical prompt strings live in `packages/chat-orchestrator/src/pipelinePrompts.ts` and are the single source of truth (placeholders `{{OWNER_NAME}}` and `{{DOMAIN_LABEL}}` are filled at runtime).
 
 - **Planner** — Classifies `questionType/enumeration/scope`, sets `cardsEnabled/topic`, and issues intentional `retrievalRequests` (resume/projects/profile). Never uses `meta` for skills/experience/location asks; location presence always triggers resume retrieval.
-- **Evidence** — Decides verdict/confidence, builds `selectedEvidence` and `uiHints`, and sets `semanticFlags` for shape issues only. No evidence for non-meta → verdict `unknown`, confidence `low`, empty evidence/uiHints; meta → verdict `n/a`. `enumeration = "all_relevant"` drives full uiHints coverage.
+- **Evidence** — Decides verdict/confidence, builds `selectedEvidence` and `uiHints`, and sets `semanticFlags` for shape issues only. No evidence for non-meta → verdict `no_evidence`, confidence `low`, empty evidence/uiHints; meta → verdict `n/a`. `enumeration = "all_relevant"` drives full uiHints coverage.
 - **Answer** — Speaks as the owner in first person using persona/profile; never re-decides verdict. Maps verdict to stance/hedging, respects `cardsEnabled`, and uses `uiHints/selectedEvidence` for grounding. Semantic flags adjust tone (clarification/off-topic/ambiguity).
 
 Refer to the code file for the exact text sent to the models.

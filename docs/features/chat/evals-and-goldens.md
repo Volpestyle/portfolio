@@ -69,14 +69,14 @@ const factCheckSuite: ChatEvalSuite = {
       },
     },
     {
-      id: 'fc-unknown-rust',
+      id: 'fc-no-evidence-rust',
       name: 'Skill absent',
       category: 'binary',
       input: { userMessage: 'Have you used Rust?' },
       expected: {
         questionType: 'binary',
         enumeration: 'sample',
-        verdict: 'unknown', // should not invent Rust if portfolio lacks it
+        verdict: 'no_evidence', // should not invent Rust if portfolio lacks it
         uiHintsProjectsMaxCount: 0,
       },
     },

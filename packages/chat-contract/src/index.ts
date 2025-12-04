@@ -301,7 +301,7 @@ export type EvidenceItem = {
   relevance: 'high' | 'medium' | 'low';
 };
 
-export type Verdict = 'yes' | 'no' | 'partial' | 'unknown' | 'n/a';
+export type Verdict = 'yes' | 'no_evidence' | 'partial_evidence' | 'n/a';
 
 export type Confidence = 'high' | 'medium' | 'low';
 
@@ -350,7 +350,7 @@ export type AnswerPayload = {
 export const RETRIEVAL_SOURCE_VALUES = ['projects', 'resume', 'profile'] as const;
 export const QUESTION_TYPE_VALUES = ['binary', 'list', 'narrative', 'meta'] as const;
 export const ENUMERATION_VALUES = ['sample', 'all_relevant'] as const;
-export const VERDICT_VALUES = ['yes', 'no', 'partial', 'unknown', 'n/a'] as const;
+export const VERDICT_VALUES = ['yes', 'no_evidence', 'partial_evidence', 'n/a'] as const;
 export const CONFIDENCE_VALUES = ['high', 'medium', 'low'] as const;
 export const RESUME_FACET_VALUES = ['experience', 'education', 'award', 'skill'] as const;
 export const EVIDENCE_SOURCE_VALUES = ['project', 'resume', 'profile'] as const;
@@ -415,7 +415,7 @@ export type UiHintValidationWarning = {
 };
 
 export const EvidenceSummarySchema: z.ZodType<EvidenceSummary, z.ZodTypeDef, unknown> = z.object({
-  verdict: z.enum(VERDICT_VALUES).default('unknown'),
+  verdict: z.enum(VERDICT_VALUES).default('no_evidence'),
   confidence: z.enum(CONFIDENCE_VALUES).default('low'),
   reasoning: z.string().default(''),
   selectedEvidence: z.array(EvidenceItemSchema).default([]),

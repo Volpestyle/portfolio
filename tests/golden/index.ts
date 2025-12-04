@@ -15,7 +15,7 @@ export type ChatEvalTestCase = {
     questionType: 'binary' | 'list' | 'narrative' | 'meta';
     enumeration?: 'sample' | 'all_relevant';
     scope?: 'employment_only' | 'any_experience';
-    verdict?: 'yes' | 'no' | 'partial' | 'unknown' | 'n/a';
+    verdict?: 'yes' | 'no_evidence' | 'partial_evidence' | 'n/a';
     answerContains?: string[];
     answerNotContains?: string[];
     uiHintsProjectsMinCount?: number;
@@ -51,14 +51,14 @@ export const factCheckSuite: ChatEvalSuite = {
       },
     },
     {
-      id: 'fc-unknown-rust',
+      id: 'fc-no-evidence-rust',
       name: 'Skill absent',
       category: 'binary',
       input: { userMessage: 'Have you used Rust?' },
       expected: {
         questionType: 'binary',
         enumeration: 'sample',
-        verdict: 'unknown',
+        verdict: 'no_evidence',
         uiHintsProjectsMaxCount: 0,
       },
     },
@@ -233,7 +233,7 @@ export const edgeCaseSuite: ChatEvalSuite = {
       expected: {
         questionType: 'binary',
         enumeration: 'sample',
-        verdict: 'unknown',
+        verdict: 'no_evidence',
         uiHintsProjectsMaxCount: 0,
       },
     },

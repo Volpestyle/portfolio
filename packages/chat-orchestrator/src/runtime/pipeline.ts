@@ -1537,7 +1537,7 @@ function buildEvidenceUserContent(input: {
     `Plan axes: questionType=${plan.questionType}. enumeration=${plan.enumeration}. scope=${plan.scope}. cardsEnabled=${plan.cardsEnabled === false ? 'false' : 'true'}.`,
     '- Populate uiHints.projects / uiHints.experiences with ordered IDs from the retrieved docs only (respect scope).',
     '- For questionType="binary" keep uiHints to the strongest supporting examples; for questionType="list" with enumeration="all_relevant" include all clearly relevant projects/experiences (ordered).',
-    '- If there is no evidence for a non-meta question, set verdict to "unknown" or "n/a", confidence to "low", selectedEvidence to [], and uiHints to empty arrays.',
+    '- If there is no evidence for a non-meta question, set verdict to "no_evidence", confidence to "low", selectedEvidence to [], and uiHints to empty arrays.',
     'Return ONLY the EvidenceSummary JSON with keys verdict, confidence, reasoning, selectedEvidence, semanticFlags, uiHints.',
   ].join('\n');
 }
@@ -1645,8 +1645,6 @@ export function buildAnswerUserContent(input: BuildAnswerUserContentInput): stri
     `Evidence counts:\n${JSON.stringify(evidenceCounts, null, 2)}`,
     '',
     `Cards rendering gate:\n${JSON.stringify(cardsGate, null, 2)}`,
-    '',
-    'You do NOT have access to raw documents—only the fields inside EvidenceSummary plus persona/profile/plan metadata.',
     '',
     'Return strict JSON matching AnswerPayload: {"message": string, "thoughts"?: string[]}.',
     '- message: final assistant reply text grounded in the evidence/profile. Use selectedEvidence as the named examples; treat uiHints.projects / uiHints.experiences as the full set of relevant items when enumeration="all_relevant" and acknowledge the UI will show them.',
@@ -2466,14 +2464,14 @@ export function normalizeEvidenceSummaryPayload(
   const uiHintsEmpty = (normalizedHints.projects?.length ?? 0) + (normalizedHints.experiences?.length ?? 0) === 0;
 
   let verdict: Verdict =
-    summary.verdict && (['yes', 'no', 'partial', 'unknown', 'n/a'] as const).includes(summary.verdict)
+    summary.verdict && (['yes', 'no_evidence', 'partial_evidence', 'n/a'] as const).includes(summary.verdict)
       ? summary.verdict
-      : 'unknown';
+      : 'no_evidence';
   let confidence: Confidence =
     summary.confidence && (['high', 'medium', 'low'] as const).includes(summary.confidence) ? summary.confidence : 'low';
 
   if (filteredSelected.length === 0 && uiHintsEmpty) {
-    verdict = verdict === 'n/a' ? 'n/a' : 'unknown';
+    verdict = verdict === 'n/a' ? 'n/a' : 'no_evidence';
     confidence = 'low';
   }
 
@@ -2488,7 +2486,7 @@ export function normalizeEvidenceSummaryPayload(
   const hasEvidence = finalSelected.length > 0;
   const selectedIds = new Set(finalSelected.map((item) => item.id));
 
-  if ((verdict === 'unknown' || verdict === 'n/a') && !hasEvidence) {
+  if ((verdict === 'no_evidence' || verdict === 'n/a') && !hasEvidence) {
     finalUiHints = { projects: [], experiences: [] };
   }
 
@@ -3516,7 +3514,7 @@ function synthesizeEvidenceSummary(reason: 'meta' | 'no_docs'): EvidenceSummary 
   }
 
   return {
-    verdict: 'unknown',
+    verdict: 'no_evidence',
     confidence: 'low',
     reasoning: 'No relevant documents were retrieved for this question.',
     selectedEvidence: [],

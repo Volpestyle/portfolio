@@ -501,9 +501,9 @@ function getVerdictColor(verdict: string): string {
   switch (verdict) {
     case 'yes':
       return 'text-green-300';
-    case 'no':
+    case 'no_evidence':
       return 'text-red-300';
-    case 'partial':
+    case 'partial_evidence':
       return 'text-yellow-300';
     case 'n/a':
       return 'text-white/60';
