@@ -351,6 +351,23 @@ export function ChatProvider({
     [setReasoningTraces]
   );
 
+  const markStreamCompletion = useCallback(
+    (messageId: string, totalDurationMs?: number, createdAt?: string) => {
+      if (!messageId || typeof totalDurationMs !== 'number' || !Number.isFinite(totalDurationMs)) {
+        return;
+      }
+      setCompletionTimes((prev) => {
+        if (prev[messageId]) {
+          return prev;
+        }
+        const createdAtMs = createdAt ? new Date(createdAt).getTime() : NaN;
+        const completedAt = Number.isFinite(createdAtMs) ? createdAtMs + totalDurationMs : Date.now();
+        return { ...prev, [messageId]: completedAt };
+      });
+    },
+    [setCompletionTimes]
+  );
+
   const markMessageRendered = useCallback((messageId: string) => {
     if (!messageId) return;
     // Mark completion timestamp if missing
@@ -372,6 +389,7 @@ export function ChatProvider({
     applyBannerText,
     applyReasoningTrace,
     applyAttachment: ingestAttachment,
+    recordCompletionTime: markStreamCompletion,
   });
   useEffect(() => {
     const resolved = ownerId ?? process.env.NEXT_PUBLIC_CHAT_OWNER_ID ?? 'portfolio-owner';

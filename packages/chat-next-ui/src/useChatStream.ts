@@ -16,6 +16,7 @@ type StreamDependencies = {
   applyBannerText?: (text?: string | null) => void;
   applyReasoningTrace: (itemId?: string, trace?: PartialReasoningTrace) => void;
   applyAttachment?: (attachment: ChatAttachment) => void;
+  recordCompletionTime?: (messageId: string, totalDurationMs?: number, createdAt?: string) => void;
 };
 
 type StreamRequest = {
@@ -29,6 +30,7 @@ export function useChatStream({
   applyBannerText,
   applyReasoningTrace,
   applyAttachment,
+  recordCompletionTime,
 }: StreamDependencies) {
   return useCallback(
     async ({ response, assistantMessage }: StreamRequest) => {
@@ -209,6 +211,9 @@ export function useChatStream({
         if (event.type === 'done') {
           const itemId = typeof event.itemId === 'string' ? event.itemId : mutableAssistant.id;
           const totalDurationMs = typeof event.totalDurationMs === 'number' ? event.totalDurationMs : undefined;
+          if (recordCompletionTime) {
+            recordCompletionTime(itemId, totalDurationMs, mutableAssistant.createdAt);
+          }
           if (isTypewriterDebugEnabled()) {
             const textParts = mutableAssistant.parts.filter((part) => part.kind === 'text') as ChatTextPart[];
             typewriterDebug('sse_done', {
@@ -235,7 +240,7 @@ export function useChatStream({
         }
       }
     },
-    [applyAttachment, applyBannerText, applyReasoningTrace, applyUiActions, replaceMessage]
+    [applyAttachment, applyBannerText, applyReasoningTrace, applyUiActions, recordCompletionTime, replaceMessage]
   );
 }
 

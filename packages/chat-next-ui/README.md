@@ -87,7 +87,7 @@ type UseChat = {
   experienceCache: Record<string, ResumeEntry>; // Experiences keyed by id/slug/title (normalized).
   reasoningTraces: Record<string, PartialReasoningTrace>; // Streaming planner/retrieval/evidence/answer metadata by item id.
   reasoningEnabled: boolean; // Echo of the provider flag so the UI can show/hide traces.
-  completionTimes: Record<string, number>; // Epoch millis when an assistant message first finished rendering.
+  completionTimes: Record<string, number>; // Epoch millis when a turn completed (SSE done), falling back to render-finish if missing.
   markMessageRendered: (messageId: string) => void; // Marks an assistant turn as rendered + records completion time.
 };
 ```
