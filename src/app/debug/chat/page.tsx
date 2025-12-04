@@ -51,8 +51,8 @@ export default function ChatDebugPage() {
         <p className="text-sm uppercase tracking-wide text-white/50">Debug tools</p>
         <h1 className="text-3xl font-semibold">Chat Pipeline Dashboard</h1>
         <p className="text-sm text-white/70">
-          Inspect the most recent planner/retrieval/evidence/answer events captured by the in-memory log buffer. Logging
-          level: <span className="font-mono">{CHAT_DEBUG_LEVEL}</span>
+          Inspect the most recent planner/retrieval/answer events captured by the in-memory log buffer. Logging level:{' '}
+          <span className="font-mono">{CHAT_DEBUG_LEVEL}</span>
         </p>
       </header>
 
@@ -70,8 +70,6 @@ export default function ChatDebugPage() {
               <JsonPreview value={summaryPayload?.retrieval} />
             </div>
             <div className="space-y-3">
-              <h3 className="text-sm uppercase tracking-wide text-white/60">Evidence</h3>
-              <JsonPreview value={summaryPayload?.evidence} />
               <h3 className="text-sm uppercase tracking-wide text-white/60">Answer</h3>
               <JsonPreview value={summaryPayload?.answer} />
             </div>

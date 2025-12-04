@@ -19,18 +19,14 @@ export async function mockChatStream(page: Page) {
     { type: 'stage', stage: 'planner', status: 'start', itemId: anchorId, anchorId },
     {
       type: 'reasoning',
-      stage: 'plan',
+      stage: 'planner',
       trace: {
         plan: {
-          questionType: 'narrative',
-          enumeration: 'sample',
-          scope: 'any_experience',
           topic: 'featured project',
-          retrievalRequests: [
-            { source: 'projects', topK: 5, queryText: 'featured project highlights' },
-            { source: 'resume', topK: 3, queryText: 'supporting experience context' },
+          queries: [
+            { source: 'projects', limit: 5, text: 'featured project highlights' },
+            { source: 'resume', limit: 3, text: 'supporting experience context' },
           ],
-          resumeFacets: [],
           cardsEnabled: true,
         },
       },
@@ -41,12 +37,7 @@ export async function mockChatStream(page: Page) {
       type: 'stage',
       stage: 'planner',
       status: 'complete',
-      meta: {
-        questionType: 'narrative',
-        enumeration: 'sample',
-        scope: 'any_experience',
-        topic: 'featured project',
-      },
+      meta: { topic: 'featured project', cardsEnabled: true },
       durationMs: 180,
       itemId: anchorId,
       anchorId,
@@ -85,34 +76,6 @@ export async function mockChatStream(page: Page) {
       itemId: anchorId,
       anchorId,
     },
-    { type: 'stage', stage: 'evidence', status: 'start', itemId: anchorId, anchorId },
-    {
-      type: 'reasoning',
-      stage: 'evidence',
-      trace: {
-        evidence: {
-          verdict: 'yes',
-          confidence: 'high',
-          reasoning: 'Highlighted the featured project and invited the user to open the inline docs.',
-          selectedEvidence: [
-            { source: 'project', id: project.slug, title: project.name, snippet: project.oneLiner, relevance: 'high' },
-          ],
-          semanticFlags: [],
-          uiHints: { projects: [project.slug], experiences: [] },
-        },
-      },
-      itemId: anchorId,
-      anchorId,
-    },
-    {
-      type: 'stage',
-      stage: 'evidence',
-      status: 'complete',
-      meta: { verdict: 'yes', confidence: 'high', evidenceCount: 1 },
-      durationMs: 220,
-      itemId: anchorId,
-      anchorId,
-    },
     { type: 'stage', stage: 'answer', status: 'start', itemId: anchorId, anchorId },
     {
       type: 'token',
@@ -124,7 +87,7 @@ export async function mockChatStream(page: Page) {
       type: 'ui',
       itemId: anchorId,
       anchorId,
-      ui: { showProjects: [project.slug], showExperiences: [], bannerText: 'Surfaced a featured project.' },
+      ui: { showProjects: [project.slug], showExperiences: [] },
     },
     {
       type: 'attachment',
@@ -136,14 +99,11 @@ export async function mockChatStream(page: Page) {
       type: 'reasoning',
       stage: 'answer',
       trace: {
-        answerMeta: {
+        answer: {
           model: 'gpt-5-nano-2025-08-07',
-          questionType: 'narrative',
-          enumeration: 'sample',
-          scope: 'any_experience',
-          verdict: 'yes',
-          confidence: 'high',
+          uiHints: { projects: [project.slug], experiences: [] },
           thoughts: ['Introduce the featured project', 'Invite the user to open the inline docs'],
+          message: "Here's a featured project from my portfolio.",
         },
       },
       itemId: anchorId,

@@ -1,5 +1,5 @@
 import type OpenAI from 'openai';
-import type { ChatRequestMessage, PartialReasoningTrace, ReasoningStage, UiPayload } from '@portfolio/chat-contract';
+import type { ChatRequestMessage, ReasoningUpdate, UiPayload } from '@portfolio/chat-contract';
 import type { PipelineStage, StageMeta, StageStatus } from '@portfolio/chat-orchestrator';
 import {
   createChatRuntime,
@@ -18,7 +18,7 @@ export type RunOptions = {
   onAnswerToken?: (token: string) => void;
   abortSignal?: AbortSignal;
   softTimeoutMs?: number;
-  onReasoningUpdate?: (stage: ReasoningStage, trace: PartialReasoningTrace) => void;
+  onReasoningUpdate?: (update: ReasoningUpdate) => void;
   ownerId?: string;
   reasoningEnabled?: boolean;
   onStageEvent?: (stage: PipelineStage, status: StageStatus, meta?: StageMeta, durationMs?: number) => void;

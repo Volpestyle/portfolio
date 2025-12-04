@@ -34,13 +34,12 @@ export function ChatReasoningDisplay({
   }, []);
 
   // Only render once we have planner output (or later stages) so meta/greeting turns don't flash a user panel.
-  const hasTraceContent = trace && (trace.plan || trace.retrieval || trace.evidence || trace.answerMeta || trace.error);
-  const isMetaTurn = trace?.plan?.questionType === 'meta' || trace?.answerMeta?.questionType === 'meta';
+  const hasTraceContent = trace && (trace.plan || trace.retrieval || trace.answer || trace.error);
   const planReady = Boolean(trace?.plan);
   const streamingHasPlan = Boolean(isStreaming && trace && planReady);
   const shouldRenderTrace = Boolean(hasTraceContent || streamingHasPlan);
-  const allowUserPanel = show && !isMetaTurn;
-  const allowDevPanel = isDev && (showDevMode || isMetaTurn);
+  const allowUserPanel = show;
+  const allowDevPanel = isDev && showDevMode;
   const shouldRender = shouldRenderTrace && (allowUserPanel || allowDevPanel);
 
   // Keep hidden when nothing to render or visibility is off
@@ -52,8 +51,7 @@ export function ChatReasoningDisplay({
   const effectiveTrace: PartialReasoningTrace = trace ?? {
     plan: null,
     retrieval: null,
-    evidence: null,
-    answerMeta: null,
+    answer: null,
     error: null,
   };
 
@@ -88,7 +86,7 @@ export function ChatReasoningDisplay({
       </AnimatePresence>
 
       {/* Dev mode toggle (only in development with user_opt_in) */}
-      {isDev && !isMetaTurn && (
+      {isDev && (
         <button
           onClick={() => setShowDevMode(!showDevMode)}
           className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-white/50 transition-colors hover:bg-white/5 hover:text-white/70"

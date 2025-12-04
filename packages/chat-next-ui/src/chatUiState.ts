@@ -7,7 +7,6 @@ export type ChatSurfaceState = {
   focusedProjectId: string | null;
   highlightedSkills: string[];
   lastActionAt: string | null;
-  coreEvidenceIds: string[];
 };
 
 export type ChatUiState = {
@@ -19,8 +18,6 @@ export type ApplyUiActionOptions = {
   ui?: {
     showProjects?: string[];
     showExperiences?: string[];
-    bannerText?: string | null;
-    coreEvidenceIds?: string[];
   };
   timestamp?: string;
 };
@@ -65,7 +62,6 @@ export function reduceChatUiState(prev: ChatUiState, options?: ApplyUiActionOpti
   let nextVisibleExperiences = baseSurface.visibleExperienceIds;
   const nextFocused: string | null = null;
   const nextSkills: string[] = [];
-  let coreEvidenceIds = baseSurface.coreEvidenceIds ?? [];
   let mutated = false;
 
   if (options?.ui) {
@@ -85,20 +81,10 @@ export function reduceChatUiState(prev: ChatUiState, options?: ApplyUiActionOpti
       }
     }
 
-    if (Array.isArray(options.ui.coreEvidenceIds)) {
-      const dedupedCoreEvidence = dedupeIdentifiers(options.ui.coreEvidenceIds);
-      if (!arraysEqual(dedupedCoreEvidence, coreEvidenceIds)) {
-        coreEvidenceIds = dedupedCoreEvidence;
-        mutated = true;
-      }
-    }
   }
 
   const hasPayload =
-    (nextVisible?.length ?? 0) > 0 ||
-    (nextVisibleExperiences?.length ?? 0) > 0 ||
-    (coreEvidenceIds?.length ?? 0) > 0 ||
-    Boolean(nextFocused);
+    (nextVisible?.length ?? 0) > 0 || (nextVisibleExperiences?.length ?? 0) > 0 || Boolean(nextFocused);
 
   if (!hasPayload) {
     if (existingIndex === -1) {
@@ -122,7 +108,6 @@ export function reduceChatUiState(prev: ChatUiState, options?: ApplyUiActionOpti
     focusedProjectId: nextFocused ?? null,
     highlightedSkills: nextSkills,
     lastActionAt: options?.timestamp ?? new Date().toISOString(),
-    coreEvidenceIds,
   };
 
   if (existingIndex !== -1) {
@@ -142,7 +127,6 @@ function createEmptySurface(anchorId: string): ChatSurfaceState {
     focusedProjectId: null,
     highlightedSkills: [],
     lastActionAt: null,
-    coreEvidenceIds: [],
   };
 }
 

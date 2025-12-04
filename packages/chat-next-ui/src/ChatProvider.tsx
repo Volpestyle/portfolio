@@ -315,17 +315,6 @@ export function ChatProvider({
     };
   }, [cacheExperiences, resolveFetcher]);
 
-  const applyBannerText = useCallback((text?: string | null) => {
-    setBanner((prev) => {
-      if (typeof text === 'string' && text.trim().length > 0) {
-        return { mode: 'chat', text };
-      }
-      if (text === null) {
-        return prev.mode === 'thinking' ? prev : { mode: 'hover' };
-      }
-      return prev;
-    });
-  }, []);
   const applyReasoningTrace = useCallback(
     (itemId?: string, trace?: PartialReasoningTrace) => {
       if (!itemId) {
@@ -387,7 +376,6 @@ export function ChatProvider({
   const streamAssistantResponse = useChatStream({
     replaceMessage,
     applyUiActions,
-    applyBannerText,
     applyReasoningTrace,
     applyAttachment: ingestAttachment,
     recordCompletionTime: markStreamCompletion,
@@ -639,13 +627,11 @@ function mergeReasoningTraces(
   const merged: PartialReasoningTrace = {
     plan: incoming.plan ?? existing?.plan ?? null,
     retrieval: incoming.retrieval ?? existing?.retrieval ?? null,
-    evidence: incoming.evidence ?? existing?.evidence ?? null,
-    answerMeta: incoming.answerMeta ?? existing?.answerMeta ?? null,
+    answer: incoming.answer ?? existing?.answer ?? null,
     error: mergeReasoningErrors(existing?.error, incoming.error, {
       plan: incoming.plan ?? existing?.plan ?? null,
       retrieval: incoming.retrieval ?? existing?.retrieval ?? null,
-      evidence: incoming.evidence ?? existing?.evidence ?? null,
-      answerMeta: incoming.answerMeta ?? existing?.answerMeta ?? null,
+      answer: incoming.answer ?? existing?.answer ?? null,
     }),
   };
   if (existing && reasoningTracesEqual(existing, merged)) {
@@ -658,8 +644,7 @@ function reasoningTracesEqual(a: PartialReasoningTrace, b: PartialReasoningTrace
   return (
     a.plan === b.plan &&
     a.retrieval === b.retrieval &&
-    a.evidence === b.evidence &&
-    a.answerMeta === b.answerMeta &&
+    a.answer === b.answer &&
     a.error === b.error
   );
 }
@@ -667,7 +652,7 @@ function reasoningTracesEqual(a: PartialReasoningTrace, b: PartialReasoningTrace
 function mergeReasoningErrors(
   existing: PartialReasoningTrace['error'],
   incoming: PartialReasoningTrace['error'],
-  mergedStages: Pick<PartialReasoningTrace, 'plan' | 'retrieval' | 'evidence' | 'answerMeta'>
+  mergedStages: Pick<PartialReasoningTrace, 'plan' | 'retrieval' | 'answer'>
 ): ReasoningTraceError | null {
   const candidate = incoming ?? existing ?? null;
   if (!candidate) {
@@ -686,11 +671,10 @@ function mergeReasoningErrors(
 }
 
 function inferErroredStage(
-  trace: Pick<PartialReasoningTrace, 'plan' | 'retrieval' | 'evidence' | 'answerMeta'>
+  trace: Pick<PartialReasoningTrace, 'plan' | 'retrieval' | 'answer'>
 ): ReasoningTraceError['stage'] {
-  if (trace.answerMeta) return 'answer';
-  if (trace.evidence) return 'answer';
-  if (trace.retrieval) return 'evidence';
-  if (trace.plan) return 'retrieval';
-  return 'plan';
+  if (trace.answer) return 'answer';
+  if (trace.retrieval) return 'retrieval';
+  if (trace.plan) return 'planner';
+  return 'planner';
 }

@@ -9,8 +9,6 @@ export type ChatConfig = {
   models?: {
     default?: string;
     plannerModel?: string;
-    evidenceModel?: string;
-    evidenceModelDeepDive?: string;
     answerModel?: string;
     embeddingModel?: string;
     reasoning?: StageReasoningConfig;
@@ -18,7 +16,6 @@ export type ChatConfig = {
   };
   tokens?: {
     planner?: number;
-    evidence?: number;
     answer?: number;
   };
 };
@@ -94,8 +91,8 @@ function trimModelConfig(config?: Partial<ModelConfig>): Partial<ModelConfig> | 
     if (typeof value === 'number' && Number.isFinite(value)) {
       return true;
     }
-    // Keep stageReasoning object if it has any defined values
-    if (key === 'stageReasoning' && value && typeof value === 'object') {
+    // Keep reasoning object if it has any defined values
+    if (key === 'reasoning' && value && typeof value === 'object') {
       return Object.values(value).some((v) => v !== undefined);
     }
     return false;
@@ -131,24 +128,19 @@ export function resolveChatModelConfig(config?: ChatConfig): Partial<ModelConfig
     throw new Error('chat.config.yml is missing models.answerModel');
   }
   const plannerModel = config.models.plannerModel ?? answerModel;
-  const evidenceModel = config.models.evidenceModel ?? answerModel;
-  const evidenceModelDeepDive = config.models.evidenceModelDeepDive;
 
-  const stageReasoning: StageReasoningConfig | undefined = config.models.reasoning
+  const reasoning: StageReasoningConfig | undefined = config.models.reasoning
     ? {
         planner: config.models.reasoning.planner,
-        evidence: config.models.reasoning.evidence,
         answer: config.models.reasoning.answer,
       }
     : undefined;
 
   return trimModelConfig({
     plannerModel,
-    evidenceModel,
-    evidenceModelDeepDive,
     answerModel,
     embeddingModel: resolveEmbedding(),
-    stageReasoning,
+    reasoning,
     answerTemperature: normalizeTemperature(config.models.answerTemperature),
   });
 }

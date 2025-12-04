@@ -1,5 +1,5 @@
 import type OpenAI from 'openai';
-import type { ChatRequestMessage, PartialReasoningTrace, ReasoningStage, UiPayload } from '@portfolio/chat-contract';
+import type { ChatRequestMessage, PartialReasoningTrace, ReasoningUpdate, UiPayload } from '@portfolio/chat-contract';
 import type { ChatApi, ChatbotResponse, RunOptions } from './index';
 
 export const SSE_HEADERS = {
@@ -101,12 +101,12 @@ export function createChatSseStream(
         sendEvent('token', { type: 'token', token, itemId: anchorId, anchorId });
       };
 
-      const enqueueReasoningEvent = (stage: ReasoningStage, trace: PartialReasoningTrace | undefined) => {
-        if (!trace) {
+      const enqueueReasoningEvent = (update?: ReasoningUpdate) => {
+        if (!update) {
           return;
         }
         resetTimeout();
-        sendEvent('reasoning', { type: 'reasoning', stage, trace, itemId: anchorId, anchorId });
+        sendEvent('reasoning', { type: 'reasoning', ...update, itemId: anchorId, anchorId });
       };
       type OnStageEvent = NonNullable<RunOptions['onStageEvent']>;
       const enqueueStageEvent = (
@@ -153,9 +153,9 @@ export function createChatSseStream(
             }
             streamToken(token);
           },
-          onReasoningUpdate: (stage, trace) => {
-            enqueueReasoningEvent(stage, trace);
-            upstreamRunOptions?.onReasoningUpdate?.(stage, trace);
+          onReasoningUpdate: (update) => {
+            enqueueReasoningEvent(update);
+            upstreamRunOptions?.onReasoningUpdate?.(update as unknown as ReasoningUpdate);
           },
           onUiEvent: (ui) => {
             enqueueUiEvent(ui);

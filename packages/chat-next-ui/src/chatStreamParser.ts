@@ -9,7 +9,7 @@ export type ChatStreamEvent =
   | { type: 'item'; itemId?: string }
   | { type: 'token'; token: string; itemId?: string }
   | { type: 'ui'; ui?: unknown; itemId?: string }
-  | { type: 'reasoning'; stage?: string; trace?: unknown; itemId?: string }
+  | { type: 'reasoning'; stage?: string; trace?: unknown; delta?: string; notes?: string; progress?: number; itemId?: string }
   | { type: 'attachment'; attachment?: unknown; itemId?: string }
   | { type: 'ui_actions'; actions?: unknown; itemId?: string }
   | {

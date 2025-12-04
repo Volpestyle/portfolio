@@ -13,7 +13,6 @@ export type ChatAttachment = {
 type StreamDependencies = {
   replaceMessage: (message: ChatMessage) => void;
   applyUiActions: (options?: ApplyUiActionOptions) => void;
-  applyBannerText?: (text?: string | null) => void;
   applyReasoningTrace: (itemId?: string, trace?: PartialReasoningTrace) => void;
   applyAttachment?: (attachment: ChatAttachment) => void;
   recordCompletionTime?: (messageId: string, totalDurationMs?: number, createdAt?: string) => void;
@@ -27,7 +26,6 @@ type StreamRequest = {
 export function useChatStream({
   replaceMessage,
   applyUiActions,
-  applyBannerText,
   applyReasoningTrace,
   applyAttachment,
   recordCompletionTime,
@@ -127,10 +125,6 @@ export function useChatStream({
             anchorItemId: itemId ?? mutableAssistant.id,
             ui: uiPayload,
           });
-          const bannerText = coerceBannerText(uiPayload?.bannerText);
-          if (applyBannerText && bannerText !== undefined) {
-            applyBannerText(bannerText);
-          }
           return;
         }
 
@@ -193,8 +187,7 @@ export function useChatStream({
             applyReasoningTrace(itemId, {
               plan: null,
               retrieval: null,
-              evidence: null,
-              answerMeta: null,
+              answer: null,
               error: reasoningError,
             });
           }
@@ -238,18 +231,11 @@ export function useChatStream({
         }
       }
     },
-    [applyAttachment, applyBannerText, applyReasoningTrace, applyUiActions, recordCompletionTime, replaceMessage]
+    [applyAttachment, applyReasoningTrace, applyUiActions, recordCompletionTime, replaceMessage]
   );
 }
 
-function coerceUiPayload(input: unknown):
-  | {
-      showProjects?: string[];
-      showExperiences?: string[];
-      bannerText?: string | null;
-      coreEvidenceIds?: string[];
-    }
-  | undefined {
+function coerceUiPayload(input: unknown): { showProjects?: string[]; showExperiences?: string[] } | undefined {
   if (!input || typeof input !== 'object') {
     return undefined;
   }
@@ -263,34 +249,15 @@ function coerceUiPayload(input: unknown):
 
   const showProjects = normalizeIds(record.showProjects);
   const showExperiences = normalizeIds(record.showExperiences);
-  const bannerText = coerceBannerText(record.bannerText);
-  const coreEvidenceIds = normalizeIds(record.coreEvidenceIds);
 
-  if (
-    showProjects === undefined &&
-    showExperiences === undefined &&
-    bannerText === undefined &&
-    coreEvidenceIds === undefined
-  ) {
+  if (showProjects === undefined && showExperiences === undefined) {
     return undefined;
   }
 
   return {
     showProjects,
     showExperiences,
-    bannerText,
-    coreEvidenceIds,
   };
-}
-
-function coerceBannerText(value: unknown): string | null | undefined {
-  if (typeof value === 'string') {
-    return value;
-  }
-  if (value === null) {
-    return null;
-  }
-  return undefined;
 }
 
 function coerceReasoningTrace(input: unknown): PartialReasoningTrace | undefined {
@@ -298,16 +265,14 @@ function coerceReasoningTrace(input: unknown): PartialReasoningTrace | undefined
     return undefined;
   }
   const record = input as Partial<PartialReasoningTrace>;
-  const hasKnownField =
-    'plan' in record || 'retrieval' in record || 'evidence' in record || 'answerMeta' in record || 'error' in record;
+  const hasKnownField = 'plan' in record || 'retrieval' in record || 'answer' in record || 'error' in record;
   if (!hasKnownField) {
     return undefined;
   }
   return {
     plan: 'plan' in record ? (record.plan ?? null) : null,
     retrieval: 'retrieval' in record ? (record.retrieval ?? null) : null,
-    evidence: 'evidence' in record ? (record.evidence ?? null) : null,
-    answerMeta: 'answerMeta' in record ? (record.answerMeta ?? null) : null,
+    answer: 'answer' in record ? (record.answer ?? null) : null,
     error: 'error' in record ? (record.error ?? null) : null,
   };
 }

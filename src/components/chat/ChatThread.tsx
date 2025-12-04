@@ -47,16 +47,9 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
   const lastMessageAssistant = lastMessage?.role === 'assistant' ? lastMessage : undefined;
   const assistantHasContent = lastMessageAssistant?.parts?.some((p) => p.kind === 'text' && p.text.trim().length > 0);
   const currentTrace = streamingAssistantMessageId ? reasoningTraces[streamingAssistantMessageId] : null;
-  // Meta/chitchat turns hide the reasoning panel, so we need spinner to persist
-  const isMetaTurn = currentTrace?.plan?.questionType === 'meta' || currentTrace?.answerMeta?.questionType === 'meta';
   const hasRenderableTrace =
-    currentTrace &&
-    (currentTrace.plan ||
-      currentTrace.retrieval ||
-      currentTrace.evidence ||
-      currentTrace.answerMeta ||
-      currentTrace.error);
-  const reasoningWillDisplay = reasoningEnabled && !isMetaTurn && hasRenderableTrace;
+    currentTrace && (currentTrace.plan || currentTrace.retrieval || currentTrace.answer || currentTrace.error);
+  const reasoningWillDisplay = reasoningEnabled && hasRenderableTrace;
   const showPendingThinking = isBusy && !assistantHasContent && !reasoningWillDisplay;
 
   const fallbackAnchorId = '__chat-surface-fallback__';
@@ -153,7 +146,6 @@ function hasSurfacePayload(surface: ChatSurfaceState) {
     Boolean(surface.focusedProjectId) ||
     (surface.visibleProjectIds?.length ?? 0) > 0 ||
     (surface.visibleExperienceIds?.length ?? 0) > 0 ||
-    (surface.coreEvidenceIds?.length ?? 0) > 0 ||
     (surface.highlightedSkills?.length ?? 0) > 0
   );
 }

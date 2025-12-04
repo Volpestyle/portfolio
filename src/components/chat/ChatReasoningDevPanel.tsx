@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { PartialReasoningTrace } from '@portfolio/chat-contract';
 import { cn } from '@/lib/utils';
-import { ChevronDown, Code, Database, Brain, FileSearch, Settings, Copy, Check } from 'lucide-react';
+import { ChevronDown, Code, Database, Brain, BookOpen } from 'lucide-react';
 
 interface ChatReasoningDevPanelProps {
   trace: PartialReasoningTrace;
@@ -14,16 +14,6 @@ interface ChatReasoningDevPanelProps {
 
 export function ChatReasoningDevPanel({ trace, isStreaming = false, className }: ChatReasoningDevPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    plan: true,
-    retrieval: true,
-    evidence: true,
-    answer: true,
-  });
-
-  const toggleSection = (section: string) => {
-    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
-  };
 
   if (!trace.plan) {
     return null;
@@ -31,15 +21,10 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
 
   const plan = trace.plan;
   const retrievals = trace.retrieval ?? [];
-  const evidence = trace.evidence ?? null;
-  const answerMeta = trace.answerMeta ?? null;
-  const planFocus = inferPlanFocus(plan);
-  const isMetaTurn = plan.questionType === 'meta';
-  const retrievalExpected = !isMetaTurn && (plan.retrievalRequests?.length ?? 0) > 0;
+  const answer = trace.answer ?? null;
 
   return (
     <div className={cn('w-full rounded-lg border border-purple-500/30 bg-purple-950/20 backdrop-blur-sm', className)}>
-      {/* Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-purple-500/10"
@@ -58,7 +43,6 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
         </motion.div>
       </button>
 
-      {/* Expandable Content */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
@@ -69,43 +53,27 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
             className="overflow-hidden"
           >
             <div className="space-y-3 border-t border-purple-500/20 px-4 py-3">
-              {/* Planner Output */}
-              <DevSection
-                icon={<Brain className="h-4 w-4" />}
-                title="Planner Output"
-                sectionKey="plan"
-                isExpanded={expandedSections.plan}
-                onToggle={() => toggleSection('plan')}
-              >
-                <div className="space-y-3">
-                  <KeyValue label="questionType" value={plan.questionType} />
-                  <KeyValue label="enumeration" value={plan.enumeration} />
-                  <KeyValue label="scope" value={plan.scope} />
-                  {planFocus && <KeyValue label="retrievalFocus" value={planFocus} />}
-                  {plan.cardsEnabled === false && <KeyValue label="cardsEnabled" value="false" />}
+              <DevSection icon={<Brain className="h-4 w-4" />} title="Planner Output">
+                <div className="space-y-3 text-xs text-purple-200">
+                  <KeyValue label="cardsEnabled" value={plan.cardsEnabled !== false ? 'true' : 'false'} />
                   {plan.topic && <KeyValue label="topic" value={plan.topic} />}
-                  {plan.resumeFacets && plan.resumeFacets.length > 0 && (
-                    <KeyValue label="resumeFacets" value={plan.resumeFacets} />
-                  )}
-                  {plan.retrievalRequests.length > 0 && (
-                    <div className="mt-2">
-                      <p className="mb-2 text-xs font-medium text-purple-300">retrievalRequests:</p>
+                  {plan.queries.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-medium text-purple-300">queries:</p>
                       <div className="space-y-2">
-                        {plan.retrievalRequests.map((req, idx) => (
+                        {plan.queries.map((q, idx) => (
                           <div key={idx} className="rounded border border-purple-500/20 bg-purple-950/30 p-2 text-xs">
-                            <div className="space-y-1">
-                              <div className="flex justify-between">
-                                <span className="text-purple-400">source:</span>
-                                <span className="text-purple-200">{req.source}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-purple-400">topK:</span>
-                                <span className="text-purple-200">{req.topK}</span>
-                              </div>
-                              <div className="mt-1">
-                                <span className="text-purple-400">queryText:</span>
-                                <p className="mt-1 text-purple-200">{req.queryText}</p>
-                              </div>
+                            <div className="flex justify-between">
+                              <span className="text-purple-400">source:</span>
+                              <span className="text-purple-200">{q.source}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-purple-400">limit:</span>
+                              <span className="text-purple-200">{q.limit ?? '—'}</span>
+                            </div>
+                            <div className="mt-1">
+                              <span className="text-purple-400">text:</span>
+                              <p className="mt-1 text-purple-200">{q.text}</p>
                             </div>
                           </div>
                         ))}
@@ -116,19 +84,8 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                 <JsonCollapsible data={plan} label="Full JSON" />
               </DevSection>
 
-              {/* Retrieval Results */}
-              <DevSection
-                icon={<Database className="h-4 w-4" />}
-                title="Retrieval Results"
-                sectionKey="retrieval"
-                isExpanded={expandedSections.retrieval}
-                onToggle={() => toggleSection('retrieval')}
-              >
-                {trace.retrieval === null ? (
-                  <DevPlaceholder>
-                    {retrievalExpected ? 'Retrieval stage pending…' : 'Skipped (no retrieval needed)'}
-                  </DevPlaceholder>
-                ) : retrievals.length === 0 ? (
+              <DevSection icon={<Database className="h-4 w-4" />} title="Retrieval Results">
+                {retrievals.length === 0 ? (
                   <DevPlaceholder>No retrieval results</DevPlaceholder>
                 ) : (
                   <>
@@ -165,137 +122,32 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                 )}
               </DevSection>
 
-              {/* Evidence Summary */}
-              <DevSection
-                icon={<FileSearch className="h-4 w-4" />}
-                title="Evidence Summary"
-                sectionKey="evidence"
-                isExpanded={expandedSections.evidence}
-                onToggle={() => toggleSection('evidence')}
-              >
-                {evidence ? (
-                  <>
-                    <div className="space-y-3">
-                      <KeyValue label="verdict" value={evidence.verdict} />
-                      <KeyValue label="confidence" value={evidence.confidence} />
-                      <div>
-                        <p className="mb-1 text-xs font-medium text-purple-300">reasoning:</p>
-                        <p className="text-xs leading-relaxed text-purple-200">{evidence.reasoning}</p>
+              <DevSection icon={<BookOpen className="h-4 w-4" />} title="Answer">
+                {answer ? (
+                  <div className="space-y-2 text-xs text-purple-200">
+                    <KeyValue label="message" value={answer.message} />
+                    {answer.uiHints && (
+                      <div className="flex gap-4 text-[11px] text-purple-300">
+                        <span>projects: {answer.uiHints.projects?.length ?? 0}</span>
+                        <span>experiences: {answer.uiHints.experiences?.length ?? 0}</span>
                       </div>
-                      {evidence.selectedEvidence.length > 0 && (
-                        <div>
-                          <p className="mb-2 text-xs font-medium text-purple-300">
-                            selectedEvidence ({evidence.selectedEvidence.length}):
-                          </p>
-                          <div className="space-y-2">
-                            {evidence.selectedEvidence.map((item, idx) => (
-                              <div
-                                key={idx}
-                                className="rounded border border-purple-500/20 bg-purple-950/30 p-2 text-xs"
-                              >
-                                <div className="space-y-1">
-                                  <div className="flex justify-between">
-                                    <span className="text-purple-400">source:</span>
-                                    <span className="text-purple-200">{item.source}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-purple-400">relevance:</span>
-                                    <span className="text-purple-200">{item.relevance}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-purple-400">id:</span>
-                                    <span className="font-mono text-purple-200">{item.id}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-purple-400">title:</span>
-                                    <p className="mt-1 text-purple-200">{item.title}</p>
-                                  </div>
-                                  <div>
-                                    <span className="text-purple-400">snippet:</span>
-                                    <p className="mt-1 text-purple-200">{item.snippet}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
+                    )}
+                    {answer.thoughts && answer.thoughts.length > 0 && (
+                      <div className="space-y-1">
+                        {answer.thoughts.map((thought, idx) => (
+                          <div key={idx} className="flex gap-2">
+                            <span className="text-purple-400">{idx + 1}.</span>
+                            <span>{thought}</span>
                           </div>
-                        </div>
-                      )}
-                      {evidence.semanticFlags && evidence.semanticFlags.length > 0 && (
-                        <div>
-                          <p className="mb-2 text-xs font-medium text-purple-300">semanticFlags:</p>
-                          <div className="space-y-2">
-                            {evidence.semanticFlags.map((flag, idx) => (
-                              <div
-                                key={idx}
-                                className="rounded border border-yellow-500/30 bg-yellow-950/30 p-2 text-xs"
-                              >
-                                <div className="flex justify-between">
-                                  <span className="text-yellow-400">type:</span>
-                                  <span className="text-yellow-200">{flag.type}</span>
-                                </div>
-                                <div className="mt-1">
-                                  <span className="text-yellow-400">reason:</span>
-                                  <p className="mt-1 text-yellow-200">{flag.reason}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <JsonCollapsible data={evidence} label="Full JSON" />
-                  </>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ) : (
-                  <DevPlaceholder>Evidence stage pending…</DevPlaceholder>
+                  <DevPlaceholder>Answer not ready</DevPlaceholder>
                 )}
+                {answer && <JsonCollapsible data={answer} label="Full JSON" />}
               </DevSection>
-
-              {/* Answer Metadata */}
-              <DevSection
-                icon={<Settings className="h-4 w-4" />}
-                title="Answer Metadata"
-                sectionKey="answer"
-                isExpanded={expandedSections.answer}
-                onToggle={() => toggleSection('answer')}
-              >
-                {answerMeta ? (
-                  <>
-                    <div className="space-y-3">
-                      <KeyValue label="model" value={answerMeta.model} />
-                      <KeyValue label="questionType" value={answerMeta.questionType} />
-                      <KeyValue label="enumeration" value={answerMeta.enumeration} />
-                      <KeyValue label="scope" value={answerMeta.scope} />
-                      <KeyValue label="verdict" value={answerMeta.verdict} />
-                      <KeyValue label="confidence" value={answerMeta.confidence} />
-                      {answerMeta.thoughts && answerMeta.thoughts.length > 0 && (
-                        <div>
-                          <p className="mb-2 text-xs font-medium text-purple-300">
-                            thoughts ({answerMeta.thoughts.length}):
-                          </p>
-                          <ol className="space-y-2">
-                            {answerMeta.thoughts.map((thought, idx) => (
-                              <li key={idx} className="flex gap-2 text-xs">
-                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-purple-500/20 font-mono text-purple-300">
-                                  {idx + 1}
-                                </span>
-                                <span className="flex-1 leading-relaxed text-purple-200">{thought}</span>
-                              </li>
-                            ))}
-                          </ol>
-                        </div>
-                      )}
-                    </div>
-                    <JsonCollapsible data={answerMeta} label="Full JSON" />
-                  </>
-                ) : (
-                  <DevPlaceholder>Answer stage pending…</DevPlaceholder>
-                )}
-              </DevSection>
-
-              {/* Full Trace JSON */}
-              <div className="pt-2">
-                <JsonCollapsible data={trace} label="Complete Reasoning Trace (JSON)" defaultExpanded={false} />
-              </div>
             </div>
           </motion.div>
         )}
@@ -304,132 +156,66 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
   );
 }
 
-interface DevSectionProps {
+function DevSection({
+  icon,
+  title,
+  children,
+}: {
   icon: React.ReactNode;
   title: string;
-  sectionKey: string;
-  isExpanded: boolean;
-  onToggle: () => void;
   children: React.ReactNode;
+  isExpanded?: boolean;
+  onToggle?: () => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-purple-200">
+        {icon}
+        <span className="text-xs font-semibold">{title}</span>
+      </div>
+      <div className="pl-6">{children}</div>
+    </div>
+  );
 }
 
-function DevSection({ icon, title, isExpanded, onToggle, children }: DevSectionProps) {
+function KeyValue({ label, value }: { label: string; value?: string }) {
+  if (value === undefined) return null;
   return (
-    <div className="rounded-lg border border-purple-500/20 bg-purple-950/20">
+    <div className="flex items-center justify-between text-xs">
+      <span className="text-purple-400">{label}</span>
+      <span className="text-purple-100">{value}</span>
+    </div>
+  );
+}
+
+function JsonCollapsible({ data, label }: { data: unknown; label?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded border border-purple-500/20 bg-purple-950/40">
       <button
-        onClick={onToggle}
-        className="flex w-full items-center justify-between px-3 py-2 text-left transition-colors hover:bg-purple-500/10"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between px-2 py-1 text-left text-[11px] font-medium text-purple-200"
       >
-        <div className="flex items-center gap-2">
-          <div className="text-purple-400">{icon}</div>
-          <h4 className="text-xs font-semibold text-purple-200">{title}</h4>
-        </div>
-        <motion.div animate={{ rotate: isExpanded ? 0 : -90 }} transition={{ duration: 0.2 }}>
-          <ChevronDown className="h-3.5 w-3.5 text-purple-300" />
-        </motion.div>
+        <span>{label ?? 'JSON'}</span>
+        <ChevronDown className="h-3 w-3 transition-transform" style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }} />
       </button>
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.pre
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="overflow-hidden"
+            className="overflow-auto px-2 pb-2 text-[11px] text-purple-100"
           >
-            <div className="border-t border-purple-500/20 px-3 py-2">{children}</div>
-          </motion.div>
+            {JSON.stringify(data, null, 2)}
+          </motion.pre>
         )}
       </AnimatePresence>
     </div>
   );
-}
-
-function inferPlanFocus(plan?: PartialReasoningTrace['plan'] | null): 'resume' | 'projects' | 'mixed' | null {
-  if (!plan) return null;
-  const sources = new Set(plan.retrievalRequests?.map((req) => req.source));
-  const hasResume = sources.has('resume');
-  const hasProjects = sources.has('projects');
-  if (hasResume && hasProjects) return 'mixed';
-  if (hasResume) return 'resume';
-  if (hasProjects) return 'projects';
-  if (plan.scope === 'employment_only' || (plan.resumeFacets ?? []).includes('experience')) return 'resume';
-  return 'mixed';
 }
 
 function DevPlaceholder({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-purple-200/70">{children}</p>;
-}
-
-interface KeyValueProps {
-  label: string;
-  value: string | number | boolean | string[] | null | undefined;
-}
-
-function KeyValue({ label, value }: KeyValueProps) {
-  const displayValue = Array.isArray(value) ? `[${value.join(', ')}]` : String(value);
-
-  return (
-    <div className="flex items-start justify-between gap-4 text-xs">
-      <span className="font-mono text-purple-400">{label}:</span>
-      <span className="text-right font-mono text-purple-200">{displayValue}</span>
-    </div>
-  );
-}
-
-interface JsonCollapsibleProps {
-  data: unknown;
-  label?: string;
-  defaultExpanded?: boolean;
-}
-
-function JsonCollapsible({ data, label = 'View JSON', defaultExpanded = false }: JsonCollapsibleProps) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-  const [copied, setCopied] = useState(false);
-
-  const jsonString = JSON.stringify(data, null, 2);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(jsonString);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="mt-3 rounded border border-purple-500/20 bg-purple-950/40">
-      <div className="flex items-center justify-between border-b border-purple-500/20 px-2 py-1.5">
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-1.5 text-xs font-medium text-purple-300 hover:text-purple-200"
-        >
-          <motion.div animate={{ rotate: isExpanded ? 0 : -90 }} transition={{ duration: 0.2 }}>
-            <ChevronDown className="h-3 w-3" />
-          </motion.div>
-          {label}
-        </button>
-        <button
-          onClick={handleCopy}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-purple-300 hover:bg-purple-500/20 hover:text-purple-200"
-          title="Copy JSON"
-        >
-          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-        </button>
-      </div>
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0 }}
-            animate={{ height: 'auto' }}
-            exit={{ height: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <pre className="max-h-96 overflow-auto p-2 text-[10px] leading-relaxed text-purple-200">
-              <code>{jsonString}</code>
-            </pre>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
 }
