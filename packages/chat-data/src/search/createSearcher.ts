@@ -357,7 +357,7 @@ export function createSearcher<TRecord, TInput, TFilters, TResult>(config: {
       .slice(0, limit);
 
     const results = scored.map(
-      ({ record, baseScore, structuredScore, textScore, semanticScore, recencyContribution, normalizedScore }) => {
+      ({ record, structuredScore, textScore, semanticScore, recencyContribution, normalizedScore }) => {
         const baseResult = spec.buildResult(record);
         const metadata: ScoreMetadata = {
           _score: normalizedScore,
