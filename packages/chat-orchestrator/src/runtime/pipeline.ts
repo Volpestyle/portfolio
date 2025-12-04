@@ -171,11 +171,12 @@ type JsonResponseArgs<T> = {
 };
 
 const DEFAULT_MAX_CONTEXT = DEFAULT_CHAT_HISTORY_LIMIT;
-const SLIDING_WINDOW_CONFIG = {
+export const SLIDING_WINDOW_CONFIG = {
   maxConversationTokens: 8000,
   minRecentTurns: 3,
   maxUserMessageTokens: 500,
 };
+export type SlidingWindowConfig = typeof SLIDING_WINDOW_CONFIG;
 const MAX_TOPK = RETRIEVAL_REQUEST_TOPK_MAX;
 const MAX_ENUMERATION_DOCS = 50;
 const MIN_PLAN_TOPK = 3;
@@ -596,6 +597,14 @@ export function inferRetrievalFocus(
   return 'mixed';
 }
 
+/**
+ * Normalizes raw Planner output into a retrieval plan safe for pipeline consumption.
+ *
+ * - Validates enum fields with fallbacks
+ * - Deduplicates and clamps retrieval requests
+ * - Drops education facets when scope is employment_only
+ * - Backfills missing sources unless the planner explicitly disabled retrieval
+ */
 export function normalizeRetrievalPlan(plan: RetrievalPlan, logger?: ChatRuntimeOptions['logger']): RetrievalPlan {
   const questionType: QuestionType = (QUESTION_TYPE_VALUES as readonly string[]).includes(plan.questionType)
     ? plan.questionType
@@ -1800,6 +1809,14 @@ type BuildUiArtifactsParams = {
   logger?: ChatRuntimeOptions['logger'];
 };
 
+/**
+ * Derives UiPayload from Evidence output and retrieved document sets.
+ *
+ * - Validates uiHints against retrieved IDs and logs uiHintWarnings
+ * - Honors cardsEnabled/questionType toggles
+ * - Trusts uiHints completeness for all_relevant, otherwise falls back to selectedEvidence
+ * - Applies display limits and adds banner/core evidence helpers
+ */
 export function buildUiArtifacts(params: BuildUiArtifactsParams): UiPayload {
   const maxDisplayItems = params.maxDisplayItems ?? MAX_DISPLAY_ITEMS;
   const coreEvidenceIds = dedupeDocIds(params.evidence.selectedEvidence.map((item) => item.id));
@@ -1980,6 +1997,12 @@ function capEnumerationDocs(retrieved: RetrievalResult, maxDocs = MAX_ENUMERATIO
   };
 }
 
+/**
+ * Applies source-aware limits to retrieval output before calling Evidence.
+ *
+ * - all_relevant → keep top 50 docs across sources by score
+ * - sample → bucket by source with priority weights from plan focus/facets/scope and cap at 12 total
+ */
 function limitEvidenceDocs(retrieved: RetrievalResult, plan: RetrievalPlan): RetrievalResult {
   if (plan.enumeration === 'all_relevant') {
     return capEnumerationDocs(retrieved);

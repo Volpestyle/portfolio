@@ -41,7 +41,7 @@ At a high level:
 - Observable – Every turn has a structured reasoning trace and token metrics.
 - Composable – Orchestrator and UI are decoupled via a clean SSE contract.
 - Reusable – Driven by OwnerConfig and data providers; domain-agnostic.
-- Cheap & fast – Uses nano-class runtime models (e.g., gpt‑5‑nano‑2025‑08‑07); offline preprocessing uses full-size models (e.g., gpt‑5.1‑2025‑11‑13).
+- Cheap & fast – Uses nano-class runtime models (placeholder "nano model"); offline preprocessing uses a full-size model.
 - Measurable – Preprocessing and runtime both emit token and cost metrics.
 
 Companion docs:
@@ -124,7 +124,7 @@ In addition, the Planner MAY set `retrievalRequests = []` when:
   - Note: Traditional TTFT (time-to-first-answer-token) is less critical here because the reasoning trace provides continuous visible feedback throughout the pipeline. Users see plan → retrieval summary → evidence summary → answer tokens as each stage completes. This progressive disclosure keeps perceived latency low even though multiple LLM calls run sequentially before the answer streams.
 - **Cost**
   - Runtime: Planner, Evidence → nano; Answer → nano or mini.
-  - Preprocessing (offline): full-size models (e.g., gpt‑5.1‑2025‑11‑13) and text‑embedding‑3‑large for one‑time work.
+  - Preprocessing (offline): full-size model and text‑embedding‑3‑large for one‑time work.
   - Track tokens & estimated USD cost for both preprocessing and runtime.
   - See `docs/features/chat/rate-limits-and-cost-guards.md` for cost alarms and rate limiting.
 - **Safety & Grounding**
@@ -148,9 +148,13 @@ In addition, the Planner MAY set `retrievalRequests = []` when:
 
 Per-IP Upstash Redis limiter: 5/min, 40/hr, 120/day. Fail-closed if Redis or IP detection fails; dev bypass when Redis env vars are missing, otherwise enforced in dev unless `ENABLE_DEV_RATE_LIMIT=false`. Implementation details live in `docs/features/chat/implementation-notes.md#11-rate-limiting-upstash-sliding-window`.
 
+> **Implementation note:** Rate limiting is enforced in the Next.js `/api/chat` route (Upstash Redis). The orchestrator stays limiter-free; see `docs/features/chat/implementation-notes.md` for route wiring.
+
 ### 1.5 Cost Monitoring & Alarms
 
 Runtime budget defaults to $10/month (override via `CHAT_MONTHLY_BUDGET_USD`) with warn/critical/exceeded thresholds at $8/$9.50/$10. Dynamo tracks spend per calendar month; CloudWatch/SNS alarm uses a rolling 30-day sum of daily cost metrics. Runtime only (Planner/Evidence/Answer + embeddings). See `docs/features/chat/implementation-notes.md#12-cost-monitoring--alarms` for Dynamo/CloudWatch/SNS wiring.
+
+> **Implementation note:** Budget enforcement happens in the Next.js `/api/chat` route. The orchestrator emits per-stage `StageUsage` with `costUsd`; the route aggregates and blocks turns that would exceed the Dynamo-tracked monthly budget.
 
 ---
 
@@ -197,7 +201,7 @@ _Figure 2.0: High-level runtime architecture showing the flow between client, se
   - CLI to build generated artifacts from:
     - data/chat/\* (resume PDF, profile markdown),
     - GitHub (projects), via a gist‑based repo config.
-  - Uses full-size models (e.g., gpt‑5.1‑2025‑11‑13) and text‑embedding‑3‑large for enrichment & embeddings.
+  - Uses full-size model and text‑embedding‑3‑large for enrichment & embeddings.
   - Emits metrics for token usage & cost per run.
 - **Observability & Devtools**
   - Logging of all pipeline stages and token usage.
@@ -209,6 +213,8 @@ _Figure 2.0: High-level runtime architecture showing the flow between client, se
 ![Portfolio Chat Engine - Runtime Data Usage](../../../generated-diagrams/portfolio-chat-runtime-data.png)
 
 _Figure 2.2: Runtime data usage showing how generated artifacts are loaded and used at runtime._
+
+> **Note:** All model IDs in this spec (e.g., "nano model", "mini model", "full-size model") are placeholders. Actual model IDs are configured in `chat.config.yml`.
 
 Runtime wiring uses typed configs exported from packages/chat-contract:
 
@@ -222,11 +228,12 @@ type OwnerConfig = {
 };
 
 type ModelConfig = {
-  plannerModel: string; // nano model id, e.g., "gpt-5-nano-2025-08-07"
+  plannerModel: string; // nano model id
   evidenceModel: string; // nano model id (default)
-  evidenceModelDeepDive?: string; // optional mini model id, e.g., "gpt-5-mini-2025-08-07" for complex queries
+  evidenceModelDeepDive?: string; // optional mini model id for complex queries
   answerModel: string; // nano or mini model id (mini recommended for voice adherence)
-  embeddingModel: string; // "text-embedding-3-large"
+  answerTemperature?: number; // optional Answer-stage temperature (0-2; undefined uses model default)
+  embeddingModel: string; // embedding model id
   stageReasoning?: {
     planner?: ReasoningEffort; // minimal | low | medium | high (reasoning-capable models only)
     evidence?: ReasoningEffort;
@@ -257,9 +264,9 @@ type DataProviders = {
 // (models map directly to ModelConfig; reasoning is optional and only used on reasoning-capable models)
 /*
 models:
-  plannerModel: gpt-5-nano-2025-08-07
-  evidenceModel: gpt-5-nano-2025-08-07
-  answerModel: gpt-5-mini-2025-08-07  # mini recommended for better voice/persona adherence
+  plannerModel: 'nano model'
+  evidenceModel: 'nano model'
+  answerModel: 'mini model'  # mini recommended for better voice/persona adherence
   embeddingModel: text-embedding-3-large
   reasoning:
     planner: minimal
@@ -299,7 +306,7 @@ chatApi.run(openaiClient, messages, {
 });
 ```
 
-Model IDs for Planner/Evidence/Answer/Embeddings come from `chat.config.yml`; the strings in this spec are illustrative snapshots, not hardcoded defaults.
+Model IDs for Planner/Evidence/Answer/Embeddings come from `chat.config.yml`; the strings in this spec are placeholders, not hardcoded defaults.
 
 Planner quality note: on reasoning-capable models, set `stageReasoning.planner` to `low` or higher—`minimal` tends to reduce plan accuracy and produces less inclusive retrieval coverage.
 
@@ -313,9 +320,9 @@ Quick at-a-glance view of purpose, inputs/outputs, and primary tech. See §5 for
 
 | Stage     | Purpose                                                        | Inputs                                                                                  | Outputs                                                                                  | Primary tech                                                                                                                         |
 | --------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Planner   | Normalize ask into structured intent + retrieval strategy      | Latest user message + short history; OwnerConfig + persona baked into system prompt     | RetrievalPlan (questionType, enumeration, scope, cardsEnabled, retrievalRequests, topic) | OpenAI Responses API (json schema) with `ModelConfig.plannerModel` (nano, e.g., gpt-5-nano-2025-08-07)                               |
+| Planner   | Normalize ask into structured intent + retrieval strategy      | Latest user message + short history; OwnerConfig + persona baked into system prompt     | RetrievalPlan (questionType, enumeration, scope, cardsEnabled, retrievalRequests, topic) | OpenAI Responses API (json schema) with `ModelConfig.plannerModel` (nano class)                                           |
 | Retrieval | Turn plan into ranked document sets                            | RetrievalPlan.retrievalRequests + corpora (projects/resume/profile) + embedding indexes | Retrieved docs per source (scored and filtered)                                          | MiniSearch BM25 + text-embedding-3-large re-rank + recency scoring (projects/resume); profile short-circuited                        |
-| Evidence  | Decide truth/confidence; own UI hints as source of truth       | RetrievalPlan + retrieved docs + latest user message                                    | EvidenceSummary (verdict, confidence, selectedEvidence, uiHints, semanticFlags)          | OpenAI Responses API with `ModelConfig.evidenceModel` (nano) or `evidenceModelDeepDive` (mini, e.g., gpt-5-mini-2025-08-07) when set |
+| Evidence  | Decide truth/confidence; own UI hints as source of truth       | RetrievalPlan + retrieved docs + latest user message                                    | EvidenceSummary (verdict, confidence, selectedEvidence, uiHints, semanticFlags)          | OpenAI Responses API with `ModelConfig.evidenceModel` (nano) or `evidenceModelDeepDive` (mini class) when set             |
 | Answer    | Turn evidence into first-person text without re-deciding truth | RetrievalPlan + EvidenceSummary + persona/profile + short history                       | AnswerPayload (message + optional thoughts)                                              | OpenAI Responses API with `ModelConfig.answerModel` (nano or mini; mini recommended for voice adherence), streaming tokens           |
 
 ---
@@ -404,7 +411,7 @@ For each repo in the gist where `include !== false` and `hideFromChat !== true`:
    - Find root README (e.g., README.md, README.mdx).
    - Treat README as the canonical source of project information for chat.
 3. **Summarize & enrich (full-size LLM)**
-   - Use a full-size model (e.g., gpt‑5.1) with a schema‑driven prompt to produce a ProjectDoc, given the README content.
+   - Use a full-size model with a schema‑driven prompt to produce a ProjectDoc, given the README content.
    - Instructions:
      - Derive name, oneLiner, description, impactSummary, sizeOrScope, techStack, languages, tags, context, bullets, and URLs only from the README.
      - `tags` should be short free‑form phrases capturing domains (e.g., “AI”, “backend”), techniques (e.g., “LLM”, “computer vision”), and architectures/approaches (e.g., “microservices”, “serverless”).
@@ -434,16 +441,14 @@ Resume is provided as a PDF, configured in chat-preprocess.config.yml.
 type ExperienceType = 'full_time' | 'internship' | 'contract' | 'freelance' | 'other';
 
 type ExperienceRecord = {
-  kind: 'experience';
+  type?: 'experience';
   id: string;
 
   company: string;
   title: string;
   location?: string | null;
-  dates?: {
-    start?: string | null; // "2021-06"
-    end?: string | null; // "2023-01" or null for current
-  } | null;
+  startDate: string;
+  endDate?: string | null;
   isCurrent?: boolean;
 
   experienceType?: ExperienceType;
@@ -452,7 +457,7 @@ type ExperienceRecord = {
   skills: string[]; // free-form: "LLM", "PyTorch", "Kubernetes", "React"
 
   linkedProjects?: string[]; // ProjectDoc ids, filled by cross-corpus linking (see §3.5)
-  monthsOfExperience?: number | null; // derived from dates when possible
+  monthsOfExperience?: number | null; // derived from start/end dates when possible
   impactSummary?: string | null;
   sizeOrScope?: string | null;
 
@@ -462,22 +467,22 @@ type ExperienceRecord = {
 };
 
 type EducationRecord = {
-  kind: 'education';
+  type: 'education';
   id: string;
   institution: string;
   degree?: string | null;
   field?: string | null;
-  dates?: {
-    start?: string | null;
-    end?: string | null;
-  } | null;
+  location?: string | null;
+  startDate?: string;
+  endDate?: string | null;
+  isCurrent?: boolean;
   summary?: string | null;
   bullets: string[];
   skills: string[];
 };
 
 type AwardRecord = {
-  kind: 'award';
+  type: 'award';
   id: string;
   title: string;
   issuer?: string | null;
@@ -488,7 +493,7 @@ type AwardRecord = {
 };
 
 type SkillRecord = {
-  kind: 'skill';
+  type: 'skill';
   id: string;
   name: string;
   category?: string | null; // "language", "framework", "tool", "domain"
@@ -512,18 +517,18 @@ type ResumeDoc = ExperienceRecord | EducationRecord | AwardRecord | SkillRecord;
      - “Awards” / “Honors”.
    - Group lines under headings.
 3. **LLM structuring (full-size LLM)**
-   - Use a full-size model (e.g., gpt‑5.1) with a schema‑driven prompt to map the extracted resume text into ExperienceRecord[], EducationRecord[], AwardRecord[], SkillRecord[].
-   - Instructions:
+  - Use a full-size model with a schema‑driven prompt to map the extracted resume text into ExperienceRecord[], EducationRecord[], AwardRecord[], SkillRecord[].
+  - Instructions:
      - Preserve exact company/school/job titles.
-     - Normalize dates into YYYY-MM or similar.
+     - Normalize `startDate`/`endDate` into YYYY-MM or similar.
      - Extract bullets as arrays.
      - Populate skills with explicit tools, frameworks, and domains mentioned.
      - Classify each experience into `experienceType` ("full_time", "internship", "contract", "freelance", "other") based on role, keywords, and context.
      - Do not invent employers, degrees, or skills that aren’t in the PDF.
 4. **Duration computation (monthsOfExperience)**
-   - For each ExperienceRecord with a valid `dates` range:
-     - Compute `monthsOfExperience` as the month‑difference between `start` and `end` (or current month if `end` is null and `isCurrent` is true).
-   - If dates are missing or ambiguous, leave `monthsOfExperience` as null.
+   - For each ExperienceRecord with a valid start/end range:
+     - Compute `monthsOfExperience` as the month‑difference between `startDate` and `endDate` (or current month if `endDate` is null and `isCurrent` is true).
+   - If start/end dates are missing or ambiguous, leave `monthsOfExperience` as null.
 5. **Embeddings**
    - For each ExperienceRecord and SkillRecord:
      - Build embedding input: `summary + '\n' + bullets.join(' ') + '\n' + skills.join(', ')`.
@@ -564,15 +569,15 @@ type PersonaSummary = {
 };
 ```
 
-- **Profile is required.** It is ingested from a Markdown file in `data/chat/profile.md` using a full-size model (e.g., gpt‑5.1) to structure into a single ProfileDoc (with `id` typically set to `"profile"`). If `profile.md` is missing or empty, preprocessing fails with `PREPROCESS_PROFILE_REQUIRED`.
-- Persona is synthesized from the resume + projects + profile using a full-size model (e.g., gpt‑5.1) and stored as a PersonaSummary. All three sources are required to produce a high-quality, grounded persona.
+- **Profile is required.** It is ingested from a Markdown file in `data/chat/profile.md` using a full-size model to structure into a single ProfileDoc (with `id` typically set to `"profile"`). If `profile.md` is missing or empty, preprocessing fails with `PREPROCESS_PROFILE_REQUIRED`.
+- Persona is synthesized from the resume + projects + profile using a full-size model and stored as a PersonaSummary. All three sources are required to produce a high-quality, grounded persona.
 
 #### 3.3.1 Profile ingestion
 
 1. **Markdown → text**
    - Read `data/chat/profile.md` as UTF‑8 text.
 2. **LLM structuring (full-size LLM)**
-   - Use a full-size model (e.g., gpt‑5.1) with a schema‑driven prompt to map the markdown into a single ProfileDoc.
+   - Use a full-size model with a schema‑driven prompt to map the markdown into a single ProfileDoc.
    - Instructions:
      - Set `id` to a stable value, typically `"profile"`.
      - Preserve exact name, headline, and social URLs.
@@ -644,10 +649,10 @@ type EmbeddingIndex = {
 
 Semantic enrichment is purely free‑form:
 
-- For each project, the full-size model (e.g., gpt‑5.1):
+- For each project, the full-size model:
   - Normalizes tools/frameworks into techStack / languages.
   - Generates tags as short free‑form keywords/phrases describing domains, techniques, and architectures.
-- For each experience, the full-size model (e.g., gpt‑5.1):
+- For each experience, the full-size model:
   - Populates skills with tools/frameworks/domains.
 - There is no fixed tag vocabulary; the model can use any phrasing justified by the README or resume text. Modern embeddings plus this enrichment allow broad queries like “what AI projects have you done?” to hit projects with varied wording.
 
@@ -875,125 +880,31 @@ When `incrementalBuild: true`:
 
 ### 4.1 Core Types & Reasoning
 
-```ts
-// Planner axis enums
-type QuestionType = 'binary' | 'list' | 'narrative' | 'meta';
-type EnumerationMode = 'sample' | 'all_relevant';
-type ExperienceScope = 'employment_only' | 'any_experience';
+Appendix A is the single source of truth for the runtime enums/unions (`QuestionType`, `EnumerationMode`, `ExperienceScope`, `Verdict`, `Confidence`, `RetrievalSource`, `EvidenceSource`, `EvidenceRelevance`) and the `ReasoningTrace` / `PartialReasoningTrace` shapes.
 
-// Evidence axes
-type Verdict = 'yes' | 'no_evidence' | 'partial_evidence' | 'n/a';
-type Confidence = 'high' | 'medium' | 'low';
-
-// Shared sources
-type RetrievalSource = 'projects' | 'resume' | 'profile';
-type EvidenceSource = 'project' | 'resume' | 'profile';
-type EvidenceRelevance = 'high' | 'medium' | 'low';
-
-// Answer stage output
-type AnswerPayload = {
-  message: string; // user-facing text (streamed)
-  thoughts?: string[]; // optional brief internal reasoning steps (dev-only)
-};
-
-type RetrievalSummary = {
-  source: RetrievalSource;
-  queryText: string;
-  requestedTopK: number;
-  effectiveTopK: number;
-  numResults: number;
-};
-
-type ReasoningStage = 'plan' | 'retrieval' | 'evidence' | 'answer';
-
-type PartialReasoningTrace = {
-  plan: RetrievalPlan | null;
-  retrieval: RetrievalSummary[] | null;
-  evidence: EvidenceSummary | null;
-  answerMeta: {
-    model: string;
-    questionType: QuestionType;
-    enumeration: EnumerationMode;
-    scope: ExperienceScope;
-    verdict: Verdict;
-    confidence: Confidence;
-    thoughts?: string[];
-  } | null;
-};
-
-type ReasoningTrace = Required<PartialReasoningTrace>;
-```
+> **Naming convention:** Retrieval sources use plural (`projects`, `resume`, `profile`) because they reference corpus collections. Evidence sources use singular (`project`, `resume`, `profile`) because they reference individual documents.
 
 ReasoningTrace is a structured dev trace (plan → retrieval → evidence → answerMeta, including optional dev-only thoughts). PartialReasoningTrace streams when reasoning is enabled; any user-facing reasoning view is derived by the integrator.
 
 ### 4.2 Planner: RetrievalPlan
 
-```ts
-type RetrievalRequest = {
-  source: RetrievalSource;
-  queryText: string;
-  topK: number; // runtime clamps
-};
-
-type RetrievalPlan = {
-  // Core axes
-  questionType: QuestionType;
-  enumeration: EnumerationMode;
-  scope: ExperienceScope;
-
-  // Retrieval instructions
-  retrievalRequests: RetrievalRequest[];
-  resumeFacets?: Array<'experience' | 'education' | 'award' | 'skill'>;
-
-  // UI / presentation hints
-  cardsEnabled?: boolean; // default true when omitted
-
-  // Telemetry only
-  topic?: string | null;
-};
-```
+See Appendix A for the `RetrievalPlan` schema (`questionType`, `enumeration`, `scope`, `retrievalRequests`, `resumeFacets`, `cardsEnabled`, `topic`).
 
 `questionType`, `enumeration`, and `scope` are the cross-stage behavioral axes. Planner sets them directly instead of emitting derived flags like `enumerateAllRelevant` or `answerMode`. `cardsEnabled` replaces `uiTarget`, with `false` meaning text-only answers.
 
 ### 4.3 Evidence: EvidenceSummary
 
+See Appendix A for the `EvidenceSummary`, `SelectedEvidenceItem`, `SemanticFlag`, `EvidenceUiHints`, and `UiHintValidationWarning` schemas.
+
 ```ts
-type SelectedEvidenceItem = {
-  source: EvidenceSource;
-  id: string;
-  title: string;
-  snippet: string;
-  relevance: EvidenceRelevance;
-};
-
-type SemanticFlagType = 'multi_topic' | 'ambiguous' | 'needs_clarification' | 'off_topic';
-
-type SemanticFlag = {
-  type: SemanticFlagType;
-  reason: string;
-};
-
-type EvidenceUiHints = {
-  projects?: string[];
-  experiences?: string[];
-};
-
 type UiHintValidationWarning = {
   code: 'UIHINT_INVALID_PROJECT_ID' | 'UIHINT_INVALID_EXPERIENCE_ID';
   invalidIds: string[];
   retrievedIds: string[];
 };
-
-type EvidenceSummary = {
-  verdict: Verdict;
-  confidence: Confidence;
-  reasoning: string; // internal explanation; may be shown in reasoning panel
-  selectedEvidence: SelectedEvidenceItem[];
-  semanticFlags?: SemanticFlag[];
-  uiHints?: EvidenceUiHints;
-  uiHintWarnings?: UiHintValidationWarning[];
-};
 ```
+
+The orchestrator validates `uiHints` against retrieved doc IDs. If Evidence returns IDs that were not retrieved (hallucinated/stale), they are filtered out and logged via `uiHintWarnings` for debugging.
 
 Constraints:
 
@@ -1004,20 +915,20 @@ Constraints:
 
 ### 4.4 UI Payload (driven by Evidence)
 
-```ts
-type UiPayload = {
-  showProjects: string[]; // ProjectDoc ids
-  showExperiences: string[]; // ResumeDoc ids, filtered to ExperienceRecord.kind === 'experience'
-  bannerText?: string;
-  coreEvidenceIds?: string[]; // EvidenceItem ids in explanation-set order
-};
-```
+See Appendix A for the `UiPayload` schema (cards + optional banner/core evidence ids).
 
 Key invariants:
 
 - showProjects/showExperiences MUST come from Evidence (uiHints or selectedEvidence) and be subsets of retrieved docs.
 - Enumeration completeness is encoded in `plan.enumeration` + `uiHints`: when `enumeration = "all_relevant"`, `uiHints` is treated as the full relevant set for cards.
 - When `cardsEnabled = false`, renderers suppress cards even if uiHints is populated.
+
+### 4.5 Cross-Stage Invariants
+
+- **Zero-evidence behavior:** For non-meta questions with zero retrieved docs, Evidence returns `verdict: "no_evidence"` and `confidence: "low"` with empty `selectedEvidence/uiHints`; Answer carries that through without calling LLM when possible.
+- **Cards toggle:** `cardsEnabled = false` suppresses UI cards even if Evidence provides uiHints; downstream derivation always honors this toggle.
+- **Enumeration completeness:** When `enumeration = "all_relevant"`, uiHints is treated as the full relevant set; `buildUiArtifacts` does not fall back to selectedEvidence.
+- **Evidence as source of truth:** UI is derived strictly from Evidence (uiHints/selectedEvidence) filtered to retrieved IDs; retrieval extras or hallucinated IDs are ignored and logged via `uiHintWarnings`.
 
 ---
 
@@ -1034,9 +945,9 @@ All LLM interactions use the OpenAI Responses API with:
 
 ### 5.0 Model Strategy
 
-All runtime model IDs are read from `chat.config.yml`. We use three model classes: nano (e.g., gpt‑5‑nano‑2025‑08‑07) for low cost/latency, mini (e.g., gpt‑5‑mini‑2025‑08‑07) for deeper reasoning when needed, and full-size (e.g., gpt‑5.1‑2025‑11‑13) for strongest quality.
+All runtime model IDs are read from `chat.config.yml`. We refer to them using placeholder class names: nano model (low cost/latency), mini model (deeper reasoning when needed), and full-size model (strongest quality).
 
-- Offline (preprocess) – full-size model (e.g., gpt‑5.1‑2025‑11‑13) for enrichment & persona + text-embedding-3-large for embeddings.
+- Offline (preprocess) – full-size model for enrichment & persona + text-embedding-3-large for embeddings.
 - Online (Planner/Evidence) – nano by default for cost/latency; Evidence may opt into a mini model for deep dives when configured.
 - Online (Answer) – nano or mini. Mini is recommended when voice examples are important, as it adheres to persona/voice guidelines more reliably than nano. Trade-off is slightly higher cost/latency.
 
@@ -1060,6 +971,33 @@ Runtime defaults:
 
 Implementation details and the tokenizer guardrails live in `docs/features/chat/implementation-notes.md#21-sliding-window--token-budgets`.
 
+### 5.0.2 Sliding Window Algorithm
+
+The orchestrator uses tiktoken (`o200k_base` encoding) for token counting.
+
+**Configuration:**
+
+```ts
+const SLIDING_WINDOW_CONFIG = {
+  maxConversationTokens: 8000,
+  minRecentTurns: 3,
+  maxUserMessageTokens: 500,
+};
+```
+
+**Algorithm:**
+
+1. Group messages into turns (user + assistant pairs).
+2. Validate the latest user message does not exceed `maxUserMessageTokens`; reject with `MessageTooLongError` if it does.
+3. Working backwards from the most recent turn:
+   - Always keep the last `minRecentTurns` turns regardless of token count.
+   - Continue adding older turns while total tokens ≤ `maxConversationTokens`.
+4. Return truncated messages and a `truncationApplied` flag.
+
+**Error handling:**
+
+- If the user message exceeds 500 tokens, return an error to the client before the pipeline runs.
+
 ### 5.1 Planner
 
 - Purpose: Normalize the user's ask into structured intent and retrieval strategy.
@@ -1070,6 +1008,8 @@ Implementation details and the tokenizer guardrails live in `docs/features/chat/
   - Latest user message.
 - Output:
   - RetrievalPlan JSON.
+
+See §4.5 Cross-Stage Invariants for zero-evidence handling, cards toggles, and enumeration completeness expectations carried through later stages.
 
 **Responsibilities**
 
@@ -1117,6 +1057,37 @@ Use short noun phrases (2–5 words), e.g., “Go experience”, “AWS backgrou
 - Validates that `retrievalRequests` align with the plan (e.g., non-empty unless meta/no-retrieval).
 - Clamps `topK` values to configured bounds and may raise `topK` in enumeration mode.
 
+### 5.1.1 Plan Normalization
+
+After receiving the Planner's output, the orchestrator normalizes it:
+
+**Validation**
+
+- `questionType`, `enumeration`, and `scope` are coerced to valid enum values (fallback defaults applied).
+- `cardsEnabled` defaults to `true` when omitted.
+- `resumeFacets` is filtered to valid values; `education` is dropped when `scope = employment_only`.
+
+**Retrieval request processing**
+
+- Deduplicate by `source:queryText.toLowerCase()`.
+- Clamp `topK` into the `[3, 10]` range.
+- For `questionType = "meta"`, only `profile` source requests are honored.
+
+**Backfill logic**
+
+When `retrievalRequests` are insufficient for non-meta questions:
+
+1. Infer retrieval focus from existing requests, scope, and resumeFacets.
+2. If focus is `resume` but no resume request exists, add one with `topK = 3`.
+3. If focus is `projects` but no projects request exists, add one with `topK = 3`.
+4. If focus is `mixed`, ensure both sources are present.
+
+Backfill is skipped when:
+
+- Planner explicitly set `retrievalRequests = []` (no-retrieval intent).
+- All requests are `profile`-only.
+- `questionType = "meta"`.
+
 ### 5.2 Retrieval (with Enumeration Mode)
 
 - Purpose: Turn the plan's retrieval requests into scored document sets per source.
@@ -1126,15 +1097,53 @@ Use short noun phrases (2–5 words), e.g., “Go experience”, “AWS backgrou
 - Output:
   - Retrieved docs per source, scored and filtered for Evidence.
 
+See §4.5 for cross-stage invariants on zero-evidence handling, cards, and enumeration completeness.
+
 For each `RetrievalRequest`: BM25 shortlist → embedding re-rank → recency weighting → combined score. Profile is auto-included for `questionType = narrative|meta`; otherwise only when the Planner explicitly requests it. `enumeration = "all_relevant"` bumps recall (up to ~50 docs) so Evidence/uiHints can cover everything; `scope = employment_only` filters resume results to jobs/internships; `resumeFacets` optionally bias resume retrieval.
 
 Implementation details (scoring weights, MiniSearch BM25 usage, recency decay, scope/resume facet filters) live in `docs/features/chat/implementation-notes.md#3-retrieval-pipeline-internals`.
+
+**Query sanitization**
+
+- Strip noise words from `queryText` before retrieval: `projects`, `project`, `experiences`, `experience`, `resume`.
+- If sanitization yields an empty string, fall back to the original query.
+- Prevents overly broad matches for asks like "show me your projects."
+
+**Linked project resolution**
+
+When `scope = employment_only`, after retrieving experiences the orchestrator auto-fetches projects referenced in `ExperienceRecord.linkedProjects` so employment-focused asks can still surface linked project cards.
 
 **Caching & reuse**
 
 - Retrieval drivers memoize searchers and doc maps per owner.
 - Planner cache keyed by `{ ownerId, conversationSnippet }`; follow-up detection is best-effort from the sliding window, and once older context falls out of the window the turn is treated as a new topic.
 - Retrieval results can be reused for identical `{ source, queryText }` pairs within the active conversation window; otherwise the orchestrator reruns retrieval per turn.
+
+### 5.2.1 Evidence Input Limiting
+
+Before passing docs to Evidence, the orchestrator limits them to prevent context overflow.
+
+**For `enumeration = "all_relevant"`**
+
+- Cap total docs at 50 across all sources.
+- Score each doc by `_score` (retrieval score) with source-specific fallbacks.
+- Keep the top 50 by score.
+
+**For `enumeration = "sample"`**
+
+- Use priority buckets with per-source limits:
+
+| Source | Base Limit | Priority Factors |
+|--------|------------|------------------|
+| experiences | 6 | +2.5 if resume focus, +0.8 if `experience` facet, +0.8 if `employment_only` |
+| projects | 6 | +2.5 if projects focus |
+| education | 4 | +1.5 if `education` facet |
+| awards | 4 | +1.2 if `award` facet |
+| skills | 4 | +1.2 if `skill` facet |
+
+- Sort buckets by priority descending.
+- Allocate docs from each bucket until total reaches 12.
+- Profile is always included if retrieved.
 
 ### 5.3 Evidence (with uiHints)
 
@@ -1147,6 +1156,8 @@ Implementation details (scoring weights, MiniSearch BM25 usage, recency decay, s
   - Retrieved docs (projects, resume, profile).
 - Output:
   - EvidenceSummary JSON.
+
+For zero-evidence behavior, cards toggles, and enumeration completeness rules, see §4.5 Cross-Stage Invariants.
 
 **Responsibilities**
 
@@ -1221,6 +1232,12 @@ Implementation details (scoring weights, MiniSearch BM25 usage, recency decay, s
 - Output:
   - AnswerPayload JSON.
 
+See §4.5 for cross-stage invariants that Answer must preserve (zero-evidence behavior, cards toggle, and enumeration completeness).
+
+**Temperature**
+
+- If `modelConfig.answerTemperature` is set, it controls response creativity. Lower values (0.3–0.5) produce more deterministic responses; higher values (0.8–1.0) allow more varied phrasing.
+
 **Behavior**
 
 - Always speak as "I" representing the portfolio owner.
@@ -1263,6 +1280,29 @@ Implementation details (scoring weights, MiniSearch BM25 usage, recency decay, s
   - Orchestrator skips retrieval; Evidence sees empty docs and sets verdict/confidence accordingly.
 - Zero‑evidence fast path (canonical):
   - If retrieval returns nothing for a non-meta ask, Evidence MUST return verdict = "no_evidence", confidence = "low", and empty evidence/uiHints (optionally with an `off_topic` flag).
+
+See §4.5 Cross-Stage Invariants for the shared expectations Answer and UI derivation must preserve.
+
+**Zero-evidence fast path (implementation detail):**
+
+When retrieval returns zero documents for a non-meta question, the orchestrator **skips the Evidence LLM call entirely** and synthesizes a stub response:
+
+```ts
+function synthesizeEvidenceSummary(reason: 'meta' | 'no_docs'): EvidenceSummary {
+  return {
+    verdict: reason === 'meta' ? 'n/a' : 'no_evidence',
+    confidence: 'low',
+    reasoning: reason === 'meta'
+      ? 'Meta question; no portfolio evidence needed.'
+      : 'No relevant documents found in retrieval.',
+    selectedEvidence: [],
+    semanticFlags: [],
+    uiHints: { projects: [], experiences: [] },
+  };
+}
+```
+
+This saves latency and cost when there is nothing to evaluate.
 
 ---
 
@@ -1372,10 +1412,43 @@ The planner sets `cardsEnabled` (default true). Use `false` for explicit text-on
 
 - Evidence.uiHints is the single source of truth for cards; when `enumeration = "all_relevant"`, uiHints is treated as the full set (no fallback).
 - If uiHints is absent and cardsEnabled is true, fall back to evidence-selected IDs (subset of retrieved docs only).
-- Cards always filter to retrieved doc IDs; resume cards must map to `kind === "experience"` entries.
+- Cards always filter to retrieved doc IDs; resume cards must map to `type === "experience"` entries.
 - When `cardsEnabled = false`, UI suppresses cards even if uiHints is present.
 
 Helper implementation lives in `docs/features/chat/implementation-notes.md#41-ui-derivation-helper`.
+
+See §4.5 for the cross-stage invariants this section must honor (cards toggle, enumeration completeness, evidence as the UI source of truth).
+
+### 6.3.1 UI Payload Construction
+
+The `buildUiArtifacts()` helper constructs `UiPayload` from Evidence output:
+
+**Inputs**
+
+- `plan.cardsEnabled`, `plan.enumeration`, `plan.questionType`
+- `evidence.uiHints`, `evidence.selectedEvidence`
+- Retrieved document ID sets
+
+**Algorithm**
+
+1. If `cardsEnabled = false` or `questionType = "meta"`, return empty arrays.
+2. Validate `uiHints` IDs against retrieved IDs; log `uiHintWarnings` when invalid IDs are present.
+3. For `enumeration = "all_relevant"`, treat `uiHints` as the complete set.
+4. For `enumeration = "sample"`, prefer `uiHints` when present, else fall back to `selectedEvidence` IDs.
+5. Apply display limits (`MAX_DISPLAY_ITEMS = 10`).
+6. For binary questions, tighten uiHints to only IDs in `selectedEvidence`.
+7. Generate `bannerText` for truncation or zero-evidence cases.
+
+**Output**
+
+```ts
+{
+  showProjects: string[],
+  showExperiences: string[],
+  bannerText?: string,
+  coreEvidenceIds?: string[]
+}
+```
 
 ### 6.4 SSE Event Payload Shapes
 
@@ -1454,6 +1527,8 @@ If the Answer stage fails after emitting some tokens:
 - **Moderation**
   - Input moderation is enabled by default in the Next.js route; flagged inputs short-circuit with a brief, non-streamed refusal (HTTP 200 is acceptable).
   - Output moderation is also enabled by default in the current route; refusals are non-streamed with the configured refusal message/banner. Adjust route options if you want it disabled.
+
+> **Implementation note:** Moderation hooks live in the Next.js `/api/chat` route. The orchestrator focuses on Planner → Retrieval → Evidence → Answer and assumes inputs are already moderated.
 
 ---
 
@@ -1773,6 +1848,12 @@ export interface UiHints {
   experiences?: string[];
 }
 
+export interface UiHintValidationWarning {
+  code: 'UIHINT_INVALID_PROJECT_ID' | 'UIHINT_INVALID_EXPERIENCE_ID';
+  invalidIds: string[];
+  retrievedIds: string[];
+}
+
 export interface EvidenceSummary {
   // Verdict + strength for the underlying question
   verdict: Verdict;
@@ -1807,6 +1888,12 @@ export interface EvidenceSummary {
    * the UI layer ignore it (depending on your chosen approach).
    */
   uiHints?: UiHints;
+
+  /**
+   * Captures validation issues when uiHints refer to IDs that were not retrieved.
+   * Used for diagnostics; does not surface to end users.
+   */
+  uiHintWarnings?: UiHintValidationWarning[];
 }
 
 // ================================
@@ -1827,19 +1914,31 @@ export interface AnswerPayload {
    */
   thoughts?: string[];
 }
+
+// ================================
+// UI payload → frontend
+// ================================
+
+export interface UiPayload {
+  showProjects: string[]; // ProjectDoc ids
+  showExperiences: string[]; // ResumeDoc ids, filtered to ExperienceRecord.type === 'experience'
+  bannerText?: string;
+  coreEvidenceIds?: string[]; // EvidenceItem ids in explanation-set order
+}
 ```
 
 ---
 
-## Appendix B – System Prompts (Canonical)
+## Appendix B – System Prompts
 
-Canonical prompt strings live in `packages/chat-orchestrator/src/pipelinePrompts.ts` and are the single source of truth (placeholders `{{OWNER_NAME}}` and `{{DOMAIN_LABEL}}` are filled at runtime).
+Canonical prompt strings are defined in:
 
-- **Planner** — Classifies `questionType/enumeration/scope`, sets `cardsEnabled/topic`, and issues intentional `retrievalRequests` (resume/projects/profile). Never uses `meta` for skills/experience/location asks; location presence always triggers resume retrieval.
-- **Evidence** — Decides verdict/confidence, builds `selectedEvidence` and `uiHints`, and sets `semanticFlags` for shape issues only. No evidence for non-meta → verdict `no_evidence`, confidence `low`, empty evidence/uiHints; meta → verdict `n/a`. `enumeration = "all_relevant"` drives full uiHints coverage.
-- **Answer** — Speaks as the owner in first person using persona/profile; never re-decides verdict. Maps verdict to stance/hedging, respects `cardsEnabled`, and uses `uiHints/selectedEvidence` for grounding. Semantic flags adjust tone (clarification/off-topic/ambiguity).
+- `packages/chat-orchestrator/src/pipelinePrompts.ts`
 
-Refer to the code file for the exact text sent to the models.
+Key prompt variables:
+
+- `{{OWNER_NAME}}` — replaced with `OwnerConfig.ownerName`
+- `{{DOMAIN_LABEL}}` — replaced with `OwnerConfig.domainLabel`
 
 ## Appendix C – Example chat-preprocess.config.yml
 
@@ -1876,7 +1975,7 @@ profile:
 
 models:
   # Strong full-size model for offline enrichment and persona building.
-  enrichmentModel: 'gpt-5.1-2025-11-13' # example full-size model id
+  enrichmentModel: 'full-size model' # example full-size model id
   # Embedding model for all corpora.
   embeddingModel: 'text-embedding-3-large'
 

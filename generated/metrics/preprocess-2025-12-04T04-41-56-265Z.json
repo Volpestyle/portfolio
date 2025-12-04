@@ -1,0 +1,17 @@
+{
+  "runId": "2025-12-04T04-41-56-265Z",
+  "ownerId": "portfolio-owner",
+  "startedAt": "2025-12-04T04:41:56.266Z",
+  "finishedAt": "2025-12-04T04:41:56.268Z",
+  "totals": {
+    "calls": 0,
+    "ok": 0,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "totalTokens": 0,
+    "costUsdEstimate": 0,
+    "withCost": 0
+  },
+  "stageTotals": {},
+  "calls": []
+}
