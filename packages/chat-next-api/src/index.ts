@@ -1,7 +1,12 @@
 import type OpenAI from 'openai';
 import type { ChatRequestMessage, PartialReasoningTrace, ReasoningStage, UiPayload } from '@portfolio/chat-contract';
 import type { PipelineStage, StageMeta, StageStatus } from '@portfolio/chat-orchestrator';
-import { createChatRuntime, createRetrieval, type ChatbotResponse, type ChatRuntimeOptions } from '@portfolio/chat-orchestrator';
+import {
+  createChatRuntime,
+  createRetrieval,
+  type ChatbotResponse,
+  type ChatRuntimeOptions,
+} from '@portfolio/chat-orchestrator';
 import type { RetrievalOptions } from '@portfolio/chat-orchestrator';
 
 export type ChatApiConfig = {

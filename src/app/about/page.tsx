@@ -48,8 +48,7 @@ export default function About() {
   const resumeFilename = resolveResumeFilename();
   const aboutParagraphs = profile.about?.length ? profile.about : PROFILE_BIO_PARAGRAPHS;
   const fromProfile = normalizeSocialLinks(profile.socialLinks);
-  const socialLinks: readonly ProfileSocialLink[] =
-    fromProfile.length > 0 ? fromProfile : PROFILE_SOCIAL_LINKS;
+  const socialLinks: readonly ProfileSocialLink[] = fromProfile.length > 0 ? fromProfile : PROFILE_SOCIAL_LINKS;
   const normalizedAbout = Array.isArray(aboutParagraphs) ? aboutParagraphs : [aboutParagraphs].filter(Boolean);
 
   return (

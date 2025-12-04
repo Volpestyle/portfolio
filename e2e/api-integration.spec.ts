@@ -56,10 +56,7 @@ test.describe('API integration', () => {
       ...buildProjectHeaders('api', runtime),
     };
     // When running locally with fixtures, force the E2E header so the server returns the chat fixture stream
-    const headers =
-      runtime.mode === 'mock'
-        ? { ...baseHeaders, 'x-portfolio-test-mode': 'e2e' }
-        : baseHeaders;
+    const headers = runtime.mode === 'mock' ? { ...baseHeaders, 'x-portfolio-test-mode': 'e2e' } : baseHeaders;
 
     const response = await request.post(`${baseUrl}/api/chat`, {
       headers,
@@ -86,12 +83,8 @@ test.describe('API integration', () => {
     expect(errorEvents.length, 'SSE stream should not include error frames').toBe(0);
 
     const stageEvents = events.filter((event): event is StageEvent => event.type === 'stage');
-    const plannerComplete = stageEvents.find(
-      (event) => event.stage === 'planner' && event.status === 'complete'
-    );
-    const evidenceComplete = stageEvents.find(
-      (event) => event.stage === 'evidence' && event.status === 'complete'
-    );
+    const plannerComplete = stageEvents.find((event) => event.stage === 'planner' && event.status === 'complete');
+    const evidenceComplete = stageEvents.find((event) => event.stage === 'evidence' && event.status === 'complete');
     expect(plannerComplete, 'Planner stage should complete').toBeDefined();
     expect(evidenceComplete, 'Evidence stage should complete').toBeDefined();
 

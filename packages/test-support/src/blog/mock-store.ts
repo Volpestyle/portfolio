@@ -65,9 +65,7 @@ function applySearchFilter(record: BlogPostRecord, search?: string | null) {
   if (!normalized) {
     return true;
   }
-  return (
-    record.title.toLowerCase().includes(normalized) || record.slug.toLowerCase().includes(normalized)
-  );
+  return record.title.toLowerCase().includes(normalized) || record.slug.toLowerCase().includes(normalized);
 }
 
 function assertVersion(record: BlogPostRecord, expected: number) {
@@ -298,10 +296,7 @@ export async function markScheduledRecord(input: {
   return toRecord(update);
 }
 
-export async function unmarkScheduledRecord(input: {
-  slug: string;
-  expectedVersion: number;
-}): Promise<BlogPostRecord> {
+export async function unmarkScheduledRecord(input: { slug: string; expectedVersion: number }): Promise<BlogPostRecord> {
   const existing = requirePost(input.slug);
   assertVersion(existing, input.expectedVersion);
   const update: MockPost = {

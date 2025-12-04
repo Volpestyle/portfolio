@@ -1,15 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {
-  CfnOutput,
-  CustomResource,
-  Duration,
-  Fn,
-  RemovalPolicy,
-  Size,
-  Stack,
-  StackProps,
-} from 'aws-cdk-lib';
+import { CfnOutput, CustomResource, Duration, Fn, RemovalPolicy, Size, Stack, StackProps } from 'aws-cdk-lib';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import { experimental as cloudfrontExperimental } from 'aws-cdk-lib/aws-cloudfront';
@@ -157,10 +148,10 @@ export class PortfolioStack extends Stack {
         ? acm.Certificate.fromCertificateArn(this, 'PortfolioCertificate', certificateArn)
         : domainName && hostedZone
           ? new acm.Certificate(this, 'PortfolioCertificate', {
-            domainName,
-            validation: acm.CertificateValidation.fromDns(hostedZone),
-            subjectAlternativeNames: alternateDomainNames,
-          })
+              domainName,
+              validation: acm.CertificateValidation.fromDns(hostedZone),
+              subjectAlternativeNames: alternateDomainNames,
+            })
           : undefined;
 
     this.runtimeEnvironment = this.enrichRuntimeEnvironment(environment);
@@ -204,7 +195,9 @@ export class PortfolioStack extends Stack {
     if (serverEdgeFunctionResource) {
       serverEdgeFunctionResource.applyRemovalPolicy(RemovalPolicy.RETAIN);
     }
-    const serverEdgeFunctionVersion = serverEdgeFunction.currentVersion.node.defaultChild as lambda.CfnVersion | undefined;
+    const serverEdgeFunctionVersion = serverEdgeFunction.currentVersion.node.defaultChild as
+      | lambda.CfnVersion
+      | undefined;
     if (serverEdgeFunctionVersion) {
       serverEdgeFunctionVersion.applyRemovalPolicy(RemovalPolicy.RETAIN);
     }
@@ -346,9 +339,7 @@ export class PortfolioStack extends Stack {
   }
 
   private resolveOpenNextDirectory(explicitPath: string | undefined, appDirectory: string): string {
-    const candidate = explicitPath
-      ? path.resolve(explicitPath)
-      : path.resolve(appDirectory, '.open-next');
+    const candidate = explicitPath ? path.resolve(explicitPath) : path.resolve(appDirectory, '.open-next');
 
     if (!fs.existsSync(candidate)) {
       throw new Error(
@@ -561,10 +552,10 @@ export class PortfolioStack extends Stack {
         ephemeralStorageSize: Size.gibibytes(4),
         cacheControl: copy.cached
           ? [
-            s3deploy.CacheControl.setPublic(),
-            s3deploy.CacheControl.immutable(),
-            s3deploy.CacheControl.maxAge(Duration.days(365)),
-          ]
+              s3deploy.CacheControl.setPublic(),
+              s3deploy.CacheControl.immutable(),
+              s3deploy.CacheControl.maxAge(Duration.days(365)),
+            ]
           : [s3deploy.CacheControl.setPublic(), s3deploy.CacheControl.noCache()],
       });
     });
@@ -737,11 +728,7 @@ export class PortfolioStack extends Stack {
       code: lambda.Code.fromAsset(bundlePath),
       timeout: Duration.minutes(5),
       memorySize: 256,
-      environment: this.pickRuntimeEnv(baseEnv, [
-        'CACHE_DYNAMO_TABLE',
-        'NODE_ENV',
-        'NEXT_PUBLIC_SITE_URL',
-      ]),
+      environment: this.pickRuntimeEnv(baseEnv, ['CACHE_DYNAMO_TABLE', 'NODE_ENV', 'NEXT_PUBLIC_SITE_URL']),
       logGroup: initLogGroup,
     });
 
@@ -1017,11 +1004,7 @@ export class PortfolioStack extends Stack {
 
       const isStatic = originKey === 's3';
       const isImageOptimizer = originKey === 'imageOptimizer';
-      const cachePolicy = isImageOptimizer
-        ? imageCachePolicy
-        : isStatic
-          ? staticCachePolicy
-          : serverCachePolicy;
+      const cachePolicy = isImageOptimizer ? imageCachePolicy : isStatic ? staticCachePolicy : serverCachePolicy;
       const allowedMethods =
         isImageOptimizer || isStatic
           ? cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS
@@ -1034,12 +1017,12 @@ export class PortfolioStack extends Stack {
       const edgeLambdas =
         !isStatic && !isImageOptimizer
           ? [
-            {
-              eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
-              functionVersion: serverEdgeFunction.currentVersion,
-              includeBody: true,
-            },
-          ]
+              {
+                eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
+                functionVersion: serverEdgeFunction.currentVersion,
+                includeBody: true,
+              },
+            ]
           : undefined;
 
       const behaviorOptions: cloudfront.BehaviorOptions = {
@@ -1065,9 +1048,9 @@ export class PortfolioStack extends Stack {
     certificate?: acm.ICertificate
   ):
     | {
-      domainNames: string[];
-      certificate: acm.ICertificate;
-    }
+        domainNames: string[];
+        certificate: acm.ICertificate;
+      }
     | undefined {
     if (!domainName) {
       return undefined;
@@ -1207,9 +1190,7 @@ export class PortfolioStack extends Stack {
     );
   }
 
-  private attachCloudFrontInvalidationPermission(
-    fn: cloudfrontExperimental.EdgeFunction,
-  ) {
+  private attachCloudFrontInvalidationPermission(fn: cloudfrontExperimental.EdgeFunction) {
     const stack = Stack.of(this);
     const distributionArn = stack.formatArn({
       service: 'cloudfront',
@@ -1314,9 +1295,9 @@ export class PortfolioStack extends Stack {
     const splitList = (value?: string) =>
       value
         ? value
-          .split(',')
-          .map((entry) => entry.trim())
-          .filter(Boolean)
+            .split(',')
+            .map((entry) => entry.trim())
+            .filter(Boolean)
         : [];
 
     const defaultPrefixes = ['NEXT_PUBLIC_'];
@@ -1435,8 +1416,7 @@ export class PortfolioStack extends Stack {
     }
 
     const primaryRegion =
-      this.runtimeEnvironment['AWS_SECRETS_MANAGER_PRIMARY_REGION'] ??
-      this.runtimeEnvironment['AWS_REGION'];
+      this.runtimeEnvironment['AWS_SECRETS_MANAGER_PRIMARY_REGION'] ?? this.runtimeEnvironment['AWS_REGION'];
     if (primaryRegion) {
       headers[this.edgeSecretsRegionHeaderName] = primaryRegion;
     }

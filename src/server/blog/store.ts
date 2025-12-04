@@ -59,9 +59,7 @@ function normalizeTags(value?: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
-  return value
-    .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
-    .filter(Boolean);
+  return value.map((tag) => (typeof tag === 'string' ? tag.trim() : '')).filter(Boolean);
 }
 
 function toRecord(item?: RawBlogRecord | null): BlogPostRecord | null {
@@ -74,8 +72,8 @@ function toRecord(item?: RawBlogRecord | null): BlogPostRecord | null {
     typeof readTimeValue === 'number'
       ? readTimeValue
       : typeof readTimeValue === 'string'
-      ? Number(readTimeValue)
-      : undefined;
+        ? Number(readTimeValue)
+        : undefined;
 
   const record: BlogPostRecord = {
     slug: item.slug,
@@ -144,9 +142,7 @@ async function deleteAllRevisions(slug: string) {
       })
     );
 
-    const keys = (response.Contents ?? [])
-      .map((object) => object.Key)
-      .filter((key): key is string => Boolean(key));
+    const keys = (response.Contents ?? []).map((object) => object.Key).filter((key): key is string => Boolean(key));
 
     if (keys.length > 0) {
       await s3Client.send(
@@ -235,10 +231,7 @@ export interface PaginatedPosts {
   hasMore: boolean;
 }
 
-export async function listPublishedPosts(
-  limit: number = 20,
-  cursor?: string
-): Promise<PaginatedPosts> {
+export async function listPublishedPosts(limit: number = 20, cursor?: string): Promise<PaginatedPosts> {
   if (useMockStore()) {
     const store = await loadMockStore();
     const { posts, hasMore, nextCursor } = await store.listPublishedPosts(limit);
@@ -321,10 +314,7 @@ export async function listPosts(options: { status?: BlogPostStatus; search?: str
         return false;
       }
       if (searchValue) {
-        return (
-          record.title.toLowerCase().includes(searchValue) ||
-          record.slug.toLowerCase().includes(searchValue)
-        );
+        return record.title.toLowerCase().includes(searchValue) || record.slug.toLowerCase().includes(searchValue);
       }
       return true;
     })
@@ -666,10 +656,7 @@ export async function markScheduledRecord(input: {
   return record;
 }
 
-export async function unmarkScheduledRecord(input: {
-  slug: string;
-  expectedVersion: number;
-}): Promise<BlogPostRecord> {
+export async function unmarkScheduledRecord(input: { slug: string; expectedVersion: number }): Promise<BlogPostRecord> {
   if (useMockStore()) {
     const store = await loadMockStore();
     return store.unmarkScheduledRecord(input);

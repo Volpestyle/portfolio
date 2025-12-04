@@ -5,9 +5,7 @@ type FilesystemProfileRepositoryOptions = {
   profileFile: unknown;
 };
 
-export function createFilesystemProfileRepository(
-  options: FilesystemProfileRepositoryOptions
-): ProfileRepository {
+export function createFilesystemProfileRepository(options: FilesystemProfileRepositoryOptions): ProfileRepository {
   const profileSummary = assertProfileSummary(options.profileFile);
   const provider = createProfileProvider(profileSummary);
 

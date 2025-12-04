@@ -28,7 +28,10 @@ function parseLine(line: string): ParsedEntry | null {
     return null;
   }
 
-  const value = rest.join('=').trim().replace(/^['"]|['"]$/g, '');
+  const value = rest
+    .join('=')
+    .trim()
+    .replace(/^['"]|['"]$/g, '');
   return { key, value };
 }
 

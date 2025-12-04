@@ -43,7 +43,10 @@ export function createFilesystemExperienceRepository(
   );
 
   return {
-    async searchExperiences(query?: ResumeSearchQuery, searcherOptions?: ResumeSearcherOptions): Promise<ResumeEntry[]> {
+    async searchExperiences(
+      query?: ResumeSearchQuery,
+      searcherOptions?: ResumeSearcherOptions
+    ): Promise<ResumeEntry[]> {
       const searcher = searcherOptions ? buildSearcher(searcherOptions) : defaultSearcher;
       return searcher.searchResume(query);
     },

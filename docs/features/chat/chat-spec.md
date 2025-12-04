@@ -318,12 +318,12 @@ Placeholders note: In prompts (Appendix B) we use `{{OWNER_NAME}}` and `{{DOMAIN
 
 Quick at-a-glance view of purpose, inputs/outputs, and primary tech. See §5 for detailed behavior and prompts.
 
-| Stage     | Purpose                                                        | Inputs                                                                                  | Outputs                                                                                  | Primary tech                                                                                                                         |
-| --------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Planner   | Normalize ask into structured intent + retrieval strategy      | Latest user message + short history; OwnerConfig + persona baked into system prompt     | RetrievalPlan (questionType, enumeration, scope, cardsEnabled, retrievalRequests, topic) | OpenAI Responses API (json schema) with `ModelConfig.plannerModel` (nano class)                                           |
-| Retrieval | Turn plan into ranked document sets                            | RetrievalPlan.retrievalRequests + corpora (projects/resume/profile) + embedding indexes | Retrieved docs per source (scored and filtered)                                          | MiniSearch BM25 + text-embedding-3-large re-rank + recency scoring (projects/resume); profile short-circuited                        |
-| Evidence  | Decide truth/confidence; own UI hints as source of truth       | RetrievalPlan + retrieved docs + latest user message                                    | EvidenceSummary (verdict, confidence, selectedEvidence, uiHints, semanticFlags)          | OpenAI Responses API with `ModelConfig.evidenceModel` (nano) or `evidenceModelDeepDive` (mini class) when set             |
-| Answer    | Turn evidence into first-person text without re-deciding truth | RetrievalPlan + EvidenceSummary + persona/profile + short history                       | AnswerPayload (message + optional thoughts)                                              | OpenAI Responses API with `ModelConfig.answerModel` (nano or mini; mini recommended for voice adherence), streaming tokens           |
+| Stage     | Purpose                                                        | Inputs                                                                                  | Outputs                                                                                  | Primary tech                                                                                                               |
+| --------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Planner   | Normalize ask into structured intent + retrieval strategy      | Latest user message + short history; OwnerConfig + persona baked into system prompt     | RetrievalPlan (questionType, enumeration, scope, cardsEnabled, retrievalRequests, topic) | OpenAI Responses API (json schema) with `ModelConfig.plannerModel` (nano class)                                            |
+| Retrieval | Turn plan into ranked document sets                            | RetrievalPlan.retrievalRequests + corpora (projects/resume/profile) + embedding indexes | Retrieved docs per source (scored and filtered)                                          | MiniSearch BM25 + text-embedding-3-large re-rank + recency scoring (projects/resume); profile short-circuited              |
+| Evidence  | Decide truth/confidence; own UI hints as source of truth       | RetrievalPlan + retrieved docs + latest user message                                    | EvidenceSummary (verdict, confidence, selectedEvidence, uiHints, semanticFlags)          | OpenAI Responses API with `ModelConfig.evidenceModel` (nano) or `evidenceModelDeepDive` (mini class) when set              |
+| Answer    | Turn evidence into first-person text without re-deciding truth | RetrievalPlan + EvidenceSummary + persona/profile + short history                       | AnswerPayload (message + optional thoughts)                                              | OpenAI Responses API with `ModelConfig.answerModel` (nano or mini; mini recommended for voice adherence), streaming tokens |
 
 ---
 
@@ -517,14 +517,16 @@ type ResumeDoc = ExperienceRecord | EducationRecord | AwardRecord | SkillRecord;
      - “Awards” / “Honors”.
    - Group lines under headings.
 3. **LLM structuring (full-size LLM)**
-  - Use a full-size model with a schema‑driven prompt to map the extracted resume text into ExperienceRecord[], EducationRecord[], AwardRecord[], SkillRecord[].
-  - Instructions:
-     - Preserve exact company/school/job titles.
-     - Normalize `startDate`/`endDate` into YYYY-MM or similar.
-     - Extract bullets as arrays.
-     - Populate skills with explicit tools, frameworks, and domains mentioned.
-     - Classify each experience into `experienceType` ("full_time", "internship", "contract", "freelance", "other") based on role, keywords, and context.
-     - Do not invent employers, degrees, or skills that aren’t in the PDF.
+
+- Use a full-size model with a schema‑driven prompt to map the extracted resume text into ExperienceRecord[], EducationRecord[], AwardRecord[], SkillRecord[].
+- Instructions:
+  - Preserve exact company/school/job titles.
+  - Normalize `startDate`/`endDate` into YYYY-MM or similar.
+  - Extract bullets as arrays.
+  - Populate skills with explicit tools, frameworks, and domains mentioned.
+  - Classify each experience into `experienceType` ("full_time", "internship", "contract", "freelance", "other") based on role, keywords, and context.
+  - Do not invent employers, degrees, or skills that aren’t in the PDF.
+
 4. **Duration computation (monthsOfExperience)**
    - For each ExperienceRecord with a valid start/end range:
      - Compute `monthsOfExperience` as the month‑difference between `startDate` and `endDate` (or current month if `endDate` is null and `isCurrent` is true).
@@ -1133,13 +1135,13 @@ Before passing docs to Evidence, the orchestrator limits them to prevent context
 
 - Use priority buckets with per-source limits:
 
-| Source | Base Limit | Priority Factors |
-|--------|------------|------------------|
-| experiences | 6 | +2.5 if resume focus, +0.8 if `experience` facet, +0.8 if `employment_only` |
-| projects | 6 | +2.5 if projects focus |
-| education | 4 | +1.5 if `education` facet |
-| awards | 4 | +1.2 if `award` facet |
-| skills | 4 | +1.2 if `skill` facet |
+| Source      | Base Limit | Priority Factors                                                            |
+| ----------- | ---------- | --------------------------------------------------------------------------- |
+| experiences | 6          | +2.5 if resume focus, +0.8 if `experience` facet, +0.8 if `employment_only` |
+| projects    | 6          | +2.5 if projects focus                                                      |
+| education   | 4          | +1.5 if `education` facet                                                   |
+| awards      | 4          | +1.2 if `award` facet                                                       |
+| skills      | 4          | +1.2 if `skill` facet                                                       |
 
 - Sort buckets by priority descending.
 - Allocate docs from each bucket until total reaches 12.
@@ -1292,9 +1294,8 @@ function synthesizeEvidenceSummary(reason: 'meta' | 'no_docs'): EvidenceSummary 
   return {
     verdict: reason === 'meta' ? 'n/a' : 'no_evidence',
     confidence: 'low',
-    reasoning: reason === 'meta'
-      ? 'Meta question; no portfolio evidence needed.'
-      : 'No relevant documents found in retrieval.',
+    reasoning:
+      reason === 'meta' ? 'Meta question; no portfolio evidence needed.' : 'No relevant documents found in retrieval.',
     selectedEvidence: [],
     semanticFlags: [],
     uiHints: { projects: [], experiences: [] },

@@ -60,7 +60,9 @@ export type ResumeSearcherOptions = {
 };
 
 const normalizeFacets = (facets?: ResumeFacet[]) =>
-  Array.isArray(facets) && facets.length ? Array.from(new Set(facets.filter((facet): facet is ResumeFacet => Boolean(facet)))) : undefined;
+  Array.isArray(facets) && facets.length
+    ? Array.from(new Set(facets.filter((facet): facet is ResumeFacet => Boolean(facet))))
+    : undefined;
 
 const normalizeFilters = (input?: ResumeSearchQuery): NormalizedResumeFilters => ({
   company: normalizeValue(input?.company) || undefined,
@@ -133,10 +135,7 @@ function recordMatchesFilters(record: ResumeEntry, filters: NormalizedResumeFilt
     return false;
   }
   if (filters.skill) {
-    const skillBag =
-      record.type === 'skill'
-        ? [record.name, ...(record.skills ?? [])]
-        : record.skills ?? [];
+    const skillBag = record.type === 'skill' ? [record.name, ...(record.skills ?? [])] : (record.skills ?? []);
     if (!skillBag.some((s) => includesText(s, filters.skill!))) {
       return false;
     }
@@ -170,10 +169,7 @@ const computeStructuredScore = (record: ResumeEntry, filters: NormalizedResumeFi
     score += 3;
   }
   if (filters.skill) {
-    const skillBag =
-      record.type === 'skill'
-        ? [record.name, ...(record.skills ?? [])]
-        : record.skills ?? [];
+    const skillBag = record.type === 'skill' ? [record.name, ...(record.skills ?? [])] : (record.skills ?? []);
     if (skillBag.some((s) => includesText(s, filters.skill!))) {
       score += 2;
     }
@@ -244,7 +240,7 @@ export function buildResumeSearchIndex(records: ResumeEntry[]) {
         'location' in record && typeof (record as { location?: string }).location === 'string'
           ? (record as { location?: string }).location
           : undefined;
-      const bullets = record.type === 'skill' ? [] : record.bullets ?? [];
+      const bullets = record.type === 'skill' ? [] : (record.bullets ?? []);
 
       const tokens = tokenizeWeighted([
         { value: companyLike, weight: 3 },

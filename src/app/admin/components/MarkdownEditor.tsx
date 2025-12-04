@@ -27,7 +27,7 @@ export function MarkdownEditor({ value, onChange, showPreview }: MarkdownEditorP
         className="min-h-[500px] font-mono text-sm"
         spellCheck={false}
       />
-      
+
       {/* Markdown Toolbar */}
       <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
         <button
@@ -45,7 +45,7 @@ export function MarkdownEditor({ value, onChange, showPreview }: MarkdownEditorP
               textarea.setSelectionRange(start + 2, end + 2);
             }, 0);
           }}
-          className="px-2 py-1 rounded hover:bg-muted transition-colors"
+          className="rounded px-2 py-1 transition-colors hover:bg-muted"
         >
           **Bold**
         </button>
@@ -64,7 +64,7 @@ export function MarkdownEditor({ value, onChange, showPreview }: MarkdownEditorP
               textarea.setSelectionRange(start + 1, end + 1);
             }, 0);
           }}
-          className="px-2 py-1 rounded hover:bg-muted transition-colors"
+          className="rounded px-2 py-1 transition-colors hover:bg-muted"
         >
           *Italic*
         </button>
@@ -83,7 +83,7 @@ export function MarkdownEditor({ value, onChange, showPreview }: MarkdownEditorP
               textarea.setSelectionRange(start + 1, end + 1);
             }, 0);
           }}
-          className="px-2 py-1 rounded hover:bg-muted transition-colors"
+          className="rounded px-2 py-1 transition-colors hover:bg-muted"
         >
           `Code`
         </button>
@@ -100,7 +100,7 @@ export function MarkdownEditor({ value, onChange, showPreview }: MarkdownEditorP
               textarea.setSelectionRange(start + 5, start + 5);
             }, 0);
           }}
-          className="px-2 py-1 rounded hover:bg-muted transition-colors"
+          className="rounded px-2 py-1 transition-colors hover:bg-muted"
         >
           ```Code Block```
         </button>
@@ -119,7 +119,7 @@ export function MarkdownEditor({ value, onChange, showPreview }: MarkdownEditorP
               textarea.setSelectionRange(start + selected.length + 3, start + selected.length + 6);
             }, 0);
           }}
-          className="px-2 py-1 rounded hover:bg-muted transition-colors"
+          className="rounded px-2 py-1 transition-colors hover:bg-muted"
         >
           [Link](url)
         </button>
@@ -136,7 +136,7 @@ export function MarkdownEditor({ value, onChange, showPreview }: MarkdownEditorP
               textarea.setSelectionRange(start + 14, start + 23);
             }, 0);
           }}
-          className="px-2 py-1 rounded hover:bg-muted transition-colors"
+          className="rounded px-2 py-1 transition-colors hover:bg-muted"
         >
           ![Image](url)
         </button>
@@ -155,7 +155,7 @@ export function MarkdownEditor({ value, onChange, showPreview }: MarkdownEditorP
               textarea.setSelectionRange(start + 3, end + 3);
             }, 0);
           }}
-          className="px-2 py-1 rounded hover:bg-muted transition-colors"
+          className="rounded px-2 py-1 transition-colors hover:bg-muted"
         >
           ## Heading
         </button>
@@ -172,7 +172,7 @@ export function MarkdownEditor({ value, onChange, showPreview }: MarkdownEditorP
               textarea.setSelectionRange(start + 3, start + 9);
             }, 0);
           }}
-          className="px-2 py-1 rounded hover:bg-muted transition-colors"
+          className="rounded px-2 py-1 transition-colors hover:bg-muted"
         >
           - List
         </button>
@@ -180,4 +180,3 @@ export function MarkdownEditor({ value, onChange, showPreview }: MarkdownEditorP
     </div>
   );
 }
-

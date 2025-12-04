@@ -52,11 +52,7 @@ function buildSearchableText(project: ProjectRecord): string {
   pushValue(parts, project.embeddingId);
   pushValue(parts, project.readme);
 
-  return parts
-    .join(' ')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim();
+  return parts.join(' ').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
 function createIndexedProjects(projects: ProjectRecord[]): IndexedProject[] {
@@ -106,9 +102,7 @@ function searchProjectIndex(query: string, index: IndexedProject[]): ProjectSear
     .map(({ entry, score }) => ({ project: entry.project, score }));
 }
 
-export function createFilesystemProjectRepository(
-  options: FilesystemProjectRepositoryOptions
-): ProjectRepository {
+export function createFilesystemProjectRepository(options: FilesystemProjectRepositoryOptions): ProjectRepository {
   const dataset = assertProjectDataset(options.datasetFile);
   const embeddingIndex: EmbeddingIndex | null = options.embeddingsFile
     ? assertProjectEmbeddings(options.embeddingsFile)

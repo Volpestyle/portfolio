@@ -199,9 +199,7 @@ export function useChatStream({
             });
           }
           const errorMessage =
-            (event as { message?: string }).message ??
-            (event as { error?: string }).error ??
-            'Chat stream error';
+            (event as { message?: string }).message ?? (event as { error?: string }).error ?? 'Chat stream error';
           applyAssistantChange((message) => {
             message.animated = false;
           });
@@ -244,14 +242,14 @@ export function useChatStream({
   );
 }
 
-function coerceUiPayload(
-  input: unknown
-): {
-  showProjects?: string[];
-  showExperiences?: string[];
-  bannerText?: string | null;
-  coreEvidenceIds?: string[];
-} | undefined {
+function coerceUiPayload(input: unknown):
+  | {
+      showProjects?: string[];
+      showExperiences?: string[];
+      bannerText?: string | null;
+      coreEvidenceIds?: string[];
+    }
+  | undefined {
   if (!input || typeof input !== 'object') {
     return undefined;
   }
@@ -320,11 +318,7 @@ function coerceReasoningError(input: unknown): ReasoningTraceError | undefined {
   }
   const record = input as Record<string, unknown>;
   const message =
-    typeof record.message === 'string'
-      ? record.message
-      : typeof record.error === 'string'
-        ? record.error
-        : undefined;
+    typeof record.message === 'string' ? record.message : typeof record.error === 'string' ? record.error : undefined;
   if (!message) {
     return undefined;
   }

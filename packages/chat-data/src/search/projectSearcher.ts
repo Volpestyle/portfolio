@@ -278,12 +278,7 @@ export function createProjectSearcher(records: ProjectRecord[], options?: Projec
     };
 
     const combined = new Map<string, CombinedEntry>();
-    const addEntry = (
-      record: ProjectRecord,
-      score: number,
-      source: 'bm25' | 'structured',
-      rank: number
-    ) => {
+    const addEntry = (record: ProjectRecord, score: number, source: 'bm25' | 'structured', rank: number) => {
       const normalized = projectById.get(record.id) ?? record;
       const existing = combined.get(normalized.id) ?? { record: normalized };
       if (source === 'bm25') {

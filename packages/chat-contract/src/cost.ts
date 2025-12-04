@@ -32,24 +32,75 @@ const ISO_DATE_SUFFIX = /-\d{4}-\d{2}-\d{2}$/;
 
 // Pricing in USD per 1M tokens to mirror OpenAI public pricing.
 export const MODEL_PRICING: Record<string, ModelPricing> = {
-  'gpt-5.1': { prompt: { amount: 1.25, perTokens: TOKENS_PER_MILLION }, completion: { amount: 10, perTokens: TOKENS_PER_MILLION } },
-  'gpt-5-pro': { prompt: { amount: 15, perTokens: TOKENS_PER_MILLION }, completion: { amount: 120, perTokens: TOKENS_PER_MILLION } },
-  'gpt-5-mini': { prompt: { amount: 0.25, perTokens: TOKENS_PER_MILLION }, completion: { amount: 2, perTokens: TOKENS_PER_MILLION } },
-  'gpt-5-nano': { prompt: { amount: 0.05, perTokens: TOKENS_PER_MILLION }, completion: { amount: 0.4, perTokens: TOKENS_PER_MILLION } },
-  'gpt-4.1': { prompt: { amount: 2.75, perTokens: TOKENS_PER_MILLION }, completion: { amount: 11, perTokens: TOKENS_PER_MILLION } },
-  'gpt-4o': { prompt: { amount: 2.5, perTokens: TOKENS_PER_MILLION }, completion: { amount: 10, perTokens: TOKENS_PER_MILLION } },
-  'gpt-4o-mini': { prompt: { amount: 0.15, perTokens: TOKENS_PER_MILLION }, completion: { amount: 0.6, perTokens: TOKENS_PER_MILLION } },
+  'gpt-5.1': {
+    prompt: { amount: 1.25, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 10, perTokens: TOKENS_PER_MILLION },
+  },
+  'gpt-5-pro': {
+    prompt: { amount: 15, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 120, perTokens: TOKENS_PER_MILLION },
+  },
+  'gpt-5-mini': {
+    prompt: { amount: 0.25, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 2, perTokens: TOKENS_PER_MILLION },
+  },
+  'gpt-5-nano': {
+    prompt: { amount: 0.05, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 0.4, perTokens: TOKENS_PER_MILLION },
+  },
+  'gpt-4.1': {
+    prompt: { amount: 2.75, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 11, perTokens: TOKENS_PER_MILLION },
+  },
+  'gpt-4o': {
+    prompt: { amount: 2.5, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 10, perTokens: TOKENS_PER_MILLION },
+  },
+  'gpt-4o-mini': {
+    prompt: { amount: 0.15, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 0.6, perTokens: TOKENS_PER_MILLION },
+  },
   // gpt-4.1-nano is priced like 4o-mini; keep keyed so dated variants resolve to this entry.
-  'gpt-4.1-nano': { prompt: { amount: 0.15, perTokens: TOKENS_PER_MILLION }, completion: { amount: 0.6, perTokens: TOKENS_PER_MILLION } },
-  'gpt-4-turbo': { prompt: { amount: 10, perTokens: TOKENS_PER_MILLION }, completion: { amount: 30, perTokens: TOKENS_PER_MILLION } },
-  'gpt-4': { prompt: { amount: 30, perTokens: TOKENS_PER_MILLION }, completion: { amount: 60, perTokens: TOKENS_PER_MILLION } },
-  'gpt-4-0613': { prompt: { amount: 30, perTokens: TOKENS_PER_MILLION }, completion: { amount: 60, perTokens: TOKENS_PER_MILLION } },
-  'gpt-4-32k': { prompt: { amount: 60, perTokens: TOKENS_PER_MILLION }, completion: { amount: 120, perTokens: TOKENS_PER_MILLION } },
-  'gpt-3.5-turbo': { prompt: { amount: 0.5, perTokens: TOKENS_PER_MILLION }, completion: { amount: 1.5, perTokens: TOKENS_PER_MILLION } },
-  'o1-preview': { prompt: { amount: 15, perTokens: TOKENS_PER_MILLION }, completion: { amount: 60, perTokens: TOKENS_PER_MILLION } },
-  o1: { prompt: { amount: 15, perTokens: TOKENS_PER_MILLION }, completion: { amount: 60, perTokens: TOKENS_PER_MILLION } },
-  'o1-mini': { prompt: { amount: 3, perTokens: TOKENS_PER_MILLION }, completion: { amount: 12, perTokens: TOKENS_PER_MILLION } },
-  'text-embedding-3-large': { prompt: { amount: 0.13, perTokens: TOKENS_PER_MILLION }, completion: { amount: 0, perTokens: TOKENS_PER_MILLION } },
+  'gpt-4.1-nano': {
+    prompt: { amount: 0.15, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 0.6, perTokens: TOKENS_PER_MILLION },
+  },
+  'gpt-4-turbo': {
+    prompt: { amount: 10, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 30, perTokens: TOKENS_PER_MILLION },
+  },
+  'gpt-4': {
+    prompt: { amount: 30, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 60, perTokens: TOKENS_PER_MILLION },
+  },
+  'gpt-4-0613': {
+    prompt: { amount: 30, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 60, perTokens: TOKENS_PER_MILLION },
+  },
+  'gpt-4-32k': {
+    prompt: { amount: 60, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 120, perTokens: TOKENS_PER_MILLION },
+  },
+  'gpt-3.5-turbo': {
+    prompt: { amount: 0.5, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 1.5, perTokens: TOKENS_PER_MILLION },
+  },
+  'o1-preview': {
+    prompt: { amount: 15, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 60, perTokens: TOKENS_PER_MILLION },
+  },
+  o1: {
+    prompt: { amount: 15, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 60, perTokens: TOKENS_PER_MILLION },
+  },
+  'o1-mini': {
+    prompt: { amount: 3, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 12, perTokens: TOKENS_PER_MILLION },
+  },
+  'text-embedding-3-large': {
+    prompt: { amount: 0.13, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 0, perTokens: TOKENS_PER_MILLION },
+  },
 };
 
 export const MODEL_ALIASES: Record<string, string> = {
@@ -149,7 +200,9 @@ export function resolveModelKey(model?: string | null): string | null {
 }
 
 function ratePerThousand(price: Price): number {
-  return price.perTokens === TOKENS_PER_THOUSAND ? price.amount : (price.amount / price.perTokens) * TOKENS_PER_THOUSAND;
+  return price.perTokens === TOKENS_PER_THOUSAND
+    ? price.amount
+    : (price.amount / price.perTokens) * TOKENS_PER_THOUSAND;
 }
 
 const NORMALIZED_PRICING_CACHE = new Map<string, NormalizedModelPricing>();
@@ -190,7 +243,11 @@ export type EstimateCostOptions = {
   decimalPlaces?: number;
 };
 
-export function estimateCostUsd(model: string | undefined | null, usage: TokenUsage, options: EstimateCostOptions = {}): number | null {
+export function estimateCostUsd(
+  model: string | undefined | null,
+  usage: TokenUsage,
+  options: EstimateCostOptions = {}
+): number | null {
   const pricing = getNormalizedPricing(model) ?? options.fallbackPricing;
   if (!pricing) {
     return null;

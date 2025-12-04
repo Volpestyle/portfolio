@@ -4,12 +4,7 @@ import type OpenAI from 'openai';
 import { createChatSseStream, SSE_HEADERS } from './stream';
 import { validateChatPostBody, resolveReasoningEnabled, type ChatPostBody } from './validation';
 import { moderateChatMessages } from './moderation';
-import {
-  logChatDebug,
-  resetChatDebugLogs,
-  runWithChatLogContext,
-  type ChatServerLogger,
-} from './server';
+import { logChatDebug, resetChatDebugLogs, runWithChatLogContext, type ChatServerLogger } from './server';
 import type { ChatApi } from './index';
 import type { ChatRuntimeOptions } from '@portfolio/chat-orchestrator';
 import type { RuntimeCostClients, RuntimeCostState } from './runtimeCost';
@@ -20,7 +15,11 @@ type FixtureResponder = (options: { answerModel: string; headers?: HeadersInit }
 type RuntimeCostHooks = {
   getClients: (ownerId: string) => Promise<RuntimeCostClients | null>;
   shouldThrottleForBudget: (clients: RuntimeCostClients, logger?: ChatServerLogger) => Promise<RuntimeCostState>;
-  recordRuntimeCost: (clients: RuntimeCostClients, costUsd: number, logger?: ChatServerLogger) => Promise<RuntimeCostState>;
+  recordRuntimeCost: (
+    clients: RuntimeCostClients,
+    costUsd: number,
+    logger?: ChatServerLogger
+  ) => Promise<RuntimeCostState>;
   budgetExceededMessage?: string;
 };
 
@@ -143,11 +142,12 @@ export function createNextChatHandler(options: NextChatHandlerOptions) {
         const rateLimitHeaders = rateLimit
           ? options.buildRateLimitHeaders
             ? options.buildRateLimitHeaders(rateLimit)
-            : rateLimit.headers ?? {}
+            : (rateLimit.headers ?? {})
           : {};
         if (rateLimit && !rateLimit.success) {
-          const status = rateLimit.status
-            ?? (rateLimit.reason === 'Rate limiter unavailable'
+          const status =
+            rateLimit.status ??
+            (rateLimit.reason === 'Rate limiter unavailable'
               ? 503
               : rateLimit.reason === 'Unable to identify client IP'
                 ? 400
@@ -219,24 +219,30 @@ export function createNextChatHandler(options: NextChatHandlerOptions) {
                   refusalBanner: outputModeration.refusalBanner,
                 }
               : undefined,
-            runtimeCost: runtimeCostClients && options.runtimeCost
-              ? {
-                  budgetExceededMessage,
-                  onResult: async (result) => {
-                    const fromUsage = Array.isArray(result.usage)
-                      ? result.usage.reduce((acc, entry) => acc + (entry?.costUsd ?? 0), 0)
-                      : 0;
-                    const costUsd = typeof result.totalCostUsd === 'number' ? result.totalCostUsd : fromUsage;
-                    try {
-                      return await options.runtimeCost!.recordRuntimeCost(runtimeCostClients, costUsd, options.chatLogger);
-                    } catch (error) {
-                      logChatDebug('api.chat.cost_record_error', { error: String(error), correlationId });
-                      return undefined;
-                    }
-                  },
-                }
-              : undefined,
-            onError: (error: unknown) => logChatDebug('api.chat.pipeline_error', { error: String(error), correlationId }),
+            runtimeCost:
+              runtimeCostClients && options.runtimeCost
+                ? {
+                    budgetExceededMessage,
+                    onResult: async (result) => {
+                      const fromUsage = Array.isArray(result.usage)
+                        ? result.usage.reduce((acc, entry) => acc + (entry?.costUsd ?? 0), 0)
+                        : 0;
+                      const costUsd = typeof result.totalCostUsd === 'number' ? result.totalCostUsd : fromUsage;
+                      try {
+                        return await options.runtimeCost!.recordRuntimeCost(
+                          runtimeCostClients,
+                          costUsd,
+                          options.chatLogger
+                        );
+                      } catch (error) {
+                        logChatDebug('api.chat.cost_record_error', { error: String(error), correlationId });
+                        return undefined;
+                      }
+                    },
+                  }
+                : undefined,
+            onError: (error: unknown) =>
+              logChatDebug('api.chat.pipeline_error', { error: String(error), correlationId }),
           });
           return new Response(stream, { headers: { ...SSE_HEADERS, ...rateLimitHeaders } });
         } catch (error) {

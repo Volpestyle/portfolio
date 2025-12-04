@@ -73,10 +73,7 @@ export async function getPortfolioConfig(): Promise<PortfolioConfig | null> {
  * Fetches language breakdown for a repository
  * Returns a map of language names to byte counts
  */
-export async function fetchRepoLanguages(
-  owner: string,
-  repo: string
-): Promise<Record<string, number> | null> {
+export async function fetchRepoLanguages(owner: string, repo: string): Promise<Record<string, number> | null> {
   try {
     const token = await resolveGitHubToken();
     if (!token) {

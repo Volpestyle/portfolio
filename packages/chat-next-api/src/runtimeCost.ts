@@ -260,10 +260,7 @@ export async function recordRuntimeCost(
   return state;
 }
 
-export async function shouldThrottleForBudget(
-  clients: RuntimeCostClients,
-  logger?: Logger
-): Promise<RuntimeCostState> {
+export async function shouldThrottleForBudget(clients: RuntimeCostClients, logger?: Logger): Promise<RuntimeCostState> {
   try {
     const state = await getRuntimeCostState(clients);
     if (state.level === 'critical' || state.level === 'exceeded') {

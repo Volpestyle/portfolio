@@ -44,7 +44,7 @@ export function PostsFilters() {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       {/* Search */}
-      <div className="relative flex-1 max-w-md">
+      <div className="relative max-w-md flex-1">
         <Input
           type="search"
           placeholder="Search posts by title or slug..."
@@ -71,7 +71,7 @@ export function PostsFilters() {
       </div>
 
       {/* Status Filter */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex flex-wrap gap-2">
         {STATUS_OPTIONS.map((option) => (
           <Button
             key={option.value}
@@ -87,4 +87,3 @@ export function PostsFilters() {
     </div>
   );
 }
-

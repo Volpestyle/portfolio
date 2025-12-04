@@ -42,9 +42,7 @@ export type BootstrapResult = {
   chatApi: ChatApi;
 };
 
-export function createFilesystemChatProviders(
-  options: FilesystemChatProviderOptions
-): BootstrapResult['providers'] {
+export function createFilesystemChatProviders(options: FilesystemChatProviderOptions): BootstrapResult['providers'] {
   const projectRepository = createFilesystemProjectRepository({
     datasetFile: options.projectsFile,
     embeddingsFile: options.projectEmbeddingsFile,

@@ -56,13 +56,7 @@ export function BlogList({ initialPosts, initialCursor, initialHasMore }: BlogLi
               {error}
             </p>
           )}
-          <Button
-            onClick={loadMore}
-            disabled={loading}
-            variant="outline"
-            size="lg"
-            className="min-w-[200px]"
-          >
+          <Button onClick={loadMore} disabled={loading} variant="outline" size="lg" className="min-w-[200px]">
             {loading ? 'Loading...' : 'Load More Posts'}
           </Button>
         </div>
@@ -76,4 +70,3 @@ export function BlogList({ initialPosts, initialCursor, initialHasMore }: BlogLi
     </div>
   );
 }
-

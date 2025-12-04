@@ -39,11 +39,15 @@ function extractUsageFromPayload(payload: unknown): (TokenTotals & { stage: stri
     return null;
   }
 
-  const prompt = toNumber((usageSource as Record<string, unknown>).input_tokens ?? (usageSource as Record<string, unknown>).inputTokens);
+  const prompt = toNumber(
+    (usageSource as Record<string, unknown>).input_tokens ?? (usageSource as Record<string, unknown>).inputTokens
+  );
   const completion = toNumber(
     (usageSource as Record<string, unknown>).output_tokens ?? (usageSource as Record<string, unknown>).outputTokens
   );
-  const total = toNumber((usageSource as Record<string, unknown>).total_tokens ?? (usageSource as Record<string, unknown>).totalTokens);
+  const total = toNumber(
+    (usageSource as Record<string, unknown>).total_tokens ?? (usageSource as Record<string, unknown>).totalTokens
+  );
 
   if (prompt === null && completion === null && total === null) {
     return null;
@@ -118,7 +122,6 @@ export function formatChatMessagesAsMarkdown(messages: ChatMessage[], debugLogs?
       lines.push('_No text content_');
       lines.push('');
     }
-
   });
 
   if (messages.length === 0) {
@@ -147,9 +150,7 @@ export function formatChatMessagesAsMarkdown(messages: ChatMessage[], debugLogs?
     if (stageEntries.length) {
       lines.push('- By stage:');
       stageEntries.forEach(([stage, totals]) => {
-        lines.push(
-          `  - ${stage}: prompt=${totals.prompt}, completion=${totals.completion}, total=${totals.total}`
-        );
+        lines.push(`  - ${stage}: prompt=${totals.prompt}, completion=${totals.completion}, total=${totals.total}`);
       });
     }
   } else if (debugLogs && debugLogs.length) {

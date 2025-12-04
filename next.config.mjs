@@ -4,11 +4,7 @@ const nextConfig = {
   experimental: {
     externalDir: true,
     outputFileTracingIncludes: {
-      '/api/chat': [
-        './generated/**/*',
-        './chat.config.*',
-        './chat-preprocess.config.*',
-      ],
+      '/api/chat': ['./generated/**/*', './chat.config.*', './chat-preprocess.config.*'],
     },
   },
   transpilePackages: [

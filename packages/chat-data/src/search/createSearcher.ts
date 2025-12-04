@@ -63,10 +63,7 @@ type SearchIndexEntry<TRecord> = {
   score: number;
 };
 
-type SemanticScorer<TRecord> = (
-  records: readonly TRecord[],
-  query: string
-) => Promise<Map<string, number>>;
+type SemanticScorer<TRecord> = (records: readonly TRecord[], query: string) => Promise<Map<string, number>>;
 
 export type SearchLogPayload<TFilters> = {
   filters: TFilters;
@@ -143,10 +140,7 @@ export function createSearcher<TRecord, TInput, TFilters, TResult>(config: {
     return normalized;
   };
 
-  const emitLog = (
-    filters: TFilters,
-    payload: Omit<SearchLogPayload<TFilters>, 'filters' | 'filterDescription'>
-  ) => {
+  const emitLog = (filters: TFilters, payload: Omit<SearchLogPayload<TFilters>, 'filters' | 'filterDescription'>) => {
     if (!logger) {
       return;
     }
@@ -164,8 +158,7 @@ export function createSearcher<TRecord, TInput, TFilters, TResult>(config: {
     const limit = clampLimit(requestedLimit ?? defaultLimit);
 
     const hasStructuredFilters = spec.hasStructuredFilters(filters);
-    const recordMatchesFilters = (record: TRecord) =>
-      !hasStructuredFilters || spec.recordMatches(record, filters);
+    const recordMatchesFilters = (record: TRecord) => !hasStructuredFilters || spec.recordMatches(record, filters);
 
     const structuredMatches = records.filter(recordMatchesFilters);
     const candidateMap = new Map<string, TRecord>();
@@ -258,8 +251,7 @@ export function createSearcher<TRecord, TInput, TFilters, TResult>(config: {
     const hasQueryTerms =
       spec.hasQueryTerms?.(filters, queryContext) ?? (hasStructuredFilters || Boolean(combinedTextQuery));
     const requireSignals =
-      Boolean(combinedTextQuery) &&
-      (textScoreMap.size > 0 || semanticScoreMap.size > 0 || hasStructuredFilters);
+      Boolean(combinedTextQuery) && (textScoreMap.size > 0 || semanticScoreMap.size > 0 || hasStructuredFilters);
 
     const now = getNow();
     const recencyAccessor = spec.getRecencyTimestamp;
@@ -330,19 +322,21 @@ export function createSearcher<TRecord, TInput, TFilters, TResult>(config: {
 
     const scored = scoredAll.slice(0, limit);
 
-    const results = scored.map(({ record, baseScore, structuredScore, textScore, semanticScore, recencyContribution }) => {
-      const baseResult = spec.buildResult(record);
-      const metadata: ScoreMetadata = {
-        _score: baseScore,
-        _signals: {
-          structured: structuredScore || undefined,
-          text: textScore || undefined,
-          semantic: semanticScore || undefined,
-          recency: recencyContribution || undefined,
-        },
-      };
-      return { ...baseResult, ...metadata } as Scored<TResult>;
-    });
+    const results = scored.map(
+      ({ record, baseScore, structuredScore, textScore, semanticScore, recencyContribution }) => {
+        const baseResult = spec.buildResult(record);
+        const metadata: ScoreMetadata = {
+          _score: baseScore,
+          _signals: {
+            structured: structuredScore || undefined,
+            text: textScore || undefined,
+            semantic: semanticScore || undefined,
+            recency: recencyContribution || undefined,
+          },
+        };
+        return { ...baseResult, ...metadata } as Scored<TResult>;
+      }
+    );
 
     emitLog(filters, {
       limit,
@@ -350,7 +344,7 @@ export function createSearcher<TRecord, TInput, TFilters, TResult>(config: {
       matchedCount: results.length,
       expandedCandidates: candidateRecords.length,
       usedSemantic: semanticScoreMap.size > 0,
-      topScore: scoredAll.length ? scoredAll[0]?.baseScore ?? 0 : 0,
+      topScore: scoredAll.length ? (scoredAll[0]?.baseScore ?? 0) : 0,
       recencyLambda: recencyEnabled ? recencyLambda : undefined,
       freshestTimestamp: recencyEnabled ? freshestTimestamp : undefined,
       topRecencyScore: recencyEnabled ? topRecencyContribution : undefined,

@@ -11,18 +11,12 @@ interface DocumentContentProps {
 
 export function DocumentContent({ content, pid, path, projectName }: DocumentContentProps) {
   const documentName = path[path.length - 1].replace(/\.md$/, '');
-  
+
   const breadcrumbs = [
     { label: 'Projects', href: '/projects' },
     { label: projectName, href: `/projects/${pid}` },
-    { label: documentName }
+    { label: documentName },
   ];
 
-  return (
-    <MarkdownViewer
-      content={content}
-      pid={pid}
-      breadcrumbs={breadcrumbs}
-    />
-  );
+  return <MarkdownViewer content={content} pid={pid} breadcrumbs={breadcrumbs} />;
 }

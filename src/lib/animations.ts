@@ -3,36 +3,36 @@
  */
 
 export const springAnimations = {
-    /** Spring animation for width changes - smooth and bouncy */
-    width: {
-        type: 'spring' as const,
-        stiffness: 300,
-        damping: 25,
-    },
-    /** Spring animation for icon/text movements */
-    iconText: {
-        type: 'spring' as const,
-        stiffness: 300,
-        damping: 20,
-    },
-    /** Simple fade transition */
-    fade: {
-        duration: 0.2,
-    },
+  /** Spring animation for width changes - smooth and bouncy */
+  width: {
+    type: 'spring' as const,
+    stiffness: 300,
+    damping: 25,
+  },
+  /** Spring animation for icon/text movements */
+  iconText: {
+    type: 'spring' as const,
+    stiffness: 300,
+    damping: 20,
+  },
+  /** Simple fade transition */
+  fade: {
+    duration: 0.2,
+  },
 } as const;
 
 /**
  * Transition presets for card state changes (card <-> detail <-> doc)
  */
 export const cardTransitions = {
-    /** Layout transition for container height/size changes */
-    layout: {
-        duration: 1,
-        ease: [0.16, 1, 0.3, 1] as const,
-    },
-    /** Quick fade for overlapping content during state change */
-    crossfade: {
-        duration: 0.2,
-        ease: [0.4, 0, 0.2, 1] as const,
-    },
+  /** Layout transition for container height/size changes */
+  layout: {
+    duration: 1,
+    ease: [0.16, 1, 0.3, 1] as const,
+  },
+  /** Quick fade for overlapping content during state change */
+  crossfade: {
+    duration: 0.2,
+    ease: [0.4, 0, 0.2, 1] as const,
+  },
 } as const;

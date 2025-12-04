@@ -368,20 +368,21 @@ export function ChatProvider({
     [setCompletionTimes]
   );
 
-  const markMessageRendered = useCallback((messageId: string) => {
-    if (!messageId) return;
-    // Mark completion timestamp if missing
-    setCompletionTimes((prev) => {
-      if (prev[messageId]) {
-        return prev;
-      }
-      return { ...prev, [messageId]: Date.now() };
-    });
-    // Flip animated flag off for the rendered message
-    commitMessages((prev) =>
-      prev.map((msg) => (msg.id === messageId ? { ...msg, animated: false } : msg))
-    );
-  }, [commitMessages]);
+  const markMessageRendered = useCallback(
+    (messageId: string) => {
+      if (!messageId) return;
+      // Mark completion timestamp if missing
+      setCompletionTimes((prev) => {
+        if (prev[messageId]) {
+          return prev;
+        }
+        return { ...prev, [messageId]: Date.now() };
+      });
+      // Flip animated flag off for the rendered message
+      commitMessages((prev) => prev.map((msg) => (msg.id === messageId ? { ...msg, animated: false } : msg)));
+    },
+    [commitMessages]
+  );
 
   const streamAssistantResponse = useChatStream({
     replaceMessage,
@@ -640,16 +641,12 @@ function mergeReasoningTraces(
     retrieval: incoming.retrieval ?? existing?.retrieval ?? null,
     evidence: incoming.evidence ?? existing?.evidence ?? null,
     answerMeta: incoming.answerMeta ?? existing?.answerMeta ?? null,
-    error: mergeReasoningErrors(
-      existing?.error,
-      incoming.error,
-      {
-        plan: incoming.plan ?? existing?.plan ?? null,
-        retrieval: incoming.retrieval ?? existing?.retrieval ?? null,
-        evidence: incoming.evidence ?? existing?.evidence ?? null,
-        answerMeta: incoming.answerMeta ?? existing?.answerMeta ?? null,
-      }
-    ),
+    error: mergeReasoningErrors(existing?.error, incoming.error, {
+      plan: incoming.plan ?? existing?.plan ?? null,
+      retrieval: incoming.retrieval ?? existing?.retrieval ?? null,
+      evidence: incoming.evidence ?? existing?.evidence ?? null,
+      answerMeta: incoming.answerMeta ?? existing?.answerMeta ?? null,
+    }),
   };
   if (existing && reasoningTracesEqual(existing, merged)) {
     return existing;
@@ -677,8 +674,7 @@ function mergeReasoningErrors(
     return null;
   }
 
-  const stage =
-    candidate.stage && candidate.stage.length ? candidate.stage : inferErroredStage(mergedStages);
+  const stage = candidate.stage && candidate.stage.length ? candidate.stage : inferErroredStage(mergedStages);
   if (!incoming && existing && existing.stage === stage) {
     return existing;
   }

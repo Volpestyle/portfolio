@@ -1,16 +1,7 @@
 import type {
   ChatRequestMessage,
-  EvidenceItem,
-  EvidenceSummary,
   RetrievalPlan,
   AnswerPayload,
-  EvidenceUiHints,
-  ExperienceScope,
-  EnumerationMode,
-  QuestionType,
-  Confidence,
-  Verdict,
-  ResumeFacet,
   UiPayload,
   PersonaSummary,
   RetrievalSummary,
@@ -22,16 +13,13 @@ import type {
   ModelConfig,
   TokenUsage,
   ChatStreamError,
-  UiHintValidationWarning,
   ReasoningEffort,
+  ReasoningUpdate,
+  AnswerUiHints,
 } from '@portfolio/chat-contract';
 import {
   DEFAULT_CHAT_HISTORY_LIMIT,
   AnswerPayloadSchema,
-  EvidenceSummarySchema,
-  ENUMERATION_VALUES,
-  QUESTION_TYPE_VALUES,
-  RESUME_FACET_VALUES,
   RETRIEVAL_REQUEST_TOPK_MAX,
   PlannerLLMOutputSchema,
   parseUsage,
@@ -47,7 +35,7 @@ import { performance } from 'node:perf_hooks';
 import { inspect } from 'node:util';
 import { getEncoding } from 'js-tiktoken';
 import { z } from 'zod';
-import { answerSystemPrompt, evidenceSystemPrompt, plannerSystemPrompt } from '../pipelinePrompts';
+import { answerSystemPrompt, plannerSystemPrompt } from '../pipelinePrompts';
 import {
   type AwardDoc,
   type EducationDoc,
@@ -109,7 +97,6 @@ export type ChatRuntimeOptions = {
   modelConfig?: Partial<ModelConfig>;
   tokenLimits?: {
     planner?: number;
-    evidence?: number;
     answer?: number;
   };
   persona?: PersonaSummary;
@@ -118,18 +105,13 @@ export type ChatRuntimeOptions = {
   logPrompts?: boolean;
 };
 
-export type PipelineStage = 'planner' | 'retrieval' | 'evidence' | 'answer';
+export type PipelineStage = 'planner' | 'retrieval' | 'answer';
 export type StageStatus = 'start' | 'complete';
 export type StageMeta = {
-  questionType?: RetrievalPlan['questionType'];
-  enumeration?: RetrievalPlan['enumeration'];
-  scope?: RetrievalPlan['scope'];
-  topic?: RetrievalPlan['topic'];
+  topic?: string | null;
+  cardsEnabled?: boolean;
   docsFound?: number;
   sources?: RetrievalSummary['source'][];
-  verdict?: EvidenceSummary['verdict'];
-  confidence?: EvidenceSummary['confidence'];
-  evidenceCount?: number;
   tokenCount?: number;
 };
 
@@ -137,7 +119,7 @@ export type RunChatPipelineOptions = {
   onAnswerToken?: (delta: string) => void;
   abortSignal?: AbortSignal;
   softTimeoutMs?: number;
-  onReasoningUpdate?: (stage: ReasoningStage, trace: PartialReasoningTrace) => void;
+  onReasoningUpdate?: (update: ReasoningUpdate) => void;
   ownerId?: string;
   reasoningEnabled?: boolean;
   onStageEvent?: (stage: PipelineStage, status: StageStatus, meta?: StageMeta, durationMs?: number) => void;
@@ -178,28 +160,19 @@ export const SLIDING_WINDOW_CONFIG = {
 };
 export type SlidingWindowConfig = typeof SLIDING_WINDOW_CONFIG;
 const MAX_TOPK = RETRIEVAL_REQUEST_TOPK_MAX;
-const MAX_ENUMERATION_DOCS = 50;
-const MIN_PLAN_TOPK = 3;
-const EVIDENCE_TOPK_CAP = 10;
 const MAX_BODY_SNIPPET_CHARS = 480;
 const PROJECT_BODY_SNIPPET_COUNT = 4;
 const EXPERIENCE_BODY_SNIPPET_COUNT = 4;
-const EVIDENCE_PROJECT_LIMIT = 6;
-const EVIDENCE_EXPERIENCE_LIMIT = 6;
-const EVIDENCE_EDUCATION_LIMIT = 4;
-const EVIDENCE_AWARD_LIMIT = 4;
-const EVIDENCE_SKILL_LIMIT = 4;
-const TOTAL_EVIDENCE_DOC_LIMIT = 12;
-const MAX_SELECTED_EVIDENCE = 6;
 const MAX_DISPLAY_ITEMS = 10;
-const ZERO_EVIDENCE_BANNER = 'I could not find any matching portfolio evidence for that question.';
 function extractResponseOutputText(response: { output_text?: string; output?: unknown[] } | null | undefined): string {
   if (!response) return '';
   if (typeof response.output_text === 'string' && response.output_text.trim().length) {
     return response.output_text.trim();
   }
   const parts: string[] = [];
-  const outputItems = Array.isArray(response.output) ? (response.output as Array<{ type?: string; content?: unknown[] }>) : [];
+  const outputItems = Array.isArray(response.output)
+    ? (response.output as Array<{ type?: string; content?: unknown[] }>)
+    : [];
   for (const item of outputItems) {
     if (!item || typeof item !== 'object') continue;
     const content = Array.isArray((item as { content?: unknown[] }).content)
@@ -230,7 +203,10 @@ function extractResponseParsedContent(response: { output?: unknown[] } | null | 
     const content = Array.isArray(item.content) ? (item.content as Array<Record<string, unknown>>) : [];
     for (const chunk of content) {
       if (!chunk || typeof chunk !== 'object') continue;
-      if (Object.prototype.hasOwnProperty.call(chunk, 'parsed') && (chunk as { parsed?: unknown }).parsed !== undefined) {
+      if (
+        Object.prototype.hasOwnProperty.call(chunk, 'parsed') &&
+        (chunk as { parsed?: unknown }).parsed !== undefined
+      ) {
         return (chunk as { parsed?: unknown }).parsed;
       }
     }
@@ -332,8 +308,7 @@ function groupIntoTurns(messages: ChatRequestMessage[]): ConversationTurn[] {
   const pushTurn = () => {
     if (!currentTurn.user) return;
     const assistant = currentTurn.assistant;
-    const estimatedTokens =
-      countTokens(currentTurn.user.content) + (assistant ? countTokens(assistant.content) : 0);
+    const estimatedTokens = countTokens(currentTurn.user.content) + (assistant ? countTokens(assistant.content) : 0);
     turns.push({
       user: currentTurn.user,
       assistant,
@@ -389,7 +364,9 @@ function applySlidingWindow(
     }
   }
 
-  const truncatedMessages = keptTurns.flatMap((turn) => [turn.user, turn.assistant].filter(Boolean)) as ChatRequestMessage[];
+  const truncatedMessages = keptTurns.flatMap((turn) =>
+    [turn.user, turn.assistant].filter(Boolean)
+  ) as ChatRequestMessage[];
   const droppedTurns = Math.max(0, turns.length - keptTurns.length);
 
   return {
@@ -422,10 +399,7 @@ function formatLogValue(value: unknown): string {
     const stack = typeof value.stack === 'string' ? value.stack : '';
     const extraKeys = Object.keys(value).filter((key) => key !== 'name' && key !== 'message' && key !== 'stack');
     const errorRecord = value as unknown as Record<string, unknown>;
-    const extras =
-      extraKeys.length > 0
-        ? Object.fromEntries(extraKeys.map((key) => [key, errorRecord[key]]))
-        : null;
+    const extras = extraKeys.length > 0 ? Object.fromEntries(extraKeys.map((key) => [key, errorRecord[key]])) : null;
     const extrasText = extras ? `\nextra: ${JSON.stringify(extras)}` : '';
     if (stack) {
       return stack.includes(summary) ? `${stack}${extrasText}` : `${summary}\n${stack}${extrasText}`;
@@ -527,7 +501,11 @@ function resolveModelConfig(options?: ChatRuntimeOptions): ModelConfig {
   };
 }
 
-function resolveReasoningParams(model: string, allowReasoning: boolean, effort?: ReasoningEffort): Reasoning | undefined {
+function resolveReasoningParams(
+  model: string,
+  allowReasoning: boolean,
+  effort?: ReasoningEffort
+): Reasoning | undefined {
   if (!allowReasoning || !effort) {
     return undefined;
   }
@@ -587,10 +565,7 @@ export function inferRetrievalFocus(
   if (hasProjects) return 'projects';
 
   const resumeFacetSet = new Set(resumeFacets ?? []);
-  const hasResumeBias =
-    scope === 'employment_only' ||
-    resumeFacetSet.has('experience') ||
-    resumeFacetSet.has('skill');
+  const hasResumeBias = scope === 'employment_only' || resumeFacetSet.has('experience') || resumeFacetSet.has('skill');
 
   if (hasResumeBias) return 'resume';
 
@@ -619,8 +594,8 @@ export function normalizeRetrievalPlan(plan: RetrievalPlan, logger?: ChatRuntime
       : 'any_experience';
   let resumeFacets = Array.isArray(plan.resumeFacets)
     ? plan.resumeFacets.filter((facet): facet is ResumeFacet =>
-      (RESUME_FACET_VALUES as readonly string[]).includes(facet as ResumeFacet)
-    )
+        (RESUME_FACET_VALUES as readonly string[]).includes(facet as ResumeFacet)
+      )
     : [];
   if (scope === 'employment_only') {
     // Keep employment-focus aligned: drop education facets when scope is employment_only.
@@ -679,7 +654,8 @@ export function normalizeRetrievalPlan(plan: RetrievalPlan, logger?: ChatRuntime
     return true;
   };
 
-  const profileOnlyPlan = normalizedRequests.length > 0 && normalizedRequests.every((request) => request.source === 'profile');
+  const profileOnlyPlan =
+    normalizedRequests.length > 0 && normalizedRequests.every((request) => request.source === 'profile');
   const shouldBackfill = !plannerExplicitNoRetrieval && !profileOnlyPlan && questionType !== 'meta';
 
   if (shouldBackfill) {
@@ -743,7 +719,10 @@ function summarizeRetrievalRequests(requests: RetrievalPlan['retrievalRequests']
 const isRetrievalSource = (value: unknown): value is RetrievalPlan['retrievalRequests'][number]['source'] =>
   value === 'projects' || value === 'resume' || value === 'profile';
 
-function summarizeBackfill(rawPlan: RetrievalPlan, normalizedPlan: RetrievalPlan): {
+function summarizeBackfill(
+  rawPlan: RetrievalPlan,
+  normalizedPlan: RetrievalPlan
+): {
   applied: boolean;
   addedSources: RetrievalPlan['retrievalRequests'][number]['source'][];
   skipReason: 'planner_no_retrieval' | 'profile_only' | 'meta' | null;
@@ -752,11 +731,14 @@ function summarizeBackfill(rawPlan: RetrievalPlan, normalizedPlan: RetrievalPlan
 } {
   const rawRequests = Array.isArray(rawPlan.retrievalRequests) ? rawPlan.retrievalRequests : [];
   const normalizedRequests = Array.isArray(normalizedPlan.retrievalRequests) ? normalizedPlan.retrievalRequests : [];
-  const rawSources = new Set(rawRequests.map((req) => (isRetrievalSource(req?.source) ? req.source : null)).filter(Boolean));
+  const rawSources = new Set(
+    rawRequests.map((req) => (isRetrievalSource(req?.source) ? req.source : null)).filter(Boolean)
+  );
   const normalizedSources = new Set(normalizedRequests.map((req) => req.source));
   const addedSources = Array.from(normalizedSources).filter((source) => !rawSources.has(source));
   const profileOnly = normalizedRequests.length > 0 && normalizedRequests.every((req) => req.source === 'profile');
-  const plannerExplicitNoRetrieval = rawPlan.retrievalRequests !== undefined && rawPlan.retrievalRequests !== null && rawRequests.length === 0;
+  const plannerExplicitNoRetrieval =
+    rawPlan.retrievalRequests !== undefined && rawPlan.retrievalRequests !== null && rawRequests.length === 0;
   const skipReason = plannerExplicitNoRetrieval
     ? 'planner_no_retrieval'
     : profileOnly
@@ -823,9 +805,9 @@ function logPlanNormalization(
     topKRange:
       topKs.length > 0
         ? {
-          min: Math.min(...topKs),
-          max: Math.max(...topKs),
-        }
+            min: Math.min(...topKs),
+            max: Math.max(...topKs),
+          }
         : null,
   };
   logger('chat.pipeline.plan.normalize', {
@@ -839,7 +821,11 @@ function logPlanNormalization(
     backfill,
   });
 }
-function resolveTopK(plan: RetrievalPlan, requestedTopK?: number, source?: RetrievalPlan['retrievalRequests'][number]['source']): {
+function resolveTopK(
+  plan: RetrievalPlan,
+  requestedTopK?: number,
+  source?: RetrievalPlan['retrievalRequests'][number]['source']
+): {
   effectiveTopK: number;
   reason: string;
 } {
@@ -894,7 +880,11 @@ async function runJsonResponse<T>({
   let lastError: unknown = null;
   const responseFormat = zodResponseFormat(schema, responseFormatName ?? usageStage ?? 'json_payload');
   const responseFormatNameValue = responseFormatName ?? usageStage ?? 'json_payload';
-  const responseFormatJsonSchema = (responseFormat as { json_schema?: Partial<ResponseFormatTextJSONSchemaConfig> & { schema?: Record<string, unknown> } }).json_schema;
+  const responseFormatJsonSchema = (
+    responseFormat as {
+      json_schema?: Partial<ResponseFormatTextJSONSchemaConfig> & { schema?: Record<string, unknown> };
+    }
+  ).json_schema;
   const jsonSchemaFormat: ResponseFormatTextJSONSchemaConfig = {
     type: 'json_schema',
     name: responseFormatJsonSchema?.name ?? responseFormatNameValue,
@@ -954,7 +944,8 @@ async function runJsonResponse<T>({
     logger?.('chat.pipeline.model.raw', { stage: stageLabel, model, raw: rawContent, attempt });
 
     let candidate = structuredCandidate;
-    let parsedFrom: 'structured' | 'text' | undefined = typeof structuredCandidate !== 'undefined' ? 'structured' : undefined;
+    let parsedFrom: 'structured' | 'text' | undefined =
+      typeof structuredCandidate !== 'undefined' ? 'structured' : undefined;
 
     if (typeof candidate === 'undefined') {
       const trimmedContent = typeof rawContent === 'string' ? rawContent.trim() : '';
@@ -1027,7 +1018,11 @@ async function runJsonResponse<T>({
     return validated.data;
   }
 
-  logger?.('chat.pipeline.model.fallback', { stage: stageLabel, model, lastError: formatLogValue(lastError ?? 'unknown') });
+  logger?.('chat.pipeline.model.fallback', {
+    stage: stageLabel,
+    model,
+    lastError: formatLogValue(lastError ?? 'unknown'),
+  });
   if (throwOnFailure) {
     throw new Error(`chat_pipeline_model_failure:${model}`);
   }
@@ -1051,12 +1046,19 @@ async function runStreamingJsonResponse<T>({
   onUsage,
   reasoning,
   temperature,
-}: JsonResponseArgs<T> & { onTextDelta?: (delta: string) => void; onUsage?: (stage: string, model: string, usage: unknown) => void }): Promise<T> {
+}: JsonResponseArgs<T> & {
+  onTextDelta?: (delta: string) => void;
+  onUsage?: (stage: string, model: string, usage: unknown) => void;
+}): Promise<T> {
   let attempt = 0;
   let lastError: unknown = null;
   const responseFormat = zodResponseFormat(schema, responseFormatName ?? usageStage ?? 'json_payload');
   const responseFormatNameValue = responseFormatName ?? usageStage ?? 'json_payload';
-  const responseFormatJsonSchema = (responseFormat as { json_schema?: Partial<ResponseFormatTextJSONSchemaConfig> & { schema?: Record<string, unknown> } }).json_schema;
+  const responseFormatJsonSchema = (
+    responseFormat as {
+      json_schema?: Partial<ResponseFormatTextJSONSchemaConfig> & { schema?: Record<string, unknown> };
+    }
+  ).json_schema;
   const jsonSchemaFormat: ResponseFormatTextJSONSchemaConfig = {
     type: 'json_schema',
     name: responseFormatJsonSchema?.name ?? responseFormatNameValue,
@@ -1251,7 +1253,8 @@ async function runStreamingJsonResponse<T>({
       logger?.('chat.pipeline.model.raw', { stage: stageLabel, model, raw: rawContent, attempt });
 
       let candidate = structuredCandidate;
-      let parsedFrom: 'structured' | 'text' | undefined = typeof structuredCandidate !== 'undefined' ? 'structured' : undefined;
+      let parsedFrom: 'structured' | 'text' | undefined =
+        typeof structuredCandidate !== 'undefined' ? 'structured' : undefined;
 
       if (typeof candidate === 'undefined') {
         const trimmedContent = typeof rawContent === 'string' ? rawContent.trim() : '';
@@ -1297,7 +1300,11 @@ async function runStreamingJsonResponse<T>({
         emitMessageDelta(finalMessage);
       }
 
-      if (candidate && typeof candidate === 'object' && typeof (candidate as { message?: unknown }).message === 'string') {
+      if (
+        candidate &&
+        typeof candidate === 'object' &&
+        typeof (candidate as { message?: unknown }).message === 'string'
+      ) {
         const currentMessage = (candidate as { message: string }).message as string;
         (candidate as { message: string }).message = sanitizeMessageSnapshot(
           currentMessage,
@@ -1349,7 +1356,11 @@ async function runStreamingJsonResponse<T>({
     }
   }
 
-  logger?.('chat.pipeline.model.fallback', { stage: stageLabel, model, lastError: formatLogValue(lastError ?? 'unknown') });
+  logger?.('chat.pipeline.model.fallback', {
+    stage: stageLabel,
+    model,
+    lastError: formatLogValue(lastError ?? 'unknown'),
+  });
   if (throwOnFailure) {
     throw new Error(`chat_pipeline_model_failure:${model}`);
   }
@@ -1358,13 +1369,7 @@ async function runStreamingJsonResponse<T>({
 
 function buildProjectEvidenceSnippet(project: ProjectDoc): string | undefined {
   const bullets = (project.bullets ?? []).slice(0, 3).join(' ');
-  const combined = [
-    project.oneLiner,
-    project.description,
-    project.impactSummary,
-    project.sizeOrScope,
-    bullets,
-  ]
+  const combined = [project.oneLiner, project.description, project.impactSummary, project.sizeOrScope, bullets]
     .filter(Boolean)
     .join(' ');
   return normalizeSnippet(combined, 360);
@@ -1474,9 +1479,11 @@ function buildEvidenceUserContent(input: {
         evidenceSnippet: buildExperienceEvidenceSnippet(exp),
         bodySnippet: experienceBodyIds.has(exp.id)
           ? normalizeSnippet(
-            [exp.title, exp.company, exp.location, exp.impactSummary, exp.sizeOrScope, ...(exp.bullets ?? [])].join(' '),
-            MAX_BODY_SNIPPET_CHARS
-          )
+              [exp.title, exp.company, exp.location, exp.impactSummary, exp.sizeOrScope, ...(exp.bullets ?? [])].join(
+                ' '
+              ),
+              MAX_BODY_SNIPPET_CHARS
+            )
           : undefined,
       })),
       null,
@@ -1496,9 +1503,9 @@ function buildEvidenceUserContent(input: {
         evidenceSnippet: buildEducationEvidenceSnippet(edu),
         bodySnippet: educationBodyIds.has(edu.id)
           ? normalizeSnippet(
-            [edu.institution, edu.degree, edu.field, edu.summary, ...(edu.bullets ?? [])].join(' '),
-            MAX_BODY_SNIPPET_CHARS
-          )
+              [edu.institution, edu.degree, edu.field, edu.summary, ...(edu.bullets ?? [])].join(' '),
+              MAX_BODY_SNIPPET_CHARS
+            )
           : undefined,
       })),
       null,
@@ -1518,9 +1525,9 @@ function buildEvidenceUserContent(input: {
         evidenceSnippet: buildAwardEvidenceSnippet(award),
         bodySnippet: awardBodyIds.has(award.id)
           ? normalizeSnippet(
-            [award.title, award.issuer, award.summary, ...(award.bullets ?? [])].join(' '),
-            MAX_BODY_SNIPPET_CHARS
-          )
+              [award.title, award.issuer, award.summary, ...(award.bullets ?? [])].join(' '),
+              MAX_BODY_SNIPPET_CHARS
+            )
           : undefined,
       })),
       null,
@@ -1578,13 +1585,22 @@ export function buildAnswerSystemPrompt(persona?: PersonaSummary, owner?: OwnerC
     sections.push(`**PERSONA (background info)**:\n${persona.systemPersona}`);
   }
   if (persona?.styleGuidelines?.length) {
-    sections.push(['**STYLE GUIDELINES (let these guide you in addition to the voicing examples)**:', ...persona.styleGuidelines.map((rule) => `- ${rule}`)].join('\n'));
+    sections.push(
+      [
+        '**STYLE GUIDELINES (let these guide you in addition to the voicing examples)**:',
+        ...persona.styleGuidelines.map((rule) => `- ${rule}`),
+      ].join('\n')
+    );
   }
 
   return sections.filter(Boolean).join('\n\n');
 }
 
-function resolveIdentityDetails(profile?: ProfileDoc | null, persona?: PersonaSummary, identityContext?: IdentityContext): IdentityContext {
+function resolveIdentityDetails(
+  profile?: ProfileDoc | null,
+  persona?: PersonaSummary,
+  identityContext?: IdentityContext
+): IdentityContext {
   return {
     fullName: identityContext?.fullName ?? profile?.fullName,
     headline: identityContext?.headline ?? profile?.headline,
@@ -1788,10 +1804,10 @@ function logPipelineSummary(params: {
     },
     reasoning: params.reasoning
       ? {
-        requested: params.reasoning.requested ?? null,
-        allowReasoning: params.reasoning.allowReasoning,
-        environment: params.reasoning.environment ?? process.env.NODE_ENV ?? null,
-      }
+          requested: params.reasoning.requested ?? null,
+          allowReasoning: params.reasoning.allowReasoning,
+          environment: params.reasoning.environment ?? process.env.NODE_ENV ?? null,
+        }
       : undefined,
     models: params.models,
     timings: params.timings,
@@ -1821,14 +1837,10 @@ export function buildUiArtifacts(params: BuildUiArtifactsParams): UiPayload {
   const maxDisplayItems = params.maxDisplayItems ?? MAX_DISPLAY_ITEMS;
   const coreEvidenceIds = dedupeDocIds(params.evidence.selectedEvidence.map((item) => item.id));
   const retrievedProjectIds = new Set(
-    params.retrieval.projects
-      .map((proj) => normalizeDocId(proj.id))
-      .filter((id): id is string => Boolean(id))
+    params.retrieval.projects.map((proj) => normalizeDocId(proj.id)).filter((id): id is string => Boolean(id))
   );
   const retrievedExperienceIds = new Set(
-    params.retrieval.experiences
-      .map((exp) => normalizeDocId(exp.id))
-      .filter((id): id is string => Boolean(id))
+    params.retrieval.experiences.map((exp) => normalizeDocId(exp.id)).filter((id): id is string => Boolean(id))
   );
   const filteredUiHints = {
     projects: params.evidence.uiHints?.projects ?? [],
@@ -1893,7 +1905,7 @@ export function buildUiArtifacts(params: BuildUiArtifactsParams): UiPayload {
     const truncatedProjects = projectIds.slice(0, maxDisplayItems);
     const truncatedExperiences = experienceIds.slice(0, Math.max(0, maxDisplayItems - truncatedProjects.length));
     const remaining =
-      (originalProjectCount - truncatedProjects.length) + (originalExperienceCount - truncatedExperiences.length);
+      originalProjectCount - truncatedProjects.length + (originalExperienceCount - truncatedExperiences.length);
     projectIds = truncatedProjects;
     experienceIds = truncatedExperiences;
     if (!bannerText && remaining > 0) {
@@ -1975,11 +1987,10 @@ function capEnumerationDocs(retrieved: RetrievalResult, maxDocs = MAX_ENUMERATIO
     scored.push({ kind: 'profile', id: 'profile', score: 0.8, index: 0 });
   }
 
-  const selected = scored
-    .sort((a, b) => b.score - a.score || a.index - b.index)
-    .slice(0, Math.max(0, maxDocs));
+  const selected = scored.sort((a, b) => b.score - a.score || a.index - b.index).slice(0, Math.max(0, maxDocs));
 
-  const selectIds = (kind: DocKind) => new Set(selected.filter((entry) => entry.kind === kind).map((entry) => entry.id));
+  const selectIds = (kind: DocKind) =>
+    new Set(selected.filter((entry) => entry.kind === kind).map((entry) => entry.id));
   const selectedProjects = selectIds('project');
   const selectedExperiences = selectIds('experience');
   const selectedEducation = selectIds('education');
@@ -2019,11 +2030,7 @@ function limitEvidenceDocs(retrieved: RetrievalResult, plan: RetrievalPlan): Ret
 
   let projectPriority = 2 + (wantsProjectFocus ? 2.5 : 0) + mixedBias;
   let experiencePriority =
-    2 +
-    (wantsResumeFocus ? 2.5 : 0) +
-    (resumeFacetSet.has('experience') ? 0.8 : 0) +
-    scopeBias +
-    mixedBias;
+    2 + (wantsResumeFocus ? 2.5 : 0) + (resumeFacetSet.has('experience') ? 0.8 : 0) + scopeBias + mixedBias;
   let educationPriority = 1 + (resumeFacetSet.has('education') ? 1.5 : 0);
   let awardPriority = 0.9 + (resumeFacetSet.has('award') ? 1.2 : 0);
   let skillPriority = 0.8 + (resumeFacetSet.has('skill') ? 1.2 : 0);
@@ -2125,7 +2132,11 @@ function formatProfileTitle(profile?: ProfileDoc | null): string {
   return profile.fullName ?? profile.headline ?? 'Profile';
 }
 
-function ensureSnippet(value: string | undefined, fallbackParts: Array<string | undefined>, maxChars = MAX_BODY_SNIPPET_CHARS): string {
+function ensureSnippet(
+  value: string | undefined,
+  fallbackParts: Array<string | undefined>,
+  maxChars = MAX_BODY_SNIPPET_CHARS
+): string {
   const normalized = value ? normalizeSnippet(value, maxChars) : undefined;
   if (normalized) return normalized;
   const fallbackText = fallbackParts.filter((part) => part && part.trim().length > 0).join(' ');
@@ -2142,9 +2153,7 @@ function buildCandidateKey(source: EvidenceItem['source'], id: string): string {
 type ResumeKind = 'experience' | 'education' | 'award' | 'skill';
 
 function getResumeKind(doc: ResumeDoc): ResumeKind {
-  const kindValue =
-    (doc as { kind?: string }).kind ??
-    (doc as { type?: string }).type;
+  const kindValue = (doc as { kind?: string }).kind ?? (doc as { type?: string }).type;
   if (kindValue === 'experience' || kindValue === 'education' || kindValue === 'award' || kindValue === 'skill') {
     return kindValue;
   }
@@ -2263,17 +2272,14 @@ export function buildEvidenceCandidates(plan: RetrievalPlan, retrieved: Retrieva
     if (wantsMixedFocus) rankScore += mixedBias;
     rankScore = Math.max(0, rankScore);
     const title = proj.name || proj.slug || id;
-    const snippet = ensureSnippet(
-      buildProjectEvidenceSnippet(proj),
-      [
-        proj.description,
-        proj.impactSummary,
-        proj.oneLiner,
-        proj.sizeOrScope,
-        proj.readme,
-        ...(proj.bullets ?? []),
-      ]
-    );
+    const snippet = ensureSnippet(buildProjectEvidenceSnippet(proj), [
+      proj.description,
+      proj.impactSummary,
+      proj.oneLiner,
+      proj.sizeOrScope,
+      proj.readme,
+      ...(proj.bullets ?? []),
+    ]);
     const relevance: EvidenceItem['relevance'] = rankScore >= 3.5 ? 'high' : rankScore >= 1.2 ? 'medium' : 'low';
     candidates.push({
       key: buildCandidateKey('project', id),
@@ -2292,17 +2298,14 @@ export function buildEvidenceCandidates(plan: RetrievalPlan, retrieved: Retrieva
     rankScore += scopeBias;
     if (wantsMixedFocus) rankScore += mixedBias;
     rankScore = Math.max(0, rankScore);
-    const snippet = ensureSnippet(
-      buildExperienceEvidenceSnippet(exp),
-      [
-        exp.summary,
-        exp.impactSummary,
-        exp.sizeOrScope,
-        exp.company,
-        exp.title,
-        ...(exp.bullets ?? []),
-      ]
-    );
+    const snippet = ensureSnippet(buildExperienceEvidenceSnippet(exp), [
+      exp.summary,
+      exp.impactSummary,
+      exp.sizeOrScope,
+      exp.company,
+      exp.title,
+      ...(exp.bullets ?? []),
+    ]);
     const relevance: EvidenceItem['relevance'] = rankScore >= 3 ? 'high' : rankScore >= 1.2 ? 'medium' : 'low';
     candidates.push({
       key: buildCandidateKey('resume', id),
@@ -2324,10 +2327,13 @@ export function buildEvidenceCandidates(plan: RetrievalPlan, retrieved: Retrieva
     let rankScore = scoreFromDoc(edu._score, 0.8) + Math.max(0, 0.3 - index * 0.01);
     if (resumeFacetSet.has('education')) rankScore += 1.5;
     rankScore = Math.max(0, rankScore);
-    const snippet = ensureSnippet(
-      buildEducationEvidenceSnippet(edu),
-      [edu.summary, ...(edu.bullets ?? []), edu.degree, edu.field, edu.institution]
-    );
+    const snippet = ensureSnippet(buildEducationEvidenceSnippet(edu), [
+      edu.summary,
+      ...(edu.bullets ?? []),
+      edu.degree,
+      edu.field,
+      edu.institution,
+    ]);
     const relevance: EvidenceItem['relevance'] = rankScore >= 2.5 ? 'high' : rankScore >= 1 ? 'medium' : 'low';
     candidates.push({
       key: buildCandidateKey('resume', id),
@@ -2349,10 +2355,12 @@ export function buildEvidenceCandidates(plan: RetrievalPlan, retrieved: Retrieva
     let rankScore = scoreFromDoc(award._score, 0.7) + Math.max(0, 0.2 - index * 0.01);
     if (resumeFacetSet.has('award')) rankScore += 1.2;
     rankScore = Math.max(0, rankScore);
-    const snippet = ensureSnippet(
-      buildAwardEvidenceSnippet(award),
-      [award.summary, ...(award.bullets ?? []), award.title, award.issuer]
-    );
+    const snippet = ensureSnippet(buildAwardEvidenceSnippet(award), [
+      award.summary,
+      ...(award.bullets ?? []),
+      award.title,
+      award.issuer,
+    ]);
     const relevance: EvidenceItem['relevance'] = rankScore >= 2 ? 'high' : rankScore >= 0.9 ? 'medium' : 'low';
     candidates.push({
       key: buildCandidateKey('resume', id),
@@ -2468,7 +2476,9 @@ export function normalizeEvidenceSummaryPayload(
     const candidate = candidateMap.get(key);
     if (!candidate) continue; // drop hallucinated/unused ids
     const relevance: EvidenceItem['relevance'] =
-      entry.relevance && (['high', 'medium', 'low'] as const).includes(entry.relevance) ? entry.relevance : candidate.relevance;
+      entry.relevance && (['high', 'medium', 'low'] as const).includes(entry.relevance)
+        ? entry.relevance
+        : candidate.relevance;
     const snippet = ensureSnippet(entry.snippet, [candidate.snippet]);
     const title = entry.title?.trim() || candidate.title;
     filteredSelected.push({
@@ -2491,7 +2501,9 @@ export function normalizeEvidenceSummaryPayload(
       ? summary.verdict
       : 'no_evidence';
   let confidence: Confidence =
-    summary.confidence && (['high', 'medium', 'low'] as const).includes(summary.confidence) ? summary.confidence : 'low';
+    summary.confidence && (['high', 'medium', 'low'] as const).includes(summary.confidence)
+      ? summary.confidence
+      : 'low';
 
   if (filteredSelected.length === 0 && uiHintsEmpty) {
     verdict = verdict === 'n/a' ? 'n/a' : 'no_evidence';
@@ -2500,9 +2512,9 @@ export function normalizeEvidenceSummaryPayload(
 
   let finalUiHints: EvidenceUiHints = isEnumerate
     ? {
-      projects: normalizedHints.projects?.filter((id) => retrievedProjectIds.has(id)) ?? [],
-      experiences: normalizedHints.experiences?.filter((id) => retrievedExperienceIds.has(id)) ?? [],
-    }
+        projects: normalizedHints.projects?.filter((id) => retrievedProjectIds.has(id)) ?? [],
+        experiences: normalizedHints.experiences?.filter((id) => retrievedExperienceIds.has(id)) ?? [],
+      }
     : normalizedHints;
 
   const finalSelected = filteredSelected.slice(0, MAX_SELECTED_EVIDENCE);
@@ -2572,17 +2584,12 @@ export async function executeRetrievalPlan(
     };
   }
 
-  const hasSkillFacetOnly = (plan.resumeFacets ?? []).length > 0 && (plan.resumeFacets ?? []).every((facet) => facet === 'skill');
-  const isSkillEnumerate =
-    plan.questionType === 'list' && plan.enumeration === 'all_relevant' && hasSkillFacetOnly;
+  const hasSkillFacetOnly =
+    (plan.resumeFacets ?? []).length > 0 && (plan.resumeFacets ?? []).every((facet) => facet === 'skill');
+  const isSkillEnumerate = plan.questionType === 'list' && plan.enumeration === 'all_relevant' && hasSkillFacetOnly;
   const GENERIC_SKILL_REGEX = /\b(skill|skills|tech\s*stack|techstack|programming\s+languages?|languages?)\b/i;
 
-  const getCacheKey = (
-    source: 'projects' | 'resume',
-    query: string,
-    limit: number,
-    facets?: ResumeFacet[]
-  ) =>
+  const getCacheKey = (source: 'projects' | 'resume', query: string, limit: number, facets?: ResumeFacet[]) =>
     JSON.stringify({
       ownerId: ownerKey,
       source,
@@ -2689,12 +2696,13 @@ export async function executeRetrievalPlan(
         continue;
       }
       recordCacheHit('miss', 'resume', cacheKey ?? 'nocache');
-      const genericSkillQuery = isSkillEnumerate && (query.length === 0 || GENERIC_SKILL_REGEX.test(rawQuery.toLowerCase()));
+      const genericSkillQuery =
+        isSkillEnumerate && (query.length === 0 || GENERIC_SKILL_REGEX.test(rawQuery.toLowerCase()));
       const results = genericSkillQuery
         ? await retrieval.searchExperiencesByText('', effectiveTopK, { facets: ['skill'] })
         : await retrieval.searchExperiencesByText(query, effectiveTopK, {
-          facets: resumeFacets,
-        });
+            facets: resumeFacets,
+          });
       if (cacheKey && cache) {
         cacheWithEviction(cache.resume, cacheKey, results);
       }
@@ -2759,12 +2767,11 @@ export async function executeRetrievalPlan(
   const scopedResumeDocs = applyExperienceScopeFilter(resumeDocs, plan.scope);
 
   // Resolve linked projects for employment-only to surface associated work context.
-  if (
-    plan.scope === 'employment_only' &&
-    scopedResumeDocs.experiences.length > 0
-  ) {
+  if (plan.scope === 'employment_only' && scopedResumeDocs.experiences.length > 0) {
     const linkedProjectIds = new Set<string>();
-    scopedResumeDocs.experiences.forEach((exp) => (exp.linkedProjects ?? []).forEach((id) => id && linkedProjectIds.add(id)));
+    scopedResumeDocs.experiences.forEach((exp) =>
+      (exp.linkedProjects ?? []).forEach((id) => id && linkedProjectIds.add(id))
+    );
     if (linkedProjectIds.size > 0) {
       const linkedProjects = await retrieval.getProjectsByIds(Array.from(linkedProjectIds));
       dedupProjects.push(...linkedProjects);
@@ -2828,7 +2835,9 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
     });
   };
 
-  const createAbortSignal = (runOptions?: RunChatPipelineOptions): { signal: AbortSignal; cleanup: () => void; timedOut: () => boolean } => {
+  const createAbortSignal = (
+    runOptions?: RunChatPipelineOptions
+  ): { signal: AbortSignal; cleanup: () => void; timedOut: () => boolean } => {
     const controller = new AbortController();
     const parent = runOptions?.abortSignal;
     const timeoutMs = typeof runOptions?.softTimeoutMs === 'number' ? runOptions.softTimeoutMs : undefined;
@@ -3003,7 +3012,11 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
   }
 
   return {
-    async run(client: OpenAI, messages: ChatRequestMessage[], runOptions?: RunChatPipelineOptions): Promise<ChatbotResponse> {
+    async run(
+      client: OpenAI,
+      messages: ChatRequestMessage[],
+      runOptions?: RunChatPipelineOptions
+    ): Promise<ChatbotResponse> {
       const tStart = performance.now();
       const timings: Record<string, number> = {};
       const effectiveOwnerId = runOptions?.ownerId ?? ownerId;
@@ -3049,7 +3062,9 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         throw error;
       }
 
-      const boundedMessages = windowedMessages.messages.length ? windowedMessages.messages : messages.slice(-DEFAULT_MAX_CONTEXT);
+      const boundedMessages = windowedMessages.messages.length
+        ? windowedMessages.messages
+        : messages.slice(-DEFAULT_MAX_CONTEXT);
       const userText = extractUserText(boundedMessages);
       const conversationSnippet = buildContextSnippet(boundedMessages);
 
@@ -3163,7 +3178,11 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         let executedRetrieval: ExecutedRetrievalResult;
         try {
           const tRetrieval = performance.now();
-          executedRetrieval = await executeRetrievalPlan(retrieval, plan, { logger, cache: retrievalCache, ownerId: effectiveOwnerId });
+          executedRetrieval = await executeRetrievalPlan(retrieval, plan, {
+            logger,
+            cache: retrievalCache,
+            ownerId: effectiveOwnerId,
+          });
           timings.retrievalMs = performance.now() - tRetrieval;
         } catch (error) {
           cleanupAborters();
@@ -3284,10 +3303,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         );
       }
 
-      emitReasoningUpdate(
-        'evidence',
-        buildPartialReasoningTrace({ evidence })
-      );
+      emitReasoningUpdate('evidence', buildPartialReasoningTrace({ evidence }));
 
       const projectMap = new Map(retrieved.projects.map((p) => [normalizeDocId(p.id), p]));
       const experienceMap = new Map(retrieved.experiences.map((e) => [normalizeDocId(e.id), e]));
@@ -3411,22 +3427,21 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         fastPath: fastPathReason,
         reasoning: requestedReasoning
           ? {
-            requested: requestedReasoning,
-            allowReasoning,
-            environment,
-          }
+              requested: requestedReasoning,
+              allowReasoning,
+              environment,
+            }
           : undefined,
       });
 
-      const reasoningTrace: ReasoningTrace | undefined =
-        allowReasoning
-          ? {
+      const reasoningTrace: ReasoningTrace | undefined = allowReasoning
+        ? {
             plan,
             retrieval: retrievalSummaries,
             evidence,
             answerMeta,
           }
-          : undefined;
+        : undefined;
 
       const totalCostUsd =
         stageUsages.length > 0 ? stageUsages.reduce((acc, entry) => acc + (entry.costUsd ?? 0), 0) : undefined;
@@ -3511,10 +3526,7 @@ function buildPartialReasoningTrace({
   };
 }
 
-function mergeReasoningTraces(
-  current: PartialReasoningTrace,
-  incoming: PartialReasoningTrace
-): PartialReasoningTrace {
+function mergeReasoningTraces(current: PartialReasoningTrace, incoming: PartialReasoningTrace): PartialReasoningTrace {
   return {
     plan: incoming.plan ?? current.plan ?? null,
     retrieval: incoming.retrieval ?? current.retrieval ?? null,

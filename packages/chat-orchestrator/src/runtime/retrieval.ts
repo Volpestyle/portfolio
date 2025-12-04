@@ -43,16 +43,8 @@ export type RetrievalResult = {
 };
 
 export type RetrievalDrivers = {
-  searchProjectsByText(
-    queryText: string,
-    topK?: number,
-    options?: { scope?: ExperienceScope }
-  ): Promise<ProjectDoc[]>;
-  searchExperiencesByText(
-    queryText: string,
-    topK?: number,
-    options?: { facets?: ResumeFacet[] }
-  ): Promise<ResumeDoc[]>;
+  searchProjectsByText(queryText: string, topK?: number, options?: { scope?: ExperienceScope }): Promise<ProjectDoc[]>;
+  searchExperiencesByText(queryText: string, topK?: number, options?: { facets?: ResumeFacet[] }): Promise<ResumeDoc[]>;
   getProfileDoc(): Promise<ProfileDoc | undefined>;
   getProjectsByIds(ids: string[]): Promise<ProjectDoc[]>;
 };
@@ -113,9 +105,7 @@ export function createRetrieval(options: RetrievalOptions): RetrievalDrivers {
           defaultLimit: defaultTopK,
           minLimit: 1,
           maxLimit: maxTopK,
-          logger: logger
-            ? (payload: ProjectSearchLogPayload) => logger('retrieval.projects', payload)
-            : undefined,
+          logger: logger ? (payload: ProjectSearchLogPayload) => logger('retrieval.projects', payload) : undefined,
         });
       })();
     }
@@ -133,9 +123,7 @@ export function createRetrieval(options: RetrievalOptions): RetrievalDrivers {
           minLimit: 1,
           maxLimit: maxTopK,
           searchIndex,
-          logger: logger
-            ? (payload: ResumeSearchLogPayload) => logger('retrieval.resume', payload)
-            : undefined,
+          logger: logger ? (payload: ResumeSearchLogPayload) => logger('retrieval.resume', payload) : undefined,
         });
       })();
     }
@@ -172,7 +160,11 @@ export function createRetrieval(options: RetrievalOptions): RetrievalDrivers {
       });
     },
 
-    async searchExperiencesByText(queryText: string, topK?: number, options?: { facets?: ResumeFacet[] }): Promise<ResumeDoc[]> {
+    async searchExperiencesByText(
+      queryText: string,
+      topK?: number,
+      options?: { facets?: ResumeFacet[] }
+    ): Promise<ResumeDoc[]> {
       const limit = clamp(topK, maxTopK, defaultTopK);
       const searcher = await getResumeSearcher();
       const results = await searcher.searchResume({

@@ -2,8 +2,7 @@ const AWS = require('aws-sdk');
 
 const dynamo = new AWS.DynamoDB.DocumentClient({ convertEmptyValues: true });
 const secretsClients = new Map();
-const primarySecretsRegion =
-  process.env.AWS_SECRETS_MANAGER_PRIMARY_REGION || process.env.AWS_REGION || 'us-east-1';
+const primarySecretsRegion = process.env.AWS_SECRETS_MANAGER_PRIMARY_REGION || process.env.AWS_REGION || 'us-east-1';
 const fallbackSecretsRegion = process.env.AWS_SECRETS_MANAGER_FALLBACK_REGION;
 
 function getSecretsManager(region) {

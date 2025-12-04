@@ -110,8 +110,7 @@ export async function runProfileTask(context: PreprocessContext): Promise<Prepro
     Array.from(experienceMap.values())
       .filter((exp) => exp.isCurrent)
       .sort((a, b) => (a.startDate < b.startDate ? 1 : -1))
-      .map((exp) => `${exp.title} @ ${exp.company}`)[0] ||
-    profileSource.currentRole?.trim();
+      .map((exp) => `${exp.title} @ ${exp.company}`)[0] || profileSource.currentRole?.trim();
 
   const aboutString = about.join('\n\n');
   const styleGuidelineList = Array.isArray(profileSource.styleGuidelines)

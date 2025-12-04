@@ -24,7 +24,11 @@ export type ChatConfig = {
 };
 
 const DEFAULT_CONFIG_FILES = ['chat.config.yml', 'chat.config.yaml', 'chat.config.json'];
-const PREPROCESS_CONFIG_FILES = ['chat-preprocess.config.yml', 'chat-preprocess.config.yaml', 'chat-preprocess.config.json'];
+const PREPROCESS_CONFIG_FILES = [
+  'chat-preprocess.config.yml',
+  'chat-preprocess.config.yaml',
+  'chat-preprocess.config.json',
+];
 export const DEFAULT_RESUME_FILENAME = 'resume.pdf';
 
 type PreprocessConfig = {

@@ -55,7 +55,10 @@ export const unschedulePostSchema = z.object({
 
 export const presignedUploadSchema = z.object({
   contentType: z.string().min(3),
-  extension: z.string().regex(/^[a-z0-9]+$/i).optional(),
+  extension: z
+    .string()
+    .regex(/^[a-z0-9]+$/i)
+    .optional(),
 });
 
 export type CreatePostInput = z.infer<typeof createPostSchema>;

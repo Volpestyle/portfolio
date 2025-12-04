@@ -74,19 +74,19 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                 icon={<Brain className="h-4 w-4" />}
                 title="Planner Output"
                 sectionKey="plan"
-              isExpanded={expandedSections.plan}
-              onToggle={() => toggleSection('plan')}
-            >
-              <div className="space-y-3">
-                <KeyValue label="questionType" value={plan.questionType} />
-                <KeyValue label="enumeration" value={plan.enumeration} />
-                <KeyValue label="scope" value={plan.scope} />
-                {planFocus && <KeyValue label="retrievalFocus" value={planFocus} />}
-                {plan.cardsEnabled === false && <KeyValue label="cardsEnabled" value="false" />}
-                {plan.topic && <KeyValue label="topic" value={plan.topic} />}
-                {plan.resumeFacets && plan.resumeFacets.length > 0 && (
-                  <KeyValue label="resumeFacets" value={plan.resumeFacets} />
-                )}
+                isExpanded={expandedSections.plan}
+                onToggle={() => toggleSection('plan')}
+              >
+                <div className="space-y-3">
+                  <KeyValue label="questionType" value={plan.questionType} />
+                  <KeyValue label="enumeration" value={plan.enumeration} />
+                  <KeyValue label="scope" value={plan.scope} />
+                  {planFocus && <KeyValue label="retrievalFocus" value={planFocus} />}
+                  {plan.cardsEnabled === false && <KeyValue label="cardsEnabled" value="false" />}
+                  {plan.topic && <KeyValue label="topic" value={plan.topic} />}
+                  {plan.resumeFacets && plan.resumeFacets.length > 0 && (
+                    <KeyValue label="resumeFacets" value={plan.resumeFacets} />
+                  )}
                   {plan.retrievalRequests.length > 0 && (
                     <div className="mt-2">
                       <p className="mb-2 text-xs font-medium text-purple-300">retrievalRequests:</p>
@@ -125,7 +125,9 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                 onToggle={() => toggleSection('retrieval')}
               >
                 {trace.retrieval === null ? (
-                  <DevPlaceholder>{retrievalExpected ? 'Retrieval stage pending…' : 'Skipped (no retrieval needed)'}</DevPlaceholder>
+                  <DevPlaceholder>
+                    {retrievalExpected ? 'Retrieval stage pending…' : 'Skipped (no retrieval needed)'}
+                  </DevPlaceholder>
                 ) : retrievals.length === 0 ? (
                   <DevPlaceholder>No retrieval results</DevPlaceholder>
                 ) : (
@@ -187,7 +189,10 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                           </p>
                           <div className="space-y-2">
                             {evidence.selectedEvidence.map((item, idx) => (
-                              <div key={idx} className="rounded border border-purple-500/20 bg-purple-950/30 p-2 text-xs">
+                              <div
+                                key={idx}
+                                className="rounded border border-purple-500/20 bg-purple-950/30 p-2 text-xs"
+                              >
                                 <div className="space-y-1">
                                   <div className="flex justify-between">
                                     <span className="text-purple-400">source:</span>
@@ -220,7 +225,10 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                           <p className="mb-2 text-xs font-medium text-purple-300">semanticFlags:</p>
                           <div className="space-y-2">
                             {evidence.semanticFlags.map((flag, idx) => (
-                              <div key={idx} className="rounded border border-yellow-500/30 bg-yellow-950/30 p-2 text-xs">
+                              <div
+                                key={idx}
+                                className="rounded border border-yellow-500/30 bg-yellow-950/30 p-2 text-xs"
+                              >
                                 <div className="flex justify-between">
                                   <span className="text-yellow-400">type:</span>
                                   <span className="text-yellow-200">{flag.type}</span>

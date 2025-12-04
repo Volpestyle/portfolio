@@ -57,8 +57,20 @@ export async function mockChatStream(page: Page) {
       stage: 'retrieval',
       trace: {
         retrieval: [
-          { source: 'projects', queryText: 'featured project highlights', requestedTopK: 5, effectiveTopK: 5, numResults: 1 },
-          { source: 'resume', queryText: 'supporting experience context', requestedTopK: 3, effectiveTopK: 3, numResults: 0 },
+          {
+            source: 'projects',
+            queryText: 'featured project highlights',
+            requestedTopK: 5,
+            effectiveTopK: 5,
+            numResults: 1,
+          },
+          {
+            source: 'resume',
+            queryText: 'supporting experience context',
+            requestedTopK: 3,
+            effectiveTopK: 3,
+            numResults: 0,
+          },
         ],
       },
       itemId: anchorId,

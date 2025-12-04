@@ -72,18 +72,14 @@ export class SecretsManagerCache {
 
   constructor(options: SecretsManagerCacheOptions = {}) {
     this.primaryRegion =
-      options.primaryRegion ??
-      process.env.AWS_SECRETS_MANAGER_PRIMARY_REGION ??
-      process.env.AWS_REGION ??
-      'us-east-1';
+      options.primaryRegion ?? process.env.AWS_SECRETS_MANAGER_PRIMARY_REGION ?? process.env.AWS_REGION ?? 'us-east-1';
 
     const fallback = options.fallbackRegion ?? process.env.AWS_SECRETS_MANAGER_FALLBACK_REGION;
 
     this.fallbackRegion = fallback && fallback !== this.primaryRegion ? fallback : undefined;
 
     const ttlEnv = Number.parseInt(process.env.AWS_SECRETS_MANAGER_CACHE_TTL_MS ?? '', 10);
-    this.defaultTtlMs =
-      Number.isFinite(ttlEnv) && ttlEnv > 0 ? ttlEnv : options.defaultTtlMs ?? DEFAULT_TTL_MS;
+    this.defaultTtlMs = Number.isFinite(ttlEnv) && ttlEnv > 0 ? ttlEnv : (options.defaultTtlMs ?? DEFAULT_TTL_MS);
   }
 
   private getClient(region: string): SecretsManagerClient {
@@ -214,8 +210,7 @@ export class SecretsManagerCache {
 
     if (response.SecretBinary) {
       try {
-        const decoder =
-          typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { fatal: true }) : undefined;
+        const decoder = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { fatal: true }) : undefined;
         if (decoder) {
           return decoder.decode(response.SecretBinary);
         }
@@ -229,8 +224,7 @@ export class SecretsManagerCache {
   }
 }
 
-const cacheKeyForRegions = (primary?: string, fallback?: string): string =>
-  `${primary ?? ''}|${fallback ?? ''}`;
+const cacheKeyForRegions = (primary?: string, fallback?: string): string => `${primary ?? ''}|${fallback ?? ''}`;
 
 const getCacheRegistry = (): Record<string, SecretsManagerCache> => {
   if (!globalThis.__portfolioSecretsCaches) {
@@ -286,10 +280,7 @@ export async function resolveSecretValue(
   key: string,
   options: ResolveSecretValueOptions = {}
 ): Promise<string | undefined> {
-  const fallbackKeys = new Set<string>([
-    key,
-    ...(options.fallbackEnvVar ? [options.fallbackEnvVar] : []),
-  ]);
+  const fallbackKeys = new Set<string>([key, ...(options.fallbackEnvVar ? [options.fallbackEnvVar] : [])]);
 
   for (const envKey of fallbackKeys) {
     const envValue = process.env[envKey];

@@ -41,9 +41,7 @@ export function cosineSimilarity(a: number[] | undefined, b: number[] | undefine
   return dot / (Math.sqrt(magA) * Math.sqrt(magB));
 }
 
-export function createEmbeddingSemanticRanker(
-  options: EmbeddingSemanticRankerOptions
-): SemanticRanker {
+export function createEmbeddingSemanticRanker(options: EmbeddingSemanticRankerOptions): SemanticRanker {
   const { embeddingProvider, projectRepository, scoreScale = 12 } = options;
 
   return {

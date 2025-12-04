@@ -29,7 +29,11 @@ type UseProjectDocumentOptions = {
   enabled?: boolean;
 };
 
-export function useProjectDocument(projectId?: string | null, docPath?: string | null, options?: UseProjectDocumentOptions) {
+export function useProjectDocument(
+  projectId?: string | null,
+  docPath?: string | null,
+  options?: UseProjectDocumentOptions
+) {
   const trimmedProjectId = projectId?.trim() ?? '';
   const trimmedDocPath = docPath?.trim() ?? '';
   const normalizedProjectId = normalizeProjectKey(trimmedProjectId);

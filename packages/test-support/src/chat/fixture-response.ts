@@ -35,7 +35,13 @@ export function buildChatFixtureResponse({
       cardsEnabled: true,
     },
     retrieval: [
-      { source: 'projects', queryText: 'featured project highlights', requestedTopK: 5, effectiveTopK: 5, numResults: 3 },
+      {
+        source: 'projects',
+        queryText: 'featured project highlights',
+        requestedTopK: 5,
+        effectiveTopK: 5,
+        numResults: 3,
+      },
       { source: 'resume', queryText: 'supporting resume context', requestedTopK: 4, effectiveTopK: 4, numResults: 2 },
     ],
     evidence: {
@@ -64,7 +70,7 @@ export function buildChatFixtureResponse({
       if (!acc.sources.includes(source)) acc.sources.push(source);
       return acc;
     },
-    { totalDocs: 0, sources: [] as string[] },
+    { totalDocs: 0, sources: [] as string[] }
   );
   const evidenceCount = reasoningTrace.evidence.selectedEvidence.length;
   const frames = [

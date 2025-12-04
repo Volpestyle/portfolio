@@ -23,7 +23,7 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
   const hasEvidenceItems = Boolean(evidence && evidence.selectedEvidence.length > 0);
   const isMetaTurn = plan?.questionType === 'meta' || answerMeta?.questionType === 'meta';
   const retrievalFocus = plan ? inferPlanFocus(plan) : null;
-  const failureStage = traceError ? traceError.stage ?? inferFailedStage(trace, isMetaTurn) : null;
+  const failureStage = traceError ? (traceError.stage ?? inferFailedStage(trace, isMetaTurn)) : null;
   const hasError = Boolean(traceError);
   const streamingStage = isStreaming ? inferStreamingStage(trace) : null;
   const streamingTitle = streamingStage ? formatStreamingStageLabel(streamingStage) : 'Thinking...';
@@ -117,7 +117,9 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-300" />
                   <div className="space-y-1">
                     <p className="font-semibold">
-                      {failureStage ? `Stopped during ${formatStageLabel(failureStage)}.` : 'Reasoning was interrupted.'}
+                      {failureStage
+                        ? `Stopped during ${formatStageLabel(failureStage)}.`
+                        : 'Reasoning was interrupted.'}
                     </p>
                     <p className="text-red-100/80">{traceError?.message}</p>
                     {traceError?.retryable === false && (
@@ -170,11 +172,7 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
                   </div>
                 </ReasoningSection>
               ) : plan ? (
-                <ReasoningSection
-                  icon={<Search className="h-4 w-4" />}
-                  title="What I Searched"
-                  isStreaming={!hasError}
-                >
+                <ReasoningSection icon={<Search className="h-4 w-4" />} title="What I Searched" isStreaming={!hasError}>
                   {hasError ? (
                     <ErrorState
                       status={

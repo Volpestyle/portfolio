@@ -76,7 +76,9 @@ test.describe('Engagement surfaces', () => {
     const assistantMessages = page.getByTestId('chat-assistant-message');
     const initialCount = await assistantMessages.count();
     const composer = page.getByPlaceholder('ask me anything...');
-    const prompt = hitsRealApis ? 'Give me a friendly one-sentence project overview.' : 'Tell me about your latest launch.';
+    const prompt = hitsRealApis
+      ? 'Give me a friendly one-sentence project overview.'
+      : 'Tell me about your latest launch.';
     await composer.fill(prompt);
     await page.getByRole('button', { name: /send message/i }).click();
     await expect(assistantMessages).toHaveCount(initialCount + 1, { timeout: 60_000 });

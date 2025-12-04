@@ -26,13 +26,7 @@
         "Confluence",
         "PDF export"
       ],
-      "languages": [
-        "TypeScript",
-        "HTML",
-        "JavaScript",
-        "SCSS",
-        "CSS"
-      ],
+      "languages": ["TypeScript", "HTML", "JavaScript", "SCSS", "CSS"],
       "tags": [
         "web app",
         "web software",
@@ -116,19 +110,11 @@
       "githubUrl": "https://github.com/Volpestyle/ilikeyacut",
       "oneLiner": "Native mobile app that lets users virtually try on different hairstyles using Gemini’s Flash Image 2.5 nano-banana model, backed by a serverless Go/AWS Lambda backend.",
       "description": "Native mobile app that lets users virtually try on different hairstyles using Gemini’s Flash Image 2.5 nano-banana model, backed by a serverless Go/AWS Lambda backend.",
-      "bullets": [
-        "native mobile app for hairstyling with gemini's nano banana"
-      ],
+      "bullets": ["native mobile app for hairstyling with gemini's nano banana"],
       "impactSummary": "Delivered a cohesive prototype that demonstrates real-time, AI-powered virtual hairstyling on mobile with a fully documented, serverless backend architecture.",
       "sizeOrScope": "Personal side project monorepo covering both iOS client and serverless backend.",
       "techStack": [],
-      "languages": [
-        "Swift",
-        "Go",
-        "Python",
-        "Shell",
-        "Makefile"
-      ],
+      "languages": ["Swift", "Go", "Python", "Shell", "Makefile"],
       "tags": [],
       "context": {
         "type": "personal",
@@ -148,20 +134,11 @@
       "githubUrl": "https://github.com/Volpestyle/improview",
       "oneLiner": "i love leetcode",
       "description": "improview appears to be a personal repository centered around solving and iterating on LeetCode problems. While the README is minimal, the project is likely used as a space to experiment with algorithmic problem-solving and track progress over time. This kind of repo typically evolves into a structured collection of solutions, notes, and patterns for common coding interview questions.",
-      "bullets": [
-        "i love leetcode"
-      ],
+      "bullets": ["i love leetcode"],
       "impactSummary": "Helps the developer systematically practice and improve their problem-solving skills in preparation for coding interviews or competitive programming.",
       "sizeOrScope": "Individual side project focused on personal LeetCode practice.",
       "techStack": [],
-      "languages": [
-        "TypeScript",
-        "Go",
-        "CSS",
-        "JavaScript",
-        "Shell",
-        "HTML"
-      ],
+      "languages": ["TypeScript", "Go", "CSS", "JavaScript", "Shell", "HTML"],
       "tags": [],
       "context": {
         "type": "personal",
@@ -218,12 +195,7 @@
         "lint",
         "build"
       ],
-      "languages": [
-        "TypeScript",
-        "Shell",
-        "JavaScript",
-        "CSS"
-      ],
+      "languages": ["TypeScript", "Shell", "JavaScript", "CSS"],
       "tags": [
         "Linkedin",
         "Monster",
@@ -284,18 +256,8 @@
       ],
       "impactSummary": "Delivered a fully client-side scientific calculator that demonstrates robust expression parsing and evaluation without external libraries or unsafe eval calls.",
       "sizeOrScope": "Solo side project; runs entirely in the browser and is accessible via a public GitHub Pages deployment.",
-      "techStack": [
-        "HTML",
-        "SASS",
-        "Vanilla JavaScript",
-        "JavaScript (vanilla)"
-      ],
-      "languages": [
-        "JavaScript",
-        "HTML",
-        "SCSS",
-        "CSS"
-      ],
+      "techStack": ["HTML", "SASS", "Vanilla JavaScript", "JavaScript (vanilla)"],
+      "languages": ["JavaScript", "HTML", "SCSS", "CSS"],
       "tags": [
         "scientific calculator",
         "calculator",
@@ -344,21 +306,8 @@
       ],
       "impactSummary": "Enabled a professional online presence early in my career, making it easier to share my work and apply for internships through a reliable, publicly hosted portfolio.",
       "sizeOrScope": "Solo personal project; publicly accessible static site hosted via AWS S3/CloudFront and GitHub Pages.",
-      "techStack": [
-        "AWS S3",
-        "Amazon S3",
-        "S3 bucket",
-        "AWS CloudFront",
-        "CloudFront",
-        "GitHub Pages",
-        "github.io"
-      ],
-      "languages": [
-        "CSS",
-        "HTML",
-        "JavaScript",
-        "PHP"
-      ],
+      "techStack": ["AWS S3", "Amazon S3", "S3 bucket", "AWS CloudFront", "CloudFront", "GitHub Pages", "github.io"],
+      "languages": ["CSS", "HTML", "JavaScript", "PHP"],
       "tags": [
         "personal website",
         "portfolio",
@@ -437,12 +386,7 @@
         "GitHub Actions (CI/CD integration implied)",
         "E2E_USE_REAL_APIS flag"
       ],
-      "languages": [
-        "TypeScript",
-        "JavaScript",
-        "Mermaid",
-        "CSS"
-      ],
+      "languages": ["TypeScript", "JavaScript", "Mermaid", "CSS"],
       "tags": [
         "portfolio website",
         "blog CMS",
@@ -549,11 +493,7 @@
         "bun",
         "GitHub Pages"
       ],
-      "languages": [
-        "TypeScript",
-        "CSS",
-        "JavaScript"
-      ],
+      "languages": ["TypeScript", "CSS", "JavaScript"],
       "tags": [
         "Rubik's cube state management",
         "Rubik's cube 2D representation",
@@ -586,28 +526,12 @@
       "githubUrl": "https://github.com/Volpestyle/slash-siege",
       "oneLiner": "Slash Siege is a multiplayer stick-figure fighting game, playable directly in the browser.",
       "description": "Slash Siege is a multiplayer stick-figure fighting game, playable directly in the browser.",
-      "bullets": [
-        "A multiplayer stick-figure fighter",
-        "Focus areas: github.io, volpestyle.github.io, trello.com"
-      ],
+      "bullets": ["A multiplayer stick-figure fighter", "Focus areas: github.io, volpestyle.github.io, trello.com"],
       "impactSummary": "Delivered a lightweight, accessible multiplayer fighting game prototype that can be tested and iterated on directly in the browser.",
       "sizeOrScope": "Likely a solo or small-team side project with public web-based access for players and testers.",
-      "techStack": [
-        "Trello",
-        "Trello board"
-      ],
-      "languages": [
-        "TypeScript",
-        "JavaScript",
-        "HTML"
-      ],
-      "tags": [
-        "github.io",
-        "volpestyle.github.io",
-        "trello.com",
-        "Trello",
-        "Trello board"
-      ],
+      "techStack": ["Trello", "Trello board"],
+      "languages": ["TypeScript", "JavaScript", "HTML"],
+      "tags": ["github.io", "volpestyle.github.io", "trello.com", "Trello", "Trello board"],
       "context": {
         "type": "personal",
         "timeframe": {
@@ -681,14 +605,7 @@
         "JWT Signing Key",
         "SHA-256"
       ],
-      "languages": [
-        "Go",
-        "TypeScript",
-        "Shell",
-        "Makefile",
-        "Dockerfile",
-        "JavaScript"
-      ],
+      "languages": ["Go", "TypeScript", "Shell", "Makefile", "Dockerfile", "JavaScript"],
       "tags": [
         "remote browser platform",
         "browser automation",

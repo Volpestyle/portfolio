@@ -243,11 +243,7 @@ function sanitizeSkill(raw: Partial<RawSkill>): RawSkill | null {
 }
 
 function makeMatchKey(exp: Partial<RawExperience>): string {
-  return [
-    exp.id?.toLowerCase() ?? '',
-    exp.company?.toLowerCase() ?? '',
-    exp.title?.toLowerCase() ?? '',
-  ].join('::');
+  return [exp.id?.toLowerCase() ?? '', exp.company?.toLowerCase() ?? '', exp.title?.toLowerCase() ?? ''].join('::');
 }
 
 async function readExistingResume(filePath: string): Promise<ResumeSource | null> {
@@ -271,7 +267,7 @@ function mergeWithExisting(experiences: RawExperience[], existing: ResumeSource 
     existingByKey.set(makeMatchKey(exp), exp);
   }
 
-  return experiences.map(exp => {
+  return experiences.map((exp) => {
     const match = existingByKey.get(makeMatchKey(exp));
     if (!match) {
       return exp;
@@ -415,7 +411,18 @@ async function extractExperiencesFromPdf(
               bullets: { type: 'array', items: { type: 'string' }, maxItems: 4 },
               skills: { type: 'array', items: { type: 'string' } },
             },
-            required: ['id', 'institution', 'degree', 'field', 'location', 'startDate', 'endDate', 'summary', 'bullets', 'skills'],
+            required: [
+              'id',
+              'institution',
+              'degree',
+              'field',
+              'location',
+              'startDate',
+              'endDate',
+              'summary',
+              'bullets',
+              'skills',
+            ],
           },
         },
         awards: {
@@ -455,24 +462,22 @@ async function extractExperiencesFromPdf(
   };
 
   const response = await (metrics
-    ? metrics.wrapLlm(
-        { stage: 'other', model, meta: { pdf: path.basename(pdfPath) } },
-        () =>
-          client.responses.create({
-            model,
-            text: { format: schema },
-            input: [
-              {
-                role: 'system',
-                content:
-                  'You are a meticulous resume parser. Convert resume text into structured resume objects (experiences, education, awards, skills). Preserve factual bullet points and keep wording concise. Dates must be ISO formatted (YYYY-MM-DD).',
-              },
-              {
-                role: 'user',
-                content: `Resume text:\n${truncated}`,
-              },
-            ],
-          })
+    ? metrics.wrapLlm({ stage: 'other', model, meta: { pdf: path.basename(pdfPath) } }, () =>
+        client.responses.create({
+          model,
+          text: { format: schema },
+          input: [
+            {
+              role: 'system',
+              content:
+                'You are a meticulous resume parser. Convert resume text into structured resume objects (experiences, education, awards, skills). Preserve factual bullet points and keep wording concise. Dates must be ISO formatted (YYYY-MM-DD).',
+            },
+            {
+              role: 'user',
+              content: `Resume text:\n${truncated}`,
+            },
+          ],
+        })
       )
     : client.responses.create({
         model,

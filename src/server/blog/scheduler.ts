@@ -1,8 +1,4 @@
-import {
-  CreateScheduleCommand,
-  DeleteScheduleCommand,
-  UpdateScheduleCommand,
-} from '@aws-sdk/client-scheduler';
+import { CreateScheduleCommand, DeleteScheduleCommand, UpdateScheduleCommand } from '@aws-sdk/client-scheduler';
 import { blogConfig } from '@/server/blog/config';
 import { getSchedulerClient } from '@/server/blog/clients';
 
@@ -17,7 +13,10 @@ function ensureSchedulerConfig() {
   }
 }
 
-export async function upsertPublishSchedule(slug: string, scheduledFor: string): Promise<{ arn: string; name: string }> {
+export async function upsertPublishSchedule(
+  slug: string,
+  scheduledFor: string
+): Promise<{ arn: string; name: string }> {
   ensureSchedulerConfig();
   const scheduleName = `publish-${slug}`;
 

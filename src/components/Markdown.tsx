@@ -55,7 +55,7 @@ export function Markdown({
   // Reset counter at start of render
   currentElementIndexRef.current = 0;
 
-  const cursorElement = useMemo(() => <span className="animate-blink ml-1">▋</span>, []);
+  const cursorElement = useMemo(() => <span className="ml-1 animate-blink">▋</span>, []);
 
   const trackBlockElement = () => {
     return currentElementIndexRef.current++;

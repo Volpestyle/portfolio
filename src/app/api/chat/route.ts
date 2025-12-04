@@ -1,5 +1,10 @@
 import { NextRequest } from 'next/server';
-import { createNextChatHandler, getRuntimeCostClients, recordRuntimeCost, shouldThrottleForBudget } from '@portfolio/chat-next-api';
+import {
+  createNextChatHandler,
+  getRuntimeCostClients,
+  recordRuntimeCost,
+  shouldThrottleForBudget,
+} from '@portfolio/chat-next-api';
 import { shouldServeFixturesForRequest } from '@/lib/test-flags';
 import { buildRateLimitHeaders, enforceChatRateLimit } from '@/lib/rate-limit';
 import { getOpenAIClient } from '@/server/openai/client';

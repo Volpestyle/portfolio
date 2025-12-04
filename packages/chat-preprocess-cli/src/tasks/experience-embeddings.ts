@@ -85,7 +85,12 @@ async function loadResume(filePath: string): Promise<ResumeDataset> {
       'Resume dataset must include an experiences array'
     );
   }
-  return { experiences: parsed.experiences, education: parsed.education ?? [], awards: parsed.awards ?? [], skills: parsed.skills ?? [] };
+  return {
+    experiences: parsed.experiences,
+    education: parsed.education ?? [],
+    awards: parsed.awards ?? [],
+    skills: parsed.skills ?? [],
+  };
 }
 
 function relPath(context: PreprocessContext, filePath: string): string {

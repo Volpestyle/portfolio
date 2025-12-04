@@ -45,17 +45,17 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
   // Show thinking spinner when busy and assistant hasn't started producing content
   const lastMessage = messages[messages.length - 1];
   const lastMessageAssistant = lastMessage?.role === 'assistant' ? lastMessage : undefined;
-  const assistantHasContent = lastMessageAssistant?.parts?.some(
-    (p) => p.kind === 'text' && p.text.trim().length > 0
-  );
-  const currentTrace = streamingAssistantMessageId
-    ? reasoningTraces[streamingAssistantMessageId]
-    : null;
+  const assistantHasContent = lastMessageAssistant?.parts?.some((p) => p.kind === 'text' && p.text.trim().length > 0);
+  const currentTrace = streamingAssistantMessageId ? reasoningTraces[streamingAssistantMessageId] : null;
   // Meta/chitchat turns hide the reasoning panel, so we need spinner to persist
   const isMetaTurn = currentTrace?.plan?.questionType === 'meta' || currentTrace?.answerMeta?.questionType === 'meta';
   const hasRenderableTrace =
     currentTrace &&
-    (currentTrace.plan || currentTrace.retrieval || currentTrace.evidence || currentTrace.answerMeta || currentTrace.error);
+    (currentTrace.plan ||
+      currentTrace.retrieval ||
+      currentTrace.evidence ||
+      currentTrace.answerMeta ||
+      currentTrace.error);
   const reasoningWillDisplay = reasoningEnabled && !isMetaTurn && hasRenderableTrace;
   const showPendingThinking = isBusy && !assistantHasContent && !reasoningWillDisplay;
 

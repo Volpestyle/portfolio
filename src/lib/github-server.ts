@@ -25,7 +25,7 @@ function shouldUseSSRFixtures(): boolean {
 
 export type PortfolioReposResponse = {
   starred: RepoData[];
-  normal: RepoData[]
+  normal: RepoData[];
 };
 
 // Removed cloneRepo function - no longer needed since we don't return mock data
@@ -77,9 +77,7 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
         // Fetch language data for public repos
         const owner = publicRepo.owner?.login || GH_CONFIG.USERNAME;
         const languagesBreakdown = await fetchRepoLanguages(owner, publicRepo.name);
-        const languagePercentages = languagesBreakdown
-          ? calculateLanguagePercentages(languagesBreakdown)
-          : undefined;
+        const languagePercentages = languagesBreakdown ? calculateLanguagePercentages(languagesBreakdown) : undefined;
 
         processedRepos.push({
           id: publicRepo.id,
@@ -121,8 +119,8 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
     }
 
     return {
-      starred: processedRepos.filter(repo => repo.isStarred),
-      normal: processedRepos.filter(repo => !repo.isStarred),
+      starred: processedRepos.filter((repo) => repo.isStarred),
+      normal: processedRepos.filter((repo) => !repo.isStarred),
     };
   } catch (error) {
     console.error('Error fetching portfolio repos:', error);
@@ -130,14 +128,10 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
   }
 }
 
-export const getPortfolioRepos = unstable_cache(
-  fetchPortfolioRepos,
-  ['portfolio-repos'],
-  {
-    revalidate: 3600, // Cache for 1 hour
-    tags: ['github-repos']
-  }
-);
+export const getPortfolioRepos = unstable_cache(fetchPortfolioRepos, ['portfolio-repos'], {
+  revalidate: 3600, // Cache for 1 hour
+  tags: ['github-repos'],
+});
 
 export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.USERNAME): Promise<RepoData> {
   // Return fixtures for test builds
@@ -153,7 +147,7 @@ export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.U
   try {
     // First try to get from portfolio config for private repos
     const portfolioConfig = await getPortfolioConfig();
-    const repoConfig = portfolioConfig?.repositories?.find(r => r.name === repo);
+    const repoConfig = portfolioConfig?.repositories?.find((r) => r.name === repo);
 
     if (repoConfig?.isPrivate) {
       return {
@@ -184,9 +178,7 @@ export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.U
 
     // Fetch language data
     const languagesBreakdown = await fetchRepoLanguages(owner, repo);
-    const languagePercentages = languagesBreakdown
-      ? calculateLanguagePercentages(languagesBreakdown)
-      : undefined;
+    const languagePercentages = languagesBreakdown ? calculateLanguagePercentages(languagesBreakdown) : undefined;
 
     return {
       id: data.id,
@@ -214,14 +206,10 @@ export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.U
   }
 }
 
-export const getRepoDetails = unstable_cache(
-  fetchRepoDetails,
-  ['repo-details'],
-  {
-    revalidate: 3600,
-    tags: ['github-repo']
-  }
-);
+export const getRepoDetails = unstable_cache(fetchRepoDetails, ['repo-details'], {
+  revalidate: 3600,
+  tags: ['github-repo'],
+});
 
 export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.USERNAME): Promise<string> {
   // Return fixtures for test builds
@@ -239,7 +227,7 @@ export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.US
   try {
     // First check portfolio config for private repos
     const portfolioConfig = await getPortfolioConfig();
-    const repoConfig = portfolioConfig?.repositories?.find(r => r.name === repo);
+    const repoConfig = portfolioConfig?.repositories?.find((r) => r.name === repo);
 
     // Determine the actual repo name to fetch from
     if (repoConfig?.isPrivate) {
@@ -263,25 +251,15 @@ export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.US
       download_url?: string;
     };
 
-    const readmeContent = readmeData?.content
-      ? Buffer.from(readmeData.content, 'base64').toString('utf-8')
-      : '';
+    const readmeContent = readmeData?.content ? Buffer.from(readmeData.content, 'base64').toString('utf-8') : '';
 
     const branchFromDownloadUrl = extractBranchFromDownloadUrl(readmeData?.download_url);
 
     // Transform relative URLs to absolute URLs pointing to the correct repo
-    return convertRelativeToAbsoluteUrls(
-      readmeContent,
-      owner,
-      actualRepoName,
-      branchFromDownloadUrl,
-      'README.md'
-    );
+    return convertRelativeToAbsoluteUrls(readmeContent, owner, actualRepoName, branchFromDownloadUrl, 'README.md');
   } catch (error) {
     if (isGithubNotFoundError(error)) {
-      console.warn(
-        `[github-server] README not found for ${owner}/${actualRepoName}. Using placeholder content.`
-      );
+      console.warn(`[github-server] README not found for ${owner}/${actualRepoName}. Using placeholder content.`);
       return buildMissingReadmeMessage(repo);
     }
 
@@ -290,14 +268,10 @@ export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.US
   }
 }
 
-export const getRepoReadme = unstable_cache(
-  fetchRepoReadme,
-  ['repo-readme'],
-  {
-    revalidate: 3600,
-    tags: ['github-readme']
-  }
-);
+export const getRepoReadme = unstable_cache(fetchRepoReadme, ['repo-readme'], {
+  revalidate: 3600,
+  tags: ['github-readme'],
+});
 
 function extractBranchFromDownloadUrl(url?: string | null): string | undefined {
   if (!url) {
@@ -346,11 +320,11 @@ export async function fetchDocumentContent(
   try {
     // Check portfolio config for private repos and document overrides
     const portfolioConfig = await getPortfolioConfig();
-    const repoConfig = portfolioConfig?.repositories?.find(r => r.name === repo);
+    const repoConfig = portfolioConfig?.repositories?.find((r) => r.name === repo);
 
     // Check if document is configured in gist
     if (repoConfig?.documents) {
-      const docConfig = repoConfig.documents.find(d => d.path === docPath);
+      const docConfig = repoConfig.documents.find((d) => d.path === docPath);
 
       if (docConfig) {
         // Fetch from gist
@@ -413,14 +387,10 @@ export async function fetchDocumentContent(
   }
 }
 
-export const getDocumentContent = unstable_cache(
-  fetchDocumentContent,
-  ['document-content'],
-  {
-    revalidate: 3600,
-    tags: ['github-document']
-  }
-);
+export const getDocumentContent = unstable_cache(fetchDocumentContent, ['document-content'], {
+  revalidate: 3600,
+  tags: ['github-document'],
+});
 
 export async function getRepos(): Promise<RepoData[]> {
   const { starred, normal } = await getPortfolioRepos();

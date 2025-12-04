@@ -18,7 +18,7 @@ function JsonPreview({ value }: { value: unknown }) {
 function LogEntry({ entry }: { entry: ChatDebugLogEntry }) {
   return (
     <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-      <p className="text-xs font-mono text-white/60">
+      <p className="font-mono text-xs text-white/60">
         [{new Date(entry.timestamp).toLocaleTimeString()}] {entry.event}
       </p>
       {entry.payload ? (
@@ -84,7 +84,9 @@ export default function ChatDebugPage() {
       <section className="space-y-3">
         <div>
           <h2 className="text-xl font-semibold">Token usage</h2>
-          <p className="text-sm text-white/70">Aggregated from recent <code>chat.pipeline.tokens</code> events.</p>
+          <p className="text-sm text-white/70">
+            Aggregated from recent <code>chat.pipeline.tokens</code> events.
+          </p>
         </div>
         {tokenSummary ? (
           <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm">
@@ -112,9 +114,12 @@ export default function ChatDebugPage() {
         </div>
         {logs.length ? (
           <div className="space-y-3">
-            {logs.slice(-50).reverse().map((entry) => (
-              <LogEntry key={`${entry.timestamp}-${entry.event}`} entry={entry} />
-            ))}
+            {logs
+              .slice(-50)
+              .reverse()
+              .map((entry) => (
+                <LogEntry key={`${entry.timestamp}-${entry.event}`} entry={entry} />
+              ))}
           </div>
         ) : (
           <p className="text-sm text-white/70">No logs captured yet.</p>

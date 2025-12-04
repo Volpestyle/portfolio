@@ -60,15 +60,15 @@ The provider automatically:
 
 ## `ChatProvider` props
 
-| Prop               | Type                                                | Default                  | Description                                                                                                   |
-| ------------------ | --------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `endpoint`         | `string`                                            | `/api/chat`              | URL the provider `POST`s to when sending a new message.                                                       |
-| `ownerId`          | `string`                                            | `process.env.NEXT_PUBLIC_CHAT_OWNER_ID \|\| 'portfolio-owner'` | Multi-tenant key forwarded to `/api/chat`; must match the server’s configured owner.                         |
-| `historyLimit`     | `number`                                            | `12`                     | Max number of prior messages included in each request payload. Non-positive/invalid values fall back to `12`. |
-| `fetcher`          | `(input, init) => Promise<Response>`                | `globalThis.fetch`       | Optional injection point for custom fetch implementations (tests, polyfills).                                 |
-| `requestFormatter` | `(messages: ChatMessage[]) => ChatRequestMessage[]` | Default `flatten` helper | Override the request content transformation before calling the API.                                           |
-| `onError`          | `(error: Error) => void`                            | `undefined`              | Notified whenever streaming or network errors occur.                                                          |
-| `reasoningOptIn`   | `boolean`                                           | `true`                   | Set to `false` to opt out of requesting reasoning traces; forwarded as `reasoningEnabled` in the request body. |
+| Prop               | Type                                                | Default                                                        | Description                                                                                                    |
+| ------------------ | --------------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `endpoint`         | `string`                                            | `/api/chat`                                                    | URL the provider `POST`s to when sending a new message.                                                        |
+| `ownerId`          | `string`                                            | `process.env.NEXT_PUBLIC_CHAT_OWNER_ID \|\| 'portfolio-owner'` | Multi-tenant key forwarded to `/api/chat`; must match the server’s configured owner.                           |
+| `historyLimit`     | `number`                                            | `12`                                                           | Max number of prior messages included in each request payload. Non-positive/invalid values fall back to `12`.  |
+| `fetcher`          | `(input, init) => Promise<Response>`                | `globalThis.fetch`                                             | Optional injection point for custom fetch implementations (tests, polyfills).                                  |
+| `requestFormatter` | `(messages: ChatMessage[]) => ChatRequestMessage[]` | Default `flatten` helper                                       | Override the request content transformation before calling the API.                                            |
+| `onError`          | `(error: Error) => void`                            | `undefined`                                                    | Notified whenever streaming or network errors occur.                                                           |
+| `reasoningOptIn`   | `boolean`                                           | `true`                                                         | Set to `false` to opt out of requesting reasoning traces; forwarded as `reasoningEnabled` in the request body. |
 
 ## `useChat` return value
 

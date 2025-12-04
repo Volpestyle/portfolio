@@ -68,7 +68,7 @@ export function HeaderTypewriter({ hoverText }: HeaderTypewriterProps) {
       }}
     >
       {displayText}
-      {displayText !== targetText && <span className="animate-blink ml-1">▋</span>}
+      {displayText !== targetText && <span className="ml-1 animate-blink">▋</span>}
     </motion.div>
   );
 }

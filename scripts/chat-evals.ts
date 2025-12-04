@@ -17,22 +17,23 @@ type AssertionResult = {
 
 function buildMessages(test: ChatEvalTestCase): ChatRequestMessage[] {
   const history = test.input.conversationHistory ?? [];
-  return [
-    ...history,
-    { role: 'user', content: test.input.userMessage },
-  ];
+  return [...history, { role: 'user', content: test.input.userMessage }];
 }
 
 function assertStringContains(text: string, substrings?: string[]): string[] {
   if (!substrings?.length) return [];
   const lower = text.toLowerCase();
-  return substrings.filter((snippet) => !lower.includes(snippet.toLowerCase())).map((snippet) => `Missing substring in answer: "${snippet}"`);
+  return substrings
+    .filter((snippet) => !lower.includes(snippet.toLowerCase()))
+    .map((snippet) => `Missing substring in answer: "${snippet}"`);
 }
 
 function assertStringNotContains(text: string, substrings?: string[]): string[] {
   if (!substrings?.length) return [];
   const lower = text.toLowerCase();
-  return substrings.filter((snippet) => lower.includes(snippet.toLowerCase())).map((snippet) => `Answer unexpectedly contains "${snippet}"`);
+  return substrings
+    .filter((snippet) => lower.includes(snippet.toLowerCase()))
+    .map((snippet) => `Answer unexpectedly contains "${snippet}"`);
 }
 
 function resolveUiIds(evidenceIds: string[] | undefined, uiIds: string[] | undefined): string[] {
@@ -93,11 +94,21 @@ async function runChatEvalCase(test: ChatEvalTestCase, client: OpenAI): Promise<
     }
     const uiHintsProjects = evidence.uiHints?.projects ?? [];
     const uiHintsExperiences = evidence.uiHints?.experiences ?? [];
-    if (typeof test.expected.uiHintsProjectsMinCount === 'number' && uiHintsProjects.length < test.expected.uiHintsProjectsMinCount) {
-      errors.push(`uiHints.projects count ${uiHintsProjects.length} is below min ${test.expected.uiHintsProjectsMinCount}`);
+    if (
+      typeof test.expected.uiHintsProjectsMinCount === 'number' &&
+      uiHintsProjects.length < test.expected.uiHintsProjectsMinCount
+    ) {
+      errors.push(
+        `uiHints.projects count ${uiHintsProjects.length} is below min ${test.expected.uiHintsProjectsMinCount}`
+      );
     }
-    if (typeof test.expected.uiHintsProjectsMaxCount === 'number' && uiHintsProjects.length > test.expected.uiHintsProjectsMaxCount) {
-      errors.push(`uiHints.projects count ${uiHintsProjects.length} exceeds max ${test.expected.uiHintsProjectsMaxCount}`);
+    if (
+      typeof test.expected.uiHintsProjectsMaxCount === 'number' &&
+      uiHintsProjects.length > test.expected.uiHintsProjectsMaxCount
+    ) {
+      errors.push(
+        `uiHints.projects count ${uiHintsProjects.length} exceeds max ${test.expected.uiHintsProjectsMaxCount}`
+      );
     }
     if (
       typeof test.expected.uiHintsExperiencesMinCount === 'number' &&

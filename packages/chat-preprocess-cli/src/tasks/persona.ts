@@ -14,8 +14,12 @@ async function loadJson<T>(filePath: string): Promise<T> {
 }
 
 function coercePersona(value: Partial<PersonaSummary>, fallback: PersonaSummary): PersonaSummary {
-  const normalizedGuidelines = normalizeDistinctStrings(value.styleGuidelines ?? fallback.styleGuidelines).filter(Boolean);
-  const normalizedVoiceExamples = normalizeDistinctStrings(value.voiceExamples ?? fallback.voiceExamples).filter(Boolean);
+  const normalizedGuidelines = normalizeDistinctStrings(value.styleGuidelines ?? fallback.styleGuidelines).filter(
+    Boolean
+  );
+  const normalizedVoiceExamples = normalizeDistinctStrings(value.voiceExamples ?? fallback.voiceExamples).filter(
+    Boolean
+  );
   return {
     systemPersona: value.systemPersona?.trim() || fallback.systemPersona,
     shortAbout: value.shortAbout?.trim() || fallback.shortAbout,

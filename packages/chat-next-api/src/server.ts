@@ -28,4 +28,3 @@ export {
   CHAT_DEBUG_LEVEL,
   type ChatDebugLogEntry,
 };
-

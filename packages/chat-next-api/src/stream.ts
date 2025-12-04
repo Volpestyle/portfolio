@@ -30,11 +30,15 @@ const DEFAULT_OUTPUT_REFUSAL_MESSAGE =
   "I can't help with that request. I'm here to talk about my work, projects, and experience if you'd like.";
 const DEFAULT_BUDGET_EXCEEDED_MESSAGE = 'Experiencing technical issues, try again later.';
 
-export function createChatSseStream(api: ChatApi, client: OpenAI, messages: ChatRequestMessage[], options?: StreamOptions) {
+export function createChatSseStream(
+  api: ChatApi,
+  client: OpenAI,
+  messages: ChatRequestMessage[],
+  options?: StreamOptions
+) {
   const encoder = new TextEncoder();
   const anchorId =
-    options?.anchorId ??
-    (typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `assistant-${Date.now()}`);
+    options?.anchorId ?? (typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `assistant-${Date.now()}`);
   const abortController = new AbortController();
   const abortSignal = abortController.signal;
   const softTimeoutMs = options?.runOptions?.softTimeoutMs ?? DEFAULT_SOFT_TIMEOUT_MS;
@@ -188,12 +192,7 @@ export function createChatSseStream(api: ChatApi, client: OpenAI, messages: Chat
 
         if (result.error) {
           errorEmitted = true;
-          sendErrorEvent(
-            result.error.code,
-            result.error.message,
-            result.error.retryable,
-            result.error.retryAfterMs
-          );
+          sendErrorEvent(result.error.code, result.error.message, result.error.retryable, result.error.retryAfterMs);
           return;
         }
 
@@ -264,16 +263,14 @@ export function createChatSseStream(api: ChatApi, client: OpenAI, messages: Chat
           options?.onError?.(error);
         }
         const reason = (abortSignal as AbortSignal & { reason?: unknown }).reason;
-        const reasonMessage = typeof reason === 'object' && reason && 'message' in reason ? String((reason as Error).message) : null;
+        const reasonMessage =
+          typeof reason === 'object' && reason && 'message' in reason ? String((reason as Error).message) : null;
         const code = aborted
           ? reasonMessage === 'soft_timeout'
             ? 'llm_timeout'
             : 'stream_interrupted'
           : 'internal_error';
-        const message =
-          code === 'llm_timeout'
-            ? 'I ran out of time while composing a response.'
-            : 'Chat unavailable';
+        const message = code === 'llm_timeout' ? 'I ran out of time while composing a response.' : 'Chat unavailable';
         const retryable = code !== 'internal_error' || Boolean(aborted);
         errorEmitted = true;
         sendErrorEvent(code, message, retryable);

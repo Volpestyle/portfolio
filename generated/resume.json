@@ -81,14 +81,7 @@
         "Presented weekly operational status updates to the broader Identity organization.",
         "Voluntarily left AWS to relocate closer to family in Chicago and was not affected by layoffs."
       ],
-      "skills": [
-        "React",
-        "Front-end development",
-        "AWS IAM",
-        "CloudWatch",
-        "On-call operations",
-        "Incident triage"
-      ],
+      "skills": ["React", "Front-end development", "AWS IAM", "CloudWatch", "On-call operations", "Incident triage"],
       "linkedProjects": [],
       "monthsOfExperience": 19
     },
@@ -108,14 +101,7 @@
         "Contributed to development of a Dart- and React-based web application (Wdesk).",
         "Worked within Agile development methodologies, participating in code reviews and writing unit and integration tests."
       ],
-      "skills": [
-        "Dart",
-        "React",
-        "Agile",
-        "Unit testing",
-        "Integration testing",
-        "Code review"
-      ],
+      "skills": ["Dart", "React", "Agile", "Unit testing", "Integration testing", "Code review"],
       "linkedProjects": [],
       "monthsOfExperience": 4
     },
@@ -135,15 +121,7 @@
         "Developed an Audio Engineering discrepancy logger web application using MongoDB, Express.js, Angular, and Node.js as the sole developer.",
         "Containerized the application with Docker to support CI/CD."
       ],
-      "skills": [
-        "MongoDB",
-        "Express.js",
-        "Angular",
-        "Node.js",
-        "Docker",
-        "Full-stack development",
-        "CI/CD"
-      ],
+      "skills": ["MongoDB", "Express.js", "Angular", "Node.js", "Docker", "Full-stack development", "CI/CD"],
       "linkedProjects": [],
       "monthsOfExperience": 4
     }
@@ -160,9 +138,7 @@
       "endDate": "2021-05-01",
       "isCurrent": false,
       "summary": "Bachelor of Science in Software Engineering with a 3.01 GPA.",
-      "bullets": [
-        "GPA: 3.01"
-      ],
+      "bullets": ["GPA: 3.01"],
       "skills": []
     }
   ],
@@ -216,27 +192,14 @@
       "id": "platforms",
       "name": "Platforms",
       "category": "technical",
-      "skills": [
-        "AWS",
-        "Google Vertex AI",
-        "RAG",
-        "Hadoop ecosystem",
-        "Druid",
-        "BigQuery"
-      ]
+      "skills": ["AWS", "Google Vertex AI", "RAG", "Hadoop ecosystem", "Druid", "BigQuery"]
     },
     {
       "type": "skill",
       "id": "databases",
       "name": "Databases & Data APIs",
       "category": "technical",
-      "skills": [
-        "MongoDB",
-        "GraphQL",
-        "DynamoDB",
-        "Redis",
-        "PostgreSQL"
-      ]
+      "skills": ["MongoDB", "GraphQL", "DynamoDB", "Redis", "PostgreSQL"]
     }
   ]
 }

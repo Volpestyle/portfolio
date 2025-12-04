@@ -97,9 +97,7 @@ async function main() {
       included.push(entry.rel);
       const fence = detectFence(entry.rel);
       const trimmed = content.trimEnd();
-      sections.push(
-        ['## ' + entry.rel, '```' + fence, trimmed, '```'].join('\n')
-      );
+      sections.push(['## ' + entry.rel, '```' + fence, trimmed, '```'].join('\n'));
     } catch (error) {
       missing.push(entry.rel);
       console.warn(`Skipped missing/unreadable file: ${entry.rel} (${String(error)})`);

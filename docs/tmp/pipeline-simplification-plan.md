@@ -390,6 +390,7 @@ export function buildAnswerSystemPrompt(persona?: PersonaSummary, owner?: OwnerC
 Replace current spinner with stage-specific ambient animations:
 
 **Planner Stage:**
+
 ```tsx
 // Pulsing "neurons" that connect and fire
 <motion.div className="flex gap-1">
@@ -412,18 +413,20 @@ Replace current spinner with stage-specific ambient animations:
 ```
 
 **Retrieval Stage:**
+
 ```tsx
 // Scanning line that sweeps across a mini-grid
 <motion.div className="relative h-4 w-16 overflow-hidden rounded bg-white/5">
   <motion.div
     className="absolute inset-y-0 w-1 bg-gradient-to-r from-transparent via-blue-400 to-transparent"
     animate={{ x: [0, 64, 0] }}
-    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+    transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
   />
 </motion.div>
 ```
 
 **Answer Stage:**
+
 ```tsx
 // Typewriter cursor blink (matches answer typewriter)
 <motion.span
@@ -463,11 +466,7 @@ function StreamingText({ text, isComplete }: StreamingTextProps) {
     <span className="relative">
       <span className="text-white/80">{revealed}</span>
       {!isComplete && pending && (
-        <motion.span
-          className="text-white/30"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.3 }}
-        >
+        <motion.span className="text-white/30" initial={{ opacity: 0 }} animate={{ opacity: 0.3 }}>
           {pending.slice(0, 20)}...
         </motion.span>
       )}
@@ -509,11 +508,7 @@ When a stage completes, add a subtle "success" flourish:
 // Icon morphs from loading state to checkmark/icon
 <AnimatePresence mode="wait">
   {isLoading ? (
-    <motion.div
-      key="loading"
-      exit={{ scale: 0, rotate: 90 }}
-      transition={{ duration: 0.15 }}
-    >
+    <motion.div key="loading" exit={{ scale: 0, rotate: 90 }} transition={{ duration: 0.15 }}>
       <LoadingDots />
     </motion.div>
   ) : (
@@ -521,7 +516,7 @@ When a stage completes, add a subtle "success" flourish:
       key="done"
       initial={{ scale: 0, rotate: -90 }}
       animate={{ scale: 1, rotate: 0 }}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
     >
       <CheckIcon className="h-4 w-4 text-green-400" />
     </motion.div>
@@ -546,35 +541,33 @@ function ProgressArc({ progress, isStreaming }: ProgressArcProps) {
   return (
     <svg className="h-4 w-4 -rotate-90" viewBox="0 0 16 16">
       {/* Background circle */}
-      <circle
-        cx="8" cy="8" r="6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        className="text-white/10"
-      />
+      <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/10" />
       {/* Progress arc */}
       <motion.circle
-        cx="8" cy="8" r="6"
+        cx="8"
+        cy="8"
+        r="6"
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
         strokeDasharray={circumference}
         animate={{ strokeDashoffset }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
         className="text-blue-400"
       />
       {/* Pulsing dot at leading edge when streaming */}
       {isStreaming && (
         <motion.circle
-          cx="8" cy="2" r="1.5"
+          cx="8"
+          cy="2"
+          r="1.5"
           fill="currentColor"
           className="text-blue-400"
           animate={{ opacity: [1, 0.4, 1] }}
           transition={{ duration: 0.8, repeat: Infinity }}
           style={{
-            transformOrigin: "8px 8px",
+            transformOrigin: '8px 8px',
             rotate: `${progress * 360}deg`,
           }}
         />
@@ -600,28 +593,32 @@ function ProgressArc({ progress, isStreaming }: ProgressArcProps) {
 When the panel is collapsed but streaming, show a subtle "activity pulse" on the header:
 
 ```tsx
-{!isExpanded && isStreaming && (
-  <motion.div
-    className="absolute inset-0 rounded-lg"
-    animate={{
-      boxShadow: [
-        "inset 0 0 0 1px rgba(96, 165, 250, 0)",
-        "inset 0 0 0 1px rgba(96, 165, 250, 0.3)",
-        "inset 0 0 0 1px rgba(96, 165, 250, 0)",
-      ],
-    }}
-    transition={{ duration: 2, repeat: Infinity }}
-  />
-)}
+{
+  !isExpanded && isStreaming && (
+    <motion.div
+      className="absolute inset-0 rounded-lg"
+      animate={{
+        boxShadow: [
+          'inset 0 0 0 1px rgba(96, 165, 250, 0)',
+          'inset 0 0 0 1px rgba(96, 165, 250, 0.3)',
+          'inset 0 0 0 1px rgba(96, 165, 250, 0)',
+        ],
+      }}
+      transition={{ duration: 2, repeat: Infinity }}
+    />
+  );
+}
 ```
 
 ### 2.6.8 Implementation Files
 
 **Update:**
+
 - `src/components/chat/ChatReasoningPanel.tsx` — Add streaming text reveal, stage-aware loaders, progress arc
 - `src/components/chat/ChatReasoningDisplay.tsx` — Pass streaming deltas to panel
 
 **New (optional):**
+
 - `src/components/chat/ReasoningAnimations.tsx` — Extract reusable animation primitives (StreamingText, ProgressArc, StagePulse)
 
 ### 2.6.9 Performance Considerations

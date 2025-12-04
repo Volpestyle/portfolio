@@ -55,11 +55,7 @@ export function ProjectContent({
       >
         <div className={cn('mb-6', isChat ? 'px-2' : '')}>
           <div className="mb-3 flex items-center">
-            <motion.h1
-              className={cn('mr-4 font-bold', isChat ? 'text-lg' : 'text-3xl')}
-            >
-              {pid}
-            </motion.h1>
+            <motion.h1 className={cn('mr-4 font-bold', isChat ? 'text-lg' : 'text-3xl')}>{pid}</motion.h1>
             {repoInfo.private ? (
               <Button
                 disabled

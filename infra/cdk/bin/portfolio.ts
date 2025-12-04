@@ -35,12 +35,15 @@ const appDirectory = process.env.NEXT_APP_PATH ?? inferredAppDirectory;
 const stringList = (value?: string) =>
   value
     ? value
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean)
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
     : [];
 
-const collectLambdaEnv = (parsedFileEnv?: { envVars: Record<string, string>; repoVars: Record<string, string> }): Record<string, string> => {
+const collectLambdaEnv = (parsedFileEnv?: {
+  envVars: Record<string, string>;
+  repoVars: Record<string, string>;
+}): Record<string, string> => {
   if (parsedFileEnv) {
     const combined: Record<string, string> = { ...parsedFileEnv.envVars, ...parsedFileEnv.repoVars };
     for (const key of Object.keys(combined)) {
@@ -75,9 +78,7 @@ const inferredOpenNextPath = fs.existsSync(openNextPath) ? openNextPath : undefi
 
 const parsedEnvFile = envFileToUse ? parseEnvFile(envFileToUse) : undefined;
 const lambdaEnvironment = collectLambdaEnv(
-  parsedEnvFile
-    ? { envVars: parsedEnvFile.envVars, repoVars: parsedEnvFile.repoVars }
-    : undefined
+  parsedEnvFile ? { envVars: parsedEnvFile.envVars, repoVars: parsedEnvFile.repoVars } : undefined
 );
 
 new PortfolioStack(app, 'PortfolioStack', {

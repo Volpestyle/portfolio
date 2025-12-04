@@ -21,10 +21,7 @@
       "outputTokens": 7684,
       "totalTokens": 29022,
       "costUsdEstimate": 0.09854399999999998,
-      "models": [
-        "gpt-5.1-2025-11-13",
-        "text-embedding-3-large"
-      ]
+      "models": ["gpt-5.1-2025-11-13", "text-embedding-3-large"]
     },
     "other": {
       "stage": "other",
@@ -34,10 +31,7 @@
       "outputTokens": 1182,
       "totalTokens": 3400,
       "costUsdEstimate": 0.013555,
-      "models": [
-        "gpt-5.1-2025-11-13",
-        "text-embedding-3-large"
-      ]
+      "models": ["gpt-5.1-2025-11-13", "text-embedding-3-large"]
     }
   },
   "calls": [
