@@ -12,6 +12,7 @@ import {
   type ResumeSearchLogPayload,
   type ResumeSearcher,
   type SemanticRanker,
+  type SearchWeights,
 } from '@portfolio/chat-data';
 import type {
   AwardRecord,
@@ -43,18 +44,9 @@ export type RetrievalResult = {
 };
 
 export type RetrievalDrivers = {
-  searchProjectsByText(
-    queryText: string,
-    topK?: number,
-    options?: { scope?: ExperienceScope }
-  ): Promise<ProjectDoc[]>;
-  searchExperiencesByText(
-    queryText: string,
-    topK?: number,
-    options?: { facets?: ResumeFacet[] }
-  ): Promise<ResumeDoc[]>;
+  searchProjectsByText(queryText: string, topK?: number, options?: { scope?: ExperienceScope }): Promise<ProjectDoc[]>;
+  searchExperiencesByText(queryText: string, topK?: number, options?: { facets?: ResumeFacet[] }): Promise<ResumeDoc[]>;
   getProfileDoc(): Promise<ProfileDoc | undefined>;
-  getProjectsByIds(ids: string[]): Promise<ProjectDoc[]>;
 };
 
 export type RetrievalOptions = {
@@ -65,11 +57,13 @@ export type RetrievalOptions = {
   experienceSemanticRanker?: ExperienceSemanticRanker | null;
   defaultTopK?: number;
   maxTopK?: number;
+  minRelevanceScore?: number;
   logger?: (event: string, payload: Record<string, unknown>) => void;
+  weights?: SearchWeights;
 };
 
 const DEFAULT_TOPK = 8;
-const MAX_TOPK = 50;
+const MAX_TOPK = 10;
 
 const clamp = (value: number | undefined, max: number, fallback: number): number | undefined => {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
@@ -113,9 +107,8 @@ export function createRetrieval(options: RetrievalOptions): RetrievalDrivers {
           defaultLimit: defaultTopK,
           minLimit: 1,
           maxLimit: maxTopK,
-          logger: logger
-            ? (payload: ProjectSearchLogPayload) => logger('retrieval.projects', payload)
-            : undefined,
+          weights: options.weights,
+          logger: logger ? (payload: ProjectSearchLogPayload) => logger('retrieval.projects', payload) : undefined,
         });
       })();
     }
@@ -132,10 +125,9 @@ export function createRetrieval(options: RetrievalOptions): RetrievalDrivers {
           defaultLimit: defaultTopK,
           minLimit: 1,
           maxLimit: maxTopK,
+          weights: options.weights,
           searchIndex,
-          logger: logger
-            ? (payload: ResumeSearchLogPayload) => logger('retrieval.resume', payload)
-            : undefined,
+          logger: logger ? (payload: ResumeSearchLogPayload) => logger('retrieval.resume', payload) : undefined,
         });
       })();
     }
@@ -172,7 +164,11 @@ export function createRetrieval(options: RetrievalOptions): RetrievalDrivers {
       });
     },
 
-    async searchExperiencesByText(queryText: string, topK?: number, options?: { facets?: ResumeFacet[] }): Promise<ResumeDoc[]> {
+    async searchExperiencesByText(
+      queryText: string,
+      topK?: number,
+      options?: { facets?: ResumeFacet[] }
+    ): Promise<ResumeDoc[]> {
       const limit = clamp(topK, maxTopK, defaultTopK);
       const searcher = await getResumeSearcher();
       const results = await searcher.searchResume({
@@ -194,14 +190,6 @@ export function createRetrieval(options: RetrievalOptions): RetrievalDrivers {
         }
         return undefined;
       }
-    },
-
-    async getProjectsByIds(ids: string[]): Promise<ProjectDoc[]> {
-      const projectMap = await resolveProjectMap();
-      return ids
-        .map((id) => projectMap.get(id.trim().toLowerCase()))
-        .filter(Boolean)
-        .map((record) => ({ ...record })) as ProjectDoc[];
     },
   };
 }

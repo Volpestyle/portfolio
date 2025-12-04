@@ -21,7 +21,7 @@ export function BlogCard({ post }: BlogCardProps) {
       <h2 className="mb-3 text-2xl font-bold">
         <Link
           href={`/blog/${post.slug}`}
-          className="group/title relative inline-flex items-center gap-2 rounded transition-all duration-200 hover:bg-white hover:text-black active:bg-white active:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          className="group/title relative inline-flex items-center gap-2 rounded transition-all duration-200 hover:bg-white hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:bg-white active:text-black"
           style={{
             paddingLeft: isTitleHovered ? '12px' : '0px',
             paddingRight: isTitleHovered ? '12px' : '0px',
@@ -62,10 +62,7 @@ export function BlogCard({ post }: BlogCardProps) {
       {post.tags && post.tags.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-2">
           {post.tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80"
-            >
+            <span key={tag} className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80">
               {tag}
             </span>
           ))}

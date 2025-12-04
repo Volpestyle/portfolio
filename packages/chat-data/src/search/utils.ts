@@ -1,13 +1,10 @@
-export const normalizeValue = (value?: string): string =>
-  typeof value === 'string' ? value.trim().toLowerCase() : '';
+export const normalizeValue = (value?: string): string => (typeof value === 'string' ? value.trim().toLowerCase() : '');
 
 export function normalizeList(values?: string[]): string[] {
   if (!Array.isArray(values)) {
     return [];
   }
-  return values
-    .map((value) => normalizeValue(value))
-    .filter((value) => value.length > 0);
+  return values.map((value) => normalizeValue(value)).filter((value) => value.length > 0);
 }
 
 export function dedupe(values: string[]): string[] {
@@ -25,9 +22,7 @@ export function collectRawList(values?: string[]): string[] {
   if (!Array.isArray(values)) {
     return [];
   }
-  return values
-    .map((value) => (typeof value === 'string' ? value.trim() : ''))
-    .filter((value) => value.length > 0);
+  return values.map((value) => (typeof value === 'string' ? value.trim() : '')).filter((value) => value.length > 0);
 }
 
 export function createNormalizedValueSet(values?: string[]): Set<string> {

@@ -152,7 +152,10 @@ function diffInMonths(startDate: string, endDate?: string | null) {
 }
 
 export function detectExperienceType(raw: RawExperience): NormalizedExperience['experienceType'] {
-  if (raw.experienceType && ['full_time', 'internship', 'contract', 'freelance', 'other'].includes(raw.experienceType)) {
+  if (
+    raw.experienceType &&
+    ['full_time', 'internship', 'contract', 'freelance', 'other'].includes(raw.experienceType)
+  ) {
     return raw.experienceType;
   }
   const haystack = `${raw.title ?? ''} ${raw.summary ?? ''}`.toLowerCase();
@@ -263,26 +266,24 @@ export async function runResumeTask(context: PreprocessContext): Promise<Preproc
   const resolvedSourcePath = sourceExists ? sourcePath : null;
 
   if (!resolvedSourcePath) {
-    throw new PreprocessError(
-      PREPROCESS_ERROR_CODES.NO_RESUME,
-      `Resume source file not found at ${relativeSource}`
-    );
+    throw new PreprocessError(PREPROCESS_ERROR_CODES.NO_RESUME, `Resume source file not found at ${relativeSource}`);
   }
 
   const rawContents = await fs.readFile(resolvedSourcePath, 'utf-8');
   const parsed = JSON.parse(rawContents) as ResumeSource;
   if (!Array.isArray(parsed.experiences)) {
-    throw new PreprocessError(PREPROCESS_ERROR_CODES.RESUME_SOURCE_INVALID, 'Resume source must include an experiences array');
+    throw new PreprocessError(
+      PREPROCESS_ERROR_CODES.RESUME_SOURCE_INVALID,
+      'Resume source must include an experiences array'
+    );
   }
 
-  const normalized = parsed.experiences
-    .map(normalizeExperience)
-    .sort((a, b) => {
-      if (a.startDate === b.startDate) {
-        return 0;
-      }
-      return a.startDate < b.startDate ? 1 : -1;
-    });
+  const normalized = parsed.experiences.map(normalizeExperience).sort((a, b) => {
+    if (a.startDate === b.startDate) {
+      return 0;
+    }
+    return a.startDate < b.startDate ? 1 : -1;
+  });
 
   const education = Array.isArray(parsed.education) ? parsed.education.map(normalizeEducation) : [];
   const awards = Array.isArray(parsed.awards) ? parsed.awards.map(normalizeAward) : [];

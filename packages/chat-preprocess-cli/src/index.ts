@@ -5,19 +5,8 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { parseArgs } from 'node:util';
 import { DEFAULT_ENV_FILES, loadPreprocessEnv } from './env';
-import {
-  coerceEnvFileList,
-  loadConfigFile,
-  mergeConfigs,
-  resolvePreprocessConfig,
-} from './config';
-import type {
-  ChatPreprocessConfig,
-  CliTask,
-  PreprocessContext,
-  PreprocessPaths,
-  PreprocessTaskResult,
-} from './types';
+import { coerceEnvFileList, loadConfigFile, mergeConfigs, resolvePreprocessConfig } from './config';
+import type { ChatPreprocessConfig, CliTask, PreprocessContext, PreprocessPaths, PreprocessTaskResult } from './types';
 import { runProjectKnowledgeTask } from './tasks/project-knowledge';
 import { runResumePdfTask } from './tasks/resume-pdf';
 import { runResumeTask } from './tasks/resume';
@@ -138,10 +127,7 @@ function collectArtifactsForTasks(tasks: CliTask[], paths: PreprocessPaths): str
   return targets;
 }
 
-async function printArtifactOutputs(
-  artifacts: PreprocessTaskResult['artifacts'],
-  rootDir: string
-): Promise<void> {
+async function printArtifactOutputs(artifacts: PreprocessTaskResult['artifacts'], rootDir: string): Promise<void> {
   if (!artifacts?.length) return;
   for (const artifact of artifacts) {
     const absolutePath = path.isAbsolute(artifact.path) ? artifact.path : path.resolve(rootDir, artifact.path);
@@ -172,11 +158,7 @@ async function resetGeneratedDir(paths: PreprocessPaths): Promise<void> {
   await fsPromises.mkdir(generatedDir, { recursive: true });
 }
 
-async function cleanTaskArtifacts(
-  paths: PreprocessPaths,
-  tasksToRun: CliTask[],
-  allTasks: CliTask[]
-): Promise<void> {
+async function cleanTaskArtifacts(paths: PreprocessPaths, tasksToRun: CliTask[], allTasks: CliTask[]): Promise<void> {
   if (tasksToRun.length === allTasks.length) {
     await resetGeneratedDir(paths);
     return;
@@ -241,9 +223,7 @@ export async function runPreprocessCli(options?: RunPreprocessCliOptions): Promi
         .filter(Boolean)
     : null;
   const tasksToRun =
-    requestedTasks && requestedTasks.length
-      ? tasks.filter((task) => requestedTasks.includes(task.name))
-      : tasks;
+    requestedTasks && requestedTasks.length ? tasks.filter((task) => requestedTasks.includes(task.name)) : tasks;
 
   if (requestedTasks && requestedTasks.length && !tasksToRun.length) {
     throw new Error(`No preprocess tasks matched ${requestedTasks.join(', ')}`);

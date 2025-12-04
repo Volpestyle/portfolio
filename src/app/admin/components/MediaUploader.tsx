@@ -143,10 +143,8 @@ export function MediaUploader({ onInsert, onClose }: MediaUploaderProps) {
       <CardContent className="space-y-4">
         {/* Drag and Drop Area */}
         <div
-          className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-            dragActive
-              ? 'border-primary bg-primary/5'
-              : 'border-border hover:border-primary/50'
+          className={`relative rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
+            dragActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
           }`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -160,12 +158,12 @@ export function MediaUploader({ onInsert, onClose }: MediaUploaderProps) {
             accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
             onChange={handleChange}
           />
-          
+
           {file ? (
             <div className="space-y-2">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-12 w-12 mx-auto text-primary"
+                className="mx-auto h-12 w-12 text-primary"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -179,9 +177,7 @@ export function MediaUploader({ onInsert, onClose }: MediaUploaderProps) {
                 />
               </svg>
               <p className="text-sm font-medium">{file.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {(file.size / 1024).toFixed(2)} KB
-              </p>
+              <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(2)} KB</p>
               <Button
                 variant="outline"
                 size="sm"
@@ -200,7 +196,7 @@ export function MediaUploader({ onInsert, onClose }: MediaUploaderProps) {
             <div className="space-y-2">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-12 w-12 mx-auto text-muted-foreground"
+                className="mx-auto h-12 w-12 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -223,9 +219,7 @@ export function MediaUploader({ onInsert, onClose }: MediaUploaderProps) {
                   browse
                 </button>
               </p>
-              <p className="text-xs text-muted-foreground">
-                JPEG, PNG, GIF, or WebP (max 5MB)
-              </p>
+              <p className="text-xs text-muted-foreground">JPEG, PNG, GIF, or WebP (max 5MB)</p>
             </div>
           )}
         </div>
@@ -234,7 +228,10 @@ export function MediaUploader({ onInsert, onClose }: MediaUploaderProps) {
         {message && (
           <div
             className={`rounded-lg border p-3 text-sm ${
-              message.includes('error') || message.includes('Failed') || message.includes('Invalid') || message.includes('too large')
+              message.includes('error') ||
+              message.includes('Failed') ||
+              message.includes('Invalid') ||
+              message.includes('too large')
                 ? 'border-destructive/50 bg-destructive/10 text-destructive'
                 : 'border-green-500/50 bg-green-500/10 text-green-500'
             }`}
@@ -249,11 +246,7 @@ export function MediaUploader({ onInsert, onClose }: MediaUploaderProps) {
         <div className="flex gap-2">
           {!uploadedKey ? (
             <>
-              <Button
-                onClick={handleUpload}
-                disabled={!file || uploading}
-                className="flex-1"
-              >
+              <Button onClick={handleUpload} disabled={!file || uploading} className="flex-1">
                 {uploading ? 'Uploading...' : 'Upload'}
               </Button>
               <Button variant="outline" onClick={onClose} className="flex-1">
@@ -288,4 +281,3 @@ export function MediaUploader({ onInsert, onClose }: MediaUploaderProps) {
     </Card>
   );
 }
-

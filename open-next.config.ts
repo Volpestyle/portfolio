@@ -30,7 +30,7 @@ const config: OpenNextConfig = {
         '@smithy/protocol-http@4',
         '@smithy/smithy-client@3',
         '@smithy/types@3',
-        '@smithy/util-stream@3'
+        '@smithy/util-stream@3',
       ],
     },
   },

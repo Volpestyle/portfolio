@@ -31,7 +31,7 @@ export function AnimatedIconButton({
   return (
     <div className={cn('inline-flex', wrapperClassName)}>
       <motion.button
-        type='button'
+        type="button"
         aria-label={label}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
@@ -42,7 +42,7 @@ export function AnimatedIconButton({
           className
         )}
       >
-        <span className='flex items-center justify-center'>{icon}</span>
+        <span className="flex items-center justify-center">{icon}</span>
       </motion.button>
     </div>
   );

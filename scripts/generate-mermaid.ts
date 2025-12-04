@@ -48,9 +48,7 @@ function parseResolution(argv: string[]): Resolution {
 
   const normalized = (value ?? 'medium').toLowerCase() as Resolution;
   if (!Object.hasOwn(RESOLUTION_SCALES, normalized)) {
-    throw new Error(
-      `Invalid resolution "${value}". Use one of: ${Object.keys(RESOLUTION_SCALES).join(', ')}.`,
-    );
+    throw new Error(`Invalid resolution "${value}". Use one of: ${Object.keys(RESOLUTION_SCALES).join(', ')}.`);
   }
   return normalized;
 }
@@ -87,23 +85,12 @@ async function main() {
   const command = useLocal ? localMmdc : 'pnpm';
   const baseArgs = useLocal ? [] : ['dlx', MERMAID_PACKAGE];
 
-  console.log(
-    `Rendering ${mmdFiles.length} Mermaid diagrams at "${resolution}" resolution (scale=${scale}).`,
-  );
+  console.log(`Rendering ${mmdFiles.length} Mermaid diagrams at "${resolution}" resolution (scale=${scale}).`);
   console.log(`Renderer: ${useLocal ? localMmdc : `pnpm dlx ${MERMAID_PACKAGE}`}`);
 
   for (const inputPath of mmdFiles) {
     const outputPath = inputPath.replace(/\.mmd$/, '.png');
-    const args = [
-      ...baseArgs,
-      '-i',
-      inputPath,
-      '-o',
-      outputPath,
-      '--scale',
-      String(scale),
-      '--quiet',
-    ];
+    const args = [...baseArgs, '-i', inputPath, '-o', outputPath, '--scale', String(scale), '--quiet'];
 
     console.log(`• ${path.basename(inputPath)} → ${path.basename(outputPath)}`);
     await run(command, args);

@@ -1,6 +1,12 @@
 import type { ResumeEntry, ExperienceRecord, ResumeFacet } from '@portfolio/chat-contract';
 import { normalizeValue, includesText } from './utils';
-import { createSearcher, type SearchLogPayload, type SearchSpec, type SearchContext } from './createSearcher';
+import {
+  createSearcher,
+  type SearchLogPayload,
+  type SearchSpec,
+  type SearchContext,
+  type SearchWeights,
+} from './createSearcher';
 import type { ExperienceSemanticRanker } from './experienceSemantic';
 import { tokenizeWeighted } from './tokens';
 import { createMiniSearchIndex, runMiniSearch } from './minisearch';
@@ -37,6 +43,8 @@ export type ResumeSearchLogPayload = ResumeSearchLogFilters & {
   expandedCandidates: number;
   usedSemantic: boolean;
   topScore?: number;
+  topRawScore?: number;
+  normalizationFactor?: number;
   recencyLambda?: number;
   freshestTimestamp?: number | null;
   topRecencyScore?: number;
@@ -57,10 +65,13 @@ export type ResumeSearcherOptions = {
   maxLimit?: number;
   logger?: (payload: ResumeSearchLogPayload) => void;
   getNow?: () => number;
+  weights?: SearchWeights;
 };
 
 const normalizeFacets = (facets?: ResumeFacet[]) =>
-  Array.isArray(facets) && facets.length ? Array.from(new Set(facets.filter((facet): facet is ResumeFacet => Boolean(facet)))) : undefined;
+  Array.isArray(facets) && facets.length
+    ? Array.from(new Set(facets.filter((facet): facet is ResumeFacet => Boolean(facet))))
+    : undefined;
 
 const normalizeFilters = (input?: ResumeSearchQuery): NormalizedResumeFilters => ({
   company: normalizeValue(input?.company) || undefined,
@@ -133,10 +144,7 @@ function recordMatchesFilters(record: ResumeEntry, filters: NormalizedResumeFilt
     return false;
   }
   if (filters.skill) {
-    const skillBag =
-      record.type === 'skill'
-        ? [record.name, ...(record.skills ?? [])]
-        : record.skills ?? [];
+    const skillBag = record.type === 'skill' ? [record.name, ...(record.skills ?? [])] : (record.skills ?? []);
     if (!skillBag.some((s) => includesText(s, filters.skill!))) {
       return false;
     }
@@ -170,10 +178,7 @@ const computeStructuredScore = (record: ResumeEntry, filters: NormalizedResumeFi
     score += 3;
   }
   if (filters.skill) {
-    const skillBag =
-      record.type === 'skill'
-        ? [record.name, ...(record.skills ?? [])]
-        : record.skills ?? [];
+    const skillBag = record.type === 'skill' ? [record.name, ...(record.skills ?? [])] : (record.skills ?? []);
     if (skillBag.some((s) => includesText(s, filters.skill!))) {
       score += 2;
     }
@@ -244,7 +249,7 @@ export function buildResumeSearchIndex(records: ResumeEntry[]) {
         'location' in record && typeof (record as { location?: string }).location === 'string'
           ? (record as { location?: string }).location
           : undefined;
-      const bullets = record.type === 'skill' ? [] : record.bullets ?? [];
+      const bullets = record.type === 'skill' ? [] : (record.bullets ?? []);
 
       const tokens = tokenizeWeighted([
         { value: companyLike, weight: 3 },
@@ -322,6 +327,7 @@ export function createResumeSearcher(records: ResumeEntry[], options?: ResumeSea
       maxLimit,
       getLimit: (input) => input?.limit,
       getNow: options?.getNow,
+      weights: options?.weights,
       logger: logger
         ? (payload: SearchLogPayload<NormalizedResumeFilters>) => {
             const described = describeFilters(payload.filters);
@@ -337,6 +343,8 @@ export function createResumeSearcher(records: ResumeEntry[], options?: ResumeSea
               expandedCandidates: payload.expandedCandidates,
               usedSemantic: payload.usedSemantic,
               topScore: payload.topScore,
+              topRawScore: payload.topRawScore,
+              normalizationFactor: payload.normalizationFactor,
               recencyLambda: payload.recencyLambda,
               freshestTimestamp: payload.freshestTimestamp ?? null,
               topRecencyScore: payload.topRecencyScore,

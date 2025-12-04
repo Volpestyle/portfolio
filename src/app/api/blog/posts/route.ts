@@ -30,9 +30,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ message: 'Invalid cursor' }, { status: 400 });
     }
     console.error('[api/blog/posts] Error fetching posts:', error);
-    return NextResponse.json(
-      { message: 'Failed to fetch posts' },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: 'Failed to fetch posts' }, { status: 500 });
   }
 }

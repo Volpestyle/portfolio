@@ -109,17 +109,15 @@ async function runJsonSchemaCompletion<T>(params: {
   const systemPromptWithJsonHint = `${systemPrompt}\n\nReturn a JSON object (json only).`;
   const completion = await withRetries(() =>
     metrics
-      ? metrics.wrapLlm(
-          { stage: stage ?? 'project_json', model, meta },
-          () =>
-            client.chat.completions.create({
-              model,
-              response_format: { type: 'json_object' },
-              messages: [
-                { role: 'system', content: systemPromptWithJsonHint },
-                { role: 'user', content: userContent },
-              ],
-            })
+      ? metrics.wrapLlm({ stage: stage ?? 'project_json', model, meta }, () =>
+          client.chat.completions.create({
+            model,
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: systemPromptWithJsonHint },
+              { role: 'user', content: userContent },
+            ],
+          })
         )
       : client.chat.completions.create({
           model,
@@ -138,9 +136,7 @@ function normalizeStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
-  return value
-    .map((item) => (typeof item === 'string' ? item.trim() : ''))
-    .filter((item) => Boolean(item));
+  return value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter((item) => Boolean(item));
 }
 
 function coerceRepoFacts(raw: Partial<RepoFacts> | undefined): RepoFacts {
@@ -336,9 +332,9 @@ function normalizeContext(input: ProjectContextCandidate | undefined, repo: Repo
   let timeframe =
     timeframeCandidate.start || timeframeCandidate.end
       ? {
-        start: timeframeCandidate.start || repoTimeframe?.start,
-        end: timeframeCandidate.end || repoTimeframe?.end,
-      }
+          start: timeframeCandidate.start || repoTimeframe?.start,
+          end: timeframeCandidate.end || repoTimeframe?.end,
+        }
       : repoTimeframe;
 
   const today = toDateOnly(new Date().toISOString());
@@ -419,7 +415,7 @@ async function generateProjectNarrative(
       client,
       model,
       systemPrompt:
-        'You are a meticulous summarizer creating structured project descriptions for a developer\'s portfolio. Produce a snappy one-liner (1-2 sentences) plus a richer description (2-4 sentences) grounded strictly in the provided facts/README. Make sure bullets are concrete contributions or results. When context is not explicit, infer conservatively (e.g., personal side project). Include impactSummary (1 sentence) and sizeOrScope (team size, users, scale) when possible.',
+        "You are a meticulous summarizer creating structured project descriptions for a developer's portfolio. Produce a snappy one-liner (1-2 sentences) plus a richer description (2-4 sentences) grounded strictly in the provided facts/README. Make sure bullets are concrete contributions or results. When context is not explicit, infer conservatively (e.g., personal side project). Include impactSummary (1 sentence) and sizeOrScope (team size, users, scale) when possible.",
       userContent: `Repository: ${repo.name}
 Description: ${repo.description ?? 'n/a'}
 
@@ -489,13 +485,11 @@ async function buildEmbedding(
     .join('\n');
 
   const response = await (metrics
-    ? metrics.wrapLlm(
-        { stage: 'project_enrichment', model, meta: { repo: repoName } },
-        () =>
-          client.embeddings.create({
-            model,
-            input: `${repoName}\n${embeddingPayload}`,
-          })
+    ? metrics.wrapLlm({ stage: 'project_enrichment', model, meta: { repo: repoName } }, () =>
+        client.embeddings.create({
+          model,
+          input: `${repoName}\n${embeddingPayload}`,
+        })
       )
     : client.embeddings.create({
         model,
@@ -527,7 +521,11 @@ export async function runProjectKnowledgeTask(context: PreprocessContext): Promi
     };
     const [projectsArtifact, embeddingsArtifact] = await Promise.all([
       context.artifacts.writeJson({ id: 'projects', filePath: projectsOutput, data: dataset }),
-      context.artifacts.writeJson({ id: 'projects-embeddings', filePath: projectsEmbeddingsOutput, data: emptyEmbeddings }),
+      context.artifacts.writeJson({
+        id: 'projects-embeddings',
+        filePath: projectsEmbeddingsOutput,
+        data: emptyEmbeddings,
+      }),
     ]);
     return {
       description: 'No repositories found in portfolio config.',
@@ -591,16 +589,24 @@ export async function runProjectKnowledgeTask(context: PreprocessContext): Promi
         sizeOrScope: narrative.sizeOrScope,
         techStack: narrative.techStack,
         languages,
-      tags,
-      context: narrative.context,
-      contextType: narrative.context.type,
-      readme: readmeText,
-      embeddingId: slug,
-    };
+        tags,
+        context: narrative.context,
+        contextType: narrative.context.type,
+        readme: readmeText,
+        embeddingId: slug,
+      };
 
       projects.push(project);
 
-      const embedding = await buildEmbedding(client, repo.name, narrative, facts, languages, projectEmbeddingModel, context.metrics);
+      const embedding = await buildEmbedding(
+        client,
+        repo.name,
+        narrative,
+        facts,
+        languages,
+        projectEmbeddingModel,
+        context.metrics
+      );
       embeddings.push({ id: slug, vector: embedding });
     }
   }

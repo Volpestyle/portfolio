@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { PartialReasoningTrace } from '@portfolio/chat-contract';
 import { ChatReasoningPanel } from './ChatReasoningPanel';
 import { ChatReasoningDevPanel } from './ChatReasoningDevPanel';
@@ -25,27 +25,70 @@ export function ChatReasoningDisplay({
   durationMs,
   className,
 }: ChatReasoningDisplayProps) {
+  const isDev = process.env.NODE_ENV === 'development';
   const [showDevMode, setShowDevMode] = useState(false);
-  const [isDev, setIsDev] = useState(false);
 
-  // Check if we're in development mode
+  // Persist dev/user view preference in dev only
   useEffect(() => {
-    setIsDev(process.env.NODE_ENV === 'development');
-  }, []);
+    if (!isDev || typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem('chat:reasoningDevMode');
+    if (stored === '1') {
+      setShowDevMode(true);
+    }
+  }, [isDev]);
 
-  // Only render once we have planner output (or later stages) so meta/greeting turns don't flash a user panel.
-  const hasTraceContent =
-    trace && (trace.plan || trace.retrieval || trace.evidence || trace.answerMeta || trace.error);
-  const isMetaTurn = trace?.plan?.questionType === 'meta' || trace?.answerMeta?.questionType === 'meta';
-  const planReady = Boolean(trace?.plan);
-  const streamingHasPlan = Boolean(isStreaming && trace && planReady);
-  const shouldRenderTrace = Boolean(hasTraceContent || streamingHasPlan);
-  const allowUserPanel = show && !isMetaTurn;
-  const allowDevPanel = isDev && (showDevMode || isMetaTurn);
-  const shouldRender = shouldRenderTrace && (allowUserPanel || allowDevPanel);
+  useEffect(() => {
+    if (!isDev || typeof window === 'undefined') return;
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ enabled?: boolean }>).detail;
+      if (detail && typeof detail.enabled === 'boolean') {
+        setShowDevMode(detail.enabled);
+      }
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === 'chat:reasoningDevMode') {
+        setShowDevMode(event.newValue === '1');
+      }
+    };
+    window.addEventListener('chat:reasoningDevModeChanged', handler as EventListener);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('chat:reasoningDevModeChanged', handler as EventListener);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [isDev]);
 
-  // Keep hidden when nothing to render or visibility is off
-  if (!shouldRender) {
+  useEffect(() => {
+    if (!isDev || typeof window === 'undefined') return;
+    try {
+      if (showDevMode) {
+        window.localStorage.setItem('chat:reasoningDevMode', '1');
+      } else {
+        window.localStorage.removeItem('chat:reasoningDevMode');
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [isDev, showDevMode]);
+
+  const hasRenderablePlan = Boolean(trace?.plan && (trace.plan.queries?.length ?? 0) > 0);
+  const hasRetrieval = Boolean(trace?.retrieval && trace.retrieval.length);
+  const hasAnswerWithQueries = Boolean(hasRenderablePlan && trace?.answer);
+  const hasError = Boolean(trace?.error);
+
+  // Only render when planner chose to search, retrieval ran, or there was an error.
+  const hasTraceContent = hasRenderablePlan || hasRetrieval || hasAnswerWithQueries || hasError;
+  const streamingHasPlan = Boolean(isStreaming && hasRenderablePlan);
+  const shouldRenderUserPanel = Boolean(show && (hasTraceContent || streamingHasPlan));
+  const hasTracePayload = trace !== null && trace !== undefined;
+  const allowDevPanel = isDev && showDevMode;
+  const shouldRenderDevPanel = allowDevPanel && (hasTracePayload || isStreaming);
+
+  const hasAnyPanel = shouldRenderUserPanel || shouldRenderDevPanel;
+  const shouldRenderContainer = hasAnyPanel || isDev;
+
+  // Keep hidden when nothing to render (non-dev)
+  if (!shouldRenderContainer) {
     return null;
   }
 
@@ -53,14 +96,15 @@ export function ChatReasoningDisplay({
   const effectiveTrace: PartialReasoningTrace = trace ?? {
     plan: null,
     retrieval: null,
-    evidence: null,
-    answerMeta: null,
+    answer: null,
+    debug: null,
     error: null,
   };
 
   // Force dev panel in dev_only mode
-  const shouldShowDevPanel = allowDevPanel;
-  const shouldHideUserPanel = !allowUserPanel;
+  const shouldShowDevPanel = shouldRenderDevPanel;
+  const shouldShowUserPanel = shouldRenderUserPanel && show;
+  const shouldHideUserPanel = !shouldShowUserPanel;
 
   return (
     <div className={cn('w-full space-y-2', className)}>
@@ -88,15 +132,6 @@ export function ChatReasoningDisplay({
         )}
       </AnimatePresence>
 
-      {/* Dev mode toggle (only in development with user_opt_in) */}
-      {isDev && !isMetaTurn && (
-        <button
-          onClick={() => setShowDevMode(!showDevMode)}
-          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-white/50 transition-colors hover:bg-white/5 hover:text-white/70"
-        >
-          <span>{showDevMode ? '← User view' : '→ Dev view'}</span>
-        </button>
-      )}
     </div>
   );
 }

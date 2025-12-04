@@ -1,7 +1,7 @@
 'use client';
 
 import { createPortal } from 'react-dom';
-import type { ChatMessage } from '@portfolio/chat-contract';
+import type { ChatMessage, PartialReasoningTrace } from '@portfolio/chat-contract';
 import type { ChatSurfaceState } from '@portfolio/chat-next-ui';
 import { ChatMessageBubble } from '@/components/chat/ChatMessageBubble';
 import { ChatActionSurface } from '@/components/chat/ChatActionSurface';
@@ -29,7 +29,15 @@ function ThinkingSpinner() {
 
 export function ChatThread({ messages, isBusy }: ChatThreadProps) {
   const { uiState, reasoningTraces, reasoningEnabled, completionTimes } = useChat();
+  const isDev = process.env.NODE_ENV === 'development';
   const surfaces = uiState.surfaces ?? [];
+  const hasRenderableTrace = (trace: PartialReasoningTrace | null | undefined) => {
+    if (!trace) return false;
+    const planHasQueries = Boolean(trace.plan && (trace.plan.queries?.length ?? 0) > 0);
+    const retrievalRan = Boolean(trace.retrieval && trace.retrieval.length);
+    const answerWithPlan = Boolean(planHasQueries && trace.answer);
+    return planHasQueries || retrievalRan || answerWithPlan || Boolean(trace.error);
+  };
   const lastAssistantMessage = messages
     .slice()
     .reverse()
@@ -42,22 +50,15 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
       ? lastAssistantMessageId
       : undefined;
 
-  // Show thinking spinner when busy and assistant hasn't started producing content
+  // Show thinking spinner when busy and assistant hasn't started producing content (before streaming message exists)
   const lastMessage = messages[messages.length - 1];
   const lastMessageAssistant = lastMessage?.role === 'assistant' ? lastMessage : undefined;
-  const assistantHasContent = lastMessageAssistant?.parts?.some(
-    (p) => p.kind === 'text' && p.text.trim().length > 0
-  );
-  const currentTrace = streamingAssistantMessageId
-    ? reasoningTraces[streamingAssistantMessageId]
-    : null;
-  // Meta/chitchat turns hide the reasoning panel, so we need spinner to persist
-  const isMetaTurn = currentTrace?.plan?.questionType === 'meta' || currentTrace?.answerMeta?.questionType === 'meta';
-  const hasRenderableTrace =
-    currentTrace &&
-    (currentTrace.plan || currentTrace.retrieval || currentTrace.evidence || currentTrace.answerMeta || currentTrace.error);
-  const reasoningWillDisplay = reasoningEnabled && !isMetaTurn && hasRenderableTrace;
-  const showPendingThinking = isBusy && !assistantHasContent && !reasoningWillDisplay;
+  const assistantHasContent = lastMessageAssistant?.parts?.some((p) => p.kind === 'text' && p.text.trim().length > 0);
+  const currentTrace = streamingAssistantMessageId ? reasoningTraces[streamingAssistantMessageId] : null;
+  const hasRenderableCurrentTrace = hasRenderableTrace(currentTrace);
+  const reasoningWillDisplay = reasoningEnabled && hasRenderableCurrentTrace;
+  const showPendingThinking =
+    isBusy && !assistantHasContent && !reasoningWillDisplay && !streamingAssistantMessageId;
 
   const fallbackAnchorId = '__chat-surface-fallback__';
   const actionableSurfaces = surfaces.filter(hasSurfacePayload);
@@ -80,13 +81,21 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
 
           // Check if next message is an assistant message with reasoning (completed)
           const nextMessage = messages[idx + 1];
-          const nextMessageHasReasoning =
+          const nextTrace = nextMessage?.role === 'assistant' ? reasoningTraces[nextMessage.id] ?? null : null;
+          const nextMessageHasUserReasoning =
             nextMessage?.role === 'assistant' &&
-            reasoningTraces[nextMessage.id] &&
-            streamingAssistantMessageId !== nextMessage.id;
+            streamingAssistantMessageId !== nextMessage.id &&
+            hasRenderableTrace(nextTrace);
+          const nextMessageHasDevReasoning =
+            nextMessage?.role === 'assistant' && streamingAssistantMessageId !== nextMessage.id && isDev && Boolean(nextTrace);
 
           // Check if next message is the streaming assistant message
           const nextIsStreaming = nextMessage?.role === 'assistant' && nextMessage.id === streamingAssistantMessageId;
+          const streamingTrace = streamingAssistantMessageId ? reasoningTraces[streamingAssistantMessageId] ?? null : null;
+          const streamingHasUserReasoning = hasRenderableTrace(streamingTrace);
+          const shouldRenderStreamingReasoning =
+            nextIsStreaming && ((reasoningEnabled && streamingHasUserReasoning) || isDev);
+          const shouldShowStreamingSpinner = nextIsStreaming && (!reasoningEnabled || !streamingHasUserReasoning);
 
           return (
             <div key={message.id} className="flex flex-col gap-2">
@@ -99,24 +108,27 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
               {message.role === 'user' && (
                 <>
                   {/* Completed reasoning for next message */}
-                  {nextMessageHasReasoning && (
+                  {(nextMessageHasUserReasoning || nextMessageHasDevReasoning) && (
                     <ChatReasoningDisplay
-                      trace={reasoningTraces[nextMessage.id]}
+                      trace={nextTrace}
                       show={reasoningEnabled}
                       isStreaming={false}
                       durationMs={calculateDuration(nextMessage)}
                     />
                   )}
                   {/* Streaming reasoning (if next message is the streaming one) */}
-                  {nextIsStreaming && reasoningEnabled && (
-                    <ChatReasoningDisplay
-                      trace={reasoningTraces[streamingAssistantMessageId] ?? null}
-                      show={reasoningEnabled}
-                      isStreaming={true}
-                    />
-                  )}
-                  {/* Fallback thinking spinner when reasoning is disabled */}
-                  {nextIsStreaming && !reasoningEnabled && <ThinkingSpinner />}
+                  {nextIsStreaming ? (
+                    <>
+                      {shouldRenderStreamingReasoning ? (
+                        <ChatReasoningDisplay
+                          trace={streamingTrace}
+                          show={reasoningEnabled}
+                          isStreaming={true}
+                        />
+                      ) : null}
+                      {shouldShowStreamingSpinner ? <ThinkingSpinner /> : null}
+                    </>
+                  ) : null}
                 </>
               )}
             </div>
@@ -153,7 +165,6 @@ function hasSurfacePayload(surface: ChatSurfaceState) {
     Boolean(surface.focusedProjectId) ||
     (surface.visibleProjectIds?.length ?? 0) > 0 ||
     (surface.visibleExperienceIds?.length ?? 0) > 0 ||
-    (surface.coreEvidenceIds?.length ?? 0) > 0 ||
     (surface.highlightedSkills?.length ?? 0) > 0
   );
 }

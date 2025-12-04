@@ -49,19 +49,6 @@ sequenceDiagram
     API->>F: event: stage (retrieval_complete)
     API->>F: event: reasoning { plan, retrieval }
 
-    %% Evidence
-    API->>F: event: stage (evidence_start)
-    ORC->>OAI: Evidence LLM call\n(plan + retrieved docs)
-    OAI-->>ORC: EvidenceSummary JSON
-    ORC-->>API: EvidenceSummary
-    API->>F: event: stage (evidence_complete)
-    API->>F: event: reasoning { plan, retrieval, evidence }
-    API->>F: event: ui (UiPayload\nderived from Evidence)
-    opt host UI actions or downloads
-        API->>F: event: ui_actions { actions }\n(optional highlight/scroll/filter)
-        API->>F: event: attachment { ... }\n(optional download payloads)
-    end
-
     %% Answer (streaming)
     API->>F: event: stage (answer_start)
     ORC->>OAI: Answer LLM call\n(streaming)
@@ -80,7 +67,8 @@ sequenceDiagram
     OAI-->>ORC: final AnswerPayload JSON
     ORC-->>API: AnswerMeta (token counts, etc.)
     API->>F: event: stage (answer_complete)
-    API->>F: event: reasoning { plan, retrieval, evidence, answerMeta }
+    API->>F: event: reasoning { plan, retrieval, answer }
+    API->>F: event: ui (UiPayload\nderived from Answer.uiHints)
     alt output moderation enabled
         API->>OAI: Output moderation check\n(buffered text)
         alt flagged

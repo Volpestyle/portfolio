@@ -6,9 +6,7 @@ function parseTags(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
-  return value
-    .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
-    .filter(Boolean);
+  return value.map((entry) => (typeof entry === 'string' ? entry.trim() : '')).filter(Boolean);
 }
 
 export async function GET(req: Request) {

@@ -5,9 +5,7 @@ function normalizeTags(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
-  return value
-    .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
-    .filter(Boolean);
+  return value.map((entry) => (typeof entry === 'string' ? entry.trim() : '')).filter(Boolean);
 }
 
 type RouteContext = { params: Promise<{ slug: string }> };

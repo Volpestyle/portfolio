@@ -14,7 +14,7 @@ flowchart LR
     end
 
     subgraph UI_STATE["UI & Progress State"]
-      STAGE["Pipeline progress + meta\n(planner / retrieval / evidence / answer)"]
+      STAGE["Pipeline progress + meta\n(planner / retrieval / answer)"]
       CARDS["Cards state\n(showProjects, showExperiences)"]
       ACTIONS["UI actions queue\n(ui_actions events)"]
       ATTACH["Attachments/downloads\n(event: attachment)"]
@@ -23,7 +23,7 @@ flowchart LR
     end
 
     subgraph DEVTOOLS["Optional Dev Reasoning UI"]
-      REASON["PartialReasoningTrace\n(plan, retrieval, evidence, answerMeta)"]
+      REASON["PartialReasoningTrace\n(plan, retrieval, answer)"]
     end
   end
 

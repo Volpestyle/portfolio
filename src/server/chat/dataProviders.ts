@@ -1,4 +1,9 @@
-import type { ExperienceRepository, ProfileRepository, ProjectDetailProvider, ProjectRepository } from '@portfolio/chat-data';
+import type {
+  ExperienceRepository,
+  ProfileRepository,
+  ProjectDetailProvider,
+  ProjectRepository,
+} from '@portfolio/chat-data';
 import { chatProviders } from './bootstrap';
 
 export type {

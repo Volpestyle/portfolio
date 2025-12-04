@@ -1,6 +1,6 @@
 # Portfolio Chat Engine — Architecture & Design Spec (vNext · 2025‑11‑23)
 
-Single‑owner “talk to my portfolio” engine (reconfigurable per deployment), built as a staged RAG pipeline with explicit question typing and evidence‑driven UI.
+Single‑owner “talk to my portfolio” engine (reconfigurable per deployment), built as a staged RAG pipeline with a lightweight planner, retrieval, and an answerer that owns UI hints.
 
 ---
 
@@ -24,20 +24,19 @@ At a high level:
     - Projects, resume‑like experiences, profile text, persona summary.
     - Embedding indexes for semantic retrieval.
 - **Pipeline**
-  - Planner → Retrieval → Evidence → Answer.
-  - All stages use the OpenAI Responses API with structured JSON output.
-  - Planner sets questionType, enumeration, scope, and whether cards are enabled.
+  - Planner → Retrieval → Answer (no Evidence stage).
+  - All LLM stages use the OpenAI Responses API with structured JSON output.
+  - Planner emits search queries + cards toggle; Answer owns uiHints (card IDs).
 - **Outputs**
   - Streamed answer text in first person ("I…").
-  - Evidence‑aligned UI hints:
-    - Project / experience IDs chosen by the Evidence stage via uiHints.
-    - Optional per‑turn reasoning trace (plan, retrieval, evidence, answer metadata), streamed only when requested per run.
+  - Answer‑aligned UI hints (uiHints.projects / uiHints.experiences) that map to retrieved docs.
+  - Optional per‑turn reasoning trace (plan, retrieval, answer metadata), streamed only when requested per run.
 
 **Design goals**
 
 - Grounded – Only asserts facts present in the owner's portfolio data.
-- Evidence‑aligned UI – Cards and lists shown to the user come from the Evidence stage, not raw retrieval.
-- Question‑aware – Planner distinguishes binary vs lists vs narratives vs meta and encodes completeness/scope expectations.
+- Answer‑aligned UI – Cards and lists shown to the user come from Answer.uiHints (validated against retrieval).
+- Query‑aware – Planner emits targeted queries and a cards toggle; Answer infers tone/structure from the question.
 - Observable – Every turn has a structured reasoning trace and token metrics.
 - Composable – Orchestrator and UI are decoupled via a clean SSE contract.
 - Reusable – Driven by OwnerConfig and data providers; domain-agnostic.
@@ -79,58 +78,36 @@ For a given owner (person / team / org), users should be able to:
 
 Per chat turn, the engine MUST:
 
-- Classify the user message into cross‑cutting axes:
-
-  ```ts
-  type QuestionType = 'binary' | 'list' | 'narrative' | 'meta';
-  type EnumerationMode = 'sample' | 'all_relevant';
-  type ExperienceScope = 'employment_only' | 'any_experience';
-  ```
-
-- Decide which corpora to search (projects, resume, profile), or when no retrieval is needed.
-- Run retrieval over precomputed indexes when requested:
+- Build a set of retrieval queries across `projects`, `resume`, and/or `profile`, plus a `cardsEnabled` flag. Empty queries are allowed for greetings/meta or when the conversation already contains the needed facts.
+- Run retrieval over precomputed indexes when queries are present:
   - BM25 shortlist.
   - Embedding re‑ranking.
   - Recency‑aware scoring.
-  - Higher‑recall mode when enumeration = 'all_relevant'.
-- Produce:
-  - A high‑level verdict and confidence:
-
-    ```ts
-    type Verdict = 'yes' | 'no_evidence' | 'partial_evidence' | 'n/a';
-    type Confidence = 'high' | 'medium' | 'low';
-    ```
-
-  - A core evidence set to support the answer.
-  - An EvidenceSummary.uiHints with ordered lists of relevant project / experience IDs.
-  - A user‑facing answer in first person (“I”).
-
+- Produce an AnswerPayload:
+  - `message` in first person (“I”).
+  - Optional `thoughts` (dev-only).
+  - Optional `uiHints` with ordered project/experience IDs (subset of retrieved docs).
 - Stream back to the frontend:
   - Answer tokens.
-  - UI hints derived from Evidence.uiHints (which project / experience cards to render).
-  - Optional incremental reasoning trace (plan → retrieval → evidence → answer).
-
-In addition, the Planner MAY set `retrievalRequests = []` when:
-
-- The question can be fully answered from recent conversation context and persona, or
-- The message is purely meta / chit‑chat.
+  - UI payload derived from Answer.uiHints (which project / experience cards to render).
+  - Optional incremental reasoning trace (planner → retrieval → answer).
 
 ### 1.3 Non‑Functional Requirements
 
 - **Latency**
-  - Planner / Evidence use nano-class models; Answer uses nano or mini (mini recommended for voice adherence).
+  - Planner uses a nano-class model; Answer uses nano or mini (mini recommended for voice adherence).
   - Answer streams tokens as soon as they're available.
   - Target: time-to-first-visible-activity < 500ms, full response < 3s for typical turns.
-  - Note: Traditional TTFT (time-to-first-answer-token) is less critical here because the reasoning trace provides continuous visible feedback throughout the pipeline. Users see plan → retrieval summary → evidence summary → answer tokens as each stage completes. This progressive disclosure keeps perceived latency low even though multiple LLM calls run sequentially before the answer streams.
+  - Note: Traditional TTFT (time-to-first-answer-token) is less critical here because the reasoning trace provides continuous visible feedback throughout the pipeline. Users see plan → retrieval summary → answer tokens as each stage completes. This progressive disclosure keeps perceived latency low even though multiple LLM calls run sequentially before the answer streams.
 - **Cost**
-  - Runtime: Planner, Evidence → nano; Answer → nano or mini.
+  - Runtime: Planner → nano; Answer → nano or mini.
   - Preprocessing (offline): full-size model and text‑embedding‑3‑large for one‑time work.
   - Track tokens & estimated USD cost for both preprocessing and runtime.
   - See `docs/features/chat/rate-limits-and-cost-guards.md` for cost alarms and rate limiting.
 - **Safety & Grounding**
   - Only asserts facts present in the owner's portfolio data (projects / resume / profile / persona).
-  - UI cards must be consistent with the text answer and underlying evidence.
-  - Clear behavior when evidence is missing or weak.
+  - UI cards must be consistent with the text answer and retrieved docs.
+  - Clear behavior when retrieval is empty or weak.
   - Basic moderation for user inputs (and optionally outputs).
 - **Abuse Prevention**
   - Per-IP rate limiting via Upstash Redis (see §1.4 for implementation details).
@@ -152,7 +129,7 @@ Per-IP Upstash Redis limiter: 5/min, 40/hr, 120/day. Fail-closed if Redis or IP 
 
 ### 1.5 Cost Monitoring & Alarms
 
-Runtime budget defaults to $10/month (override via `CHAT_MONTHLY_BUDGET_USD`) with warn/critical/exceeded thresholds at $8/$9.50/$10. Dynamo tracks spend per calendar month; CloudWatch/SNS alarm uses a rolling 30-day sum of daily cost metrics. Runtime only (Planner/Evidence/Answer + embeddings). See `docs/features/chat/implementation-notes.md#12-cost-monitoring--alarms` for Dynamo/CloudWatch/SNS wiring.
+Runtime budget defaults to $10/month (override via `CHAT_MONTHLY_BUDGET_USD`) with warn/critical/exceeded thresholds at $8/$9.50/$10. Dynamo tracks spend per calendar month; CloudWatch/SNS alarm uses a rolling 30-day sum of daily cost metrics. Runtime only (Planner/Answer + embeddings). See `docs/features/chat/implementation-notes.md#12-cost-monitoring--alarms` for Dynamo/CloudWatch/SNS wiring.
 
 > **Implementation note:** Budget enforcement happens in the Next.js `/api/chat` route. The orchestrator emits per-stage `StageUsage` with `costUsd`; the route aggregates and blocks turns that would exceed the Dynamo-tracked monthly budget.
 
@@ -175,7 +152,7 @@ _Figure 2.0: High-level runtime architecture showing the flow between client, se
 - **Frontend (Next.js app)**
   - Chat UI (dock, thread, composer, attachments).
   - Portfolio UI: project cards, resume / experience views rendered by the host app.
-  - Cards are driven by EvidenceSummary.uiHints, not raw retrieval (engine returns IDs; consumer renders components).
+  - Cards are driven by Answer.uiHints, not raw retrieval (engine returns IDs; consumer renders components).
   - Optional reasoning/debug UI built by the host app using emitted reasoning data; the engine ships data, not a built-in drawer/toggle.
 - **Chat API (Next.js route `/api/chat`)**
   - Accepts chat requests with history (and a fixed ownerId for the deployment) plus a client‑assigned assistant message ID; requests with any other ownerId are rejected (single-owner only).
@@ -183,18 +160,16 @@ _Figure 2.0: High-level runtime architecture showing the flow between client, se
   - Runs the orchestrator pipeline.
   - Streams back SSE events: stage, reasoning, token, item, ui, attachment, ui_actions, done, error.
 - **Orchestrator (packages/chat-orchestrator)**
-  - Pure implementation of Planner → Retrieval → Evidence → Answer.
+  - Pure implementation of Planner → Retrieval → Answer (three stages).
   - Assembles ReasoningTrace and UiPayload.
-  - Enforces invariants (e.g. no evidence → no_evidence answer).
   - Handles retrieval reuse within the sliding window where applicable.
-  - Derives UI exclusively from Evidence (uiHints or selectedEvidence), never from retrieval “extras”.
+  - Derives UI from Answer.uiHints, validated against retrieved docs.
 - **Retrieval & Data Layer (packages/chat-data)**
   - Corpus loaders from generated/.
   - BM25 search + embedding re‑ranking + recency scoring.
-  - Recall‑boosted retrieval when `enumeration = "all_relevant"`.
   - Process‑level and per‑session retrieval caching.
 - **LLM Integration**
-  - callPlanner, callEvidence, callAnswer wrappers over the OpenAI Responses API.
+  - callPlanner and callAnswer wrappers over the OpenAI Responses API.
   - Use `response_format: { type: "json_schema", json_schema: ... }`.
   - Answer stage streams AnswerPayload.message while capturing the full JSON (including optional thoughts).
 - **Preprocessing & Tooling (packages/chat-preprocess-cli)**
@@ -229,14 +204,11 @@ type OwnerConfig = {
 
 type ModelConfig = {
   plannerModel: string; // nano model id
-  evidenceModel: string; // nano model id (default)
-  evidenceModelDeepDive?: string; // optional mini model id for complex queries
   answerModel: string; // nano or mini model id (mini recommended for voice adherence)
-  answerTemperature?: number; // optional Answer-stage temperature (0-2; undefined uses model default)
   embeddingModel: string; // embedding model id
-  stageReasoning?: {
+  answerTemperature?: number; // optional Answer-stage temperature (0-2; undefined uses model default)
+  reasoning?: {
     planner?: ReasoningEffort; // minimal | low | medium | high (reasoning-capable models only)
-    evidence?: ReasoningEffort;
     answer?: ReasoningEffort;
   };
 };
@@ -251,7 +223,7 @@ type EmbeddingIndex = {
 
 type DataProviders = {
   projects: ProjectDoc[];
-  resume: ResumeDoc[]; // ExperienceRecord.linkedProjects populated by preprocessing
+  resume: ResumeDoc[];
   profile: ProfileDoc | null; // identity context is optional but recommended
   persona: PersonaSummary; // generated during preprocessing
   embeddingIndexes: {
@@ -264,14 +236,12 @@ type DataProviders = {
 // (models map directly to ModelConfig; reasoning is optional and only used on reasoning-capable models)
 /*
 models:
-  plannerModel: 'nano model'
-  evidenceModel: 'nano model'
-  answerModel: 'mini model'  # mini recommended for better voice/persona adherence
+  plannerModel: gpt-5-nano-2025-08-07
+  answerModel: gpt-5-mini-2025-08-07  # mini recommended for better voice/persona adherence
   embeddingModel: text-embedding-3-large
   reasoning:
-    planner: minimal
-    evidence: minimal
-    answer: minimal
+    planner: low
+    answer: low
 */
 
 // Server wiring uses createChatApi (packages/chat-next-api),
@@ -306,24 +276,23 @@ chatApi.run(openaiClient, messages, {
 });
 ```
 
-Model IDs for Planner/Evidence/Answer/Embeddings come from `chat.config.yml`; the strings in this spec are placeholders, not hardcoded defaults.
+Model IDs for Planner/Answer/Embeddings come from `chat.config.yml`; the strings in this spec are placeholders, not hardcoded defaults.
 
-Planner quality note: on reasoning-capable models, set `stageReasoning.planner` to `low` or higher—`minimal` tends to reduce plan accuracy and produces less inclusive retrieval coverage.
+Planner quality note: on reasoning-capable models, set `reasoning.planner` to `low` or higher—`minimal` tends to reduce plan accuracy and produces less inclusive retrieval coverage.
 
 Reasoning emission is a per-run option (`reasoningEnabled`), not part of the runtime config.
 
-Placeholders note: In prompts (Appendix B) we use `{{OWNER_NAME}}` and `{{DOMAIN_LABEL}}` as template placeholders. Runtime must replace those using `OwnerConfig.ownerName` and `OwnerConfig.domainLabel` before sending prompts to the LLM.
+Placeholders note: In prompts (see `packages/chat-orchestrator/src/pipelinePrompts.ts`) we use `{{OWNER_NAME}}` and `{{DOMAIN_LABEL}}` as template placeholders. Runtime must replace those using `OwnerConfig.ownerName` and `OwnerConfig.domainLabel` before sending prompts to the LLM.
 
 ### 2.3 Pipeline Overview
 
 Quick at-a-glance view of purpose, inputs/outputs, and primary tech. See §5 for detailed behavior and prompts.
 
-| Stage     | Purpose                                                        | Inputs                                                                                  | Outputs                                                                                  | Primary tech                                                                                                                         |
-| --------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Planner   | Normalize ask into structured intent + retrieval strategy      | Latest user message + short history; OwnerConfig + persona baked into system prompt     | RetrievalPlan (questionType, enumeration, scope, cardsEnabled, retrievalRequests, topic) | OpenAI Responses API (json schema) with `ModelConfig.plannerModel` (nano class)                                           |
-| Retrieval | Turn plan into ranked document sets                            | RetrievalPlan.retrievalRequests + corpora (projects/resume/profile) + embedding indexes | Retrieved docs per source (scored and filtered)                                          | MiniSearch BM25 + text-embedding-3-large re-rank + recency scoring (projects/resume); profile short-circuited                        |
-| Evidence  | Decide truth/confidence; own UI hints as source of truth       | RetrievalPlan + retrieved docs + latest user message                                    | EvidenceSummary (verdict, confidence, selectedEvidence, uiHints, semanticFlags)          | OpenAI Responses API with `ModelConfig.evidenceModel` (nano) or `evidenceModelDeepDive` (mini class) when set             |
-| Answer    | Turn evidence into first-person text without re-deciding truth | RetrievalPlan + EvidenceSummary + persona/profile + short history                       | AnswerPayload (message + optional thoughts)                                              | OpenAI Responses API with `ModelConfig.answerModel` (nano or mini; mini recommended for voice adherence), streaming tokens           |
+| Stage     | Purpose                                                           | Inputs                                                                                | Outputs                                                                                                  | Primary tech                                                                                                               |
+| --------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Planner   | Decide what to search + whether cards should render               | Latest user message + short history; OwnerConfig + persona baked into system prompt   | PlannerLLMOutput (`queries[]`, `cardsEnabled`, optional `topic`)                                         | OpenAI Responses API (json schema) with `ModelConfig.plannerModel` (nano class)                                            |
+| Retrieval | Turn planner queries into ranked document sets                    | PlannerLLMOutput.queries + corpora (projects/resume/profile) + embedding indexes      | Retrieved docs per source (scored and filtered)                                                          | MiniSearch BM25 + text-embedding-3-large re-rank + recency scoring (projects/resume); profile short-circuited              |
+| Answer    | Turn retrieval into first-person text + UI hints (cards)         | PlannerLLMOutput + retrieved docs + persona/profile + short history                   | AnswerPayload (message + optional thoughts + optional uiHints.projects/experiences)                      | OpenAI Responses API with `ModelConfig.answerModel` (nano or mini; mini recommended for voice adherence), streaming tokens |
 
 ---
 
@@ -337,7 +306,7 @@ Portfolio corpora are typed artifacts produced by chat-preprocess-cli and loaded
 
 ### 3.0 Notes
 
-All generated corpora (projects, resume, profile) are assumed safe for chat use; there is no doc safety taxonomy or override mechanism in this spec. Evidence treats all retrieved docs as eligible; filtering is purely based on relevance/grounding, not sensitivity.
+All generated corpora (projects, resume, profile) are assumed safe for chat use; there is no doc safety taxonomy or override mechanism in this spec. Retrieved docs are all eligible for answering; filtering is purely based on relevance/grounding, not sensitivity.
 
 ### 3.1 Projects (GitHub gist + README‑only summarization)
 
@@ -455,8 +424,6 @@ type ExperienceRecord = {
   summary?: string | null;
   bullets: string[];
   skills: string[]; // free-form: "LLM", "PyTorch", "Kubernetes", "React"
-
-  linkedProjects?: string[]; // ProjectDoc ids, filled by cross-corpus linking (see §3.5)
   monthsOfExperience?: number | null; // derived from start/end dates when possible
   impactSummary?: string | null;
   sizeOrScope?: string | null;
@@ -517,14 +484,16 @@ type ResumeDoc = ExperienceRecord | EducationRecord | AwardRecord | SkillRecord;
      - “Awards” / “Honors”.
    - Group lines under headings.
 3. **LLM structuring (full-size LLM)**
-  - Use a full-size model with a schema‑driven prompt to map the extracted resume text into ExperienceRecord[], EducationRecord[], AwardRecord[], SkillRecord[].
-  - Instructions:
-     - Preserve exact company/school/job titles.
-     - Normalize `startDate`/`endDate` into YYYY-MM or similar.
-     - Extract bullets as arrays.
-     - Populate skills with explicit tools, frameworks, and domains mentioned.
-     - Classify each experience into `experienceType` ("full_time", "internship", "contract", "freelance", "other") based on role, keywords, and context.
-     - Do not invent employers, degrees, or skills that aren’t in the PDF.
+
+- Use a full-size model with a schema‑driven prompt to map the extracted resume text into ExperienceRecord[], EducationRecord[], AwardRecord[], SkillRecord[].
+- Instructions:
+  - Preserve exact company/school/job titles.
+  - Normalize `startDate`/`endDate` into YYYY-MM or similar.
+  - Extract bullets as arrays.
+  - Populate skills with explicit tools, frameworks, and domains mentioned.
+  - Classify each experience into `experienceType` ("full_time", "internship", "contract", "freelance", "other") based on role, keywords, and context.
+  - Do not invent employers, degrees, or skills that aren’t in the PDF.
+
 4. **Duration computation (monthsOfExperience)**
    - For each ExperienceRecord with a valid start/end range:
      - Compute `monthsOfExperience` as the month‑difference between `startDate` and `endDate` (or current month if `endDate` is null and `isCurrent` is true).
@@ -565,6 +534,17 @@ type PersonaSummary = {
   shortAbout: string; // 1‑2 line self‑intro
   styleGuidelines: string[]; // writing style instructions
   voiceExamples?: string[]; // example user/chatbot exchanges showing desired tone
+  profile?: {
+    updatedAt?: string;
+    fullName?: string;
+    headline?: string;
+    location?: string;
+    currentRole?: string;
+    about?: string[];
+    topSkills?: string[];
+    socialLinks?: string[]; // URL-only list
+    featuredExperienceIds?: string[];
+  };
   generatedAt: string;
 };
 ```
@@ -656,103 +636,6 @@ Semantic enrichment is purely free‑form:
   - Populates skills with tools/frameworks/domains.
 - There is no fixed tag vocabulary; the model can use any phrasing justified by the README or resume text. Modern embeddings plus this enrichment allow broad queries like “what AI projects have you done?” to hit projects with varied wording.
 
-#### 3.5.1 Cross-corpus linking
-
-Cross-corpus linking connects projects to the jobs/experiences where they were built. This is done **manually via the gist**, not automatically.
-
-**Design principle: Explicit is better than magic.** You know which projects you built at which company. Specify it directly in your `PortfolioRepoConfig` rather than relying on error-prone automatic matching.
-
-**How it works:**
-
-1. In your gist, add `linkedToCompanies` to each project:
-
-```json
-[
-  {
-    "repo": "you/payment-service",
-    "projectId": "payment-service",
-    "linkedToCompanies": ["Acme Corp"]
-  },
-  {
-    "repo": "you/analytics-dashboard",
-    "projectId": "analytics-dashboard",
-    "linkedToCompanies": ["Acme Corp", "BigCo"]
-  },
-  {
-    "repo": "you/side-project",
-    "projectId": "side-project"
-  }
-]
-```
-
-2. Preprocessing extracts company names from your resume and outputs them:
-
-```
-$ pnpm preprocess
-
-📋 Found experiences (use these exact company names in linkedToCompanies):
-   • "Acme Corp" — Senior Engineer (2022-01 to present)
-   • "BigCo" — Software Engineer (2020-03 to 2021-12)
-   • "StartupCo" — Intern (2019-06 to 2019-08)
-```
-
-3. Preprocessing matches `linkedToCompanies` → experiences by **exact company name match** (case-insensitive):
-
-```ts
-function linkProjectsToExperiences(
-  projects: PortfolioRepoConfig[],
-  experiences: ExperienceRecord[],
-  logger: Logger
-): void {
-  // Build company → experience lookup
-  const companyToExperiences = new Map<string, ExperienceRecord[]>();
-  for (const exp of experiences) {
-    if (exp.kind !== 'experience') continue;
-    const key = exp.company.toLowerCase().trim();
-    const list = companyToExperiences.get(key) ?? [];
-    list.push(exp);
-    companyToExperiences.set(key, list);
-  }
-
-  // For each project with linkedToCompanies, find matching experiences
-  for (const proj of projects) {
-    if (!proj.linkedToCompanies?.length) continue;
-
-    for (const companyName of proj.linkedToCompanies) {
-      const key = companyName.toLowerCase().trim();
-      const matchingExps = companyToExperiences.get(key);
-
-      if (!matchingExps) {
-        logger.warn(`No experience found for company "${companyName}" (project: ${proj.projectId})`);
-        continue;
-      }
-
-      // Add this project to each matching experience's linkedProjects
-      for (const exp of matchingExps) {
-        exp.linkedProjects = exp.linkedProjects ?? [];
-        if (!exp.linkedProjects.includes(proj.projectId)) {
-          exp.linkedProjects.push(proj.projectId);
-        }
-      }
-    }
-  }
-}
-```
-
-**Key points:**
-
-- Use the **exact company name** from the preprocessing output
-- Case-insensitive matching (so "Acme Corp" matches "acme corp")
-- One project can link to multiple companies
-- Projects without `linkedToCompanies` are treated as personal/unaffiliated
-
-**Benefits:**
-
-- Enumeration questions ("Which projects did you ship at Acme Corp?") use `linkedProjects` directly
-- Narrative answers can tie employment history to concrete portfolio projects
-- No threshold tuning, no embedding comparisons, no surprises
-- You control exactly what links to what
-
 ### 3.6 Preprocessing Failure Modes
 
 **Design principle: No silent failures.** The preprocessing pipeline fails loudly with clear error messages. No fallback documents or partial outputs—if something fails, fix it and retry.
@@ -831,8 +714,6 @@ type PreprocessValidation = {
   hasResume: boolean;
   hasProfile: boolean;
 
-  // Cross-reference checks
-  linkedProjectsExist: boolean; // all ExperienceRecord.linkedProjects point to valid ProjectDoc.id
   corporaWithEmbeddingsComplete: boolean; // projects/resume embedding coverage required
 };
 
@@ -856,10 +737,6 @@ function validatePreprocessOutput(validation: PreprocessValidation): void {
     );
   }
 
-  if (!validation.linkedProjectsExist) {
-    throw new PreprocessError('PREPROCESS_INVALID_LINKS', 'Some linkedProjects reference non-existent project IDs');
-  }
-
   if (!validation.corporaWithEmbeddingsComplete) {
     throw new PreprocessError('PREPROCESS_INCOMPLETE_EMBEDDINGS', 'Projects and resume must have embeddings');
   }
@@ -880,92 +757,96 @@ When `incrementalBuild: true`:
 
 ### 4.1 Core Types & Reasoning
 
-Appendix A is the single source of truth for the runtime enums/unions (`QuestionType`, `EnumerationMode`, `ExperienceScope`, `Verdict`, `Confidence`, `RetrievalSource`, `EvidenceSource`, `EvidenceRelevance`) and the `ReasoningTrace` / `PartialReasoningTrace` shapes.
+Appendix A is the single source of truth for: `PlannerLLMOutput` (queries/cards toggle/topic), `AnswerPayload` (message/thoughts/uiHints), `UiPayload`, `ModelConfig`, and the `ReasoningTrace` / `PartialReasoningTrace` shapes. ReasoningTrace is a structured dev trace (plan → retrieval → answerMeta); PartialReasoningTrace streams when reasoning is enabled and mirrors the three pipeline stages (`planner`, `retrieval`, `answer`).
 
-> **Naming convention:** Retrieval sources use plural (`projects`, `resume`, `profile`) because they reference corpus collections. Evidence sources use singular (`project`, `resume`, `profile`) because they reference individual documents.
+### 4.2 Planner Output (`PlannerLLMOutput`)
 
-ReasoningTrace is a structured dev trace (plan → retrieval → evidence → answerMeta, including optional dev-only thoughts). PartialReasoningTrace streams when reasoning is enabled; any user-facing reasoning view is derived by the integrator.
+- `queries`: array of `{ source: 'projects' | 'resume' | 'profile'; text: string; limit?: number }`.
+- `cardsEnabled`: boolean (default true).
+- `topic?`: short telemetry label for logging only.
 
-### 4.2 Planner: RetrievalPlan
+Constraints and expectations:
 
-See Appendix A for the `RetrievalPlan` schema (`questionType`, `enumeration`, `scope`, `retrievalRequests`, `resumeFacets`, `cardsEnabled`, `topic`).
+- Queries may be empty for greetings/meta or when the latest turns already contain the necessary facts.
+- `limit` defaults to 8 when omitted; runtime clamps to safe bounds.
+- Queries should encode scope in text (e.g., “professional Go experience”, “AI/LLM projects”).
+- Use `cardsEnabled = false` for rollups/counts or pure bio/meta asks where cards add no value.
 
-`questionType`, `enumeration`, and `scope` are the cross-stage behavioral axes. Planner sets them directly instead of emitting derived flags like `enumerateAllRelevant` or `answerMode`. `cardsEnabled` replaces `uiTarget`, with `false` meaning text-only answers.
+### 4.3 AnswerPayload (combined)
 
-### 4.3 Evidence: EvidenceSummary
-
-See Appendix A for the `EvidenceSummary`, `SelectedEvidenceItem`, `SemanticFlag`, `EvidenceUiHints`, and `UiHintValidationWarning` schemas.
-
-```ts
-type UiHintValidationWarning = {
-  code: 'UIHINT_INVALID_PROJECT_ID' | 'UIHINT_INVALID_EXPERIENCE_ID';
-  invalidIds: string[];
-  retrievedIds: string[];
-};
-```
-
-The orchestrator validates `uiHints` against retrieved doc IDs. If Evidence returns IDs that were not retrieved (hallucinated/stale), they are filtered out and logged via `uiHintWarnings` for debugging.
+- `message`: first-person text answer.
+- `thoughts?`: optional dev-only trace.
+- `uiHints?`: `{ projects?: string[]; experiences?: string[] }` ordered by relevance.
 
 Constraints:
 
-- Semantic flags are only for shape issues: `multi_topic`, `ambiguous`, `needs_clarification`, `off_topic`. Do not encode uncertainty there; use `confidence`.
-- For non‑meta questions, if there is truly no evidence, use `verdict = "no_evidence"`, `confidence = "low"`, and empty `selectedEvidence`/`uiHints`.
-- For `questionType = "meta"`, verdict is typically `"n/a"`, confidence `"low"`, and evidence/uiHints stay empty.
-- Respect `cardsEnabled`: when false, uiHints may be left empty or populated for internal use, but the UI will suppress cards.
+- uiHints IDs must be subsets of retrieved docs; invalid IDs are dropped during UI derivation.
+- Omit uiHints (or leave arrays empty) when `cardsEnabled = false` or no cards are relevant.
+- Order matters; the UI preserves the returned order.
 
-### 4.4 UI Payload (driven by Evidence)
+### 4.4 UiPayload (derived from Answer.uiHints)
 
-See Appendix A for the `UiPayload` schema (cards + optional banner/core evidence ids).
+Simplified UI contract:
 
-Key invariants:
+```ts
+type UiPayload = {
+  showProjects: string[];
+  showExperiences: string[];
+};
+```
 
-- showProjects/showExperiences MUST come from Evidence (uiHints or selectedEvidence) and be subsets of retrieved docs.
-- Enumeration completeness is encoded in `plan.enumeration` + `uiHints`: when `enumeration = "all_relevant"`, `uiHints` is treated as the full relevant set for cards.
-- When `cardsEnabled = false`, renderers suppress cards even if uiHints is populated.
+Rules:
 
-### 4.5 Cross-Stage Invariants
+- Always filter to retrieved doc IDs and clamp lengths (implementation default: 10 per type).
+- When `cardsEnabled = false`, return empty arrays even if uiHints was present.
+- No banner/core-evidence metadata; cards alone represent the UI surface.
 
-- **Zero-evidence behavior:** For non-meta questions with zero retrieved docs, Evidence returns `verdict: "no_evidence"` and `confidence: "low"` with empty `selectedEvidence/uiHints`; Answer carries that through without calling LLM when possible.
-- **Cards toggle:** `cardsEnabled = false` suppresses UI cards even if Evidence provides uiHints; downstream derivation always honors this toggle.
-- **Enumeration completeness:** When `enumeration = "all_relevant"`, uiHints is treated as the full relevant set; `buildUiArtifacts` does not fall back to selectedEvidence.
-- **Evidence as source of truth:** UI is derived strictly from Evidence (uiHints/selectedEvidence) filtered to retrieved IDs; retrieval extras or hallucinated IDs are ignored and logged via `uiHintWarnings`.
+### 4.5 Reasoning & Streaming Contract
+
+- `reasoning` SSE events may contain partial text deltas and structured trace fragments: `{ stage: 'planner' | 'retrieval' | 'answer', trace, delta?, notes?, progress? }`.
+- Stages stream cumulatively: planner (plan JSON), retrieval (per-query fetch progress + ranked summaries), answer (uiHints/metadata as soon as parsable plus token thinking).
+- Final trace is emitted on stage completion; deltas are append-only text to show “what the model is thinking” during streaming.
+
+### 4.6 Cross-Stage Invariants
+
+- Cards toggle: `cardsEnabled = false` forces empty UiPayload; Answer should avoid card-facing language in that case.
+- uiHints subset: Only IDs present in retrieved docs are allowed; drop/ignore hallucinated IDs.
+- Retrieval reuse: If queries are empty, retrieval is skipped; Answer must honestly state when no relevant portfolio data is available.
+- UI alignment: Cards shown must align with the textual answer; uiHints is the only source of truth for card IDs.
 
 ---
 
 ## 5. LLM Pipeline
 
-![Portfolio Chat Engine - Pipeline Stage Internals](../../../generated-diagrams/portfolio-chat-pipeline-internals.png)
-
-_Figure 5.0: Pipeline stage internals showing the flow from incoming request through Planner, Retrieval, Evidence, and Answer stages._
+Three-stage pipeline: Planner → Retrieval → Answer (Evidence merged into Answer).
 
 All LLM interactions use the OpenAI Responses API with:
 
-- `response_format: { type: "json_schema", json_schema: ... }` for Planner, Evidence, and Answer.
-- Streaming enabled for Answer, while capturing the final JSON.
+- `response_format: { type: "json_schema", json_schema: ... }` for Planner and Answer.
+- Streaming enabled for Answer (and Planner JSON when supported), while capturing the final JSON.
 
 ### 5.0 Model Strategy
 
 All runtime model IDs are read from `chat.config.yml`. We refer to them using placeholder class names: nano model (low cost/latency), mini model (deeper reasoning when needed), and full-size model (strongest quality).
 
 - Offline (preprocess) – full-size model for enrichment & persona + text-embedding-3-large for embeddings.
-- Online (Planner/Evidence) – nano by default for cost/latency; Evidence may opt into a mini model for deep dives when configured.
-- Online (Answer) – nano or mini. Mini is recommended when voice examples are important, as it adheres to persona/voice guidelines more reliably than nano. Trade-off is slightly higher cost/latency.
+- Online Planner – nano by default for cost/latency.
+- Online Answer – nano or mini. Mini is recommended when voice examples are important, as it adheres to persona/voice guidelines more reliably than nano. Trade-off is slightly higher cost/latency.
 
 #### 5.0.1 Token Budgets & Sliding Window
 
 Sliding-window truncation keeps conversations going indefinitely while honoring per-stage token budgets. Clients generate stable `conversationId` per thread; the backend is stateless beyond the supplied messages.
 
-| Stage        | Max Input Tokens | Max Output Tokens | Notes                                |
-| ------------ | ---------------- | ----------------- | ------------------------------------ |
-| **Planner**  | 16,000           | 1,000             | Sliding window + system prompt       |
-| **Evidence** | 12,000           | 2,000             | Latest user message + retrieved docs |
-| **Answer**   | 16,000           | 2,000             | Sliding window + evidence context    |
+| Stage       | Max Input Tokens | Max Output Tokens | Notes                                          |
+| ----------- | ---------------- | ----------------- | ---------------------------------------------- |
+| **Planner** | 16,000           | 1,000             | Sliding window + system prompt                 |
+| **Answer**  | 16,000           | 2,000             | Sliding window + retrieved context + plan info |
 
 Runtime defaults:
 
 - Conversation window budget: ~8k tokens; always keep the last 3 turns.
 - Max user message: ~500 tokens; reject if longer.
-- Evidence gets the latest user message; Planner/Answer get the windowed history.
+- Answer sees retrieved docs + planner output; Planner sees the windowed history.
 - UI should surface a subtle "context truncated" hint when turns are dropped.
 - Token counts are computed with tiktoken (o200k_base), not character-length heuristics.
 
@@ -1000,309 +881,99 @@ const SLIDING_WINDOW_CONFIG = {
 
 ### 5.1 Planner
 
-- Purpose: Normalize the user's ask into structured intent and retrieval strategy.
+- Purpose: Normalize the user's ask into search queries and a cards toggle.
 - Model: `ModelConfig.plannerModel`.
 - Inputs:
-  - Planner system prompt (Appendix B / pipelinePrompts) with OwnerConfig/Persona placeholders resolved.
+  - Planner system prompt from `pipelinePrompts.ts` with OwnerConfig/Persona placeholders resolved.
   - Conversation window (last ~3 user + 3 assistant messages).
   - Latest user message.
 - Output:
-  - RetrievalPlan JSON.
+  - `PlannerLLMOutput` JSON (`queries`, `cardsEnabled`, `topic?`).
 
-See §4.5 Cross-Stage Invariants for zero-evidence handling, cards toggles, and enumeration completeness expectations carried through later stages.
+**Responsibilities (from the simplified prompt)**
 
-**Responsibilities**
+- Build targeted `queries` with explicit sources and key terms.
+- Set `cardsEnabled` (default true) — false for rollups/counts, pure bio, or meta/greetings.
+- Use empty `queries` for greetings/meta or when recent conversation suffices.
+- Fill `topic` with a short telemetry label (2–5 words).
 
-- Set the three axes: `questionType`, `enumeration`, and `scope`.
-- Decide whether cards should render (`cardsEnabled`, default true).
-- Set telemetry topic.
-- Populate `retrievalRequests` and optional `resumeFacets` with appropriate sources and queryText.
+**Query construction & routing**
 
-**Classification guardrails**
-
-- Never use `questionType = "meta"` when the user asks about the owner’s skills, projects, employment, education, location, or background.
-- Any “you/your” refers to the portfolio owner.
-- Travel/residence/location questions are portfolio questions (binary or list), not meta.
-
-**Enumeration & scope**
-
-- `enumeration = "all_relevant"` when the user asks for all/which/every item; default to `"all_relevant"` for list unless the user asks for “a couple” or “examples”.
-- `enumeration = "sample"` for binary/narrative and when the user signals brevity.
-- `scope = "employment_only"` only when the user constrains to jobs/companies/roles/tenure; internships count as employment. Otherwise default to `"any_experience"`.
+- Include key terms from the question; expand broad topics:
+  - AI/ML: “AI, ML, machine learning, LLM”.
+  - Frontend: “frontend, UI, UX, user interface”.
+  - Backend: “backend, server, API, database”.
+- Keep specific tools narrow (“Rust”, “Go”).
+- Locations: include variants (“New York, NYC, NY”).
+- Source guidance:
+  - Skills/tools → `projects` + `resume`.
+  - Employment → `resume`.
+  - Projects → `projects`.
+  - Bio/intro → `profile`.
+  - Location → `profile` + `resume`.
+- Default `limit` per query is 8 unless the model sets a lower/higher number within bounds.
 
 **Cards toggle**
 
-- `cardsEnabled = false` for attribute rollups/counts (“what languages do you know?”) or pure bio/profile asks where cards add no value.
-- Otherwise omit or set `cardsEnabled = true`.
+- `cardsEnabled = true` for most questions (project/experience cards are helpful).
+- `cardsEnabled = false` for rollups (“What languages do you know?”), pure bio, or meta/greetings.
 
-**Retrieval strategy**
+### 5.2 Retrieval
 
-- Choose sources deliberately (resume vs projects vs profile) rather than always using all.
-- Resume-only bias when employment/company-focused; projects-only when explicitly project/repo-focused; profile when bio/meta/background benefits.
-- TopK guidance (runtime clamps per-source `topK` to 10; enumeration expands overall recall to ~50 docs before Evidence):
-  - `questionType = "binary"` → modest topK (~5 per source, clamped to 10).
-  - `questionType = "narrative"` or `questionType = "list"` → stay within the per-source clamp unless `enumeration = "all_relevant"` bumps recall.
-- `questionType = "meta"` → usually no retrieval, or tiny profile lookup.
-- Multi-tool/multi-topic questions should include all tools in `queryText` (e.g., “Go and Rust experience”) or use multiple requests.
-- Location/travel questions use precise place strings and include resume (and optionally profile).
-- Profile may be auto-included for `questionType = "narrative"` and `"meta"` even if not requested; request it explicitly when helpful for other types.
-- Domain-level query expansion is allowed for broad topics (e.g., “AI, machine learning, ML, LLMs, computer vision”); avoid expanding narrow tools.
-
-**Topic formatting**
-
-Use short noun phrases (2–5 words), e.g., “Go experience”, “AWS background”, “Go and Rust experience”.
-
-**Orchestrator post‑processing**
-
-- Validates that `retrievalRequests` align with the plan (e.g., non-empty unless meta/no-retrieval).
-- Clamps `topK` values to configured bounds and may raise `topK` in enumeration mode.
-
-### 5.1.1 Plan Normalization
-
-After receiving the Planner's output, the orchestrator normalizes it:
-
-**Validation**
-
-- `questionType`, `enumeration`, and `scope` are coerced to valid enum values (fallback defaults applied).
-- `cardsEnabled` defaults to `true` when omitted.
-- `resumeFacets` is filtered to valid values; `education` is dropped when `scope = employment_only`.
-
-**Retrieval request processing**
-
-- Deduplicate by `source:queryText.toLowerCase()`.
-- Clamp `topK` into the `[3, 10]` range.
-- For `questionType = "meta"`, only `profile` source requests are honored.
-
-**Backfill logic**
-
-When `retrievalRequests` are insufficient for non-meta questions:
-
-1. Infer retrieval focus from existing requests, scope, and resumeFacets.
-2. If focus is `resume` but no resume request exists, add one with `topK = 3`.
-3. If focus is `projects` but no projects request exists, add one with `topK = 3`.
-4. If focus is `mixed`, ensure both sources are present.
-
-Backfill is skipped when:
-
-- Planner explicitly set `retrievalRequests = []` (no-retrieval intent).
-- All requests are `profile`-only.
-- `questionType = "meta"`.
-
-### 5.2 Retrieval (with Enumeration Mode)
-
-- Purpose: Turn the plan's retrieval requests into scored document sets per source.
+- Purpose: Execute planner queries and return scored document sets per source.
 - Inputs:
-  - RetrievalPlan.retrievalRequests (plus questionType/enumeration/scope) from Planner.
+  - PlannerLLMOutput.queries.
   - Corpora + embedding indexes (projects, resume) and the profile doc.
 - Output:
-  - Retrieved docs per source, scored and filtered for Evidence.
+  - Retrieved docs per source, scored and filtered for the Answer stage.
 
-See §4.5 for cross-stage invariants on zero-evidence handling, cards, and enumeration completeness.
+Processing steps:
 
-For each `RetrievalRequest`: BM25 shortlist → embedding re-rank → recency weighting → combined score. Profile is auto-included for `questionType = narrative|meta`; otherwise only when the Planner explicitly requests it. `enumeration = "all_relevant"` bumps recall (up to ~50 docs) so Evidence/uiHints can cover everything; `scope = employment_only` filters resume results to jobs/internships; `resumeFacets` optionally bias resume retrieval.
-
-Implementation details (scoring weights, MiniSearch BM25 usage, recency decay, scope/resume facet filters) live in `docs/features/chat/implementation-notes.md#3-retrieval-pipeline-internals`.
+- Deduplicate queries by `{ source, text.toLowerCase().trim() }`.
+- Clamp `limit` into a safe range (implementation default: 3–10).
+- BM25 shortlist → embedding re-rank → recency weighting → combined score.
+- Profile is short-circuited (no embeddings) and included when requested or when the question is clearly bio/meta.
+- Per-turn results may be reused when the same query repeats within the sliding window.
+- Keep total retrieved docs bounded to avoid Answer prompt bloat (implementation default ~12 docs across sources). Profile is only fetched when the planner requests it.
 
 **Query sanitization**
 
-- Strip noise words from `queryText` before retrieval: `projects`, `project`, `experiences`, `experience`, `resume`.
+- Strip noise words from query text: `projects`, `project`, `experiences`, `experience`, `resume`.
 - If sanitization yields an empty string, fall back to the original query.
 - Prevents overly broad matches for asks like "show me your projects."
 
-**Linked project resolution**
+### 5.3 Answer (cards-aware, evidence folded in)
 
-When `scope = employment_only`, after retrieving experiences the orchestrator auto-fetches projects referenced in `ExperienceRecord.linkedProjects` so employment-focused asks can still surface linked project cards.
-
-**Caching & reuse**
-
-- Retrieval drivers memoize searchers and doc maps per owner.
-- Planner cache keyed by `{ ownerId, conversationSnippet }`; follow-up detection is best-effort from the sliding window, and once older context falls out of the window the turn is treated as a new topic.
-- Retrieval results can be reused for identical `{ source, queryText }` pairs within the active conversation window; otherwise the orchestrator reruns retrieval per turn.
-
-### 5.2.1 Evidence Input Limiting
-
-Before passing docs to Evidence, the orchestrator limits them to prevent context overflow.
-
-**For `enumeration = "all_relevant"`**
-
-- Cap total docs at 50 across all sources.
-- Score each doc by `_score` (retrieval score) with source-specific fallbacks.
-- Keep the top 50 by score.
-
-**For `enumeration = "sample"`**
-
-- Use priority buckets with per-source limits:
-
-| Source | Base Limit | Priority Factors |
-|--------|------------|------------------|
-| experiences | 6 | +2.5 if resume focus, +0.8 if `experience` facet, +0.8 if `employment_only` |
-| projects | 6 | +2.5 if projects focus |
-| education | 4 | +1.5 if `education` facet |
-| awards | 4 | +1.2 if `award` facet |
-| skills | 4 | +1.2 if `skill` facet |
-
-- Sort buckets by priority descending.
-- Allocate docs from each bucket until total reaches 12.
-- Profile is always included if retrieved.
-
-### 5.3 Evidence (with uiHints)
-
-- Purpose: Decide truth/confidence and own the UI hints as the single source of truth.
-- Model: Default `ModelConfig.evidenceModel`; deep dives use `ModelConfig.evidenceModelDeepDive` when set (triggered when topic length ≥ 18 chars or retrieved doc volume is high: ≥ 12 docs, or ≥ 8 with `enumeration = "all_relevant"`), else default.
-- Inputs:
-  - Evidence system prompt (Appendix B / pipelinePrompts).
-  - Latest user message.
-  - RetrievalPlan.
-  - Retrieved docs (projects, resume, profile).
-- Output:
-  - EvidenceSummary JSON.
-
-For zero-evidence behavior, cards toggles, and enumeration completeness rules, see §4.5 Cross-Stage Invariants.
-
-**Responsibilities**
-
-- Decide `verdict` and `confidence`.
-- Build `selectedEvidence` (2–6 best items).
-- Populate `uiHints` in line with `questionType`, `enumeration`, `scope`, and `cardsEnabled`.
-- Set semantic flags only for shape issues (`multi_topic`, `ambiguous`, `needs_clarification`, `off_topic`).
-
-**Evidence hygiene (preventing over-claiming)**
-
-- Only include items in `selectedEvidence` that **directly support** the verdict.
-- Contextual information (e.g., current location when the question is about past travel) belongs in `reasoning` but NOT in `selectedEvidence` unless it directly answers the question.
-- `uiHints` must mirror only the truly supporting items—never pad with tangentially related entries.
-- When there is exactly one supporting item, do not include low-relevance "nearby" items that might tempt the Answer stage to pluralize.
-
-**Enumeration & cards (canonical)**
-
-- `enumeration = "all_relevant"` → Evidence aims to surface essentially all relevant project/experience IDs in `uiHints`; UI treats these as the full set (no fallback to `selectedEvidence`).
-- `enumeration = "sample"` → `uiHints` is representative, not exhaustive.
-- deriveUi still filters to retrieved docs and obeys `cardsEnabled`, but it trusts `uiHints` completeness when `enumeration = "all_relevant"`.
-
-**Verdict + confidence**
-
-- `verdict`: "yes" | "no_evidence" | "partial_evidence" | "n/a".
-- `confidence`: "high" | "medium" | "low".
-- If `questionType !== "meta"` and there is truly no relevant evidence (see §5.5):
-  - verdict = "no_evidence"
-  - confidence = "low"
-  - selectedEvidence = []
-  - uiHints empty or omitted.
-- For `questionType = "meta"`, verdict is typically "n/a" with low confidence and empty evidence/uiHints.
-
-**Semantic flags**
-
-- Only for shape issues (multi-topic, ambiguous, needs clarification, off-topic).
-- Every flag must include a short reason.
-- Do not use flags to encode uncertainty; that lives in `confidence`.
-
-**Cards and uiHints**
-
-- Respect `cardsEnabled`:
-  - When false, uiHints may be left empty or populated for internal use; the UI should suppress cards.
-- Behavior by questionType + enumeration:
-  - `binary`: focused supporting examples; quality over quantity. Include only items that directly prove the claim and drop adjacent entries.
-  - `list` + `enumeration = "all_relevant"`: try to cover all relevant projects/experiences from retrieved docs; order by importance/recency.
-  - `list` + `enumeration = "sample"`: representative subset.
-  - `narrative`: small curated set that tells the story.
-  - `meta`: usually empty.
-
-**Reasoning format**
-
-- `reasoning` is 2–6 sentences, single paragraph.
-- Cover interpretation, why the verdict/confidence were chosen, and why selectedEvidence/uiHints were picked.
-
-### 5.4 Answer (question‑aware, uiHints‑aware)
-
-- Purpose: Turn evidence into first-person text without re-deciding verdict or UI.
+- Purpose: Turn retrieval results into a grounded first-person answer and uiHints.
 - Model: `ModelConfig.answerModel`.
 - Inputs:
-  - Answer system prompt (Appendix B / pipelinePrompts).
+  - Answer system prompt from `pipelinePrompts.ts`.
   - Persona summary (PersonaSummary).
   - Identity context (OwnerConfig + ProfileDoc).
   - Conversation window.
   - Latest user message.
-  - RetrievalPlan.
-  - EvidenceSummary (including `semanticFlags`).
-  - **Evidence counts** (passed explicitly in prompt):
-    - `selectedEvidenceCount`: number of items in `selectedEvidence`.
-    - `uiHintsProjectCount`: length of `uiHints.projects` (or 0).
-    - `uiHintsExperienceCount`: length of `uiHints.experiences` (or 0).
-    - Source breakdown (e.g., "1 experience, 0 projects").
+  - PlannerLLMOutput (cardsEnabled/topic).
+  - Retrieved docs (projects, resume, profile).
 - Output:
-  - AnswerPayload JSON.
+  - AnswerPayload JSON with optional uiHints.
 
-See §4.5 for cross-stage invariants that Answer must preserve (zero-evidence behavior, cards toggle, and enumeration completeness).
+**Behavior (per new prompt)**
+
+- Grounding: only state facts from retrieved docs; if nothing relevant, say so (“I don’t have that in my portfolio”).
+- Voice: speak as “I”; match persona voice/style guidelines and injected voice examples.
+- UI hints: list relevant project/experience IDs (ordered) when cardsEnabled is true and cards are helpful; omit or leave arrays empty otherwise. Only include IDs present in retrieved docs.
+- Answer length: keep text concise when cards are present; expand when no cards or few docs.
+- Streaming: tokens stream; uiHints can surface as soon as valid JSON is parsable.
 
 **Temperature**
 
 - If `modelConfig.answerTemperature` is set, it controls response creativity. Lower values (0.3–0.5) produce more deterministic responses; higher values (0.8–1.0) allow more varied phrasing.
 
-**Behavior**
+### 5.4 Meta, No‑Retrieval & Zero‑Result Behavior
 
-- Always speak as "I" representing the portfolio owner.
-- Stay grounded in EvidenceSummary/Profile/Persona; never contradict `verdict`.
-- Infer answer style/length from `questionType`, `enumeration`, user phrasing, and `confidence` (no answerMode/answerLengthHint fields).
-- Map verdict → tone:
-  - yes/partial_evidence: first sentence states it clearly; back up with selectedEvidence examples (for partial_evidence, acknowledge gaps).
-  - no_evidence: explicitly say the portfolio doesn't show it; optional adjacent context.
-  - n/a: meta/out-of-scope; answer the meta ask or explain portfolio scope.
-- Use `confidence` to hedge (medium/low) or be direct (high).
-
-**Grounding guardrails (preventing over-claiming)**
-
-- **Match singular/plural to evidence counts.** If there is exactly 1 supporting experience, say "I interned at X" not "I have experience in…" or "related experiences."
-- **Reference specific evidence items.** Use exact titles/locations from `selectedEvidence` (e.g., "I interned at NPR in Washington, D.C.") rather than vague summaries.
-- **Forbid filler phrases** like "related experience," "various projects," or "several roles" when counts don't support them. If `uiHintsExperienceCount = 1`, do not imply multiple.
-- **Never expand beyond evidence.** Do not infer or generalize to experiences not in `selectedEvidence`. If the user asks about D.C. and there's one D.C. internship, mention only that—do not add "and other East Coast work" unless it's in evidence.
-
-**Semantic flags drive tone:**
-
-- ambiguous/multi_topic → acknowledge ambiguity briefly; optionally ask a concise follow-up.
-- needs_clarification → add a short follow-up question after answering best-effort.
-- off_topic → explain portfolio doesn't cover it and redirect.
-- **When `ambiguous` is set:** require a clarification clause, stick to exact evidence titles/locations, and explicitly prohibit expansion to unproven experiences. Hedge appropriately (e.g., "If you mean X, then I interned at Y in Z").
-- Enumeration behavior:
-  - `list` + `all_relevant`: treat `uiHints` as the full set; highlight key examples without listing everything in text.
-  - `list` + `sample`: present a few examples and note they are representative.
-- Cards:
-  - If `cardsEnabled = false`, do not reference cards/lists.
-  - Otherwise it’s fine to imply additional items are shown in cards.
-- If verdict is "no_evidence" for a list ask, be explicit that nothing relevant was found and keep uiHints empty when appropriate.
-
-### 5.5 Meta, No‑Retrieval & Zero‑Evidence Behavior
-
-- `questionType = "meta"`:
-  - Only when retrieval adds no value (greetings/how-it-works/off-topic).
-  - Typically `retrievalRequests = []`.
-  - Evidence uses verdict = "n/a", confidence = "low", empty evidence/uiHints.
-- No‑retrieval path (`retrievalRequests = []`):
-  - Orchestrator skips retrieval; Evidence sees empty docs and sets verdict/confidence accordingly.
-- Zero‑evidence fast path (canonical):
-  - If retrieval returns nothing for a non-meta ask, Evidence MUST return verdict = "no_evidence", confidence = "low", and empty evidence/uiHints (optionally with an `off_topic` flag).
-
-See §4.5 Cross-Stage Invariants for the shared expectations Answer and UI derivation must preserve.
-
-**Zero-evidence fast path (implementation detail):**
-
-When retrieval returns zero documents for a non-meta question, the orchestrator **skips the Evidence LLM call entirely** and synthesizes a stub response:
-
-```ts
-function synthesizeEvidenceSummary(reason: 'meta' | 'no_docs'): EvidenceSummary {
-  return {
-    verdict: reason === 'meta' ? 'n/a' : 'no_evidence',
-    confidence: 'low',
-    reasoning: reason === 'meta'
-      ? 'Meta question; no portfolio evidence needed.'
-      : 'No relevant documents found in retrieval.',
-    selectedEvidence: [],
-    semanticFlags: [],
-    uiHints: { projects: [], experiences: [] },
-  };
-}
-```
-
-This saves latency and cost when there is nothing to evaluate.
+- Empty `queries`: Skip retrieval; Answer uses profile/persona/context to respond (for greetings/meta) and returns empty uiHints.
+- Retrieval but zero relevant docs: Answer states the gap transparently and leaves uiHints empty; UiPayload will be empty.
+- Cards toggle: When `cardsEnabled = false`, Answer should avoid card-facing language and omit uiHints.
 
 ---
 
@@ -1312,7 +983,7 @@ This saves latency and cost when there is nothing to evaluate.
 
 ![Portfolio Chat Engine - End-to-End Chat Turn Sequence](../../../generated-diagrams/portfolio-chat-sequence.png)
 
-_Figure 6.0: End-to-end chat turn sequence showing the complete flow from user input through all pipeline stages back to UI._
+_Figure 6.0: End-to-end chat turn sequence showing the flow from user input through Planner, Retrieval, and Answer._
 
 ![Portfolio Chat Engine - Frontend SSE Event Handling](../../../generated-diagrams/portfolio-chat-sse-handling.png)
 
@@ -1344,8 +1015,8 @@ Canonical event types (only these names are emitted):
 | Event        | Purpose                                                        |
 | ------------ | -------------------------------------------------------------- |
 | `stage`      | Pipeline stage progress (`start` / `complete`)                 |
-| `reasoning`  | Cumulative partial ReasoningTrace as stages finish             |
-| `ui`         | UiPayload updates derived from Evidence                        |
+| `reasoning`  | Partial ReasoningTrace + optional text deltas per stage        |
+| `ui`         | UiPayload updates derived from Answer.uiHints                  |
 | `token`      | Streamed answer tokens                                         |
 | `item`       | Reserved for non-token answer payloads (markdown blocks, etc.) |
 | `attachment` | Host-defined downloadable payloads                             |
@@ -1355,128 +1026,86 @@ Canonical event types (only these names are emitted):
 
 Each event is sent as an SSE `event:` name and JSON-encoded `data:` payload.
 
-**Progressive Pipeline Streaming:**
+**Progressive Pipeline Streaming**
 
-Rather than waiting for all stages to complete before showing anything, the pipeline streams updates as each stage starts and completes. This provides immediate visual feedback and reduces perceived latency.
+The pipeline streams updates as each stage starts and completes to reduce perceived latency.
 
 ```
 [User sends message]
     ↓
-stage: planner_start     ← "Planning..." indicator
+stage: planner_start       ← "Planning..." indicator
+reasoning: { stage: 'planner', notes: 'Planning…' } (optional delta)
     ↓ (200-400ms)
-stage: planner_complete  ← Shows question classification
-reasoning: { plan: ... }
+stage: planner_complete
+reasoning: { stage: 'planner', trace: { plan: ... } }
     ↓
-stage: retrieval_start   ← "Searching..." indicator
+stage: retrieval_start     ← "Searching..." indicator
+reasoning: { stage: 'retrieval', notes: 'Running query: resume "Go golang"' }
     ↓ (100-300ms)
-stage: retrieval_complete ← Shows docs found count
-reasoning: { plan, retrieval: ... }
+stage: retrieval_complete
+reasoning: { stage: 'retrieval', trace: { plan, retrieval: ... }, notes: 'Found 6 docs' }
     ↓
-stage: evidence_start    ← "Analyzing..." indicator
-    ↓ (300-500ms)
-stage: evidence_complete ← Shows high-level answer
-reasoning: { plan, retrieval, evidence: ... }
-ui: { showProjects, showExperiences, ... }
+stage: answer_start        ← Typing indicator
+token: "Yes"               ← Answer tokens stream
+reasoning: { stage: 'answer', delta: 'thinking about uiHints...' } (optional)
     ↓
-stage: answer_start      ← Typing indicator
-    ↓
-token: "Yes"             ← Answer tokens stream
-token: ", I've"
-token: " used"
-...
-    ↓
+ui: { showProjects, showExperiences } (emitted when uiHints are known)
 stage: answer_complete
 done: {}
 ```
 
-**Stage Events:**
+**Stage Events**
 
-`stage` events fire at the start and end of each pipeline stage, enabling rich progress UX:
+`stage` events fire at the start and end of each pipeline stage:
 
-| Stage Event          | Timing           | UI Suggestion                                                          |
-| -------------------- | ---------------- | ---------------------------------------------------------------------- |
-| `planner_start`      | Immediately      | "Understanding your question..."                                       |
-| `planner_complete`   | ~200-400ms       | Show detected question type/topic (e.g., "Looking for: Go experience") |
-| `retrieval_start`    | After planner    | "Searching portfolio..."                                               |
-| `retrieval_complete` | ~100-300ms       | "Found X relevant items"                                               |
-| `evidence_start`     | After retrieval  | "Analyzing relevance..."                                               |
-| `evidence_complete`  | ~300-500ms       | Show `verdict` preview if helpful                                      |
-| `answer_start`       | After evidence   | Typing indicator / cursor                                              |
-| `answer_complete`    | After last token | Hide typing indicator                                                  |
+| Stage Event          | Timing           | UI Suggestion                                               |
+| -------------------- | ---------------- | ----------------------------------------------------------- |
+| `planner_start`      | Immediately      | "Understanding your question..."                            |
+| `planner_complete`   | ~200-400ms       | Show detected topic/queries (e.g., "Searching: Go experience") |
+| `retrieval_start`    | After planner    | "Searching portfolio..."                                    |
+| `retrieval_complete` | ~100-300ms       | "Found X relevant items"                                    |
+| `answer_start`       | After retrieval  | Typing indicator / cursor                                   |
+| `answer_complete`    | After last token | Hide typing indicator                                       |
 
-`reasoning` events stream incrementally as each stage completes, building up the `PartialReasoningTrace`. This allows dev tools to show progressive trace information.
+`reasoning` events stream incrementally as each stage progresses. Payloads may include `delta` text (append-only) plus structured trace fragments so dev tooling can show both a running transcript and the final trace.
 
-### 6.3 UI Derivation (Evidence‑Aligned)
+### 6.3 UI Derivation (Answer‑Aligned)
 
-The planner sets `cardsEnabled` (default true). Use `false` for explicit text-only asks (rollups/counts or pure bio/profile questions); otherwise allow cards to render.
+Planner sets `cardsEnabled`; Answer returns `uiHints`. The UI layer derives cards strictly from Answer.uiHints filtered to retrieved docs.
 
-- Evidence.uiHints is the single source of truth for cards; when `enumeration = "all_relevant"`, uiHints is treated as the full set (no fallback).
-- If uiHints is absent and cardsEnabled is true, fall back to evidence-selected IDs (subset of retrieved docs only).
-- Cards always filter to retrieved doc IDs; resume cards must map to `type === "experience"` entries.
-- When `cardsEnabled = false`, UI suppresses cards even if uiHints is present.
+Algorithm (buildUi):
 
-Helper implementation lives in `docs/features/chat/implementation-notes.md#41-ui-derivation-helper`.
+1. If `cardsEnabled = false`, return `{ showProjects: [], showExperiences: [] }`.
+2. Create sets of retrieved project and experience IDs.
+3. Filter `answer.uiHints?.projects` / `answer.uiHints?.experiences` to retrieved IDs.
+4. Clamp lengths (default max 10 per type).
+5. Emit UiPayload. No banner/core-evidence metadata.
 
-See §4.5 for the cross-stage invariants this section must honor (cards toggle, enumeration completeness, evidence as the UI source of truth).
-
-### 6.3.1 UI Payload Construction
-
-The `buildUiArtifacts()` helper constructs `UiPayload` from Evidence output:
-
-**Inputs**
-
-- `plan.cardsEnabled`, `plan.enumeration`, `plan.questionType`
-- `evidence.uiHints`, `evidence.selectedEvidence`
-- Retrieved document ID sets
-
-**Algorithm**
-
-1. If `cardsEnabled = false` or `questionType = "meta"`, return empty arrays.
-2. Validate `uiHints` IDs against retrieved IDs; log `uiHintWarnings` when invalid IDs are present.
-3. For `enumeration = "all_relevant"`, treat `uiHints` as the complete set.
-4. For `enumeration = "sample"`, prefer `uiHints` when present, else fall back to `selectedEvidence` IDs.
-5. Apply display limits (`MAX_DISPLAY_ITEMS = 10`).
-6. For binary questions, tighten uiHints to only IDs in `selectedEvidence`.
-7. Generate `bannerText` for truncation or zero-evidence cases.
-
-**Output**
-
-```ts
-{
-  showProjects: string[],
-  showExperiences: string[],
-  bannerText?: string,
-  coreEvidenceIds?: string[]
-}
-```
+UI events can fire as soon as valid uiHints are available (during answer streaming or at completion).
 
 ### 6.4 SSE Event Payload Shapes
 
 Logical payload shapes (actual wire format is JSON-encoded in `data:`):
 
-- `stage` events: `{ anchorId, stage, status, meta?, durationMs? }`; meta can include questionType/enumeration/scope/topic, docsFound/sources, verdict/confidence/evidenceCount, tokenCount.
+- `stage`: `{ anchorId, stage: 'planner' | 'retrieval' | 'answer', status: 'start' | 'complete', meta?, durationMs? }` where meta can include `{ queries?, docsFound?, topic?, model? }`.
+- `reasoning`: `{ anchorId, stage, trace?: PartialReasoningTrace, delta?: string, notes?: string, progress?: number }`.
 - `token`: `{ anchorId, token }`.
 - `ui`: `{ anchorId, ui: UiPayload }`.
-- `reasoning`: `{ anchorId, stage, trace: PartialReasoningTrace }` (cumulative).
 - `item`, `attachment`, `ui_actions`: host-defined payloads keyed by `anchorId`.
 - `done`: `{ anchorId, totalDurationMs, truncationApplied? }`.
 
-**Frontend Stage Handling:**
+**Frontend Stage Handling**
 
 Client-side UI can switch on `event` to drive streaming text, UI cards, dev reasoning panels, and completion state. See `docs/features/chat/implementation-notes.md#42-stage-handling--progress-ui` for a concrete handler.
 
-**Minimal vs Rich Progress UX:**
+**Minimal vs Rich Progress UX**
 
-Integrators can choose how much stage information to surface:
-
-| Mode         | Behavior                                                          |
-| ------------ | ----------------------------------------------------------------- |
-| **Minimal**  | Show generic "Thinking..." until first token                      |
-| **Standard** | Show stage names: "Planning..." → "Searching..." → "Analyzing..." |
-| **Rich**     | Show stage names + metadata: "Found 5 relevant projects"          |
-| **Dev**      | Full reasoning trace panel with all stage details                 |
-
-The `stage` events provide the data; the integrator decides the UX.
+| Mode         | Behavior                                                         |
+| ------------ | ---------------------------------------------------------------- |
+| **Minimal**  | Show generic "Thinking..." until first token                     |
+| **Standard** | Show stage names: "Planning..." → "Searching..." → "Answering..." |
+| **Rich**     | Show stage names + metadata: "Found 5 relevant projects"         |
+| **Dev**      | Full reasoning trace panel with deltas and final trace           |
 
 ### 6.5 Streaming Error Recovery
 
@@ -1490,7 +1119,8 @@ When an error occurs mid-stream, the backend emits an `error` event before closi
 
 #### 6.5.2 Backend Behavior
 
-- **Planner/Evidence failures:** Emit `error` event with `retryable: true`. Do not emit partial `token` events.
+- **Planner failures:** Emit `error` event with `retryable: true`. Do not emit partial `token` events.
+- **Retrieval failures:** Emit `error` with `code: 'retrieval_error'` and `retryable: true`.
 - **Answer stream interruption:** If tokens have already been emitted, emit `error` with `code: 'stream_interrupted'` and `retryable: true`. The frontend should show what was received plus an error indicator.
 - **Cost budget exceeded:** If the system is already over budget, short-circuit before streaming (JSON error such as `"Experiencing technical issues, try again later."`). If a turn pushes spend over the budget during streaming, the answer may finish streaming and then emit `error` with `code: 'budget_exceeded'` and `retryable: false`; subsequent turns are blocked by the preflight check.
 - **Rate limiting:** Emit `error` with `code: 'rate_limited'`, `retryable: true`, and `retryAfterMs` from the `RateLimit-Reset` header.
@@ -1520,15 +1150,15 @@ If the Answer stage fails after emitting some tokens:
 
 - **UI‑Answer consistency**
   - Cards must not visually suggest capabilities that contradict the text answer.
-  - Evidence is the single source of truth for which cards are relevant.
+  - Answer.uiHints is the single source of truth for which cards are relevant (filtered to retrieved docs).
 - **Prompt injection resistance**
   - Portfolio documents are treated as data, not instructions.
-  - Prompts for Planner / Evidence / Answer explicitly instruct models to ignore instructions embedded in documents.
+  - Prompts for Planner / Answer explicitly instruct models to ignore instructions embedded in documents.
 - **Moderation**
   - Input moderation is enabled by default in the Next.js route; flagged inputs short-circuit with a brief, non-streamed refusal (HTTP 200 is acceptable).
   - Output moderation is also enabled by default in the current route; refusals are non-streamed with the configured refusal message/banner. Adjust route options if you want it disabled.
 
-> **Implementation note:** Moderation hooks live in the Next.js `/api/chat` route. The orchestrator focuses on Planner → Retrieval → Evidence → Answer and assumes inputs are already moderated.
+> **Implementation note:** Moderation hooks live in the Next.js `/api/chat` route. The orchestrator focuses on Planner → Retrieval → Answer and assumes inputs are already moderated.
 
 ---
 
@@ -1547,32 +1177,30 @@ Per chat turn, log:
 
 - LLM usage per stage (model, tokens, cost).
 - **Planner:**
-  - questionType, enumeration, scope, cardsEnabled, topic.
-  - resumeFacets.
+  - queries (source/text/limit), cardsEnabled, topic.
+  - planner model + reasoning effort when set.
 - **Retrieval:**
-  - For each RetrievalRequest: source, queryText, requestedTopK, effectiveTopK, numResults.
-  - Whether enumeration mode was used.
-  - Cache hit/miss info.
-- **Evidence:**
-  - verdict, confidence.
-  - selectedEvidence.length.
-  - uiHints.projects.length, uiHints.experiences.length.
-  - semanticFlags.
+  - For each query: source, queryText, requestedLimit, effectiveLimit, numResults.
+  - Cache hit/miss info and retrieval latency per source.
 - **Answer:**
-  - questionType, enumeration, scope.
-  - verdict, confidence.
-  - Length of final message.
-  - Presence & size of thoughts.
+  - uiHints.projects.length, uiHints.experiences.length.
+  - cardsEnabled flag and whether uiHints were emitted early.
+  - Length of final message and presence/size of thoughts.
+  - TTFT and total streaming duration.
+- **SSE:**
+  - Time to first reasoning delta and first token.
+  - Whether ui payload was emitted during streaming or at completion.
 
 ### 8.3 Debug vs User Mode (Reasoning Emission)
 
 - Reasoning is emitted only when the integrator requests it per run (`reasoningEnabled`).
 - No environment-based defaults: both dev and prod must explicitly request reasoning.
 - The chat engine exposes reasoning as structured stream/state but does not define end‑user UX for it; any reasoning UI (panel, toggle, separate page) is built by the host app.
+- Stage values are `planner`, `retrieval`, and `answer`; deltas may be present in addition to structured trace fragments.
 
-### 8.4 Evals & Graders (with Enumeration)
+### 8.4 Evals & Graders (cards-aware)
 
-Coverage focuses on fact-check, enumeration, and domain questions, plus card/text alignment and enumeration recall. See `docs/features/chat/evals-and-goldens.md` for the active suites and runner sketch.
+Coverage focuses on grounding, UI/text alignment, cards toggle behavior, zero-result honesty, and persona adherence. See `docs/features/chat/evals-and-goldens.md` for the active suites and runner sketch.
 
 ### 8.5 Chat Eval Sets
 
@@ -1582,13 +1210,11 @@ Chat evals validate end-to-end behavior. Schema (source of truth lives in `docs/
 type ChatEvalTestCase = {
   id: string;
   name: string;
-  category: 'binary' | 'list' | 'narrative' | 'meta' | 'edge_case';
+  category: 'skill' | 'projects' | 'experience' | 'bio' | 'meta' | 'edge_case';
   input: { userMessage: string; conversationHistory?: ChatMessage[] };
-  expected: {
-    questionType: QuestionType;
-    enumeration?: EnumerationMode;
-    scope?: ExperienceScope;
-    verdict?: Verdict;
+  expected?: {
+    cardsEnabled?: boolean;
+    plannerQueries?: Array<{ source?: PlannerQuerySource; textIncludes?: string[]; limitAtMost?: number }>;
     answerContains?: string[];
     answerNotContains?: string[];
     uiHintsProjectsMinCount?: number;
@@ -1618,25 +1244,21 @@ const factCheckSuite: ChatEvalSuite = {
     {
       id: 'fc-yes-react',
       name: 'Skill affirmative',
-      category: 'binary',
+      category: 'skill',
       input: { userMessage: 'Have you used React?' },
       expected: {
-        questionType: 'binary',
-        enumeration: 'sample',
-        verdict: 'yes',
+        cardsEnabled: true,
         uiHintsProjectsMinCount: 1,
       },
     },
     {
       id: 'fc-no-evidence-rust',
       name: 'Skill absent',
-      category: 'binary',
+      category: 'skill',
       input: { userMessage: 'Have you used Rust?' },
       expected: {
-        questionType: 'binary',
-        enumeration: 'sample',
-        verdict: 'no_evidence',
         uiHintsProjectsMaxCount: 0,
+        answerContains: ["I don't have that in my portfolio"],
       },
     },
   ],
@@ -1655,7 +1277,7 @@ Full chat eval suites and runner sketch: `docs/features/chat/evals-and-goldens.m
 - generated/ – preprocess outputs: persona/profile enrichments, embeddings, indexes, metrics.
 - packages/chat-contract – shared contracts.
 - packages/chat-data – retrieval/search utilities.
-- packages/chat-orchestrator – Planner→Retrieval→Evidence→Answer runtime.
+- packages/chat-orchestrator – Planner→Retrieval→Answer runtime.
 - packages/chat-next-api – Next.js API route.
 - packages/chat-next-ui – Exports React hooks (e.g., usePortfolioChat with messages, uiPayload, reasoningTrace, loading state); consumers render their own UI components.
 - packages/chat-preprocess-cli – CLI for preprocessing.
@@ -1706,10 +1328,10 @@ chatApi.run(openaiClient, messages, {
 
 ### 9.3 Model Tiering & Config
 
-- ModelConfig controls planner/evidence/evidenceDeepDive/answer/embedding models.
+- ModelConfig controls planner/answer/embedding models.
 - Defaults live in chat.config.yml.
 - `pipelinePrompts.*` contains the prompts used by createChatRuntime.
-- chat-contract schemas define questionType/enumeration/scope-driven RetrievalPlan and EvidenceSummary with uiHints.
+- chat-contract schemas define PlannerLLMOutput, AnswerPayload with uiHints, UiPayload, and shared enums used across runtime.
 
 ### 9.4 Metrics Helper
 
@@ -1721,179 +1343,46 @@ chatApi.run(openaiClient, messages, {
 ## 10. Future Extensions
 
 - Richer evals:
-  - Synthetic enumeration queries, meta queries, and comparison questions.
-  - Automated grounding checks (text vs evidence alignment).
+  - Streaming order/latency checks for planner/retrieval/answer deltas.
+  - UI alignment checks for uiHints vs text when cardsEnabled toggles.
 - Additional UI actions via ui_actions SSE events:
   - e.g. highlightCard, scrollToTimeline, filterByTag.
 
 ### 10.1 LLM-aware retrieval knobs
 
-- Extend RetrievalPlan with optional retrieval hints:
-  - e.g. `retrievalAggressiveness: 'strict' | 'balanced' | 'high_recall'`.
+- Extend PlannerLLMOutput.queries with optional retrieval hints:
+  - e.g. `aggressiveness: 'strict' | 'balanced' | 'high_recall'`.
 - Allow the Planner to:
-  - Request stricter vs looser retrieval beyond what question type implies.
+  - Request stricter vs looser retrieval beyond default limits.
   - Bias more heavily toward recent experiences for certain queries ("latest work with X").
 
 ---
 
-## Appendix A – Schemas (Planner, Evidence, Answer)
+## Appendix A – Schemas (Planner, Answer)
 
-TypeScript-style schemas reflecting the three core axes (questionType / enumeration / scope) plus verdict/confidence and the simplified cards toggle.
+TypeScript-style schemas reflecting the simplified three-stage pipeline and uiHints-driven UI.
 
 ```ts
 // ================================
 // Core enums / string unions
 // ================================
 
-export type QuestionType =
-  | 'binary' // yes/no style (capability, presence, fact-check)
-  | 'list' // user wants a list of items / where/which questions
-  | 'narrative' // user wants an overview / story / comparison
-  | 'meta'; // greetings, how-it-works, clearly off-topic
-
-export type EnumerationMode =
-  | 'sample' // representative subset is fine
-  | 'all_relevant'; // user wants essentially all relevant items
-
-export type ExperienceScope =
-  | 'employment_only' // jobs + internships only
-  | 'any_experience'; // jobs + side projects + coursework, etc.
-
-export type Verdict = 'yes' | 'no_evidence' | 'partial_evidence' | 'n/a'; // meta or non-booleanable question
-
-export type Confidence = 'high' | 'medium' | 'low';
-
-export type RetrievalSource = 'projects' | 'resume' | 'profile';
-
-export type EvidenceSource = 'project' | 'resume' | 'profile';
-
-export type EvidenceRelevance = 'high' | 'medium' | 'low';
-
-// Narrow facets for biasing resume retrieval (not behavior-critical)
-export type ResumeFacet = 'experience' | 'education' | 'award' | 'skill';
-
-// "Shape" semantic flags – no strength/uncertainty here, that's `confidence`
-export type SemanticFlagType =
-  | 'multi_topic' // question mixes distinct topics
-  | 'ambiguous' // multiple plausible interpretations
-  | 'needs_clarification' // answer should really ask follow-up
-  | 'off_topic'; // retrieved docs don't match question
+export type PlannerQuerySource = 'projects' | 'resume' | 'profile';
 
 // ================================
-// Planner → RetrievalPlan
+// Planner → PlannerLLMOutput
 // ================================
 
-export interface RetrievalRequest {
-  source: RetrievalSource;
-  queryText: string; // short NL description with key tools/topics
-  topK: number; // desired number of docs from this source
+export interface PlannerQuery {
+  source: PlannerQuerySource;
+  text: string; // search query text
+  limit?: number; // optional, default 8
 }
 
-export interface RetrievalPlan {
-  // Core axes
-  questionType: QuestionType;
-  enumeration: EnumerationMode; // sample vs all_relevant
-  scope: ExperienceScope; // employment_only vs any_experience
-
-  // Retrieval instructions
-  retrievalRequests: RetrievalRequest[];
-
-  // Optional biasing for resume retrieval (non-behavior-critical but useful)
-  resumeFacets?: ResumeFacet[];
-
-  // UI / presentation hints
-  // When false, UI should render a text-only answer (no cards).
-  // Default at runtime should be true if omitted.
-  cardsEnabled?: boolean;
-
-  // Telemetry / observability helpers
-  /**
-   * Short noun-phrase summary of the question, e.g.:
-   * "Go experience", "React vs Vue", "AWS background", "relocation to Seattle".
-   * Used for logging/analytics only; no behavior depends on it.
-   */
-  topic?: string | null; // telemetry only
-}
-
-// ================================
-// Evidence stage → EvidenceSummary
-// ================================
-
-export interface SelectedEvidenceItem {
-  source: EvidenceSource; // project | resume | profile
-  id: string; // document id in its corpus
-  title: string; // short label for display
-  snippet: string; // short text showing why it matters
-  relevance: EvidenceRelevance;
-}
-
-export interface SemanticFlag {
-  type: SemanticFlagType;
-  reason: string; // short explanation of why this flag was set
-}
-
-export interface UiHints {
-  /**
-   * Ordered list of project IDs to show as cards.
-   * Must all be drawn from the retrieved "projects" corpus and be relevant.
-   * May be empty or omitted when cardsEnabled=false.
-   */
-  projects?: string[];
-
-  /**
-   * Ordered list of resume experience IDs to show as cards.
-   * Must all be drawn from the retrieved "resume" corpus and be relevant.
-   * May be empty or omitted when cardsEnabled=false.
-   */
-  experiences?: string[];
-}
-
-export interface UiHintValidationWarning {
-  code: 'UIHINT_INVALID_PROJECT_ID' | 'UIHINT_INVALID_EXPERIENCE_ID';
-  invalidIds: string[];
-  retrievedIds: string[];
-}
-
-export interface EvidenceSummary {
-  // Verdict + strength for the underlying question
-  verdict: Verdict;
-  confidence: Confidence;
-
-  /**
-   * Short internal explanation (2–6 sentences) of:
-   * - how the question was interpreted,
-   * - why this verdict + confidence were chosen,
-   * - how selectedEvidence and uiHints were picked.
-   * Dev-facing only; not shown directly to end-users.
-   */
-  reasoning: string;
-
-  /**
-   * Small set of core evidence items that best support the verdict.
-   * 2–6 items typical. For verdict="no_evidence"/"n/a" with confidence="low",
-   * this can legitimately be an empty array.
-   */
-  selectedEvidence: SelectedEvidenceItem[];
-
-  /**
-   * Optional semantic annotations for tricky cases:
-   * multi_topic / ambiguous / needs_clarification / off_topic.
-   * Each must have a short reason.
-   */
-  semanticFlags?: SemanticFlag[];
-
-  /**
-   * UI hints for which projects/experiences to render as cards.
-   * If the plan's cardsEnabled=false, either leave this empty or let
-   * the UI layer ignore it (depending on your chosen approach).
-   */
-  uiHints?: UiHints;
-
-  /**
-   * Captures validation issues when uiHints refer to IDs that were not retrieved.
-   * Used for diagnostics; does not surface to end users.
-   */
-  uiHintWarnings?: UiHintValidationWarning[];
+export interface PlannerLLMOutput {
+  queries: PlannerQuery[];
+  cardsEnabled: boolean;
+  topic?: string;
 }
 
 // ================================
@@ -1902,339 +1391,122 @@ export interface EvidenceSummary {
 
 export interface AnswerPayload {
   /**
-   * User-facing answer text, as if spoken by the portfolio owner ("I").
-   * Markdown is allowed. Lists must have newlines before each "- " item.
+   * User-facing message in first person ("I...").
+   * Typically short when cards are present; longer narrative when cards are absent.
    */
   message: string;
 
   /**
-   * Optional dev-only notes – short, one-sentence items
-   * describing how the verdict was mapped into wording, which evidence
-   * was highlighted, etc. Omit entirely if there is nothing useful to log.
+   * Optional dev-only chain-of-thought / rationale.
+   * Not shown to end users.
    */
   thoughts?: string[];
+
+  /**
+   * Optional uiHints to drive cards.
+   */
+  uiHints?: {
+    projects?: string[];
+    experiences?: string[];
+  };
 }
 
 // ================================
-// UI payload → frontend
+// UI payload (derived from Answer)
 // ================================
 
 export interface UiPayload {
-  showProjects: string[]; // ProjectDoc ids
-  showExperiences: string[]; // ResumeDoc ids, filtered to ExperienceRecord.type === 'experience'
-  bannerText?: string;
-  coreEvidenceIds?: string[]; // EvidenceItem ids in explanation-set order
+  /**
+   * Ordered list of project IDs to render as cards.
+   * Derived from Answer.uiHints filtered to retrieved IDs.
+   * Empty array when cardsEnabled=false or no relevant projects were found.
+   */
+  showProjects: string[];
+
+  /**
+   * Ordered list of resume experience IDs to render as cards.
+   * Derived from Answer.uiHints filtered to retrieved IDs.
+   * Empty array when cardsEnabled=false or no relevant experiences were found.
+   */
+  showExperiences: string[];
+}
+
+// ================================
+// Reasoning trace (dev-only)
+// ================================
+
+export interface ReasoningTrace {
+  plan?: PlannerLLMOutput;
+  retrieval?: {
+    query: PlannerQuery;
+    fetched: number;
+    total?: number;
+    topHits?: { id: string; source: PlannerQuerySource; score?: number }[];
+  }[];
+  answer?: {
+    model: string;
+    uiHints?: AnswerPayload['uiHints'];
+    cardsEnabled: boolean;
+  };
+  truncationApplied?: boolean;
+}
+
+export type PartialReasoningTrace = Partial<ReasoningTrace>;
+```
+
+### A.1 Sample Planner Outputs
+
+```json
+// Skill question
+{
+  "queries": [
+    { "source": "resume", "text": "Go golang", "limit": 6 },
+    { "source": "projects", "text": "Go golang backend", "limit": 6 }
+  ],
+  "cardsEnabled": true,
+  "topic": "Go experience"
+}
+
+// AI experience
+{
+  "queries": [
+    { "source": "resume", "text": "AI ML machine learning LLM PyTorch TensorFlow" },
+    { "source": "projects", "text": "AI ML machine learning LLM" }
+  ],
+  "cardsEnabled": true,
+  "topic": "AI experience"
+}
+
+// Greeting
+{
+  "queries": [],
+  "cardsEnabled": false,
+  "topic": "greeting"
 }
 ```
 
----
+### A.2 Sample AnswerPayloads
 
-## Appendix B – System Prompts
+```json
+{
+  "message": "Yep—I’ve used Go in production. At Datadog I built Go microservices, and I also shipped a personal Go service.",
+  "uiHints": {
+    "projects": ["proj_go_service"],
+    "experiences": ["exp_datadog_2022"]
+  }
+}
 
-Canonical prompt strings are defined in:
-
-- `packages/chat-orchestrator/src/pipelinePrompts.ts`
-
-Key prompt variables:
-
-- `{{OWNER_NAME}}` — replaced with `OwnerConfig.ownerName`
-- `{{DOMAIN_LABEL}}` — replaced with `OwnerConfig.domainLabel`
-
-## Appendix C – Example chat-preprocess.config.yml
-
-This file is an example.
-Replace owner IDs, GitHub usernames, and URLs with real values. There are no templating placeholders in this YAML, just example strings.
-
-```yaml
-# chat-preprocess.config.yml
-# Configuration for chat-preprocess-cli (offline preprocessing).
-
-owner:
-  ownerId: 'your-owner-id'
-  ownerName: 'Your Name'
-  domainLabel: 'software engineer'
-
-github:
-  # Gist containing an array of PortfolioRepoConfig objects.
-  # Example content:
-  # [
-  #   { "repo": "your-github-username/nano-banana", "projectId": "nano-banana" },
-  #   { "repo": "your-github-username/other-project", "projectId": "other-project" }
-  # ]
-  portfolioRepoConfigGistUrl: 'https://gist.github.com/your-github-username/your-gist-id'
-  # Optional: name of env var containing a GitHub token for private repos / gist.
-  githubAccessTokenEnvVar: 'GITHUB_TOKEN'
-
-resume:
-  # Path to the source resume PDF (relative to repo root).
-  pdfPath: 'public/resume/resume.pdf' # defaults to resume.filename in chat-preprocess.config.yml (falls back to resume.pdf)
-
-profile:
-  # Path to a Markdown file used to build ProfileDoc and PersonaSummary.
-  profileMarkdownPath: 'data/chat/profile.md'
-
-models:
-  # Strong full-size model for offline enrichment and persona building.
-  enrichmentModel: 'full-size model' # example full-size model id
-  # Embedding model for all corpora.
-  embeddingModel: 'text-embedding-3-large'
-
-output:
-  # Directory for generated artifacts (JSON corpora, embeddings, metrics).
-  generatedDir: 'generated'
-
-metrics:
-  # Whether to write detailed per-stage metrics files.
-  writeMetrics: true
-  # Optional label for this run (e.g. "prod", "local-dev", "resume-v3").
-  runLabel: 'local-dev'
-
-options:
-  # Enable incremental build mode (currently rebuilds all corpora each run).
-  incrementalBuild: true
-  # Maximum number of docs per corpus to embed per run (for very large portfolios).
-  maxProjects: 200
-  maxResumeEntries: 500
-# Note: Cross-corpus linking is configured in the GitHub gist via linkedToCompanies
-# on each PortfolioRepoConfig entry. See §3.5.1 for details.
+{
+  "message": "Hi! I’m James. Ask me about my projects or experience whenever you’re ready.",
+  "uiHints": {}
+}
 ```
 
-## Appendix D – Example Turns
+### A.3 Sample UiPayload (derived)
 
-Four end-to-end examples using the updated schemas.
-
-### D.1 Binary fact-check — “Have you used Go professionally?”
-
-```ts
-// User: "Have you used Go professionally?"
-const plan1: RetrievalPlan = {
-  questionType: 'binary',
-  enumeration: 'sample',
-  scope: 'employment_only',
-  retrievalRequests: [
-    {
-      source: 'resume',
-      queryText: 'Go language experience in professional roles',
-      topK: 5,
-    },
-    {
-      source: 'projects',
-      queryText: 'Go language usage in production or serious projects',
-      topK: 5,
-    },
-  ],
-  resumeFacets: ['experience', 'skill'],
-  cardsEnabled: true,
-  topic: 'professional Go experience',
-};
-
-const evidence1: EvidenceSummary = {
-  verdict: 'yes',
-  confidence: 'high',
-  reasoning:
-    'The question asks whether the owner has used Go in professional roles. ' +
-    'The resume shows at least one employment entry where Go is explicitly listed as a primary language. ' +
-    "Additional projects using Go support this as well, so the verdict is 'yes' with high confidence. " +
-    'UiHints highlight the most representative Go-heavy role and one supporting project.',
-  selectedEvidence: [
-    {
-      source: 'resume',
-      id: 'exp_aws_iam_2021',
-      title: 'Software Engineer — AWS IAM Console',
-      snippet: 'Built internal tooling and backend services where Go was used alongside TypeScript and AWS Lambda.',
-      relevance: 'high',
-    },
-    {
-      source: 'project',
-      id: 'proj_wallcrawler_go',
-      title: 'wallcrawler (Go-based crawler/CLI)',
-      snippet:
-        'Personal tool written in Go to crawl and analyze website structures; used as a showcase of Go proficiency.',
-      relevance: 'medium',
-    },
-  ],
-  semanticFlags: [],
-  uiHints: {
-    projects: ['proj_wallcrawler_go'],
-    experiences: ['exp_aws_iam_2021'],
-  },
-};
-
-const answer1: AnswerPayload = {
-  message:
-    'Yes, I’ve used Go in professional settings.\\n\\n' +
-    'For example, in my role on the AWS IAM Console team I worked on internal tooling and backend services where Go was part of the stack alongside TypeScript and AWS Lambda. I’ve also built personal tools like a Go-based crawler/CLI called wallcrawler that I use as a playground for experimenting with Go in real-world scenarios.',
-  thoughts: [
-    "Mapped question to questionType='binary' with a professional scope.",
-    "Verdict 'yes' + confidence 'high' because resume explicitly lists Go in an employment role.",
-    'Highlighted one AWS role and one Go project as concrete examples.',
-  ],
-};
-```
-
-### D.2 List / all_relevant — “Which projects have you used Go on?”
-
-```ts
-// User: "Which projects have you used Go on?"
-const plan2: RetrievalPlan = {
-  questionType: 'list',
-  enumeration: 'all_relevant',
-  scope: 'any_experience',
-  retrievalRequests: [
-    {
-      source: 'projects',
-      queryText: 'Go language usage in projects, tools, CLIs, services',
-      topK: 20,
-    },
-  ],
-  cardsEnabled: true,
-  topic: 'Go projects',
-};
-
-const evidence2: EvidenceSummary = {
-  verdict: 'yes',
-  confidence: 'high',
-  reasoning:
-    'The question asks for projects where Go is used. Several retrieved projects explicitly list Go as a primary language. ' +
-    "Thus, the verdict is 'yes' with high confidence. " +
-    'uiHints.projects contains all projects that clearly use Go, ordered by importance, while selectedEvidence focuses on a handful of representative examples.',
-  selectedEvidence: [
-    {
-      source: 'project',
-      id: 'proj_wallcrawler_go',
-      title: 'wallcrawler (Go-based crawler/CLI)',
-      snippet: 'A Go CLI that crawls websites and builds link graphs, used to explore Go concurrency patterns.',
-      relevance: 'high',
-    },
-    {
-      source: 'project',
-      id: 'proj_ilikeyacut_go',
-      title: 'ilikeyacut backend (Go microservices)',
-      snippet: 'Backend for a playful haircut recommendation app, implemented as small Go services on AWS.',
-      relevance: 'high',
-    },
-  ],
-  semanticFlags: [],
-  uiHints: {
-    projects: ['proj_wallcrawler_go', 'proj_ilikeyacut_go', 'proj_misc_go_tools'],
-    experiences: [],
-  },
-};
-
-const answer2: AnswerPayload = {
-  message:
-    'I’ve used Go on several projects.\\n\\n' +
-    '- **wallcrawler** – a Go-based crawler/CLI that scans websites and builds link graphs, which I use to experiment with concurrency and tooling.\\n' +
-    '- **ilikeyacut backend** – small Go services on AWS powering a playful haircut recommendation app.\\n\\n' +
-    'You’ll see these and a few other Go-related projects in the cards below for more detail on how I used Go in each case.',
-  thoughts: [
-    "questionType='list' and enumeration='all_relevant' so uiHints.projects is treated as the full Go-project set.",
-    "Verdict 'yes' because multiple projects clearly use Go.",
-    'Answer highlights key examples by name and relies on cards to show the full list.',
-  ],
-};
-```
-
-### D.3 Narrative overview — “Tell me about your AWS background”
-
-```ts
-// User: "Tell me about your AWS background."
-const plan3: RetrievalPlan = {
-  questionType: 'narrative',
-  enumeration: 'sample',
-  scope: 'employment_only',
-  retrievalRequests: [
-    {
-      source: 'resume',
-      queryText: 'employment experience at Amazon Web Services and AWS-related roles',
-      topK: 8,
-    },
-    {
-      source: 'projects',
-      queryText: 'projects heavily using AWS services (Lambda, CloudFront, S3, etc.)',
-      topK: 8,
-    },
-  ],
-  resumeFacets: ['experience', 'skill'],
-  cardsEnabled: true,
-  topic: 'AWS background',
-};
-
-const evidence3: EvidenceSummary = {
-  verdict: 'yes',
-  confidence: 'high',
-  reasoning:
-    'The question asks for a narrative overview of AWS background. The resume shows a role at AWS IAM Console and other positions where AWS services are central. ' +
-    'Projects also demonstrate practical AWS use (Lambda, CloudFront, S3). ' +
-    "Thus the verdict is 'yes' with high confidence and uiHints highlights the main AWS employment entry plus one side project.",
-  selectedEvidence: [
-    {
-      source: 'resume',
-      id: 'exp_aws_iam_2021',
-      title: 'Front-End Engineer — AWS IAM Console',
-      snippet: 'Owned features on the AWS IAM Console, working closely with AWS services and internal APIs.',
-      relevance: 'high',
-    },
-    {
-      source: 'project',
-      id: 'proj_portfolio_aws',
-      title: 'Personal portfolio on AWS',
-      snippet: 'Deployed a Next.js portfolio to AWS using CloudFront, Lambda@Edge, S3, and IaC tooling.',
-      relevance: 'medium',
-    },
-  ],
-  semanticFlags: [],
-  uiHints: {
-    projects: ['proj_portfolio_aws'],
-    experiences: ['exp_aws_iam_2021'],
-  },
-};
-
-const answer3: AnswerPayload = {
-  message:
-    'I have a pretty deep background with AWS, both as an engineer at AWS and through personal projects.\\n\\n' +
-    'Professionally, I worked as a Front-End Engineer on the AWS IAM Console, where I owned features end-to-end and collaborated closely with teams building IAM APIs and supporting services. Outside of that role, I’ve also used AWS heavily for my own projects—for example, my portfolio runs on AWS using CloudFront, Lambda@Edge, S3, and infrastructure-as-code tooling—so I’m comfortable thinking about both the developer experience and the underlying cloud architecture.',
-  thoughts: [
-    "questionType='narrative' so the answer is an overview story rather than a list or yes/no.",
-    "Verdict 'yes' with confidence 'high' because AWS appears prominently in employment and projects.",
-    'Used one employment entry and one project as anchors to describe AWS background.',
-  ],
-};
-```
-
-### D.4 Meta — “How do you work?”
-
-```ts
-// User: "How do you work?"
-const plan4: RetrievalPlan = {
-  questionType: 'meta',
-  enumeration: 'sample',
-  scope: 'any_experience',
-  retrievalRequests: [],
-  cardsEnabled: false,
-  topic: 'how the chat works',
-};
-
-const evidence4: EvidenceSummary = {
-  verdict: 'n/a',
-  confidence: 'low',
-  reasoning:
-    'The user is asking how the chat works rather than about portfolio content. ' +
-    'This is a meta question, so no portfolio evidence is needed. ' +
-    "Verdict is 'n/a' with low confidence, selectedEvidence is empty, and uiHints are omitted.",
-  selectedEvidence: [],
-  semanticFlags: [],
-  uiHints: {},
-};
-
-const answer4: AnswerPayload = {
-  message:
-    'I answer your questions by pulling from my portfolio—projects, roles, and profile—and then summarizing that information in first person as if I’m speaking directly.\\n\\n' +
-    'Behind the scenes, there’s a planning step that figures out what you’re really asking, a retrieval step that finds relevant projects and experiences, and an answer step that turns that into a grounded response that only talks about things actually in my portfolio.',
-  thoughts: [
-    "questionType='meta' so no portfolio retrieval or cards are used.",
-    "Verdict set to 'n/a' because this is not a true/false question.",
-    'Answer explains the pipeline in simple terms instead of referencing evidence.',
-  ],
-};
+```json
+{
+  "showProjects": ["proj_go_service"],
+  "showExperiences": ["exp_datadog_2022"]
+}
 ```

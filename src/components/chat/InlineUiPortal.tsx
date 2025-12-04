@@ -68,13 +68,7 @@ export function useInlineUiPortal() {
   return context;
 }
 
-export function InlineUiPortalAnchor({
-  anchorId,
-  className,
-}: {
-  anchorId?: string | null;
-  className?: string;
-}) {
+export function InlineUiPortalAnchor({ anchorId, className }: { anchorId?: string | null; className?: string }) {
   const { registerAnchor, unregisterAnchor } = useInlineUiPortal();
   const nodeRef = useRef<HTMLDivElement | null>(null);
   const idRef = useRef<string | null>(null);

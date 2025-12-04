@@ -16,7 +16,7 @@ import {
   normalizedTagMatches,
 } from './utils';
 import { createMiniSearchIndex, runMiniSearch } from './minisearch';
-import { createSearcher, type SearchLogPayload, type SearchSpec } from './createSearcher';
+import { createSearcher, type SearchLogPayload, type SearchSpec, type SearchWeights } from './createSearcher';
 
 type NormalizedProjectFilters = {
   languages: string[];
@@ -41,6 +41,8 @@ export type ProjectSearchLogPayload = ProjectSearchLogFilters & {
   expandedCandidates: number;
   usedSemantic: boolean;
   topScore?: number;
+  topRawScore?: number;
+  normalizationFactor?: number;
   recencyLambda?: number;
   freshestTimestamp?: number | null;
   topRecencyScore?: number;
@@ -61,6 +63,7 @@ type ProjectSearcherOptions = {
   minLimit?: number;
   maxLimit?: number;
   getNow?: () => number;
+  weights?: SearchWeights;
 };
 
 const normalizeFilters = (input: ProjectSearchInput): NormalizedProjectFilters => ({
@@ -278,12 +281,7 @@ export function createProjectSearcher(records: ProjectRecord[], options?: Projec
     };
 
     const combined = new Map<string, CombinedEntry>();
-    const addEntry = (
-      record: ProjectRecord,
-      score: number,
-      source: 'bm25' | 'structured',
-      rank: number
-    ) => {
+    const addEntry = (record: ProjectRecord, score: number, source: 'bm25' | 'structured', rank: number) => {
       const normalized = projectById.get(record.id) ?? record;
       const existing = combined.get(normalized.id) ?? { record: normalized };
       if (source === 'bm25') {
@@ -358,6 +356,7 @@ export function createProjectSearcher(records: ProjectRecord[], options?: Projec
       maxLimit: maxLimit ?? 10,
       getLimit: (input) => input.limit,
       getNow: options?.getNow,
+      weights: options?.weights,
       logger: logger
         ? (payload: SearchLogPayload<NormalizedProjectFilters>) => {
             const filterDescription = (payload.filterDescription ?? {}) as Partial<ProjectSearchLogFilters>;
@@ -373,6 +372,8 @@ export function createProjectSearcher(records: ProjectRecord[], options?: Projec
               expandedCandidates: payload.expandedCandidates,
               usedSemantic: payload.usedSemantic,
               topScore: payload.topScore,
+              topRawScore: payload.topRawScore,
+              normalizationFactor: payload.normalizationFactor,
               recencyLambda: payload.recencyLambda,
               freshestTimestamp: payload.freshestTimestamp ?? null,
               topRecencyScore: payload.topRecencyScore,

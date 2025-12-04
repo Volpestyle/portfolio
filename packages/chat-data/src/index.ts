@@ -249,24 +249,14 @@ export {
   createFilesystemProfileRepository,
 } from './providers/filesystem';
 export { createProjectDetailProvider } from './providers/projectDetail';
-export {
-  cosineSimilarity,
-  createEmbeddingSemanticRanker,
-  type SemanticRanker,
-} from './search/semantic';
-export {
-  createExperienceEmbeddingSemanticRanker,
-  type ExperienceSemanticRanker,
-} from './search/experienceSemantic';
-export {
-  createProjectSearcher,
-  type ProjectSearcher,
-  type ProjectSearchLogPayload,
-} from './search/projectSearcher';
+export { cosineSimilarity, createEmbeddingSemanticRanker, type SemanticRanker } from './search/semantic';
+export { createExperienceEmbeddingSemanticRanker, type ExperienceSemanticRanker } from './search/experienceSemantic';
+export { createProjectSearcher, type ProjectSearcher, type ProjectSearchLogPayload } from './search/projectSearcher';
 export {
   createSearcher,
   type SearchSpec,
   type SearcherOptions,
   type SearchLogPayload,
   type SearchContext,
+  type SearchWeights,
 } from './search/createSearcher';

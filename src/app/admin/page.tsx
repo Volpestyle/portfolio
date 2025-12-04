@@ -18,7 +18,7 @@ export default function AdminPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Blog Posts</h1>
-            <p className="text-muted-foreground mt-1">Manage and publish your blog content</p>
+            <p className="mt-1 text-muted-foreground">Manage and publish your blog content</p>
           </div>
           <Link href="/admin/new">
             <Button size="lg" className="gap-2">
@@ -64,4 +64,3 @@ export default function AdminPage() {
     </div>
   );
 }
-

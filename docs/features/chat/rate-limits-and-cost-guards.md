@@ -28,7 +28,7 @@ This stack ships with two defensive controls for the chat service:
   - Threshold: **$10** over the trailing 30 days (per infra stack).
   - Notifications: SNS email from `OPENAI_COST_ALERT_EMAIL`.
   - Missing-data guard: secondary alarm fires if no data points arrive for 3 consecutive days so we notice when publishing breaks.
-- Runtime budget guard (separate from the CloudWatch alarm) tracks month-to-date spend via Dynamo and optional SNS topic; see `docs/features/chat/implementation-notes.md#12-cost-monitoring--alarms` for `CHAT_MONTHLY_BUDGET_USD` and `COST_ALERT_TOPIC_ARN`.
+- Runtime budget guard (separate from the CloudWatch alarm) defaults to `$10/month` (`CHAT_MONTHLY_BUDGET_USD`) with warn/critical/exceeded at `$8 / $9.50 / $10`, tracks Planner/Retrieval/Answer runtime spend via Dynamo, and can fan out to SNS via `COST_ALERT_TOPIC_ARN` or `CHAT_COST_ALERT_TOPIC_ARN`. `/api/chat` blocks turns when already over budget; if a turn crosses the limit mid-stream, it finishes streaming and then emits SSE `error` with `code: "budget_exceeded"`.
 - Touchpoints: `packages/chat-next-api/src/costMetrics.ts` (publisher invoked from `createChatServerLogger` when `chat.pipeline.tokens` fire), `packages/chat-next-api/src/server.ts` (logger hook), `infra/cdk/lib/portfolio-stack.ts#createOpenAiCostAlarm` (alarm wiring + missing-data alert).
 
 ## Ops quick checks

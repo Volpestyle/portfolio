@@ -18,7 +18,7 @@ function JsonPreview({ value }: { value: unknown }) {
 function LogEntry({ entry }: { entry: ChatDebugLogEntry }) {
   return (
     <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-      <p className="text-xs font-mono text-white/60">
+      <p className="font-mono text-xs text-white/60">
         [{new Date(entry.timestamp).toLocaleTimeString()}] {entry.event}
       </p>
       {entry.payload ? (
@@ -51,8 +51,8 @@ export default function ChatDebugPage() {
         <p className="text-sm uppercase tracking-wide text-white/50">Debug tools</p>
         <h1 className="text-3xl font-semibold">Chat Pipeline Dashboard</h1>
         <p className="text-sm text-white/70">
-          Inspect the most recent planner/retrieval/evidence/answer events captured by the in-memory log buffer. Logging
-          level: <span className="font-mono">{CHAT_DEBUG_LEVEL}</span>
+          Inspect the most recent planner/retrieval/answer events captured by the in-memory log buffer. Logging level:{' '}
+          <span className="font-mono">{CHAT_DEBUG_LEVEL}</span>
         </p>
       </header>
 
@@ -70,8 +70,6 @@ export default function ChatDebugPage() {
               <JsonPreview value={summaryPayload?.retrieval} />
             </div>
             <div className="space-y-3">
-              <h3 className="text-sm uppercase tracking-wide text-white/60">Evidence</h3>
-              <JsonPreview value={summaryPayload?.evidence} />
               <h3 className="text-sm uppercase tracking-wide text-white/60">Answer</h3>
               <JsonPreview value={summaryPayload?.answer} />
             </div>
@@ -84,18 +82,32 @@ export default function ChatDebugPage() {
       <section className="space-y-3">
         <div>
           <h2 className="text-xl font-semibold">Token usage</h2>
-          <p className="text-sm text-white/70">Aggregated from recent <code>chat.pipeline.tokens</code> events.</p>
+          <p className="text-sm text-white/70">
+            Aggregated from recent <code>chat.pipeline.tokens</code> events.
+          </p>
         </div>
         {tokenSummary ? (
           <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm">
             <p>Total prompt tokens: {tokenSummary.totals.prompt.toLocaleString()}</p>
             <p>Total completion tokens: {tokenSummary.totals.completion.toLocaleString()}</p>
             <p>Total tokens: {tokenSummary.totals.total.toLocaleString()}</p>
+            {tokenSummary.hasCost ? (
+              <p>
+                Estimated cost:{' '}
+                {tokenSummary.totals.costUsd.toLocaleString(undefined, {
+                  style: 'currency',
+                  currency: 'USD',
+                  minimumFractionDigits: 4,
+                  maximumFractionDigits: 4,
+                })}
+              </p>
+            ) : null}
             <div className="mt-3 space-y-1">
               <p className="text-xs uppercase tracking-wide text-white/60">By stage</p>
               {Object.entries(tokenSummary.byStage).map(([stage, totals]) => (
                 <p key={stage} className="font-mono text-xs text-white/80">
                   {stage}: prompt={totals.prompt} completion={totals.completion} total={totals.total}
+                  {tokenSummary.hasCost ? ` cost=$${totals.costUsd.toFixed(4)}` : ''}
                 </p>
               ))}
             </div>
@@ -112,9 +124,12 @@ export default function ChatDebugPage() {
         </div>
         {logs.length ? (
           <div className="space-y-3">
-            {logs.slice(-50).reverse().map((entry) => (
-              <LogEntry key={`${entry.timestamp}-${entry.event}`} entry={entry} />
-            ))}
+            {logs
+              .slice(-50)
+              .reverse()
+              .map((entry) => (
+                <LogEntry key={`${entry.timestamp}-${entry.event}`} entry={entry} />
+              ))}
           </div>
         ) : (
           <p className="text-sm text-white/70">No logs captured yet.</p>

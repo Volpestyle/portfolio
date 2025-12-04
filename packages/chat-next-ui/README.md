@@ -55,20 +55,20 @@ The provider automatically:
 
 - Tracks the full message history (with a configurable window for outbound requests).
 - Streams the full SSE contract (`stage`, `reasoning`, `ui`, `token`, `item`, `attachment`, `ui_actions`, `done`, `error`) and applies updates as events arrive.
-- Updates `uiState.surfaces` based on UiPayload (`showProjects`, `showExperiences`, optional `coreEvidenceIds`) so components can render inline cards/actionable items next to specific assistant messages.
+- Updates `uiState.surfaces` based on UiPayload (`showProjects`, `showExperiences`) so components can render inline cards/actionable items next to specific assistant messages.
 - Maintains normalized project/resume caches hydrated from `/api/projects` and `/api/resume`.
 
 ## `ChatProvider` props
 
-| Prop               | Type                                                | Default                  | Description                                                                                                   |
-| ------------------ | --------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `endpoint`         | `string`                                            | `/api/chat`              | URL the provider `POST`s to when sending a new message.                                                       |
-| `ownerId`          | `string`                                            | `process.env.NEXT_PUBLIC_CHAT_OWNER_ID \|\| 'portfolio-owner'` | Multi-tenant key forwarded to `/api/chat`; must match the server’s configured owner.                         |
-| `historyLimit`     | `number`                                            | `12`                     | Max number of prior messages included in each request payload. Non-positive/invalid values fall back to `12`. |
-| `fetcher`          | `(input, init) => Promise<Response>`                | `globalThis.fetch`       | Optional injection point for custom fetch implementations (tests, polyfills).                                 |
-| `requestFormatter` | `(messages: ChatMessage[]) => ChatRequestMessage[]` | Default `flatten` helper | Override the request content transformation before calling the API.                                           |
-| `onError`          | `(error: Error) => void`                            | `undefined`              | Notified whenever streaming or network errors occur.                                                          |
-| `reasoningOptIn`   | `boolean`                                           | `true`                   | Set to `false` to opt out of requesting reasoning traces; forwarded as `reasoningEnabled` in the request body. |
+| Prop               | Type                                                | Default                                                        | Description                                                                                                    |
+| ------------------ | --------------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `endpoint`         | `string`                                            | `/api/chat`                                                    | URL the provider `POST`s to when sending a new message.                                                        |
+| `ownerId`          | `string`                                            | `process.env.NEXT_PUBLIC_CHAT_OWNER_ID \|\| 'portfolio-owner'` | Multi-tenant key forwarded to `/api/chat`; must match the server’s configured owner.                           |
+| `historyLimit`     | `number`                                            | `12`                                                           | Max number of prior messages included in each request payload. Non-positive/invalid values fall back to `12`.  |
+| `fetcher`          | `(input, init) => Promise<Response>`                | `globalThis.fetch`                                             | Optional injection point for custom fetch implementations (tests, polyfills).                                  |
+| `requestFormatter` | `(messages: ChatMessage[]) => ChatRequestMessage[]` | Default `flatten` helper                                       | Override the request content transformation before calling the API.                                            |
+| `onError`          | `(error: Error) => void`                            | `undefined`                                                    | Notified whenever streaming or network errors occur.                                                           |
+| `reasoningOptIn`   | `boolean`                                           | `true`                                                         | Set to `false` to opt out of requesting reasoning traces; forwarded as `reasoningEnabled` in the request body. |
 
 ## `useChat` return value
 
@@ -85,7 +85,7 @@ type UseChat = {
   uiState: ChatUiState; // Contains the per-message surfaces for inline UI portals.
   projectCache: Record<string, ProjectSummary | ProjectDetail>; // Projects keyed by slug or normalized name.
   experienceCache: Record<string, ResumeEntry>; // Experiences keyed by id/slug/title (normalized).
-  reasoningTraces: Record<string, PartialReasoningTrace>; // Streaming planner/retrieval/evidence/answer metadata by item id.
+  reasoningTraces: Record<string, PartialReasoningTrace>; // Streaming planner/retrieval/answer metadata by item id.
   reasoningEnabled: boolean; // Echo of the provider flag so the UI can show/hide traces.
   completionTimes: Record<string, number>; // Epoch millis when a turn completed (SSE done), falling back to render-finish if missing.
   markMessageRendered: (messageId: string) => void; // Marks an assistant turn as rendered + records completion time.
@@ -99,7 +99,7 @@ type UseChat = {
 - `anchorId`: Item/message id used to place inline UI via portals.
 - `visibleProjectIds`: Ordered, deduplicated identifiers from UiPayload.showProjects.
 - `visibleExperienceIds`: Ordered, deduplicated identifiers from UiPayload.showExperiences.
-- `coreEvidenceIds`: Ordered evidence ids from UiPayload.coreEvidenceIds (for dev/trace alignment).
+- `reasoningTraces`: Partial reasoning traces keyed by item id.
 - `focusedProjectId`: Reserved for future use (currently null).
 - `highlightedSkills`: Reserved for future use.
 - `lastActionAt`: ISO timestamp recording when the latest UI instruction was applied.
@@ -112,7 +112,7 @@ The provider expects the chat endpoint to stream newline-separated server-sent e
 
 - `stage` – pipeline progress (`planner_start`, etc.).
 - `reasoning` – partial `ReasoningTrace` updates.
-- `ui` – UiPayload `{ showProjects, showExperiences, coreEvidenceIds?, bannerText? }` for the referenced assistant turn.
+- `ui` – UiPayload `{ showProjects, showExperiences }` for the referenced assistant turn.
 - `token` – answer token chunks (the Answer stage streams `AnswerPayload.message`).
 - `item` – non-token answer parts, ordered by `itemId`.
 - `attachment` – host-defined payloads (projects/resume entries).

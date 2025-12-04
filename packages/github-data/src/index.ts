@@ -63,7 +63,9 @@ const DEFAULT_USERNAME = 'volpestyle';
 const DEFAULT_CONFIG_FILENAME = 'portfolio-config.json';
 const octokitByToken = new Map<string, Octokit>();
 
-export function calculateLanguagePercentages(languagesBreakdown: Record<string, number>): Array<{ name: string; percent: number }> {
+export function calculateLanguagePercentages(
+  languagesBreakdown: Record<string, number>
+): Array<{ name: string; percent: number }> {
   const totalBytes = Object.values(languagesBreakdown).reduce((sum, bytes) => sum + bytes, 0);
   if (!totalBytes) {
     return [];

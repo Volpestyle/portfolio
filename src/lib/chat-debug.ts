@@ -1,11 +1,12 @@
 import type { ChatMessage, ChatMessagePart, ChatTextPart } from '@portfolio/chat-contract';
 import type { ChatDebugLogEntry } from '@portfolio/chat-next-api';
+import { estimateCostUsd, parseUsage } from '@portfolio/chat-contract';
 
 function isTextPart(part: ChatMessagePart): part is ChatTextPart {
   return part.kind === 'text';
 }
 
-type TokenTotals = { prompt: number; completion: number; total: number };
+type TokenTotals = { prompt: number; completion: number; total: number; costUsd: number };
 
 function formatRole(role: ChatMessage['role']) {
   return role === 'assistant' ? 'Assistant' : 'User';
@@ -33,28 +34,25 @@ function extractUsageFromPayload(payload: unknown): (TokenTotals & { stage: stri
   if (!payload || typeof payload !== 'object') {
     return null;
   }
+
   const payloadObj = payload as Record<string, unknown>;
-  const usageSource = (payloadObj.usage ?? payloadObj) as Record<string, unknown>;
-  if (!usageSource || typeof usageSource !== 'object') {
-    return null;
-  }
-
-  const prompt = toNumber((usageSource as Record<string, unknown>).input_tokens ?? (usageSource as Record<string, unknown>).inputTokens);
-  const completion = toNumber(
-    (usageSource as Record<string, unknown>).output_tokens ?? (usageSource as Record<string, unknown>).outputTokens
-  );
-  const total = toNumber((usageSource as Record<string, unknown>).total_tokens ?? (usageSource as Record<string, unknown>).totalTokens);
-
-  if (prompt === null && completion === null && total === null) {
-    return null;
-  }
+  const usageSource = payloadObj.usage ?? payloadObj;
+  const parsedUsage = parseUsage(usageSource, { allowZero: false });
+  if (!parsedUsage) return null;
 
   const stage = typeof payloadObj.stage === 'string' && payloadObj.stage.trim() ? payloadObj.stage : 'unknown';
+  const model = typeof payloadObj.model === 'string' ? payloadObj.model : undefined;
+  const costCandidate = toNumber((payloadObj as Record<string, unknown>).costUsd ?? (usageSource as Record<string, unknown> | null)?.costUsd);
+  const resolvedCost =
+    costCandidate !== null
+      ? costCandidate
+      : estimateCostUsd(model, parsedUsage) ?? undefined;
 
   return {
-    prompt: prompt ?? 0,
-    completion: completion ?? 0,
-    total: total ?? (prompt ?? 0) + (completion ?? 0),
+    prompt: parsedUsage.promptTokens,
+    completion: parsedUsage.completionTokens,
+    total: parsedUsage.totalTokens,
+    costUsd: resolvedCost ?? 0,
     stage,
   };
 }
@@ -62,9 +60,10 @@ function extractUsageFromPayload(payload: unknown): (TokenTotals & { stage: stri
 export function summarizeTokenUsage(logs?: ChatDebugLogEntry[]) {
   if (!logs?.length) return null;
 
-  const totals: TokenTotals = { prompt: 0, completion: 0, total: 0 };
+  const totals: TokenTotals = { prompt: 0, completion: 0, total: 0, costUsd: 0 };
   const byStage: Record<string, TokenTotals> = {};
   let count = 0;
+  let hasCost = false;
 
   logs.forEach((entry) => {
     const usage = extractUsageFromPayload(entry.payload);
@@ -75,16 +74,24 @@ export function summarizeTokenUsage(logs?: ChatDebugLogEntry[]) {
     totals.prompt += usage.prompt;
     totals.completion += usage.completion;
     totals.total += usage.total;
+    if (Number.isFinite(usage.costUsd) && usage.costUsd !== 0) {
+      hasCost = true;
+      totals.costUsd += usage.costUsd;
+    }
 
-    const bucket = byStage[usage.stage] ?? { prompt: 0, completion: 0, total: 0 };
+    const bucket = byStage[usage.stage] ?? { prompt: 0, completion: 0, total: 0, costUsd: 0 };
     bucket.prompt += usage.prompt;
     bucket.completion += usage.completion;
     bucket.total += usage.total;
+    if (Number.isFinite(usage.costUsd) && usage.costUsd !== 0) {
+      hasCost = true;
+      bucket.costUsd = (bucket.costUsd ?? 0) + usage.costUsd;
+    }
     byStage[usage.stage] = bucket;
   });
 
   if (!count) return null;
-  return { totals, byStage };
+  return { totals, byStage, hasCost };
 }
 
 export function formatChatMessagesAsMarkdown(messages: ChatMessage[], debugLogs?: ChatDebugLogEntry[]): string {
@@ -118,7 +125,6 @@ export function formatChatMessagesAsMarkdown(messages: ChatMessage[], debugLogs?
       lines.push('_No text content_');
       lines.push('');
     }
-
   });
 
   if (messages.length === 0) {
@@ -147,10 +153,19 @@ export function formatChatMessagesAsMarkdown(messages: ChatMessage[], debugLogs?
     if (stageEntries.length) {
       lines.push('- By stage:');
       stageEntries.forEach(([stage, totals]) => {
-        lines.push(
-          `  - ${stage}: prompt=${totals.prompt}, completion=${totals.completion}, total=${totals.total}`
-        );
+        lines.push(`  - ${stage}: prompt=${totals.prompt}, completion=${totals.completion}, total=${totals.total}`);
       });
+    }
+    if (usageSummary.hasCost) {
+      lines.push('', '## Cost Summary', '');
+      lines.push(`- Estimated cost (USD): $${usageSummary.totals.costUsd.toFixed(4)}`);
+      if (stageEntries.length) {
+        lines.push('- By stage:');
+        stageEntries.forEach(([stage, totals]) => {
+          const stageCost = totals.costUsd ?? 0;
+          lines.push(`  - ${stage}: ~$${stageCost.toFixed(4)}`);
+        });
+      }
     }
   } else if (debugLogs && debugLogs.length) {
     lines.push('', '---', '', '## Token Usage Summary', '', '- No token usage logs found.');

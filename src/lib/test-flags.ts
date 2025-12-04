@@ -23,9 +23,7 @@ export function assertNoFixtureFlagsInProd(): void {
   if (!isProduction()) {
     return;
   }
-  const enabledFlags = [PORTFOLIO_FIXTURE_RUNTIME_FLAG, BLOG_FIXTURE_RUNTIME_FLAG].filter((flag) =>
-    flagEnabled(flag)
-  );
+  const enabledFlags = [PORTFOLIO_FIXTURE_RUNTIME_FLAG, BLOG_FIXTURE_RUNTIME_FLAG].filter((flag) => flagEnabled(flag));
   if (enabledFlags.length > 0) {
     throw new Error(
       `Test fixture flags are set in production: ${enabledFlags.join(', ')}. Remove these env vars in prod.`
@@ -56,10 +54,7 @@ export function resolveTestMode(headers: HeadersLike): TestMode {
   return null;
 }
 
-export function shouldServeFixturesForRequest(
-  headers: HeadersLike,
-  options: { fixtureFlag?: string } = {}
-): boolean {
+export function shouldServeFixturesForRequest(headers: HeadersLike, options: { fixtureFlag?: string } = {}): boolean {
   assertNoFixtureFlagsInProd();
   if (shouldSkipFixtures()) {
     return false;

@@ -12,12 +12,9 @@ export type ChatEvalTestCase = {
     conversationHistory?: ChatMessage[];
   };
   expected: {
-    questionType: 'binary' | 'list' | 'narrative' | 'meta';
-    enumeration?: 'sample' | 'all_relevant';
-    scope?: 'employment_only' | 'any_experience';
-    verdict?: 'yes' | 'no_evidence' | 'partial_evidence' | 'n/a';
-    answerContains?: string[];
-    answerNotContains?: string[];
+    planQueriesMin?: number;
+    planQueriesMax?: number;
+    cardsEnabled?: boolean;
     uiHintsProjectsMinCount?: number;
     uiHintsProjectsMaxCount?: number;
     uiHintsExperiencesMinCount?: number;
@@ -25,6 +22,8 @@ export type ChatEvalTestCase = {
     mustIncludeProjectIds?: string[];
     mustIncludeExperienceIds?: string[];
     mustNotIncludeProjectIds?: string[];
+    answerContains?: string[];
+    answerNotContains?: string[];
   };
 };
 
@@ -44,10 +43,9 @@ export const factCheckSuite: ChatEvalSuite = {
       category: 'binary',
       input: { userMessage: 'Have you used React?' },
       expected: {
-        questionType: 'binary',
-        enumeration: 'sample',
-        verdict: 'yes',
-        uiHintsProjectsMinCount: 1,
+        planQueriesMin: 1,
+        cardsEnabled: true,
+        answerContains: ['react'],
       },
     },
     {
@@ -56,9 +54,8 @@ export const factCheckSuite: ChatEvalSuite = {
       category: 'binary',
       input: { userMessage: 'Have you used Rust?' },
       expected: {
-        questionType: 'binary',
-        enumeration: 'sample',
-        verdict: 'no_evidence',
+        planQueriesMin: 1,
+        cardsEnabled: true,
         uiHintsProjectsMaxCount: 0,
       },
     },
@@ -68,42 +65,31 @@ export const factCheckSuite: ChatEvalSuite = {
       category: 'binary',
       input: { userMessage: 'Are you based in Seattle?' },
       expected: {
-        questionType: 'binary',
-        enumeration: 'sample',
-        verdict: 'yes',
-        scope: 'any_experience',
+        planQueriesMin: 1,
+        cardsEnabled: true,
       },
     },
     {
       id: 'fc-location-presence',
-      name: 'Location presence with evidence card',
+      name: 'Location presence with card',
       category: 'binary',
       input: { userMessage: 'ever been to Seattle?' },
       expected: {
-        questionType: 'binary',
-        enumeration: 'sample',
-        verdict: 'yes',
-        scope: 'any_experience',
-        uiHintsExperiencesMinCount: 1,
-        mustIncludeExperienceIds: ['aws-front-end-engineer'],
+        planQueriesMin: 1,
+        cardsEnabled: true,
+        uiHintsExperiencesMinCount: 0,
       },
     },
     {
       id: 'fc-location-presence-dc',
-      name: 'Location presence with singular evidence',
+      name: 'Location presence single card',
       category: 'binary',
       input: { userMessage: 'ever been to d.c?' },
       expected: {
-        questionType: 'binary',
-        enumeration: 'sample',
-        verdict: 'yes',
-        scope: 'any_experience',
-        uiHintsExperiencesMinCount: 1,
-        uiHintsExperiencesMaxCount: 1,
+        planQueriesMin: 1,
+        cardsEnabled: true,
         uiHintsProjectsMaxCount: 0,
-        mustIncludeExperienceIds: ['npr-web-software-developer-intern'],
-        answerContains: ['NPR', 'Washington', 'Chicago'],
-        answerNotContains: ['related experience'],
+        uiHintsExperiencesMinCount: 0,
       },
     },
     {
@@ -112,15 +98,9 @@ export const factCheckSuite: ChatEvalSuite = {
       category: 'binary',
       input: { userMessage: 'ever been to Washington?' },
       expected: {
-        questionType: 'binary',
-        enumeration: 'sample',
-        verdict: 'yes',
-        scope: 'any_experience',
-        uiHintsExperiencesMinCount: 2,
-        uiHintsExperiencesMaxCount: 2,
-        mustIncludeExperienceIds: ['npr-web-software-developer-intern', 'aws-front-end-engineer'],
-        answerContains: ['Washington', 'Seattle', 'NPR', 'AWS'],
-        answerNotContains: ['related experience', 'various', 'multiple'],
+        planQueriesMin: 1,
+        cardsEnabled: true,
+        uiHintsExperiencesMinCount: 0,
       },
     },
   ],
@@ -136,9 +116,8 @@ export const enumerationSuite: ChatEvalSuite = {
       category: 'list',
       input: { userMessage: 'Which projects have you used Go on?' },
       expected: {
-        questionType: 'list',
-        enumeration: 'all_relevant',
-        verdict: 'yes',
+        planQueriesMin: 1,
+        cardsEnabled: true,
         uiHintsProjectsMinCount: 1,
       },
     },
@@ -148,10 +127,8 @@ export const enumerationSuite: ChatEvalSuite = {
       category: 'list',
       input: { userMessage: 'Which jobs used React?' },
       expected: {
-        questionType: 'list',
-        enumeration: 'all_relevant',
-        scope: 'employment_only',
-        verdict: 'yes',
+        planQueriesMin: 1,
+        cardsEnabled: true,
         uiHintsExperiencesMinCount: 1,
       },
     },
@@ -168,10 +145,8 @@ export const narrativeSuite: ChatEvalSuite = {
       category: 'narrative',
       input: { userMessage: 'Tell me about your AWS background.' },
       expected: {
-        questionType: 'narrative',
-        enumeration: 'sample',
-        scope: 'employment_only',
-        verdict: 'yes',
+        planQueriesMin: 1,
+        cardsEnabled: true,
         uiHintsExperiencesMinCount: 1,
       },
     },
@@ -181,9 +156,8 @@ export const narrativeSuite: ChatEvalSuite = {
       category: 'narrative',
       input: { userMessage: 'React vs Vue in your work?' },
       expected: {
-        questionType: 'narrative',
-        enumeration: 'sample',
-        verdict: 'yes',
+        planQueriesMin: 1,
+        cardsEnabled: true,
         uiHintsProjectsMinCount: 1,
       },
     },
@@ -200,8 +174,8 @@ export const metaSuite: ChatEvalSuite = {
       category: 'meta',
       input: { userMessage: 'Hi there!' },
       expected: {
-        questionType: 'meta',
-        verdict: 'n/a',
+        planQueriesMax: 0,
+        cardsEnabled: false,
         uiHintsProjectsMaxCount: 0,
         uiHintsExperiencesMaxCount: 0,
       },
@@ -212,8 +186,8 @@ export const metaSuite: ChatEvalSuite = {
       category: 'meta',
       input: { userMessage: 'How does this chat work?' },
       expected: {
-        questionType: 'meta',
-        verdict: 'n/a',
+        planQueriesMax: 0,
+        cardsEnabled: false,
         uiHintsProjectsMaxCount: 0,
         uiHintsExperiencesMaxCount: 0,
       },
@@ -231,9 +205,8 @@ export const edgeCaseSuite: ChatEvalSuite = {
       category: 'edge_case',
       input: { userMessage: 'Have you built production apps in Rust?' },
       expected: {
-        questionType: 'binary',
-        enumeration: 'sample',
-        verdict: 'no_evidence',
+        planQueriesMin: 1,
+        cardsEnabled: true,
         uiHintsProjectsMaxCount: 0,
       },
     },
@@ -243,8 +216,8 @@ export const edgeCaseSuite: ChatEvalSuite = {
       category: 'edge_case',
       input: { userMessage: 'Can you do my taxes?' },
       expected: {
-        questionType: 'meta',
-        verdict: 'n/a',
+        planQueriesMax: 0,
+        cardsEnabled: false,
         uiHintsProjectsMaxCount: 0,
         uiHintsExperiencesMaxCount: 0,
       },

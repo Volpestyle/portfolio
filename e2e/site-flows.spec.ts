@@ -13,46 +13,46 @@ test.describe('Site flows', () => {
       path: string;
       assertion: () => Promise<void>;
     }> = [
-        {
-          label: /about/i,
-          path: '/about',
-          assertion: async () => {
-            await expect(page.getByText(/i'm a software engineer from chicago/i)).toBeVisible();
-          },
+      {
+        label: /about/i,
+        path: '/about',
+        assertion: async () => {
+          await expect(page.getByText(/i'm a software engineer from chicago/i)).toBeVisible();
         },
-        {
-          label: /projects/i,
-          path: '/projects',
-          assertion: async () => {
-            await expect(page.getByRole('link', { name: /view details/i }).first()).toBeVisible();
-          },
+      },
+      {
+        label: /projects/i,
+        path: '/projects',
+        assertion: async () => {
+          await expect(page.getByRole('link', { name: /view details/i }).first()).toBeVisible();
         },
-        {
-          label: /blog/i,
-          path: '/blog',
-          assertion: async () => {
-            const emptyState = page.getByText(/no blog posts yet/i);
-            const readLink = page.getByRole('link', { name: /read article/i }).first();
-            await Promise.race([
-              emptyState.waitFor({ state: 'visible' }).catch(() => undefined),
-              readLink.waitFor({ state: 'visible' }).catch(() => undefined),
-            ]);
-            if ((await readLink.count()) > 0) {
-              await expect(readLink).toBeVisible();
-            } else {
-              await expect(emptyState).toBeVisible();
-            }
-          },
+      },
+      {
+        label: /blog/i,
+        path: '/blog',
+        assertion: async () => {
+          const emptyState = page.getByText(/no blog posts yet/i);
+          const readLink = page.getByRole('link', { name: /read article/i }).first();
+          await Promise.race([
+            emptyState.waitFor({ state: 'visible' }).catch(() => undefined),
+            readLink.waitFor({ state: 'visible' }).catch(() => undefined),
+          ]);
+          if ((await readLink.count()) > 0) {
+            await expect(readLink).toBeVisible();
+          } else {
+            await expect(emptyState).toBeVisible();
+          }
         },
-        {
-          label: /contact/i,
-          path: '/contact',
-          assertion: async () => {
-            await expect(page.getByRole('heading', { name: /chat with me/i })).toBeVisible();
-            await expect(page.getByRole('button', { name: /send message/i })).toBeVisible();
-          },
+      },
+      {
+        label: /contact/i,
+        path: '/contact',
+        assertion: async () => {
+          await expect(page.getByRole('heading', { name: /chat with me/i })).toBeVisible();
+          await expect(page.getByRole('button', { name: /send message/i })).toBeVisible();
         },
-      ];
+      },
+    ];
 
     for (const target of navTargets) {
       await page.goto('/');

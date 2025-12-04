@@ -1,7 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { resolveTestRuntime, buildProjectHeaders } from './e2e/utils/runtime-env';
 
-
 const LOCAL_E2E_BASE = 'http://127.0.0.1:3000';
 if (process.env.PLAYWRIGHT_SKIP_WEBSERVER !== 'true') {
   process.env.PLAYWRIGHT_TEST_BASE_URL ??= LOCAL_E2E_BASE;
@@ -26,9 +25,7 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: process.env.CI
-    ? [['html'], ['github'], ['list']]
-    : [['html'], ['list']],
+  reporter: process.env.CI ? [['html'], ['github'], ['list']] : [['html'], ['list']],
 
   /* Shared settings for all projects. */
   use: {
@@ -70,16 +67,16 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: shouldStartWebServer
     ? {
-      // Use dev mode so tests run against a fresh Next build
-      command: 'pnpm run dev',
-      url: 'http://localhost:3000',
-      reuseExistingServer: false,
-      timeout: 120 * 1000,
-      env: {
-        ...process.env,
-        BLOG_TEST_FIXTURES: 'true', // Force mock blog data for Playwright runs
-        PORTFOLIO_TEST_FIXTURES: 'true', // Enable SSR fixtures while Playwright runs
-      },
-    }
+        // Use dev mode so tests run against a fresh Next build
+        command: 'pnpm run dev',
+        url: 'http://localhost:3000',
+        reuseExistingServer: false,
+        timeout: 120 * 1000,
+        env: {
+          ...process.env,
+          BLOG_TEST_FIXTURES: 'true', // Force mock blog data for Playwright runs
+          PORTFOLIO_TEST_FIXTURES: 'true', // Enable SSR fixtures while Playwright runs
+        },
+      }
     : undefined,
 });

@@ -23,39 +23,28 @@ export function buildChatFixtureResponse({
   const projectId = project.slug ?? project.name;
   const reasoningTrace = {
     plan: {
-      questionType: 'narrative',
-      enumeration: 'sample',
-      scope: 'any_experience',
       topic: 'featured project',
-      retrievalRequests: [
-        { source: 'projects', topK: 5, queryText: 'featured project highlights' },
-        { source: 'resume', topK: 4, queryText: 'supporting resume context' },
+      queries: [
+        { source: 'projects', limit: 5, text: 'featured project highlights' },
+        { source: 'resume', limit: 4, text: 'supporting resume context' },
       ],
-      resumeFacets: [],
       cardsEnabled: true,
     },
     retrieval: [
-      { source: 'projects', queryText: 'featured project highlights', requestedTopK: 5, effectiveTopK: 5, numResults: 3 },
+      {
+        source: 'projects',
+        queryText: 'featured project highlights',
+        requestedTopK: 5,
+        effectiveTopK: 5,
+        numResults: 3,
+      },
       { source: 'resume', queryText: 'supporting resume context', requestedTopK: 4, effectiveTopK: 4, numResults: 2 },
     ],
-    evidence: {
-      verdict: 'yes',
-      confidence: 'high',
-      reasoning: 'Highlighted the featured project and related resume examples to explain the impact.',
-      selectedEvidence: [
-        { source: 'project', id: projectId, title: project.name, snippet: project.oneLiner, relevance: 'high' },
-      ],
-      semanticFlags: [],
-      uiHints: { projects: [projectId], experiences: [] },
-    },
-    answerMeta: {
+    answer: {
       model: answerModel,
-      questionType: 'narrative',
-      enumeration: 'sample',
-      scope: 'any_experience',
-      verdict: 'yes',
-      confidence: 'high',
+      uiHints: { projects: [projectId], experiences: [] },
       thoughts: ['Introduce the project and why it stands out', 'Invite the user to explore the card for more context'],
+      message: "Here's a featured project from my portfolio.",
     },
   };
   const retrievalCounts = reasoningTrace.retrieval.reduce(
@@ -64,9 +53,8 @@ export function buildChatFixtureResponse({
       if (!acc.sources.includes(source)) acc.sources.push(source);
       return acc;
     },
-    { totalDocs: 0, sources: [] as string[] },
+    { totalDocs: 0, sources: [] as string[] }
   );
-  const evidenceCount = reasoningTrace.evidence.selectedEvidence.length;
   const frames = [
     { type: 'item', itemId: anchorId, anchorId, kind: 'answer' },
     { type: 'stage', itemId: anchorId, anchorId, stage: 'planner', status: 'start' },
@@ -76,12 +64,7 @@ export function buildChatFixtureResponse({
       anchorId,
       stage: 'planner',
       status: 'complete',
-      meta: {
-        questionType: reasoningTrace.plan.questionType,
-        enumeration: reasoningTrace.plan.enumeration,
-        scope: reasoningTrace.plan.scope,
-        topic: reasoningTrace.plan.topic,
-      },
+      meta: { topic: reasoningTrace.plan.topic, cardsEnabled: true },
       durationMs: 220,
     },
     { type: 'stage', itemId: anchorId, anchorId, stage: 'retrieval', status: 'start' },
@@ -93,16 +76,6 @@ export function buildChatFixtureResponse({
       status: 'complete',
       meta: { docsFound: retrievalCounts.totalDocs, sources: retrievalCounts.sources },
       durationMs: 140,
-    },
-    { type: 'stage', itemId: anchorId, anchorId, stage: 'evidence', status: 'start' },
-    {
-      type: 'stage',
-      itemId: anchorId,
-      anchorId,
-      stage: 'evidence',
-      status: 'complete',
-      meta: { verdict: reasoningTrace.evidence.verdict, confidence: reasoningTrace.evidence.confidence, evidenceCount },
-      durationMs: 260,
     },
     { type: 'stage', itemId: anchorId, anchorId, stage: 'answer', status: 'start' },
     {
@@ -118,26 +91,20 @@ export function buildChatFixtureResponse({
     {
       type: 'reasoning',
       itemId: anchorId,
-      stage: 'plan',
-      trace: { plan: reasoningTrace.plan, retrieval: null, evidence: null, answerMeta: null },
+      stage: 'planner',
+      trace: { plan: reasoningTrace.plan, retrieval: null, answer: null },
     },
     {
       type: 'reasoning',
       itemId: anchorId,
       stage: 'retrieval',
-      trace: { plan: null, retrieval: reasoningTrace.retrieval, evidence: null, answerMeta: null },
-    },
-    {
-      type: 'reasoning',
-      itemId: anchorId,
-      stage: 'evidence',
-      trace: { plan: null, retrieval: null, evidence: reasoningTrace.evidence, answerMeta: null },
+      trace: { plan: null, retrieval: reasoningTrace.retrieval, answer: null },
     },
     {
       type: 'reasoning',
       itemId: anchorId,
       stage: 'answer',
-      trace: { plan: null, retrieval: null, evidence: null, answerMeta: reasoningTrace.answerMeta },
+      trace: { plan: null, retrieval: null, answer: reasoningTrace.answer },
     },
     { type: 'ui_actions', itemId: anchorId, actions: [] },
     { type: 'stage', itemId: anchorId, anchorId, stage: 'answer', status: 'complete', durationMs: 800 },

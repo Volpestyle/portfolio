@@ -8,12 +8,7 @@ import {
   DescribeSecretCommand,
 } from '@aws-sdk/client-secrets-manager';
 import { parseEnvFile, ParsedEnv } from '../infra/cdk/scripts/env-parser';
-import {
-  log,
-  firstNonEmpty,
-  deriveSecretIds,
-  resolveOwnerRepo,
-} from './shared';
+import { log, firstNonEmpty, deriveSecretIds, resolveOwnerRepo } from './shared';
 
 // using shared utilities for repo detection and secret id derivation
 

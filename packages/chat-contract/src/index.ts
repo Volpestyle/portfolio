@@ -179,11 +179,24 @@ export type ProfileSummary = {
   socialLinks?: ProfileSocialLink[];
 };
 
+export type PersonaProfile = {
+  updatedAt?: string;
+  fullName?: string;
+  headline?: string;
+  location?: string;
+  currentRole?: string;
+  about?: string[];
+  topSkills?: string[];
+  socialLinks?: string[];
+  featuredExperienceIds?: string[];
+};
+
 export type PersonaSummary = {
   systemPersona: string;
   shortAbout: string;
   styleGuidelines: string[];
   voiceExamples?: string[];
+  profile?: PersonaProfile;
   generatedAt?: string;
 };
 
@@ -199,18 +212,17 @@ export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high';
 
 export type StageReasoningConfig = {
   planner?: ReasoningEffort;
-  evidence?: ReasoningEffort;
   answer?: ReasoningEffort;
+  answerNoRetrieval?: ReasoningEffort;
 };
 
 export type ModelConfig = {
   plannerModel: string;
-  evidenceModel: string;
-  evidenceModelDeepDive?: string;
   answerModel: string;
+  answerModelNoRetrieval?: string;
   embeddingModel: string;
   answerTemperature?: number;
-  stageReasoning?: StageReasoningConfig;
+  reasoning?: StageReasoningConfig;
 };
 
 export type DataProviders = {
@@ -256,172 +268,72 @@ export type ChatRequestMessage = {
   content: string;
 };
 
-// Chat pipeline contract (planner/evidence/answer)
-export type QuestionType = 'binary' | 'list' | 'narrative' | 'meta';
-export type EnumerationMode = 'sample' | 'all_relevant';
+// Chat pipeline contract (planner/retrieval/answer)
 export type RetrievalSource = 'projects' | 'resume' | 'profile';
-
 export type ExperienceScope = 'employment_only' | 'any_experience';
-
 export type ResumeFacet = 'experience' | 'education' | 'award' | 'skill';
 
-export type RetrievalRequest = {
+export type PlannerQuery = {
   source: RetrievalSource;
-  queryText: string;
-  topK: number;
+  text: string;
+  limit?: number;
 };
 
 export type PlannerLLMOutput = {
-  // Core axes
-  questionType: QuestionType;
-  enumeration: EnumerationMode;
-  scope: ExperienceScope;
-
-  // Retrieval instructions
-  retrievalRequests: RetrievalRequest[];
-  resumeFacets?: ResumeFacet[];
-
-  // UI / presentation hints
-  cardsEnabled?: boolean;
-
-  // Telemetry only
-  topic?: string | null;
+  queries: PlannerQuery[];
+  cardsEnabled: boolean;
+  topic?: string;
 };
 
-// Full RetrievalPlan (identical to planner output; kept as a separate alias for clarity)
-export type RetrievalPlan = PlannerLLMOutput;
-
-type EvidenceItemSource = 'project' | 'resume' | 'profile';
-
-export type EvidenceItem = {
-  source: EvidenceItemSource;
-  id: string;
-  title: string;
-  snippet: string;
-  relevance: 'high' | 'medium' | 'low';
+export type RetrievalPlan = PlannerLLMOutput & {
+  model?: string;
 };
 
-export type Verdict = 'yes' | 'no_evidence' | 'partial_evidence' | 'n/a';
-
-export type Confidence = 'high' | 'medium' | 'low';
-
-type SemanticFlagType = 'multi_topic' | 'ambiguous' | 'needs_clarification' | 'off_topic';
-
-export type SemanticFlag = {
-  type: SemanticFlagType;
-  reason: string;
-};
-
-export type EvidenceUiHints = {
-  /**
-   * Project IDs chosen by the Evidence stage, ordered by priority.
-   * Must be a subset of retrieved project doc ids.
-   */
+export type AnswerUiHints = {
   projects?: string[];
-  /**
-   * Resume experience IDs chosen by the Evidence stage, ordered by priority.
-   * Must be a subset of retrieved resume experience doc ids.
-   */
   experiences?: string[];
 };
 
-export type EvidenceSummary = {
-  verdict: Verdict;
-  confidence: Confidence;
-  reasoning: string;
-  selectedEvidence: EvidenceItem[];
-  semanticFlags?: SemanticFlag[];
-  uiHints?: EvidenceUiHints | null;
-  uiHintWarnings?: UiHintValidationWarning[];
+export type AnswerPayload = {
+  message: string;
+  thoughts?: string[];
+  uiHints?: AnswerUiHints;
 };
 
 export type UiPayload = {
   showProjects: string[];
   showExperiences: string[];
-  bannerText?: string;
-  coreEvidenceIds?: string[];
-};
-
-export type AnswerPayload = {
-  message: string;
-  thoughts?: string[] | null;
 };
 
 export const RETRIEVAL_SOURCE_VALUES = ['projects', 'resume', 'profile'] as const;
-export const QUESTION_TYPE_VALUES = ['binary', 'list', 'narrative', 'meta'] as const;
-export const ENUMERATION_VALUES = ['sample', 'all_relevant'] as const;
-export const VERDICT_VALUES = ['yes', 'no_evidence', 'partial_evidence', 'n/a'] as const;
-export const CONFIDENCE_VALUES = ['high', 'medium', 'low'] as const;
 export const RESUME_FACET_VALUES = ['experience', 'education', 'award', 'skill'] as const;
-export const EVIDENCE_SOURCE_VALUES = ['project', 'resume', 'profile'] as const;
-export const SEMANTIC_FLAG_VALUES = ['multi_topic', 'ambiguous', 'needs_clarification', 'off_topic'] as const;
 export const RETRIEVAL_REQUEST_TOPK_MAX = 10;
+export const RETRIEVAL_REQUEST_TOPK_DEFAULT = 8;
 
-const RetrievalRequestSchema: z.ZodType<RetrievalRequest, z.ZodTypeDef, unknown> = z.object({
+const PlannerQuerySchema: z.ZodType<PlannerQuery, z.ZodTypeDef, unknown> = z.object({
   source: z.enum(RETRIEVAL_SOURCE_VALUES),
-  queryText: z.string().default(''),
-  topK: z.number().int().min(0).default(8),
+  text: z.string().default(''),
+  limit: z.number().int().min(1).max(RETRIEVAL_REQUEST_TOPK_MAX).default(RETRIEVAL_REQUEST_TOPK_DEFAULT),
 });
 
 /**
- * Schema for parsing raw Planner LLM output (per spec §4.2).
+ * Schema for parsing raw Planner LLM output (per simplified spec).
  */
 export const PlannerLLMOutputSchema: z.ZodType<PlannerLLMOutput, z.ZodTypeDef, unknown> = z.object({
-  questionType: z.enum(QUESTION_TYPE_VALUES).default('narrative'),
-  enumeration: z.enum(ENUMERATION_VALUES).default('sample'),
-  scope: z.enum(['employment_only', 'any_experience']).default('any_experience'),
-  retrievalRequests: z.array(RetrievalRequestSchema).default([]),
-  resumeFacets: z.array(z.enum(RESUME_FACET_VALUES)).default([]),
+  queries: z.array(PlannerQuerySchema).default([]),
   cardsEnabled: z.boolean().default(true),
-  topic: z.string().nullable().optional(),
+  topic: z.string().default(''),
 });
 
-/**
- * Schema for EvidenceSummary and related data.
- */
-const EvidenceItemSchema: z.ZodType<EvidenceItem, z.ZodTypeDef, unknown> = z.object({
-  source: z.enum(EVIDENCE_SOURCE_VALUES),
-  id: z.string(),
-  title: z.string().default(''),
-  snippet: z.string().default(''),
-  relevance: z.enum(['high', 'medium', 'low']).default('medium'),
-});
-
-const SemanticFlagSchema: z.ZodType<SemanticFlag, z.ZodTypeDef, unknown> = z.object({
-  type: z.enum(SEMANTIC_FLAG_VALUES),
-  reason: z.string().default(''),
-});
-
-const UiHintValidationWarningSchema: z.ZodType<UiHintValidationWarning, z.ZodTypeDef, unknown> = z.object({
-  code: z.enum(['UIHINT_INVALID_PROJECT_ID', 'UIHINT_INVALID_EXPERIENCE_ID']),
-  invalidIds: z.array(z.string()).default([]),
-  retrievedIds: z.array(z.string()).default([]),
-});
-
-const EvidenceUiHintsSchema: z.ZodType<EvidenceUiHints, z.ZodTypeDef, unknown> = z.object({
+const AnswerUiHintsSchema: z.ZodType<AnswerUiHints, z.ZodTypeDef, unknown> = z.object({
   projects: z.array(z.string()).default([]),
   experiences: z.array(z.string()).default([]),
 });
 
 export const AnswerPayloadSchema: z.ZodType<AnswerPayload, z.ZodTypeDef, unknown> = z.object({
   message: z.string(),
-  thoughts: z.array(z.string()).optional().nullable(),
-});
-
-export type UiHintValidationWarning = {
-  code: 'UIHINT_INVALID_PROJECT_ID' | 'UIHINT_INVALID_EXPERIENCE_ID';
-  invalidIds: string[];
-  retrievedIds: string[];
-};
-
-export const EvidenceSummarySchema: z.ZodType<EvidenceSummary, z.ZodTypeDef, unknown> = z.object({
-  verdict: z.enum(VERDICT_VALUES).default('no_evidence'),
-  confidence: z.enum(CONFIDENCE_VALUES).default('low'),
-  reasoning: z.string().default(''),
-  selectedEvidence: z.array(EvidenceItemSchema).default([]),
-  semanticFlags: z.array(SemanticFlagSchema).default([]),
-  uiHints: EvidenceUiHintsSchema.default({ projects: [], experiences: [] }).nullable(),
-  uiHintWarnings: z.array(UiHintValidationWarningSchema).default([]),
+  thoughts: z.array(z.string()).default([]),
+  uiHints: AnswerUiHintsSchema.default({}),
 });
 
 export type RetrievalSummary = {
@@ -430,9 +342,27 @@ export type RetrievalSummary = {
   requestedTopK: number;
   effectiveTopK: number;
   numResults: number;
+  embeddingModel?: string;
 };
 
-export type ReasoningStage = 'plan' | 'retrieval' | 'evidence' | 'answer';
+export type ReasoningStage = 'planner' | 'retrieval' | 'answer';
+
+export type ReasoningPrompt = {
+  system: string;
+  user: string;
+};
+
+export type ReasoningDebug = {
+  plannerPrompt?: ReasoningPrompt;
+  answerPrompt?: ReasoningPrompt;
+  plannerRawResponse?: string;
+  answerRawResponse?: string;
+  retrievalDocs?: {
+    projects?: unknown[];
+    resume?: unknown[];
+    profile?: unknown | null;
+  };
+};
 
 export type ReasoningTraceError = {
   stage?: ReasoningStage | 'unknown';
@@ -442,22 +372,60 @@ export type ReasoningTraceError = {
   retryAfterMs?: number;
 };
 
-type ReasoningAnswerMeta = {
-  model: string;
-  questionType: QuestionType;
-  enumeration: EnumerationMode;
-  scope: ExperienceScope;
-  verdict: Verdict;
-  confidence: Confidence;
+export type ReasoningUpdate = {
+  stage: ReasoningStage;
+  trace?: PartialReasoningTrace;
+  notes?: string;
+  delta?: string;
+  progress?: number;
+};
+
+export type AnswerReasoning = {
+  model?: string;
+  uiHints?: AnswerUiHints;
   thoughts?: string[];
+};
+
+export type RetrievedProjectDoc = {
+  id: string;
+  name: string;
+  oneLiner?: string;
+  techStack?: string[];
+  _score?: number;
+};
+
+export type RetrievedResumeDoc = {
+  id: string;
+  type?: 'experience' | 'education' | 'award' | 'skill';
+  title?: string;
+  company?: string;
+  institution?: string;
+  summary?: string;
+  _score?: number;
+};
+
+export type RetrievalDocs = {
+  projects?: RetrievedProjectDoc[];
+  resume?: RetrievedResumeDoc[];
 };
 
 export type PartialReasoningTrace = {
   plan: RetrievalPlan | null;
   retrieval: RetrievalSummary[] | null;
-  evidence: EvidenceSummary | null;
-  answerMeta: ReasoningAnswerMeta | null;
+  retrievalDocs?: RetrievalDocs | null;
+  answer: AnswerReasoning | null;
   error?: ReasoningTraceError | null;
+  debug?: ReasoningDebug | null;
+  streaming?: Partial<
+    Record<
+      ReasoningStage,
+      {
+        text?: string;
+        notes?: string;
+        progress?: number;
+      }
+    >
+  >;
 };
 
 type CompleteReasoningTrace<T extends PartialReasoningTrace> = {

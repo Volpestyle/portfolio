@@ -43,9 +43,7 @@ export function MarkdownViewer({
     ? 'flex items-center gap-2 text-xs text-white/60 mb-3'
     : 'mb-8 flex items-center space-x-2 text-sm';
   const iconClass = isChat ? 'h-3 w-3 text-white/50' : 'h-4 w-4 text-gray-600';
-  const markdownClass = isChat
-    ? 'preserve-case'
-    : 'preserve-case rounded-lg border border-gray-800 bg-gray-900/50 p-8';
+  const markdownClass = isChat ? 'preserve-case' : 'preserve-case rounded-lg border border-gray-800 bg-gray-900/50 p-8';
 
   if (isLoading) {
     return (

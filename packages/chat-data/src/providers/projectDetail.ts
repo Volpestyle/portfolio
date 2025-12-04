@@ -17,9 +17,7 @@ async function resolveProject(repository: ProjectRepository, identifier: string)
   return repository.getProjectByName(normalized);
 }
 
-export function createProjectDetailProvider(
-  options: ProjectDetailProviderOptions
-): ProjectDetailProvider {
+export function createProjectDetailProvider(options: ProjectDetailProviderOptions): ProjectDetailProvider {
   const { repository } = options;
   return {
     async getProjectDetail(projectId) {

@@ -39,7 +39,10 @@ export interface ExperienceRepository {
   /**
    * Return resume/experience entries filtered by the provided query.
    */
-  searchExperiences(query?: ResumeSearchQuery, options?: import('../index').ResumeSearcherOptions): Promise<ResumeEntry[]>;
+  searchExperiences(
+    query?: ResumeSearchQuery,
+    options?: import('../index').ResumeSearcherOptions
+  ): Promise<ResumeEntry[]>;
 
   /**
    * List all experiences available to the runtime. Useful for callers that want to build custom search strategies.

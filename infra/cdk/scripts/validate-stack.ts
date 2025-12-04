@@ -6,8 +6,7 @@ import { PortfolioStack } from '../lib/portfolio-stack';
 
 const OPEN_NEXT_OUTPUT_FILE = 'open-next.output.json';
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
 interface LambdaEnvironment {
   Variables?: Record<string, unknown>;
@@ -66,9 +65,7 @@ function resolveOpenNextPath(): string {
     return fixtureDir;
   }
 
-  throw new Error(
-    `Unable to locate ${OPEN_NEXT_OUTPUT_FILE}. Run 'pnpm run build:web' before validating the stack.`
-  );
+  throw new Error(`Unable to locate ${OPEN_NEXT_OUTPUT_FILE}. Run 'pnpm run build:web' before validating the stack.`);
 }
 
 function validateStack() {

@@ -130,13 +130,13 @@ _\*Set `PORTFOLIO_TEST_FIXTURES=true` to opt into fixtures locally (Playwright d
 
 ### Key Environment Variables
 
-| Variable                        | What It Does                                               |
-| ------------------------------- | ---------------------------------------------------------- |
-| `PORTFOLIO_TEST_FIXTURES=true`  | Forces SSR/data loaders to return fixtures (used by tests) |
-| `CI=true`                       | Enables Playwright defaults (retries, workers, etc.)       |
+| Variable                       | What It Does                                               |
+| ------------------------------ | ---------------------------------------------------------- |
+| `PORTFOLIO_TEST_FIXTURES=true` | Forces SSR/data loaders to return fixtures (used by tests) |
+| `CI=true`                      | Enables Playwright defaults (retries, workers, etc.)       |
 | `BLOG_TEST_FIXTURES=true`      | Forces blog APIs to use mock data (set during tests)       |
-| `E2E_USE_REAL_APIS=true`        | Integration tests use real services                        |
-| `PLAYWRIGHT_TEST_BASE_URL`      | Override what URL to test against                          |
+| `E2E_USE_REAL_APIS=true`       | Integration tests use real services                        |
+| `PLAYWRIGHT_TEST_BASE_URL`     | Override what URL to test against                          |
 
 ## 🧪 E2E Tests (Fast & Reliable)
 

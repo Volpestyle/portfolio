@@ -1,12 +1,5 @@
 import { CloudWatchClient, PutMetricDataCommand, StandardUnit, type MetricDatum } from '@aws-sdk/client-cloudwatch';
-import {
-  calculateCost,
-  DEFAULT_COST_DECIMAL_PLACES,
-  FALLBACK_NORMALIZED_PRICING,
-  getNormalizedPricing,
-  parseUsage,
-  resolveModelKey,
-} from '@portfolio/chat-contract';
+import { calculateCost, DEFAULT_COST_DECIMAL_PLACES, getNormalizedPricing, parseUsage, resolveModelKey } from '@portfolio/chat-contract';
 
 const ENABLED = process.env.OPENAI_COST_METRICS_ENABLED === 'true';
 const NAMESPACE = process.env.OPENAI_COST_METRIC_NAMESPACE || 'PortfolioChat/OpenAI';
@@ -37,15 +30,12 @@ export async function recordOpenAICostFromUsage(payload: unknown) {
 
   const resolvedModelKey = resolveModelKey(model);
   const pricing = getNormalizedPricing(resolvedModelKey ?? model);
-  const normalizedPricing = pricing ?? FALLBACK_NORMALIZED_PRICING;
-
   if (!pricing) {
-    console.warn(
-      `No pricing found for model "${model ?? 'unknown'}". Using fallback pricing (prompt=$${normalizedPricing.prompt}/1K, completion=$${normalizedPricing.completion}/1K) until MODEL_PRICING is updated.`
-    );
+    console.warn(`No pricing found for model "${model ?? 'unknown'}". Skipping cost metric publish until MODEL_PRICING is updated.`);
+    return;
   }
 
-  const cost = calculateCost(parsed, normalizedPricing);
+  const cost = calculateCost(parsed, pricing);
 
   if (!Number.isFinite(cost) || cost <= 0) {
     return;
@@ -62,20 +52,20 @@ export async function recordOpenAICostFromUsage(payload: unknown) {
       },
     ];
 
-    const modelDimensionValue = resolvedModelKey ?? model ?? 'unknown';
-    if (modelDimensionValue) {
-      metricData.push({
-        MetricName: METRIC_NAME,
-        Value: value,
-        Unit: StandardUnit.None,
-        Dimensions: [
-          {
-            Name: MODEL_DIMENSION_NAME,
-            Value: modelDimensionValue,
-          },
-        ],
-      });
-    }
+  const modelDimensionValue = resolvedModelKey ?? model ?? 'unknown';
+  if (modelDimensionValue) {
+    metricData.push({
+      MetricName: METRIC_NAME,
+      Value: value,
+      Unit: StandardUnit.None,
+      Dimensions: [
+        {
+          Name: MODEL_DIMENSION_NAME,
+          Value: modelDimensionValue,
+        },
+      ],
+    });
+  }
 
     await client.send(
       new PutMetricDataCommand({

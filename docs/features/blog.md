@@ -141,36 +141,36 @@ const ALLOW = new Set((process.env.ADMIN_EMAILS ?? "").split(",").map(s => s.tri
 const nextAuthSecret = await resolveSecretValue("NEXTAUTH_SECRET", { scope: "repo", required: true });
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: "jwt" }, // no DB
-  trustHost: true,
-  providers: [
-    Google({
-      authorization: { params: { prompt: "select_account" } },
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: await resolveSecretValue("GOOGLE_CLIENT_SECRET", { scope: "env", required: true }),
-    }),
-  ],
-  secret: nextAuthSecret,
-  callbacks: {
-    async jwt({ token, user, profile }) {
-      token.email ??= user?.email ?? profile?.email ?? token.email;
-      return token;
-    },
-    async session({ session, token }) {
-      if (typeof token.email === "string") {
-        session.user = { ...session.user, email: token.email };
-      }
-      return session;
-    },
-    async signIn({ user, profile }) {
-      const email = user?.email ?? profile?.email ?? null;
-      const verified =
-        (profile as Record<string, unknown>)?.email_verified ??
-        (profile as Record<string, unknown>)?.verified ??
-        true;
-      return !!email && verified && ALLOW.has(email);
-    },
-  },
+session: { strategy: "jwt" }, // no DB
+trustHost: true,
+providers: [
+Google({
+authorization: { params: { prompt: "select_account" } },
+clientId: process.env.GOOGLE_CLIENT_ID!,
+clientSecret: await resolveSecretValue("GOOGLE_CLIENT_SECRET", { scope: "env", required: true }),
+}),
+],
+secret: nextAuthSecret,
+callbacks: {
+async jwt({ token, user, profile }) {
+token.email ??= user?.email ?? profile?.email ?? token.email;
+return token;
+},
+async session({ session, token }) {
+if (typeof token.email === "string") {
+session.user = { ...session.user, email: token.email };
+}
+return session;
+},
+async signIn({ user, profile }) {
+const email = user?.email ?? profile?.email ?? null;
+const verified =
+(profile as Record<string, unknown>)?.email_verified ??
+(profile as Record<string, unknown>)?.verified ??
+true;
+return !!email && verified && ALLOW.has(email);
+},
+},
 });
 
 app/api/auth/[...nextauth]/route.ts
@@ -190,14 +190,14 @@ import { auth } from "@/auth";
 import { isAdminEmail } from "@/lib/auth/allowlist";
 
 export default auth((req) => {
-  if (!req.nextUrl.pathname.startsWith("/admin")) return NextResponse.next();
-  const email = req.auth?.user?.email;
-  if (!email || !isAdminEmail(email)) {
-    const redirect = new URL("/api/auth/signin", req.url);
-    redirect.searchParams.set("callbackUrl", req.nextUrl.href);
-    return NextResponse.redirect(redirect);
-  }
-  return NextResponse.next();
+if (!req.nextUrl.pathname.startsWith("/admin")) return NextResponse.next();
+const email = req.auth?.user?.email;
+if (!email || !isAdminEmail(email)) {
+const redirect = new URL("/api/auth/signin", req.url);
+redirect.searchParams.set("callbackUrl", req.nextUrl.href);
+return NextResponse.redirect(redirect);
+}
+return NextResponse.next();
 });
 
 export const config = { matcher: ["/admin/:path*"] };

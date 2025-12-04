@@ -56,10 +56,7 @@ test.describe('API integration', () => {
       ...buildProjectHeaders('api', runtime),
     };
     // When running locally with fixtures, force the E2E header so the server returns the chat fixture stream
-    const headers =
-      runtime.mode === 'mock'
-        ? { ...baseHeaders, 'x-portfolio-test-mode': 'e2e' }
-        : baseHeaders;
+    const headers = runtime.mode === 'mock' ? { ...baseHeaders, 'x-portfolio-test-mode': 'e2e' } : baseHeaders;
 
     const response = await request.post(`${baseUrl}/api/chat`, {
       headers,
@@ -86,18 +83,22 @@ test.describe('API integration', () => {
     expect(errorEvents.length, 'SSE stream should not include error frames').toBe(0);
 
     const stageEvents = events.filter((event): event is StageEvent => event.type === 'stage');
-    const plannerComplete = stageEvents.find(
-      (event) => event.stage === 'planner' && event.status === 'complete'
-    );
-    const evidenceComplete = stageEvents.find(
-      (event) => event.stage === 'evidence' && event.status === 'complete'
-    );
+    const plannerComplete = stageEvents.find((event) => event.stage === 'planner' && event.status === 'complete');
     expect(plannerComplete, 'Planner stage should complete').toBeDefined();
-    expect(evidenceComplete, 'Evidence stage should complete').toBeDefined();
+    // Retrieval can be skipped when the planner determines no portfolio lookups are needed.
+    const retrievalEvents = stageEvents.filter((event) => event.stage === 'retrieval');
+    const retrievalComplete = retrievalEvents.find((event) => event.status === 'complete');
+    const answerEvents = stageEvents.filter((event) => event.stage === 'answer');
+    const answerComplete = answerEvents.find((event) => event.status === 'complete');
+    if (retrievalEvents.length) {
+      expect(retrievalComplete, 'Retrieval stage should complete when run').toBeDefined();
+    }
+    const answerStart = answerEvents.find((event) => event.status === 'start');
+    expect(answerStart ?? answerComplete, 'Answer stage should emit status updates').toBeDefined();
 
     const reasoningEvents = events.filter((event): event is ReasoningEvent => event.type === 'reasoning');
     expect(
-      reasoningEvents.some((event) => event.stage === 'plan' && event.trace?.plan),
+      reasoningEvents.some((event) => event.stage === 'planner' && event.trace?.plan),
       'Planner reasoning trace should stream'
     ).toBeTruthy();
 

@@ -200,13 +200,7 @@ function ExperienceCard({ experience: exp, variant = 'default' }: ExperienceCard
 }
 
 // Entries arrive pre-sorted by buildUiArtifacts so we respect backend recency ordering.
-export function ExperienceList({
-  experiences,
-  education,
-  awards,
-  skills,
-  variant = 'default',
-}: ExperienceListProps) {
+export function ExperienceList({ experiences, education, awards, skills, variant = 'default' }: ExperienceListProps) {
   const experienceEntries = experiences ?? [];
   const educationEntries = education ?? [];
   const awardEntries = awards ?? [];

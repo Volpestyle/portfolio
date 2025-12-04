@@ -57,38 +57,31 @@ function getLanguageColor(language: string): string {
   if (languageColors[language]) {
     return languageColors[language];
   }
-  
+
   // Case-insensitive match
   const lowerLang = language.toLowerCase();
-  const match = Object.entries(languageColors).find(
-    ([key]) => key.toLowerCase() === lowerLang
-  );
-  
+  const match = Object.entries(languageColors).find(([key]) => key.toLowerCase() === lowerLang);
+
   if (match) {
     return match[1];
   }
-  
+
   // Generate a consistent color from the language name
   let hash = 0;
   for (let i = 0; i < language.length; i++) {
     hash = language.charCodeAt(i) + ((hash << 5) - hash);
   }
-  
+
   const hue = Math.abs(hash % 360);
   return `hsl(${hue}, 60%, 50%)`;
 }
 
-export function LanguageBar({
-  languages,
-  className,
-  showLabels = true,
-  maxLabels = 4,
-}: LanguageBarProps) {
+export function LanguageBar({ languages, className, showLabels = true, maxLabels = 4 }: LanguageBarProps) {
   const [hoveredLanguage, setHoveredLanguage] = useState<string | null>(null);
 
   // Filter out languages with very small percentages for visual clarity
-  const visibleLanguages = languages.filter(lang => lang.percent >= 0.1);
-  
+  const visibleLanguages = languages.filter((lang) => lang.percent >= 0.1);
+
   if (visibleLanguages.length === 0) {
     return null;
   }
@@ -103,7 +96,7 @@ export function LanguageBar({
         {sortedLanguages.map((lang, index) => {
           const color = getLanguageColor(lang.name);
           const isHovered = hoveredLanguage === lang.name;
-          
+
           return (
             <motion.div
               key={lang.name}
@@ -113,7 +106,7 @@ export function LanguageBar({
                 backgroundColor: color,
               }}
               initial={{ opacity: 0, scaleX: 0 }}
-              animate={{ 
+              animate={{
                 opacity: isHovered ? 1 : 0.9,
                 scaleX: 1,
               }}
@@ -147,7 +140,7 @@ export function LanguageBar({
           {sortedLanguages.slice(0, maxLabels).map((lang) => {
             const color = getLanguageColor(lang.name);
             const isHovered = hoveredLanguage === lang.name;
-            
+
             return (
               <motion.div
                 key={lang.name}
@@ -157,27 +150,17 @@ export function LanguageBar({
                 animate={{ opacity: isHovered ? 1 : 0.8 }}
                 whileHover={{ scale: 1.05 }}
               >
-                <div
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: color }}
-                />
-                <span className={cn(isHovered && 'font-semibold')}>
-                  {lang.name}
-                </span>
-                <span className="text-white/60">
-                  {lang.percent.toFixed(1)}%
-                </span>
+                <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+                <span className={cn(isHovered && 'font-semibold')}>{lang.name}</span>
+                <span className="text-white/60">{lang.percent.toFixed(1)}%</span>
               </motion.div>
             );
           })}
           {sortedLanguages.length > maxLabels && (
-            <span className="text-xs text-white/60">
-              +{sortedLanguages.length - maxLabels} more
-            </span>
+            <span className="text-xs text-white/60">+{sortedLanguages.length - maxLabels} more</span>
           )}
         </div>
       )}
     </div>
   );
 }
-

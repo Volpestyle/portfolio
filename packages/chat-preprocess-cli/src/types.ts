@@ -13,8 +13,7 @@ export type RepoFilterConfig = {
   exclude?: string[];
 };
 
-export type ArtifactWriterConfig =
-  | { type: 's3'; bucket: string; prefix?: string; region?: string; kmsKeyId?: string };
+export type ArtifactWriterConfig = { type: 's3'; bucket: string; prefix?: string; region?: string; kmsKeyId?: string };
 
 export type PreprocessModelConfig = {
   /**

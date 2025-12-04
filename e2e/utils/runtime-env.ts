@@ -105,10 +105,7 @@ export function resolveTestRuntime(): TestRuntime {
   return { baseUrl, isLocalBase, mode: 'integration' };
 }
 
-export function buildProjectHeaders(
-  project: 'ui' | 'api',
-  runtime: TestRuntime
-): Record<string, string> {
+export function buildProjectHeaders(project: 'ui' | 'api', runtime: TestRuntime): Record<string, string> {
   if (runtime.mode === 'mock') {
     return {
       [TEST_MODE_HEADER]: project === 'ui' ? 'e2e' : 'integration',

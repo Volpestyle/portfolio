@@ -81,9 +81,11 @@ export class PreprocessMetrics {
     const startedAt = new Date().toISOString();
     try {
       const result = await fn();
-      const usage =
-        parseUsage((result as { usage?: unknown })?.usage ?? (result as unknown), { allowZero: true }) ??
-        { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+      const usage = parseUsage((result as { usage?: unknown })?.usage ?? (result as unknown), { allowZero: true }) ?? {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+      };
       this.entries.push({
         stage: options.stage,
         model: options.model ?? 'unknown',

@@ -14,13 +14,7 @@ interface ServerImageRendererProps {
  * A server-side image renderer component that displays images without client-side fetching
  * Images should already have their URLs resolved on the server
  */
-export function ServerImageRenderer({
-  src,
-  alt,
-  onImageClick,
-  onImageLoad,
-  className,
-}: ServerImageRendererProps) {
+export function ServerImageRenderer({ src, alt, onImageClick, onImageLoad, className }: ServerImageRendererProps) {
   const isLocalImage = src.startsWith('/');
 
   return (

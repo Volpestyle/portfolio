@@ -137,8 +137,14 @@ export function resolvePreprocessConfig(config?: ChatPreprocessConfig): Resolved
     experiencesOutput: resolveOverride('experiencesOutput', path.join(generatedDir, 'resume.json')),
     profileOutput: resolveOverride('profileOutput', path.join(generatedDir, 'profile.json')),
     projectsOutput: resolveOverride('projectsOutput', path.join(generatedDir, 'projects.json')),
-    projectsEmbeddingsOutput: resolveOverride('projectsEmbeddingsOutput', path.join(generatedDir, 'projects-embeddings.json')),
-    resumeEmbeddingsOutput: resolveOverride('resumeEmbeddingsOutput', path.join(generatedDir, 'resume-embeddings.json')),
+    projectsEmbeddingsOutput: resolveOverride(
+      'projectsEmbeddingsOutput',
+      path.join(generatedDir, 'projects-embeddings.json')
+    ),
+    resumeEmbeddingsOutput: resolveOverride(
+      'resumeEmbeddingsOutput',
+      path.join(generatedDir, 'resume-embeddings.json')
+    ),
     personaOutput: resolveOverride('personaOutput', path.join(generatedDir, 'persona.json')),
   };
 

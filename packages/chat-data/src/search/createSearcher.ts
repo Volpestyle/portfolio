@@ -1,11 +1,17 @@
 import type { Scored, ScoreMetadata } from '@portfolio/chat-contract';
 
 const DEFAULT_RECENCY_LAMBDA = 0.2;
-const TEXT_SCORE_WEIGHT = 0.3;
-const SEMANTIC_SCORE_WEIGHT = 0.5;
+const DEFAULT_TEXT_SCORE_WEIGHT = 0.3;
+const DEFAULT_SEMANTIC_SCORE_WEIGHT = 0.5;
 const NEUTRAL_RECENCY_SCORE = 0.5;
 const MONTH_IN_MS = 1000 * 60 * 60 * 24 * 30;
 const MAX_RECENCY_MONTHS = 60;
+
+export type SearchWeights = {
+  textWeight?: number;
+  semanticWeight?: number;
+  recencyLambda?: number;
+};
 
 const clampMonths = (value: number): number => {
   if (!Number.isFinite(value) || value <= 0) {
@@ -13,6 +19,16 @@ const clampMonths = (value: number): number => {
   }
   if (value > MAX_RECENCY_MONTHS) {
     return MAX_RECENCY_MONTHS;
+  }
+  return value;
+};
+
+const normalizeWeight = (value?: number): number | undefined => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined;
+  }
+  if (value < 0) {
+    return undefined;
   }
   return value;
 };
@@ -63,10 +79,7 @@ type SearchIndexEntry<TRecord> = {
   score: number;
 };
 
-type SemanticScorer<TRecord> = (
-  records: readonly TRecord[],
-  query: string
-) => Promise<Map<string, number>>;
+type SemanticScorer<TRecord> = (records: readonly TRecord[], query: string) => Promise<Map<string, number>>;
 
 export type SearchLogPayload<TFilters> = {
   filters: TFilters;
@@ -77,6 +90,8 @@ export type SearchLogPayload<TFilters> = {
   expandedCandidates: number;
   usedSemantic: boolean;
   topScore?: number;
+  topRawScore?: number;
+  normalizationFactor?: number;
   recencyLambda?: number;
   freshestTimestamp?: number | null;
   topRecencyScore?: number;
@@ -94,6 +109,7 @@ export type SearcherOptions<TRecord, TInput, TFilters> = {
   maxLimit?: number;
   getLimit?: (input: TInput) => number | null | undefined;
   getNow?: () => number;
+  weights?: SearchWeights;
 };
 
 export function createSearcher<TRecord, TInput, TFilters, TResult>(config: {
@@ -111,6 +127,14 @@ export function createSearcher<TRecord, TInput, TFilters, TResult>(config: {
   const logger = options.logger;
   const getLimit = options.getLimit;
   const getNow = options.getNow ?? Date.now;
+  const textWeightOverride = normalizeWeight(options.weights?.textWeight);
+  const semanticWeightOverride = normalizeWeight(options.weights?.semanticWeight);
+  const recencyLambdaOverride = normalizeWeight(options.weights?.recencyLambda);
+  const textScoreWeight = textWeightOverride ?? DEFAULT_TEXT_SCORE_WEIGHT;
+  const semanticScoreWeight = semanticWeightOverride ?? DEFAULT_SEMANTIC_SCORE_WEIGHT;
+  const resolvedRecencyLambda =
+    recencyLambdaOverride ??
+    (typeof spec.recencyLambda === 'number' ? spec.recencyLambda : DEFAULT_RECENCY_LAMBDA);
 
   const recordById = new Map<string, TRecord>();
   const recordOrder = new Map<string, number>();
@@ -143,10 +167,7 @@ export function createSearcher<TRecord, TInput, TFilters, TResult>(config: {
     return normalized;
   };
 
-  const emitLog = (
-    filters: TFilters,
-    payload: Omit<SearchLogPayload<TFilters>, 'filters' | 'filterDescription'>
-  ) => {
+  const emitLog = (filters: TFilters, payload: Omit<SearchLogPayload<TFilters>, 'filters' | 'filterDescription'>) => {
     if (!logger) {
       return;
     }
@@ -164,8 +185,7 @@ export function createSearcher<TRecord, TInput, TFilters, TResult>(config: {
     const limit = clampLimit(requestedLimit ?? defaultLimit);
 
     const hasStructuredFilters = spec.hasStructuredFilters(filters);
-    const recordMatchesFilters = (record: TRecord) =>
-      !hasStructuredFilters || spec.recordMatches(record, filters);
+    const recordMatchesFilters = (record: TRecord) => !hasStructuredFilters || spec.recordMatches(record, filters);
 
     const structuredMatches = records.filter(recordMatchesFilters);
     const candidateMap = new Map<string, TRecord>();
@@ -258,13 +278,11 @@ export function createSearcher<TRecord, TInput, TFilters, TResult>(config: {
     const hasQueryTerms =
       spec.hasQueryTerms?.(filters, queryContext) ?? (hasStructuredFilters || Boolean(combinedTextQuery));
     const requireSignals =
-      Boolean(combinedTextQuery) &&
-      (textScoreMap.size > 0 || semanticScoreMap.size > 0 || hasStructuredFilters);
+      Boolean(combinedTextQuery) && (textScoreMap.size > 0 || semanticScoreMap.size > 0 || hasStructuredFilters);
 
     const now = getNow();
     const recencyAccessor = spec.getRecencyTimestamp;
-    const recencyLambda = typeof spec.recencyLambda === 'number' ? spec.recencyLambda : DEFAULT_RECENCY_LAMBDA;
-    const recencyEnabled = typeof recencyAccessor === 'function' && recencyLambda > 0;
+    const recencyEnabled = typeof recencyAccessor === 'function' && resolvedRecencyLambda > 0;
     let freshestTimestamp: number | null = null;
     let topRecencyContribution = 0;
 
@@ -281,7 +299,7 @@ export function createSearcher<TRecord, TInput, TFilters, TResult>(config: {
           const timestamp = recencyAccessor(record, { now });
           recencyTimestamp = typeof timestamp === 'number' && Number.isFinite(timestamp) ? timestamp : null;
           const recencyScore = computeRecencyScore(recencyTimestamp, now);
-          recencyContribution = recencyScore * recencyLambda;
+          recencyContribution = recencyScore * resolvedRecencyLambda;
           if (recencyTimestamp !== null) {
             if (freshestTimestamp === null || recencyTimestamp > freshestTimestamp) {
               freshestTimestamp = recencyTimestamp;
@@ -291,8 +309,8 @@ export function createSearcher<TRecord, TInput, TFilters, TResult>(config: {
             topRecencyContribution = recencyContribution;
           }
         }
-        const weightedTextScore = textScore * TEXT_SCORE_WEIGHT;
-        const weightedSemanticScore = semanticScore * SEMANTIC_SCORE_WEIGHT;
+        const weightedTextScore = textScore * textScoreWeight;
+        const weightedSemanticScore = semanticScore * semanticScoreWeight;
         const baseScore = structuredScore + weightedTextScore + weightedSemanticScore;
         const sortScore = baseScore + recencyContribution;
         return {
@@ -328,21 +346,31 @@ export function createSearcher<TRecord, TInput, TFilters, TResult>(config: {
         return a.order - b.order;
       });
 
-    const scored = scoredAll.slice(0, limit);
+    const maxSortScore = scoredAll.reduce((max, entry) => Math.max(max, entry.sortScore), 0);
+    const normalizationFactor = maxSortScore > 0 ? maxSortScore : 1;
 
-    const results = scored.map(({ record, baseScore, structuredScore, textScore, semanticScore, recencyContribution }) => {
-      const baseResult = spec.buildResult(record);
-      const metadata: ScoreMetadata = {
-        _score: baseScore,
-        _signals: {
-          structured: structuredScore || undefined,
-          text: textScore || undefined,
-          semantic: semanticScore || undefined,
-          recency: recencyContribution || undefined,
-        },
-      };
-      return { ...baseResult, ...metadata } as Scored<TResult>;
-    });
+    const scored = scoredAll
+      .map((entry) => ({
+        ...entry,
+        normalizedScore: entry.sortScore > 0 ? entry.sortScore / normalizationFactor : 0,
+      }))
+      .slice(0, limit);
+
+    const results = scored.map(
+      ({ record, structuredScore, textScore, semanticScore, recencyContribution, normalizedScore }) => {
+        const baseResult = spec.buildResult(record);
+        const metadata: ScoreMetadata = {
+          _score: normalizedScore,
+          _signals: {
+            structured: structuredScore || undefined,
+            text: textScore || undefined,
+            semantic: semanticScore || undefined,
+            recency: recencyContribution || undefined,
+          },
+        };
+        return { ...baseResult, ...metadata } as Scored<TResult>;
+      }
+    );
 
     emitLog(filters, {
       limit,
@@ -350,8 +378,10 @@ export function createSearcher<TRecord, TInput, TFilters, TResult>(config: {
       matchedCount: results.length,
       expandedCandidates: candidateRecords.length,
       usedSemantic: semanticScoreMap.size > 0,
-      topScore: scoredAll.length ? scoredAll[0]?.baseScore ?? 0 : 0,
-      recencyLambda: recencyEnabled ? recencyLambda : undefined,
+      topScore: scored.length ? scored[0]?.normalizedScore ?? 0 : 0,
+      topRawScore: scoredAll.length ? maxSortScore : undefined,
+      normalizationFactor: normalizationFactor || undefined,
+      recencyLambda: recencyEnabled ? resolvedRecencyLambda : undefined,
       freshestTimestamp: recencyEnabled ? freshestTimestamp : undefined,
       topRecencyScore: recencyEnabled ? topRecencyContribution : undefined,
       rawTextMatches: textMatchCount,

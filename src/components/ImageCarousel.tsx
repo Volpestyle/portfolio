@@ -41,7 +41,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({ images, initialIndex, isO
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      className="w-auto max-w-none border-0 bg-transparent p-0 shadow-none rounded-none"
+      className="w-auto max-w-none rounded-none border-0 bg-transparent p-0 shadow-none"
     >
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
         <AnimatedIconButton

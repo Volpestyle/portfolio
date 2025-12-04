@@ -13,8 +13,7 @@ export function ToolCallIndicator({
   statusLabel = 'Tool call',
   tone = 'info',
 }: ToolCallIndicatorProps) {
-  const badgeClass =
-    tone === 'warning' ? 'bg-amber-400/80' : tone === 'success' ? 'bg-emerald-400/70' : 'bg-white/60';
+  const badgeClass = tone === 'warning' ? 'bg-amber-400/80' : tone === 'success' ? 'bg-emerald-400/70' : 'bg-white/60';
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white/80 backdrop-blur-sm">
