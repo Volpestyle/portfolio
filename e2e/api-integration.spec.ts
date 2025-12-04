@@ -84,13 +84,15 @@ test.describe('API integration', () => {
 
     const stageEvents = events.filter((event): event is StageEvent => event.type === 'stage');
     const plannerComplete = stageEvents.find((event) => event.stage === 'planner' && event.status === 'complete');
-    const evidenceComplete = stageEvents.find((event) => event.stage === 'evidence' && event.status === 'complete');
     expect(plannerComplete, 'Planner stage should complete').toBeDefined();
-    expect(evidenceComplete, 'Evidence stage should complete').toBeDefined();
+    const retrievalComplete = stageEvents.find((event) => event.stage === 'retrieval' && event.status === 'complete');
+    const answerComplete = stageEvents.find((event) => event.stage === 'answer' && event.status === 'complete');
+    expect(retrievalComplete, 'Retrieval stage should complete').toBeDefined();
+    expect(answerComplete, 'Answer stage should complete').toBeDefined();
 
     const reasoningEvents = events.filter((event): event is ReasoningEvent => event.type === 'reasoning');
     expect(
-      reasoningEvents.some((event) => event.stage === 'plan' && event.trace?.plan),
+      reasoningEvents.some((event) => event.stage === 'planner' && event.trace?.plan),
       'Planner reasoning trace should stream'
     ).toBeTruthy();
 

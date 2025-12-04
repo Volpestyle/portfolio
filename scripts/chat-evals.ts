@@ -36,12 +36,6 @@ function assertStringNotContains(text: string, substrings?: string[]): string[] 
     .map((snippet) => `Answer unexpectedly contains "${snippet}"`);
 }
 
-function resolveUiIds(evidenceIds: string[] | undefined, uiIds: string[] | undefined): string[] {
-  if (evidenceIds && evidenceIds.length > 0) return evidenceIds;
-  if (uiIds && uiIds.length > 0) return uiIds;
-  return [];
-}
-
 function assertIdInclusion(ids: string[], mustInclude?: string[], mustNotInclude?: string[]): string[] {
   const errors: string[] = [];
   if (mustInclude?.length) {
@@ -69,71 +63,61 @@ async function runChatEvalCase(test: ChatEvalTestCase, client: OpenAI): Promise<
 
   const errors: string[] = [];
   const plan = response.reasoningTrace?.plan;
-  const evidence = response.reasoningTrace?.evidence;
   const answer = response.message ?? '';
   const ui = response.ui ?? { showProjects: [], showExperiences: [] };
 
   if (!plan) errors.push('Missing plan in reasoningTrace');
-  if (!evidence) errors.push('Missing evidence in reasoningTrace');
 
   if (plan) {
-    if (plan.questionType !== test.expected.questionType) {
-      errors.push(`questionType expected ${test.expected.questionType} but got ${plan.questionType}`);
+    const queryCount = plan.queries?.length ?? 0;
+    if (typeof test.expected.planQueriesMin === 'number' && queryCount < test.expected.planQueriesMin) {
+      errors.push(`plan queries count ${queryCount} is below min ${test.expected.planQueriesMin}`);
     }
-    if (test.expected.enumeration && plan.enumeration !== test.expected.enumeration) {
-      errors.push(`enumeration expected ${test.expected.enumeration} but got ${plan.enumeration}`);
+    if (typeof test.expected.planQueriesMax === 'number' && queryCount > test.expected.planQueriesMax) {
+      errors.push(`plan queries count ${queryCount} exceeds max ${test.expected.planQueriesMax}`);
     }
-    if (test.expected.scope && plan.scope !== test.expected.scope) {
-      errors.push(`scope expected ${test.expected.scope} but got ${plan.scope}`);
+    if (typeof test.expected.cardsEnabled === 'boolean' && Boolean(plan.cardsEnabled) !== test.expected.cardsEnabled) {
+      errors.push(`cardsEnabled expected ${test.expected.cardsEnabled} but got ${Boolean(plan.cardsEnabled)}`);
     }
   }
 
-  if (evidence) {
-    if (test.expected.verdict && evidence.verdict !== test.expected.verdict) {
-      errors.push(`verdict expected ${test.expected.verdict} but got ${evidence.verdict}`);
-    }
-    const uiHintsProjects = evidence.uiHints?.projects ?? [];
-    const uiHintsExperiences = evidence.uiHints?.experiences ?? [];
-    if (
-      typeof test.expected.uiHintsProjectsMinCount === 'number' &&
-      uiHintsProjects.length < test.expected.uiHintsProjectsMinCount
-    ) {
-      errors.push(
-        `uiHints.projects count ${uiHintsProjects.length} is below min ${test.expected.uiHintsProjectsMinCount}`
-      );
-    }
-    if (
-      typeof test.expected.uiHintsProjectsMaxCount === 'number' &&
-      uiHintsProjects.length > test.expected.uiHintsProjectsMaxCount
-    ) {
-      errors.push(
-        `uiHints.projects count ${uiHintsProjects.length} exceeds max ${test.expected.uiHintsProjectsMaxCount}`
-      );
-    }
-    if (
-      typeof test.expected.uiHintsExperiencesMinCount === 'number' &&
-      uiHintsExperiences.length < test.expected.uiHintsExperiencesMinCount
-    ) {
-      errors.push(
-        `uiHints.experiences count ${uiHintsExperiences.length} is below min ${test.expected.uiHintsExperiencesMinCount}`
-      );
-    }
-    if (
-      typeof test.expected.uiHintsExperiencesMaxCount === 'number' &&
-      uiHintsExperiences.length > test.expected.uiHintsExperiencesMaxCount
-    ) {
-      errors.push(
-        `uiHints.experiences count ${uiHintsExperiences.length} exceeds max ${test.expected.uiHintsExperiencesMaxCount}`
-      );
-    }
-
-    const projectIds = resolveUiIds(uiHintsProjects, ui.showProjects);
-    const experienceIds = resolveUiIds(uiHintsExperiences, ui.showExperiences);
+  if (
+    typeof test.expected.uiHintsProjectsMinCount === 'number' &&
+    ui.showProjects.length < test.expected.uiHintsProjectsMinCount
+  ) {
     errors.push(
-      ...assertIdInclusion(projectIds, test.expected.mustIncludeProjectIds, test.expected.mustNotIncludeProjectIds),
-      ...assertIdInclusion(experienceIds, test.expected.mustIncludeExperienceIds, undefined)
+      `ui.showProjects count ${ui.showProjects.length} is below min ${test.expected.uiHintsProjectsMinCount}`
     );
   }
+  if (
+    typeof test.expected.uiHintsProjectsMaxCount === 'number' &&
+    ui.showProjects.length > test.expected.uiHintsProjectsMaxCount
+  ) {
+    errors.push(
+      `ui.showProjects count ${ui.showProjects.length} exceeds max ${test.expected.uiHintsProjectsMaxCount}`
+    );
+  }
+  if (
+    typeof test.expected.uiHintsExperiencesMinCount === 'number' &&
+    ui.showExperiences.length < test.expected.uiHintsExperiencesMinCount
+  ) {
+    errors.push(
+      `ui.showExperiences count ${ui.showExperiences.length} is below min ${test.expected.uiHintsExperiencesMinCount}`
+    );
+  }
+  if (
+    typeof test.expected.uiHintsExperiencesMaxCount === 'number' &&
+    ui.showExperiences.length > test.expected.uiHintsExperiencesMaxCount
+  ) {
+    errors.push(
+      `ui.showExperiences count ${ui.showExperiences.length} exceeds max ${test.expected.uiHintsExperiencesMaxCount}`
+    );
+  }
+
+  errors.push(
+    ...assertIdInclusion(ui.showProjects, test.expected.mustIncludeProjectIds, test.expected.mustNotIncludeProjectIds),
+    ...assertIdInclusion(ui.showExperiences, test.expected.mustIncludeExperienceIds, undefined)
+  );
 
   errors.push(...assertStringContains(answer, test.expected.answerContains));
   errors.push(...assertStringNotContains(answer, test.expected.answerNotContains));
