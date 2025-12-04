@@ -7,6 +7,8 @@ import { formatChatMessagesAsMarkdown } from '@/lib/chat-debug';
 import type { ChatDebugLogEntry } from '@portfolio/chat-next-api';
 
 const isDevEnvironment = process.env.NODE_ENV !== 'production';
+const DEV_MODE_STORAGE_KEY = 'chat:reasoningDevMode';
+const DEV_MODE_EVENT = 'chat:reasoningDevModeChanged';
 
 export function ChatDevTools() {
   const { messages } = useChat();
@@ -14,6 +16,7 @@ export function ChatDevTools() {
   const [lastExportPath, setLastExportPath] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  const [devReasoningView, setDevReasoningView] = useState(false);
   const hasMessages = messages.length > 0;
 
   useEffect(() => {
@@ -69,6 +72,33 @@ export function ChatDevTools() {
     }
   }, [hasMessages, isSaving, messages]);
 
+  // Sync dev/user reasoning view toggle via localStorage and a window event
+  useEffect(() => {
+    if (!isDevEnvironment || typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem(DEV_MODE_STORAGE_KEY);
+    const enabled = stored === '1';
+    setDevReasoningView(enabled);
+    window.dispatchEvent(new CustomEvent(DEV_MODE_EVENT, { detail: { enabled } }));
+  }, []);
+
+  const toggleDevReasoningView = useCallback(() => {
+    if (!isDevEnvironment || typeof window === 'undefined') return;
+    setDevReasoningView((prev) => {
+      const next = !prev;
+      try {
+        if (next) {
+          window.localStorage.setItem(DEV_MODE_STORAGE_KEY, '1');
+        } else {
+          window.localStorage.removeItem(DEV_MODE_STORAGE_KEY);
+        }
+        window.dispatchEvent(new CustomEvent(DEV_MODE_EVENT, { detail: { enabled: next } }));
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
+  }, []);
+
   if (!isDevEnvironment || !portalTarget) {
     return null;
   }
@@ -85,6 +115,14 @@ export function ChatDevTools() {
         }
       >
         {isSaving ? 'Saving…' : 'Export Chat to Repo'}
+      </button>
+      <button
+        type="button"
+        onClick={toggleDevReasoningView}
+        className="pointer-events-auto rounded-full border border-white/20 bg-black/60 px-4 py-2 font-semibold uppercase tracking-wide text-white/60 shadow-lg transition hover:text-white"
+        title="Toggle between user-facing and developer reasoning panels"
+      >
+        {devReasoningView ? '← User Reasoning View' : '→ Dev Reasoning View'}
       </button>
       {lastExportPath ? (
         <div className="pointer-events-auto rounded bg-emerald-500/20 px-3 py-2 font-mono text-[10px] text-emerald-100">
