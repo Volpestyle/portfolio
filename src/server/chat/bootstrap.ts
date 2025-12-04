@@ -6,7 +6,7 @@ import profileFile from '../../../generated/profile.json';
 import personaFile from '../../../generated/persona.json';
 import rawProjects from '../../../generated/projects.json';
 import rawEmbeddings from '../../../generated/projects-embeddings.json';
-import { loadChatConfig, resolveChatRuntimeOptions } from './config';
+import { loadChatConfig, resolveChatRuntimeOptions, resolveRetrievalOverrides } from './config';
 
 const chatConfig = loadChatConfig();
 export const chatRuntimeOptions = resolveChatRuntimeOptions(chatConfig);
@@ -35,6 +35,7 @@ const bootstrapped = createPortfolioChatServer({
   getEmbeddingClient: getOpenAIClient,
   retrievalOverrides: {
     logger: chatLogger,
+    ...(resolveRetrievalOverrides(chatConfig) ?? {}),
   },
   runtimeOptions,
 });

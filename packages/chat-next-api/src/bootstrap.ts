@@ -134,14 +134,27 @@ function safeProfileSummary(raw: unknown): ProfileSummary | undefined {
 }
 
 function buildIdentityContext(profile?: ProfileSummary, persona?: PersonaSummary): IdentityContext | undefined {
-  if (!profile && !persona) {
+  const personaProfile = persona?.profile;
+  const sourceProfile =
+    profile ??
+    (personaProfile
+      ? {
+          fullName: personaProfile.fullName,
+          headline: personaProfile.headline,
+          location: personaProfile.location,
+          shortAbout: personaProfile.about?.[0],
+        }
+      : undefined);
+
+  if (!sourceProfile && !persona) {
     return undefined;
   }
+
   return {
-    fullName: profile?.fullName,
-    headline: profile?.headline,
-    location: profile?.location,
-    shortAbout: persona?.shortAbout,
+    fullName: sourceProfile?.fullName,
+    headline: sourceProfile?.headline,
+    location: sourceProfile?.location,
+    shortAbout: persona?.shortAbout ?? sourceProfile?.shortAbout,
   };
 }
 

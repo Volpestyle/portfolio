@@ -60,7 +60,7 @@ export type RetrievalOptions = {
 };
 
 const DEFAULT_TOPK = 8;
-const MAX_TOPK = 50;
+const MAX_TOPK = 10;
 
 const clamp = (value: number | undefined, max: number, fallback: number): number | undefined => {
   if (typeof value !== 'number' || !Number.isFinite(value)) {

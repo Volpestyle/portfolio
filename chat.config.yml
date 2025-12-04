@@ -8,10 +8,16 @@ owner:
 models:
   plannerModel: gpt-5-nano-2025-08-07
   answerModel: gpt-5-mini-2025-08-07
+  answerModelNoRetrieval: gpt-5-nano-2025-08-07
   embeddingModel: text-embedding-3-large
   reasoning:
     planner: low
     answer: low
+    answerNoRetrieval: minimal
 tokens:
   planner: 16000
   answer: 16000
+retrieval:
+  # Increase or decrease retrieval fan-out; clamped to the contract max (10).
+  defaultTopK: 8
+  maxTopK: 10

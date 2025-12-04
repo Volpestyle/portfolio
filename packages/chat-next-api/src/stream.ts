@@ -1,5 +1,5 @@
 import type OpenAI from 'openai';
-import type { ChatRequestMessage, PartialReasoningTrace, ReasoningUpdate, UiPayload } from '@portfolio/chat-contract';
+import type { ChatRequestMessage, ReasoningUpdate, UiPayload } from '@portfolio/chat-contract';
 import type { ChatApi, ChatbotResponse, RunOptions } from './index';
 
 export const SSE_HEADERS = {

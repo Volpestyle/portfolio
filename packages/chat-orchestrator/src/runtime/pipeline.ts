@@ -11,8 +11,11 @@ import type {
   ReasoningTrace,
   ReasoningTraceError,
   ReasoningUpdate,
+  RetrievalDocs,
   RetrievalPlan,
   RetrievalSummary,
+  RetrievedProjectDoc,
+  RetrievedResumeDoc,
   TokenUsage,
   UiPayload,
   ChatStreamError,
@@ -147,6 +150,7 @@ type JsonResponseArgs<T> = {
   reasoning?: Reasoning;
   temperature?: number;
   onTextDelta?: (delta: string) => void;
+  onRawResponse?: (raw: string) => void;
 };
 
 // --- Constants ---
@@ -252,6 +256,37 @@ export function buildAnswerSystemPrompt(
   identity?: IdentityContext
 ): string {
   const sections: string[] = [];
+
+  if (persona?.systemPersona?.trim()) {
+    sections.push(['## Persona', persona.systemPersona.trim()].join('\n'));
+  }
+
+  if (persona?.profile) {
+    const lines: string[] = [];
+    if (persona.profile.fullName) lines.push(`- Name: ${persona.profile.fullName}`);
+    if (persona.profile.headline) lines.push(`- Headline: ${persona.profile.headline}`);
+    if (persona.profile.currentRole) lines.push(`- Current role: ${persona.profile.currentRole}`);
+    if (persona.profile.location) lines.push(`- Location: ${persona.profile.location}`);
+    if (persona.shortAbout) lines.push(`- Short about: ${persona.shortAbout}`);
+    if (persona.profile.topSkills?.length) lines.push(`- Top skills: ${persona.profile.topSkills.join(', ')}`);
+    if (persona.profile.about?.length) {
+      lines.push('- About:');
+      persona.profile.about.forEach((paragraph) => {
+        if (paragraph?.trim()) {
+          lines.push(`  - ${paragraph.trim()}`);
+        }
+      });
+    }
+    if (persona.profile.socialLinks?.length) {
+      lines.push(`- Social links: ${persona.profile.socialLinks.join(', ')}`);
+    }
+    if (persona.profile.featuredExperienceIds?.length) {
+      lines.push(`- Featured experience IDs: ${persona.profile.featuredExperienceIds.join(', ')}`);
+    }
+    if (lines.length) {
+      sections.push(['## Profile Snapshot', ...lines].join('\n'));
+    }
+  }
 
   if (persona?.voiceExamples?.length) {
     sections.push(
@@ -472,6 +507,7 @@ function normalizeTemperature(value?: number): number | undefined {
 
 function resolveModelConfig(options?: ChatRuntimeOptions): ModelConfig {
   const answerModel = normalizeModel(options?.modelConfig?.answerModel);
+  const answerModelNoRetrieval = normalizeModel(options?.modelConfig?.answerModelNoRetrieval);
   const plannerModel = normalizeModel(options?.modelConfig?.plannerModel) ?? answerModel;
   const embeddingModel = normalizeModel(options?.modelConfig?.embeddingModel);
   const answerTemperature = normalizeTemperature(options?.modelConfig?.answerTemperature);
@@ -488,6 +524,7 @@ function resolveModelConfig(options?: ChatRuntimeOptions): ModelConfig {
   return {
     plannerModel: plannerModel!,
     answerModel: answerModel!,
+    answerModelNoRetrieval: answerModelNoRetrieval,
     embeddingModel: embeddingModel!,
     answerTemperature,
     reasoning: options?.modelConfig?.reasoning,
@@ -503,16 +540,61 @@ function resolveReasoningParams(model: string, allowReasoning: boolean, effort?:
   return { effort };
 }
 
-function clampQueryLimit(value?: number): number {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return Math.max(1, Math.min(MAX_TOPK, Math.floor(value)));
+function clampQueryLimit(_value?: number): number {
+  // Always fan out to the maximum so the answer stage can decide relevance.
+  return MAX_TOPK;
+}
+
+function sanitizePlannerQueryText(text: string): string {
+  const trimmed = (text ?? '').trim();
+  if (!trimmed) return '';
+  const stripped = trimmed.replace(/\b(projects?|experiences?|experience|resume)\b/gi, '').replace(/\s+/g, ' ').trim();
+  return stripped.length ? stripped : trimmed;
+}
+
+function trimRetrievedDocs(result: RetrievalResult, maxTotal: number): RetrievalResult {
+  let total =
+    result.projects.length +
+    result.experiences.length +
+    result.education.length +
+    result.awards.length +
+    result.skills.length +
+    (result.profile ? 1 : 0);
+
+  if (total <= maxTotal) {
+    return result;
   }
-  return DEFAULT_QUERY_LIMIT;
+
+  const buckets: Array<{ key: keyof RetrievalResult; items: unknown[] }> = [
+    { key: 'projects', items: result.projects },
+    { key: 'experiences', items: result.experiences },
+    { key: 'education', items: result.education },
+    { key: 'awards', items: result.awards },
+    { key: 'skills', items: result.skills },
+  ];
+
+  while (total > maxTotal) {
+    const largest = buckets
+      .filter((bucket) => bucket.items.length > 0)
+      .sort((a, b) => b.items.length - a.items.length)[0];
+    if (!largest) break;
+    largest.items.pop();
+    total -= 1;
+  }
+
+  return {
+    ...result,
+    projects: buckets[0]!.items as ProjectDoc[],
+    experiences: buckets[1]!.items as ExperienceDoc[],
+    education: buckets[2]!.items as EducationDoc[],
+    awards: buckets[3]!.items as AwardDoc[],
+    skills: buckets[4]!.items as SkillDoc[],
+  };
 }
 
 // --- Model Runners ---
 
-async function runJsonResponse<T>({
+async function _runJsonResponse<T>({
   client,
   model,
   systemPrompt,
@@ -690,6 +772,7 @@ async function runStreamingJsonResponse<T>({
   reasoning,
   temperature,
   onTextDelta,
+  onRawResponse,
 }: JsonResponseArgs<T>): Promise<T> {
   let attempt = 0;
   let lastError: unknown = null;
@@ -868,6 +951,13 @@ async function runStreamingJsonResponse<T>({
       }
 
       const rawContent = streamedText || extractResponseOutputText(finalResponse);
+      if (typeof rawContent === 'string' && rawContent.length) {
+        try {
+          onRawResponse?.(rawContent);
+        } catch (err) {
+          logger?.('chat.pipeline.error', { stage: `${stageLabel}_raw_debug`, model, error: formatLogValue(err) });
+        }
+      }
       const structuredCandidate = extractResponseParsedContent(finalResponse) ?? streamedParsed;
       logger?.('chat.pipeline.model.raw', { stage: stageLabel, model, raw: rawContent, attempt });
 
@@ -979,12 +1069,12 @@ async function runStreamingJsonResponse<T>({
 
 // --- Retrieval helpers ---
 
-function normalizePlannerOutput(plan: PlannerLLMOutput): RetrievalPlan {
+function normalizePlannerOutput(plan: PlannerLLMOutput, model?: string): RetrievalPlan {
   const queries: RetrievalPlan['queries'] = Array.isArray(plan.queries)
     ? plan.queries
         .map((query) => ({
           source: query?.source,
-          text: (query?.text ?? '').trim(),
+          text: sanitizePlannerQueryText(query?.text ?? ''),
           limit: clampQueryLimit(query?.limit),
         }))
         .filter((query) => query.source === 'projects' || query.source === 'resume' || query.source === 'profile')
@@ -1003,6 +1093,7 @@ function normalizePlannerOutput(plan: PlannerLLMOutput): RetrievalPlan {
     queries: deduped,
     cardsEnabled: plan.cardsEnabled !== false,
     topic: plan.topic?.trim() || undefined,
+    model,
   };
 }
 
@@ -1060,7 +1151,7 @@ function normalizeDocId(id: string): string {
 async function executeRetrievalPlan(
   retrieval: RetrievalDrivers,
   plan: RetrievalPlan,
-  options?: { logger?: ChatRuntimeOptions['logger']; cache?: RetrievalCache; ownerId?: string; onQueryResult?: (summary: RetrievalSummary) => void }
+  options?: { logger?: ChatRuntimeOptions['logger']; cache?: RetrievalCache; ownerId?: string; embeddingModel?: string; onQueryResult?: (summary: RetrievalSummary) => void }
 ): Promise<ExecutedRetrievalResult> {
   const cache = options?.cache;
   const ownerKey = options?.ownerId ?? 'default';
@@ -1144,20 +1235,20 @@ async function executeRetrievalPlan(
   );
   const resumeDocs = dedupeById(parts.flatMap((p) => p.resumeDocs), (d) => d.id);
   const resumeSplit = splitResumeDocs(resumeDocs);
-  let profile = parts.find((p) => p.profile)?.profile;
+  const profile = parts.find((p) => p.profile)?.profile;
 
   // Include profile for meta/bio/greeting turns where planner emitted no queries.
-  let profileSummary: RetrievalSummary | null = null;
-  if (!plan.queries.length && !profile) {
-    profile = await fetchProfile();
-    profileSummary = {
-      source: 'profile',
-      queryText: '',
-      requestedTopK: 1,
-      effectiveTopK: 1,
-      numResults: profile ? 1 : 0,
-    };
-  }
+  const cappedResult = trimRetrievedDocs(
+    {
+      projects,
+      experiences: Array.from(resumeSplit.experience.values()),
+      education: Array.from(resumeSplit.education.values()),
+      awards: Array.from(resumeSplit.award.values()),
+      skills: Array.from(resumeSplit.skill.values()),
+      profile,
+    },
+    12
+  );
 
   const summaries: RetrievalSummary[] = plan.queries.map((query) => ({
     source: query.source,
@@ -1166,27 +1257,17 @@ async function executeRetrievalPlan(
     effectiveTopK: clampQueryLimit(query.limit),
     numResults:
       query.source === 'projects'
-        ? projects.length
+        ? cappedResult.projects.length
         : query.source === 'resume'
-          ? resumeDocs.length
-          : profile
+          ? cappedResult.experiences.length
+          : cappedResult.profile
             ? 1
             : 0,
+    embeddingModel: options?.embeddingModel,
   }));
 
-  if (profileSummary) {
-    summaries.push(profileSummary);
-  }
-
   return {
-    result: {
-      projects,
-      experiences: Array.from(resumeSplit.experience.values()),
-      education: Array.from(resumeSplit.education.values()),
-      awards: Array.from(resumeSplit.award.values()),
-      skills: Array.from(resumeSplit.skill.values()),
-      profile,
-    },
+    result: cappedResult,
     summaries,
   };
 }
@@ -1228,7 +1309,13 @@ function buildAnswerUserContent(input: {
         id: p.id,
         name: p.name,
         oneLiner: p.oneLiner,
+        description: normalizeSnippet(p.description),
+        impactSummary: normalizeSnippet(p.impactSummary),
+        sizeOrScope: p.sizeOrScope,
         techStack: p.techStack,
+        languages: p.languages,
+        tags: p.tags,
+        context: p.context,
         bullets: p.bullets?.slice(0, PROJECT_BODY_SNIPPET_COUNT),
       })),
       null,
@@ -1242,7 +1329,15 @@ function buildAnswerUserContent(input: {
         company: e.company,
         title: e.title,
         location: e.location,
+        startDate: e.startDate,
+        endDate: e.endDate,
+        isCurrent: e.isCurrent,
+        experienceType: e.experienceType,
+        summary: normalizeSnippet(e.summary),
+        impactSummary: normalizeSnippet(e.impactSummary),
+        sizeOrScope: e.sizeOrScope,
         skills: e.skills,
+        linkedProjects: e.linkedProjects,
         bullets: e.bullets?.slice(0, EXPERIENCE_BODY_SNIPPET_COUNT),
       })),
       null,
@@ -1324,14 +1419,64 @@ function buildAttachmentPayloads(
   return attachments;
 }
 
+// --- Retrieval docs helpers ---
+
+function buildRetrievalDocs(retrieved: RetrievalResult): RetrievalDocs {
+  const projects: RetrievedProjectDoc[] = retrieved.projects.map((p) => ({
+    id: p.id,
+    name: p.name,
+    oneLiner: p.oneLiner,
+    techStack: p.techStack?.slice(0, 5),
+    _score: p._score,
+  }));
+
+  const resume: RetrievedResumeDoc[] = [
+    ...retrieved.experiences.map((e) => ({
+      id: e.id,
+      type: 'experience' as const,
+      title: e.title,
+      company: e.company,
+      summary: e.summary,
+      _score: e._score,
+    })),
+    ...retrieved.education.map((e) => ({
+      id: e.id,
+      type: 'education' as const,
+      institution: e.institution,
+      title: e.degree,
+      summary: e.summary,
+      _score: e._score,
+    })),
+    ...retrieved.awards.map((a) => ({
+      id: a.id,
+      type: 'award' as const,
+      title: a.title,
+      summary: a.summary,
+      _score: a._score,
+    })),
+    ...retrieved.skills.map((s) => ({
+      id: s.id,
+      type: 'skill' as const,
+      title: s.name,
+      summary: s.summary,
+      _score: s._score,
+    })),
+  ];
+
+  return { projects, resume };
+}
+
 // --- Reasoning trace helpers ---
 
 function buildPartialReasoningTrace(seed?: Partial<PartialReasoningTrace>): PartialReasoningTrace {
   return {
     plan: seed?.plan ?? null,
     retrieval: seed?.retrieval ?? null,
+    retrievalDocs: seed?.retrievalDocs ?? null,
     answer: seed?.answer ?? null,
     error: seed?.error ?? null,
+    debug: seed?.debug ?? null,
+    streaming: seed?.streaming,
   };
 }
 
@@ -1339,12 +1484,54 @@ function mergeReasoningTraces(current: PartialReasoningTrace, incoming: PartialR
   return {
     plan: incoming.plan ?? current.plan,
     retrieval: incoming.retrieval ?? current.retrieval,
+    retrievalDocs: incoming.retrievalDocs ?? current.retrievalDocs,
     answer: incoming.answer ?? current.answer,
     error: incoming.error ?? current.error,
+    debug: mergeReasoningDebug(current.debug, incoming.debug),
+    streaming: mergeStreaming(current.streaming, incoming.streaming),
   };
 }
 
-function buildErrorTrace(stage: ReasoningStage, error: Error): PartialReasoningTrace {
+function mergeReasoningDebug(
+  current: PartialReasoningTrace['debug'],
+  incoming: PartialReasoningTrace['debug']
+): PartialReasoningTrace['debug'] {
+  if (!current && !incoming) return undefined;
+  if (!incoming) return current;
+  const base = current ?? {};
+  return {
+    ...base,
+    ...incoming,
+    plannerPrompt: incoming.plannerPrompt ?? base.plannerPrompt,
+    answerPrompt: incoming.answerPrompt ?? base.answerPrompt,
+    plannerRawResponse: incoming.plannerRawResponse ?? base.plannerRawResponse,
+    answerRawResponse: incoming.answerRawResponse ?? base.answerRawResponse,
+    retrievalDocs: incoming.retrievalDocs ?? base.retrievalDocs,
+  };
+}
+
+function mergeStreaming(
+  current: PartialReasoningTrace['streaming'],
+  incoming: PartialReasoningTrace['streaming']
+): PartialReasoningTrace['streaming'] {
+  if (!current && !incoming) return undefined;
+  if (!incoming) return current;
+  const merged: NonNullable<PartialReasoningTrace['streaming']> = { ...(current ?? {}) };
+  for (const [stage, chunk] of Object.entries(incoming)) {
+    if (!chunk || typeof chunk !== 'object') continue;
+    const key = stage as ReasoningStage;
+    const existing = merged[key] ?? {};
+    const combinedText = [existing.text ?? '', (chunk as { text?: string }).text ?? ''].join('');
+    merged[key] = {
+      text: combinedText.length ? combinedText : undefined,
+      notes: (chunk as { notes?: string }).notes ?? existing.notes,
+      progress: (chunk as { progress?: number }).progress ?? existing.progress,
+    };
+  }
+  return merged;
+}
+
+function buildErrorTrace(stage: ReasoningStage, error: Error): ReasoningUpdate {
   const message = error instanceof Error ? error.message : 'Unknown error';
   const traceError: ReasoningTraceError = {
     stage,
@@ -1352,7 +1539,10 @@ function buildErrorTrace(stage: ReasoningStage, error: Error): PartialReasoningT
     code: 'internal_error',
     retryable: true,
   };
-  return buildPartialReasoningTrace({ error: traceError });
+  return {
+    stage,
+    trace: buildPartialReasoningTrace({ error: traceError }),
+  };
 }
 
 // --- Runtime ---
@@ -1395,7 +1585,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
   const ownerId = options?.owner?.ownerId ?? options?.ownerId ?? 'default';
   const owner = options?.owner;
   const plannerModel = modelConfig.plannerModel;
-  const answerModel = modelConfig.answerModel;
+  const embeddingModel = modelConfig.embeddingModel;
   const stageReasoning = options?.modelConfig?.reasoning;
   const tokenLimits = options?.tokenLimits ?? {};
   const logger = options?.logger;
@@ -1414,7 +1604,21 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
     let streamedReasoning: PartialReasoningTrace = buildPartialReasoningTrace();
     const emit = (update: ReasoningUpdate) => {
       if (!allowReasoning || !runOptions?.onReasoningUpdate) return;
-      streamedReasoning = mergeReasoningTraces(streamedReasoning, update.trace ?? buildPartialReasoningTrace());
+      const baseTrace = update.trace ?? buildPartialReasoningTrace();
+      const streamingTrace =
+        update.delta || update.notes || typeof update.progress === 'number'
+          ? buildPartialReasoningTrace({
+              streaming: {
+                [update.stage]: {
+                  text: update.delta,
+                  notes: update.notes,
+                  progress: update.progress,
+                },
+              },
+            })
+          : null;
+      const incomingTrace = streamingTrace ? mergeReasoningTraces(baseTrace, streamingTrace) : baseTrace;
+      streamedReasoning = mergeReasoningTraces(streamedReasoning, incomingTrace);
       runOptions.onReasoningUpdate({ ...update, trace: streamedReasoning });
     };
     return { emit };
@@ -1423,6 +1627,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
   return {
     async run(client: OpenAI, messages: ChatRequestMessage[], runOptions?: RunChatPipelineOptions): Promise<ChatbotResponse> {
       const tStart = performance.now();
+      const devDebugEnabled = process.env.NODE_ENV !== 'production';
       const timings: Record<string, number> = {};
       const effectiveOwnerId = runOptions?.ownerId ?? ownerId;
       const { signal: runSignal, cleanup: cleanupAborters, timedOut } = createAbortSignal(runOptions);
@@ -1471,6 +1676,10 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       const userText = extractUserText(boundedMessages);
       const conversationSnippet = buildContextSnippet(boundedMessages);
       const truncationApplied = windowedMessages.truncated;
+      const plannerPromptDebug = devDebugEnabled ? { system: '', user: '' } : undefined;
+      const answerPromptDebug = devDebugEnabled ? { system: '', user: '' } : undefined;
+      let plannerRawResponse: string | undefined;
+      let answerRawResponse: string | undefined;
 
       const reasoningEmitter = createReasoningEmitter(runOptions);
       const stageEmitter = typeof runOptions?.onStageEvent === 'function' ? runOptions.onStageEvent : null;
@@ -1509,6 +1718,10 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
             'Return ONLY the RetrievalPlan JSON.',
           ].join('\n');
           const systemPrompt = buildPlannerSystemPrompt(owner);
+          if (plannerPromptDebug) {
+            plannerPromptDebug.system = systemPrompt;
+            plannerPromptDebug.user = userContent;
+          }
           if (logPrompts) {
             logger?.('chat.pipeline.prompt', {
               stage: 'planner',
@@ -1534,13 +1747,18 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
             onTextDelta: (delta) => {
               emitReasoning({ stage: 'planner', delta });
             },
+            onRawResponse: (raw) => {
+              if (devDebugEnabled) {
+                plannerRawResponse = raw;
+              }
+            },
           });
-          rawPlan = normalizePlannerOutput(plannerOutput);
+          rawPlan = normalizePlannerOutput(plannerOutput, plannerModel);
           if (!cachedPlan) {
             plannerCache.set(plannerKey, rawPlan);
           }
         }
-        plan = normalizePlannerOutput(rawPlan);
+        plan = normalizePlannerOutput(rawPlan, plannerModel);
         timings.planMs = performance.now() - tPlan;
         emitStageEvent('planner', 'complete', { topic: plan.topic ?? null, cardsEnabled: plan.cardsEnabled }, timings.planMs);
       } catch (error) {
@@ -1557,54 +1775,105 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         };
       }
 
-      emitReasoning({ stage: 'planner', trace: buildPartialReasoningTrace({ plan }) });
+      emitReasoning({
+        stage: 'planner',
+        trace: buildPartialReasoningTrace({
+          plan,
+          debug:
+            devDebugEnabled && (plannerPromptDebug || plannerRawResponse)
+              ? {
+                  plannerPrompt: plannerPromptDebug,
+                  plannerRawResponse,
+                }
+              : undefined,
+        }),
+      });
 
-      emitStageEvent('retrieval', 'start');
-      emitReasoning({ stage: 'retrieval', notes: 'Running portfolio searches...' });
-      let retrieved: RetrievalResult;
-      let retrievalSummaries: RetrievalSummary[];
-      try {
-        const tRetrieval = performance.now();
-        const executed = await executeRetrievalPlan(retrieval, plan, {
-          logger,
-          cache: retrievalCache,
-          ownerId: effectiveOwnerId,
-          onQueryResult: (summary) => emitReasoning({ stage: 'retrieval', notes: `${summary.source}: ${summary.numResults} results` }),
+      const hasQueries = plan.queries.length > 0;
+      let retrieved: RetrievalResult = {
+        projects: [],
+        experiences: [],
+        education: [],
+        awards: [],
+        skills: [],
+      };
+      let retrievalSummaries: RetrievalSummary[] = [];
+
+      if (hasQueries) {
+        emitStageEvent('retrieval', 'start');
+        emitReasoning({ stage: 'retrieval', notes: 'Running portfolio searches...' });
+        try {
+          const tRetrieval = performance.now();
+          const executed = await executeRetrievalPlan(retrieval, plan, {
+            logger,
+            cache: retrievalCache,
+            ownerId: effectiveOwnerId,
+            embeddingModel,
+            onQueryResult: (summary) => emitReasoning({ stage: 'retrieval', notes: `${summary.source}: ${summary.numResults} results` }),
+          });
+          retrieved = executed.result;
+          retrievalSummaries = executed.summaries;
+          timings.retrievalMs = performance.now() - tRetrieval;
+          emitStageEvent(
+            'retrieval',
+            'complete',
+            { docsFound: retrieved.projects.length + retrieved.experiences.length + (retrieved.profile ? 1 : 0), sources: retrievalSummaries.map((r) => r.source) },
+            timings.retrievalMs
+          );
+        } catch (error) {
+          cleanupAborters();
+          logger?.('chat.pipeline.error', { stage: 'retrieval', error: formatLogValue(error) });
+          emitReasoning(buildErrorTrace('retrieval', error as Error));
+          return {
+            message: '',
+            ui: { showProjects: [], showExperiences: [] },
+            usage: stageUsages,
+            error: buildStreamError('retrieval_error', 'I hit an internal retrieval issue—please try again.', true),
+          };
+        }
+
+        emitReasoning({
+          stage: 'retrieval',
+          trace: buildPartialReasoningTrace({
+            retrieval: retrievalSummaries,
+            retrievalDocs: buildRetrievalDocs(retrieved),
+            debug:
+              devDebugEnabled && retrieved
+                ? {
+                    retrievalDocs: {
+                      projects: retrieved.projects,
+                      resume: [...retrieved.experiences, ...retrieved.education, ...retrieved.awards, ...retrieved.skills],
+                      profile: retrieved.profile ?? null,
+                    },
+                  }
+                : undefined,
+          }),
         });
-        retrieved = executed.result;
-        retrievalSummaries = executed.summaries;
-        timings.retrievalMs = performance.now() - tRetrieval;
-        emitStageEvent(
-          'retrieval',
-          'complete',
-          { docsFound: retrieved.projects.length + retrieved.experiences.length + (retrieved.profile ? 1 : 0), sources: retrievalSummaries.map((r) => r.source) },
-          timings.retrievalMs
-        );
-      } catch (error) {
-        cleanupAborters();
-        logger?.('chat.pipeline.error', { stage: 'retrieval', error: formatLogValue(error) });
-        emitReasoning(buildErrorTrace('retrieval', error as Error));
-        return {
-          message: '',
-          ui: { showProjects: [], showExperiences: [] },
-          usage: stageUsages,
-          error: buildStreamError('retrieval_error', 'I hit an internal retrieval issue—please try again.', true),
-        };
       }
-
-      emitReasoning({ stage: 'retrieval', trace: buildPartialReasoningTrace({ retrieval: retrievalSummaries }) });
 
       emitStageEvent('answer', 'start');
       emitReasoning({ stage: 'answer', notes: 'Drafting answer...' });
 
-      const identity = options?.identityContext ?? (retrieved.profile
-        ? {
-            fullName: retrieved.profile.fullName,
-            headline: retrieved.profile.headline ?? undefined,
-            location: retrieved.profile.location ?? undefined,
-            shortAbout: (retrieved.profile as { shortAbout?: string }).shortAbout ?? undefined,
-          }
-        : undefined);
+      const identity = options?.identityContext
+        ?? (retrieved.profile
+          ? {
+              fullName: retrieved.profile.fullName,
+              headline: retrieved.profile.headline ?? undefined,
+              location: retrieved.profile.location ?? undefined,
+              shortAbout: (retrieved.profile as { shortAbout?: string }).shortAbout ?? undefined,
+            }
+          : runtimePersona?.profile
+            ? {
+                fullName: runtimePersona.profile.fullName,
+                headline: runtimePersona.profile.headline,
+                location: runtimePersona.profile.location,
+                shortAbout: runtimePersona.shortAbout ?? runtimePersona.profile.about?.[0],
+              }
+            : undefined);
+
+      const answerModel = hasQueries
+        ? modelConfig.answerModel
+        : modelConfig.answerModelNoRetrieval ?? modelConfig.answerModel;
 
       const userContent = buildAnswerUserContent({
         userMessage: userText,
@@ -1614,6 +1883,10 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         identity,
       });
       const systemPrompt = buildAnswerSystemPrompt(runtimePersona, owner, identity);
+      if (answerPromptDebug) {
+        answerPromptDebug.system = systemPrompt;
+        answerPromptDebug.user = userContent;
+      }
       if (logPrompts) {
         logger?.('chat.pipeline.prompt', {
           stage: 'answer',
@@ -1623,7 +1896,8 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         });
       }
 
-      const answerReasoning = resolveReasoningParams(answerModel, Boolean(runOptions?.reasoningEnabled), stageReasoning?.answer);
+      const answerReasoningEffort = hasQueries ? stageReasoning?.answer : stageReasoning?.answerNoRetrieval ?? 'minimal';
+      const answerReasoning = resolveReasoningParams(answerModel, Boolean(runOptions?.reasoningEnabled), answerReasoningEffort);
       let answer: AnswerPayload;
       try {
         answer = await runStreamingJsonResponse<AnswerPayload>({
@@ -1640,11 +1914,15 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           maxTokens: tokenLimits.answer,
           onTextDelta: (delta) => {
             runOptions?.onAnswerToken?.(delta);
-            emitReasoning({ stage: 'answer', delta });
           },
           onUsage: recordUsage,
           reasoning: answerReasoning,
           temperature: modelConfig.answerTemperature,
+          onRawResponse: (raw) => {
+            if (devDebugEnabled) {
+              answerRawResponse = raw;
+            }
+          },
         });
       } catch (error) {
         cleanupAborters();
@@ -1657,6 +1935,10 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           usage: stageUsages,
           error: buildStreamError(timeout ? 'llm_timeout' : 'llm_error', 'I had trouble generating a reply—please try again.', true),
         };
+      }
+
+      if (!hasQueries) {
+        answer.thoughts = undefined;
       }
 
       const ui = buildUi(answer.uiHints, retrieved, plan.cardsEnabled !== false);
@@ -1682,7 +1964,16 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
 
       emitReasoning({
         stage: 'answer',
-        trace: buildPartialReasoningTrace({ answer: reasoningTrace.answer }),
+        trace: buildPartialReasoningTrace({
+          answer: reasoningTrace.answer,
+          debug:
+            devDebugEnabled && (answerPromptDebug || answerRawResponse)
+              ? {
+                  answerPrompt: answerPromptDebug,
+                  answerRawResponse,
+                }
+              : undefined,
+        }),
       });
 
       timings.totalMs = performance.now() - tStart;
