@@ -179,11 +179,24 @@ export type ProfileSummary = {
   socialLinks?: ProfileSocialLink[];
 };
 
+export type PersonaProfile = {
+  updatedAt?: string;
+  fullName?: string;
+  headline?: string;
+  location?: string;
+  currentRole?: string;
+  about?: string[];
+  topSkills?: string[];
+  socialLinks?: string[];
+  featuredExperienceIds?: string[];
+};
+
 export type PersonaSummary = {
   systemPersona: string;
   shortAbout: string;
   styleGuidelines: string[];
   voiceExamples?: string[];
+  profile?: PersonaProfile;
   generatedAt?: string;
 };
 
@@ -200,11 +213,13 @@ export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high';
 export type StageReasoningConfig = {
   planner?: ReasoningEffort;
   answer?: ReasoningEffort;
+  answerNoRetrieval?: ReasoningEffort;
 };
 
 export type ModelConfig = {
   plannerModel: string;
   answerModel: string;
+  answerModelNoRetrieval?: string;
   embeddingModel: string;
   answerTemperature?: number;
   reasoning?: StageReasoningConfig;
@@ -270,7 +285,9 @@ export type PlannerLLMOutput = {
   topic?: string;
 };
 
-export type RetrievalPlan = PlannerLLMOutput;
+export type RetrievalPlan = PlannerLLMOutput & {
+  model?: string;
+};
 
 export type AnswerUiHints = {
   projects?: string[];
@@ -325,9 +342,27 @@ export type RetrievalSummary = {
   requestedTopK: number;
   effectiveTopK: number;
   numResults: number;
+  embeddingModel?: string;
 };
 
 export type ReasoningStage = 'planner' | 'retrieval' | 'answer';
+
+export type ReasoningPrompt = {
+  system: string;
+  user: string;
+};
+
+export type ReasoningDebug = {
+  plannerPrompt?: ReasoningPrompt;
+  answerPrompt?: ReasoningPrompt;
+  plannerRawResponse?: string;
+  answerRawResponse?: string;
+  retrievalDocs?: {
+    projects?: unknown[];
+    resume?: unknown[];
+    profile?: unknown | null;
+  };
+};
 
 export type ReasoningTraceError = {
   stage?: ReasoningStage | 'unknown';
@@ -351,11 +386,46 @@ export type AnswerReasoning = {
   thoughts?: string[];
 };
 
+export type RetrievedProjectDoc = {
+  id: string;
+  name: string;
+  oneLiner?: string;
+  techStack?: string[];
+  _score?: number;
+};
+
+export type RetrievedResumeDoc = {
+  id: string;
+  type?: 'experience' | 'education' | 'award' | 'skill';
+  title?: string;
+  company?: string;
+  institution?: string;
+  summary?: string;
+  _score?: number;
+};
+
+export type RetrievalDocs = {
+  projects?: RetrievedProjectDoc[];
+  resume?: RetrievedResumeDoc[];
+};
+
 export type PartialReasoningTrace = {
   plan: RetrievalPlan | null;
   retrieval: RetrievalSummary[] | null;
+  retrievalDocs?: RetrievalDocs | null;
   answer: AnswerReasoning | null;
   error?: ReasoningTraceError | null;
+  debug?: ReasoningDebug | null;
+  streaming?: Partial<
+    Record<
+      ReasoningStage,
+      {
+        text?: string;
+        notes?: string;
+        progress?: number;
+      }
+    >
+  >;
 };
 
 type CompleteReasoningTrace<T extends PartialReasoningTrace> = {
