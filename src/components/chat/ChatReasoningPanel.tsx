@@ -69,12 +69,7 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-400" />
               </motion.div>
             ) : (
-              <motion.div
-                key="done"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
+              <motion.div key="done" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <Brain className="h-4 w-4 text-blue-400" />
               </motion.div>
             )}
@@ -192,16 +187,14 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
 
               <ReasoningSection
                 icon={<BookOpen className="h-4 w-4" />}
-                title="Answer hints"
+                title="Answer"
                 isStreaming={isStreaming && !answer}
               >
                 {answer ? (
                   <div className="space-y-2 text-xs text-white/70">
                     {answer.uiHints && (answer.uiHints.projects?.length || answer.uiHints.experiences?.length) ? (
                       <div className="flex flex-wrap gap-3 text-[11px] text-white/60">
-                        <span>
-                          Projects: {answer.uiHints.projects?.length ?? 0}
-                        </span>
+                        <span>Projects: {answer.uiHints.projects?.length ?? 0}</span>
                         <span>Experiences: {answer.uiHints.experiences?.length ?? 0}</span>
                       </div>
                     ) : (
@@ -234,7 +227,17 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
   );
 }
 
-function ReasoningSection({ icon, title, children, isStreaming }: { icon: React.ReactNode; title: string; children: React.ReactNode; isStreaming?: boolean }) {
+function ReasoningSection({
+  icon,
+  title,
+  children,
+  isStreaming,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+  isStreaming?: boolean;
+}) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
@@ -295,7 +298,7 @@ function capitalize(value: string) {
 
 function StreamingNote({ text }: { text: string }) {
   if (!text) return null;
-  return <p className="text-xs text-white/60 whitespace-pre-wrap leading-relaxed">{text}</p>;
+  return <p className="whitespace-pre-wrap text-xs leading-relaxed text-white/60">{text}</p>;
 }
 
 function CollapsibleDocList<T extends { id: string }>({
@@ -315,7 +318,9 @@ function CollapsibleDocList<T extends { id: string }>({
         onClick={() => setIsOpen(!isOpen)}
         className="flex w-full items-center justify-between px-2.5 py-1.5 text-left text-[11px] font-medium text-white/70 hover:bg-white/5"
       >
-        <span>{title} ({items.length})</span>
+        <span>
+          {title} ({items.length})
+        </span>
         <ChevronDown
           className="h-3 w-3 text-white/40 transition-transform"
           style={{ transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
@@ -351,9 +356,7 @@ function ProjectDocItem({ doc }: { doc: RetrievedProjectDoc }) {
           <span className="shrink-0 text-[10px] text-white/40">{(doc._score * 100).toFixed(0)}%</span>
         )}
       </div>
-      {doc.oneLiner && (
-        <p className="mt-1 text-[11px] leading-relaxed text-white/60">{doc.oneLiner}</p>
-      )}
+      {doc.oneLiner && <p className="mt-1 text-[11px] leading-relaxed text-white/60">{doc.oneLiner}</p>}
       {doc.techStack && doc.techStack.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1">
           {doc.techStack.map((tech) => (
@@ -390,9 +393,7 @@ function ResumeDocItem({ doc }: { doc: RetrievedResumeDoc }) {
           <span className="shrink-0 text-[10px] text-white/40">{(doc._score * 100).toFixed(0)}%</span>
         )}
       </div>
-      {doc.summary && (
-        <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-white/60">{doc.summary}</p>
-      )}
+      {doc.summary && <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-white/60">{doc.summary}</p>}
     </div>
   );
 }

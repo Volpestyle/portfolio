@@ -17,6 +17,7 @@ export function ChatDevTools() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const [devReasoningView, setDevReasoningView] = useState(false);
+  const [devReasoningInitialized, setDevReasoningInitialized] = useState(false);
   const hasMessages = messages.length > 0;
 
   useEffect(() => {
@@ -72,31 +73,32 @@ export function ChatDevTools() {
     }
   }, [hasMessages, isSaving, messages]);
 
-  // Sync dev/user reasoning view toggle via localStorage and a window event
+  // Hydrate dev/user reasoning view toggle from localStorage in dev
   useEffect(() => {
     if (!isDevEnvironment || typeof window === 'undefined') return;
     const stored = window.localStorage.getItem(DEV_MODE_STORAGE_KEY);
-    const enabled = stored === '1';
-    setDevReasoningView(enabled);
-    window.dispatchEvent(new CustomEvent(DEV_MODE_EVENT, { detail: { enabled } }));
+    setDevReasoningView(stored === '1');
+    setDevReasoningInitialized(true);
   }, []);
+
+  // Persist and broadcast toggle changes after render (avoids cross-component setState during render)
+  useEffect(() => {
+    if (!isDevEnvironment || typeof window === 'undefined' || !devReasoningInitialized) return;
+    try {
+      if (devReasoningView) {
+        window.localStorage.setItem(DEV_MODE_STORAGE_KEY, '1');
+      } else {
+        window.localStorage.removeItem(DEV_MODE_STORAGE_KEY);
+      }
+      window.dispatchEvent(new CustomEvent(DEV_MODE_EVENT, { detail: { enabled: devReasoningView } }));
+    } catch {
+      // ignore storage errors
+    }
+  }, [devReasoningView, devReasoningInitialized]);
 
   const toggleDevReasoningView = useCallback(() => {
     if (!isDevEnvironment || typeof window === 'undefined') return;
-    setDevReasoningView((prev) => {
-      const next = !prev;
-      try {
-        if (next) {
-          window.localStorage.setItem(DEV_MODE_STORAGE_KEY, '1');
-        } else {
-          window.localStorage.removeItem(DEV_MODE_STORAGE_KEY);
-        }
-        window.dispatchEvent(new CustomEvent(DEV_MODE_EVENT, { detail: { enabled: next } }));
-      } catch {
-        // ignore storage errors
-      }
-      return next;
-    });
+    setDevReasoningView((prev) => !prev);
   }, []);
 
   if (!isDevEnvironment || !portalTarget) {

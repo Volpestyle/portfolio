@@ -12,11 +12,11 @@ models:
   embeddingModel: text-embedding-3-large
   reasoning:
     planner: low
-    answer: low
-    answerNoRetrieval: minimal
+    answer: minimal
+    # answerNoRetrieval: minimal
 tokens:
-  planner: 16000
-  answer: 16000
+  planner: 15000
+  answer: 15000
 retrieval:
   # Increase or decrease retrieval fan-out; clamped to the contract max (10).
   defaultTopK: 8

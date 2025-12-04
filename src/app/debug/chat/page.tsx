@@ -91,11 +91,23 @@ export default function ChatDebugPage() {
             <p>Total prompt tokens: {tokenSummary.totals.prompt.toLocaleString()}</p>
             <p>Total completion tokens: {tokenSummary.totals.completion.toLocaleString()}</p>
             <p>Total tokens: {tokenSummary.totals.total.toLocaleString()}</p>
+            {tokenSummary.hasCost ? (
+              <p>
+                Estimated cost:{' '}
+                {tokenSummary.totals.costUsd.toLocaleString(undefined, {
+                  style: 'currency',
+                  currency: 'USD',
+                  minimumFractionDigits: 4,
+                  maximumFractionDigits: 4,
+                })}
+              </p>
+            ) : null}
             <div className="mt-3 space-y-1">
               <p className="text-xs uppercase tracking-wide text-white/60">By stage</p>
               {Object.entries(tokenSummary.byStage).map(([stage, totals]) => (
                 <p key={stage} className="font-mono text-xs text-white/80">
                   {stage}: prompt={totals.prompt} completion={totals.completion} total={totals.total}
+                  {tokenSummary.hasCost ? ` cost=$${totals.costUsd.toFixed(4)}` : ''}
                 </p>
               ))}
             </div>

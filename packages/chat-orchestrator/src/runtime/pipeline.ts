@@ -29,7 +29,6 @@ import {
   PlannerLLMOutput,
   parseUsage,
   estimateCostUsd,
-  FALLBACK_NORMALIZED_PRICING,
 } from '@portfolio/chat-contract';
 import type OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
@@ -1072,12 +1071,12 @@ async function runStreamingJsonResponse<T>({
 function normalizePlannerOutput(plan: PlannerLLMOutput, model?: string): RetrievalPlan {
   const queries: RetrievalPlan['queries'] = Array.isArray(plan.queries)
     ? plan.queries
-        .map((query) => ({
-          source: query?.source,
-          text: sanitizePlannerQueryText(query?.text ?? ''),
-          limit: clampQueryLimit(query?.limit),
-        }))
-        .filter((query) => query.source === 'projects' || query.source === 'resume' || query.source === 'profile')
+      .map((query) => ({
+        source: query?.source,
+        text: sanitizePlannerQueryText(query?.text ?? ''),
+        limit: clampQueryLimit(query?.limit),
+      }))
+      .filter((query) => query.source === 'projects' || query.source === 'resume' || query.source === 'profile')
     : [];
 
   const deduped: RetrievalPlan['queries'] = [];
@@ -1286,14 +1285,14 @@ function buildAnswerUserContent(input: {
   const identitySection =
     identity && (identity.fullName || identity.headline || identity.location || identity.shortAbout)
       ? [
-          '## Identity Context',
-          identity.fullName ? `Name: ${identity.fullName}` : null,
-          identity.headline ? `Headline: ${identity.headline}` : null,
-          identity.location ? `Location: ${identity.location}` : null,
-          identity.shortAbout ? `About: ${identity.shortAbout}` : null,
-        ]
-          .filter(Boolean)
-          .join('\n')
+        '## Identity Context',
+        identity.fullName ? `Name: ${identity.fullName}` : null,
+        identity.headline ? `Headline: ${identity.headline}` : null,
+        identity.location ? `Location: ${identity.location}` : null,
+        identity.shortAbout ? `About: ${identity.shortAbout}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n')
       : '';
 
   return [
@@ -1349,7 +1348,7 @@ function buildAnswerUserContent(input: {
     '',
     `## Cards Enabled: ${plan.cardsEnabled !== false}`,
     plan.cardsEnabled !== false
-      ? 'Include uiHints with relevant project/experience IDs.'
+      ? 'Only include **relevant** project/experience IDs in uiHints. We show these to user. If no relevant docs, do not include uiHints.'
       : 'Do NOT include uiHints (no cards will be shown).',
   ]
     .filter(Boolean)
@@ -1608,14 +1607,14 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       const streamingTrace =
         update.delta || update.notes || typeof update.progress === 'number'
           ? buildPartialReasoningTrace({
-              streaming: {
-                [update.stage]: {
-                  text: update.delta,
-                  notes: update.notes,
-                  progress: update.progress,
-                },
+            streaming: {
+              [update.stage]: {
+                text: update.delta,
+                notes: update.notes,
+                progress: update.progress,
               },
-            })
+            },
+          })
           : null;
       const incomingTrace = streamingTrace ? mergeReasoningTraces(baseTrace, streamingTrace) : baseTrace;
       streamedReasoning = mergeReasoningTraces(streamedReasoning, incomingTrace);
@@ -1632,11 +1631,19 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       const effectiveOwnerId = runOptions?.ownerId ?? ownerId;
       const { signal: runSignal, cleanup: cleanupAborters, timedOut } = createAbortSignal(runOptions);
       const stageUsages: StageUsage[] = [];
+      const missingCostWarned = new Set<string>();
       const recordUsage = (stage: string, model: string, usageRaw: unknown) => {
         if (!model) return;
         const parsed = parseUsage(usageRaw, { allowZero: true });
         if (!parsed) return;
-        const costUsd = estimateCostUsd(model, parsed, { fallbackPricing: FALLBACK_NORMALIZED_PRICING });
+        const costUsd = estimateCostUsd(model, parsed);
+        if (costUsd === null) {
+          const key = model || 'unknown';
+          if (!missingCostWarned.has(key)) {
+            missingCostWarned.add(key);
+            logger?.('chat.pipeline.cost_pricing_missing', { stage, model });
+          }
+        }
         stageUsages.push({
           stage,
           model,
@@ -1645,6 +1652,50 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         });
       };
       const logPrompts = runOptions?.logPrompts ?? baseLogPrompts;
+      const logPipelineSummary = (result: ChatbotResponse) => {
+        if (!logger) return;
+
+        const usageEntries = Array.isArray(result.usage) && result.usage.length ? result.usage : stageUsages;
+        const totals = usageEntries.reduce(
+          (acc, entry) => {
+            const promptTokens = entry.usage?.promptTokens ?? 0;
+            const completionTokens = entry.usage?.completionTokens ?? 0;
+            acc.promptTokens += promptTokens;
+            acc.completionTokens += completionTokens;
+            acc.totalTokens += entry.usage?.totalTokens ?? promptTokens + completionTokens;
+            acc.costUsd += entry.costUsd ?? 0;
+            return acc;
+          },
+          { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0 }
+        );
+
+        logger('chat.pipeline.summary', {
+          plan: (result as { reasoningTrace?: ReasoningTrace })?.reasoningTrace?.plan ?? null,
+          retrieval: (result as { reasoningTrace?: ReasoningTrace })?.reasoningTrace?.retrieval ?? null,
+          answer: (result as { reasoningTrace?: ReasoningTrace })?.reasoningTrace?.answer ?? null,
+          totalPromptTokens: totals.promptTokens,
+          totalCompletionTokens: totals.completionTokens,
+          totalTokens: totals.totalTokens,
+          totalCostUsd: totals.costUsd,
+          stages: usageEntries.map((entry) => {
+            const promptTokens = entry.usage?.promptTokens ?? 0;
+            const completionTokens = entry.usage?.completionTokens ?? 0;
+            const totalTokens = entry.usage?.totalTokens ?? promptTokens + completionTokens;
+            return {
+              stage: entry.stage,
+              model: entry.model,
+              promptTokens,
+              completionTokens,
+              totalTokens,
+              costUsd: entry.costUsd,
+            };
+          }),
+        });
+      };
+      const finalize = <T extends ChatbotResponse>(result: T): T => {
+        logPipelineSummary(result);
+        return result;
+      };
       const buildStreamError = (
         code: ChatStreamError['code'],
         errorMessage: string,
@@ -1662,12 +1713,12 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         cleanupAborters();
         if (error instanceof MessageTooLongError) {
           logger?.('chat.pipeline.error', { stage: 'window', error: formatLogValue(error) });
-          return {
+          return finalize({
             message: '',
             ui: { showProjects: [], showExperiences: [] },
             usage: stageUsages,
             error: buildStreamError('internal_error', error.message, false),
-          };
+          });
         }
         throw error;
       }
@@ -1767,12 +1818,12 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         const timeout = timedOut();
         const message = timeout ? 'I ran out of time planning—please try again.' : 'I hit a planning issue—please try again.';
         emitReasoning(buildErrorTrace('planner', error as Error));
-        return {
+        return finalize({
           message: '',
           ui: { showProjects: [], showExperiences: [] },
           usage: stageUsages,
           error: buildStreamError(timeout ? 'llm_timeout' : 'llm_error', message, true),
-        };
+        });
       }
 
       emitReasoning({
@@ -1782,9 +1833,9 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           debug:
             devDebugEnabled && (plannerPromptDebug || plannerRawResponse)
               ? {
-                  plannerPrompt: plannerPromptDebug,
-                  plannerRawResponse,
-                }
+                plannerPrompt: plannerPromptDebug,
+                plannerRawResponse,
+              }
               : undefined,
         }),
       });
@@ -1824,12 +1875,12 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           cleanupAborters();
           logger?.('chat.pipeline.error', { stage: 'retrieval', error: formatLogValue(error) });
           emitReasoning(buildErrorTrace('retrieval', error as Error));
-          return {
+          return finalize({
             message: '',
             ui: { showProjects: [], showExperiences: [] },
             usage: stageUsages,
             error: buildStreamError('retrieval_error', 'I hit an internal retrieval issue—please try again.', true),
-          };
+          });
         }
 
         emitReasoning({
@@ -1840,12 +1891,12 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
             debug:
               devDebugEnabled && retrieved
                 ? {
-                    retrievalDocs: {
-                      projects: retrieved.projects,
-                      resume: [...retrieved.experiences, ...retrieved.education, ...retrieved.awards, ...retrieved.skills],
-                      profile: retrieved.profile ?? null,
-                    },
-                  }
+                  retrievalDocs: {
+                    projects: retrieved.projects,
+                    resume: [...retrieved.experiences, ...retrieved.education, ...retrieved.awards, ...retrieved.skills],
+                    profile: retrieved.profile ?? null,
+                  },
+                }
                 : undefined,
           }),
         });
@@ -1857,18 +1908,18 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       const identity = options?.identityContext
         ?? (retrieved.profile
           ? {
-              fullName: retrieved.profile.fullName,
-              headline: retrieved.profile.headline ?? undefined,
-              location: retrieved.profile.location ?? undefined,
-              shortAbout: (retrieved.profile as { shortAbout?: string }).shortAbout ?? undefined,
-            }
+            fullName: retrieved.profile.fullName,
+            headline: retrieved.profile.headline ?? undefined,
+            location: retrieved.profile.location ?? undefined,
+            shortAbout: (retrieved.profile as { shortAbout?: string }).shortAbout ?? undefined,
+          }
           : runtimePersona?.profile
             ? {
-                fullName: runtimePersona.profile.fullName,
-                headline: runtimePersona.profile.headline,
-                location: runtimePersona.profile.location,
-                shortAbout: runtimePersona.shortAbout ?? runtimePersona.profile.about?.[0],
-              }
+              fullName: runtimePersona.profile.fullName,
+              headline: runtimePersona.profile.headline,
+              location: runtimePersona.profile.location,
+              shortAbout: runtimePersona.shortAbout ?? runtimePersona.profile.about?.[0],
+            }
             : undefined);
 
       const answerModel = hasQueries
@@ -1929,12 +1980,12 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         logger?.('chat.pipeline.error', { stage: 'answer', error: formatLogValue(error) });
         emitReasoning(buildErrorTrace('answer', error as Error));
         const timeout = timedOut();
-        return {
+        return finalize({
           message: '',
           ui: { showProjects: [], showExperiences: [] },
           usage: stageUsages,
           error: buildStreamError(timeout ? 'llm_timeout' : 'llm_error', 'I had trouble generating a reply—please try again.', true),
-        };
+        });
       }
 
       if (!hasQueries) {
@@ -1969,16 +2020,18 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           debug:
             devDebugEnabled && (answerPromptDebug || answerRawResponse)
               ? {
-                  answerPrompt: answerPromptDebug,
-                  answerRawResponse,
-                }
+                answerPrompt: answerPromptDebug,
+                answerRawResponse,
+              }
               : undefined,
         }),
       });
 
       timings.totalMs = performance.now() - tStart;
 
-      return {
+      const totalCostUsd = stageUsages.reduce((sum, entry) => sum + (entry.costUsd ?? 0), 0);
+
+      return finalize({
         message: answer.message,
         ui,
         answerThoughts: answer.thoughts,
@@ -1986,8 +2039,8 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         reasoningTrace,
         truncationApplied,
         usage: stageUsages,
-        totalCostUsd: stageUsages.reduce((sum, entry) => sum + (entry.costUsd ?? 0), 0),
-      };
+        totalCostUsd,
+      });
     },
   };
 }
