@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { PartialReasoningTrace } from '@portfolio/chat-contract';
+import type { PartialReasoningTrace, RetrievedProjectDoc, RetrievedResumeDoc } from '@portfolio/chat-contract';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, Brain, ChevronDown, Search, Sparkles, BookOpen } from 'lucide-react';
+import { AlertTriangle, Brain, ChevronDown, Search, BookOpen, ClipboardList } from 'lucide-react';
 
 interface ChatReasoningPanelProps {
   trace: PartialReasoningTrace;
@@ -13,26 +13,17 @@ interface ChatReasoningPanelProps {
   className?: string;
 }
 
-const STAGE_PROGRESS = {
-  idle: 0,
-  planner: 0.33,
-  retrieval: 0.66,
-  answer: 1,
-};
-
 export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, className }: ChatReasoningPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const plan = trace.plan;
   const retrievals = trace.retrieval ?? null;
+  const retrievalDocs = trace.retrievalDocs ?? null;
   const answer = trace.answer ?? null;
   const traceError = trace.error ?? null;
-
-  const progress = useMemo(() => {
-    if (answer) return STAGE_PROGRESS.answer;
-    if (retrievals) return STAGE_PROGRESS.retrieval;
-    if (plan) return STAGE_PROGRESS.planner;
-    return STAGE_PROGRESS.idle;
-  }, [answer, retrievals, plan]);
+  const streaming = trace.streaming ?? {};
+  const plannerStreamingText = streaming.planner?.text || streaming.planner?.notes;
+  const retrievalStreamingText = streaming.retrieval?.text || streaming.retrieval?.notes;
+  const answerStreamingText = streaming.answer?.text || streaming.answer?.notes;
 
   const title = useMemo(() => {
     if (traceError) return 'Reasoning failed';
@@ -56,43 +47,59 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
         className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-white/5"
       >
         <div className="flex items-center gap-3">
-          <ProgressArc progress={progress} isStreaming={isStreaming} />
-          <div className="flex items-center gap-2">
-            <AnimatePresence mode="wait">
-              {traceError ? (
-                <motion.div
-                  key="error"
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0, opacity: 0 }}
-                  className="relative flex h-4 w-4 items-center justify-center"
-                >
-                  <AlertTriangle className="h-4 w-4 text-red-300" />
-                </motion.div>
-              ) : isStreaming ? (
-                <motion.div
-                  key="thinking"
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0, opacity: 0 }}
-                  className="relative h-4 w-4"
-                >
-                  <StagePulse stage={answer ? 'answer' : retrievals ? 'retrieval' : plan ? 'planner' : 'planner'} />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="done"
-                  initial={{ scale: 0, rotate: -180, opacity: 0 }}
-                  animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                  exit={{ scale: 0, rotate: 180, opacity: 0 }}
-                  transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-                >
-                  <Brain className="h-4 w-4 text-blue-400" />
-                </motion.div>
-              )}
-            </AnimatePresence>
+          <AnimatePresence mode="wait">
+            {traceError ? (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex h-4 w-4 items-center justify-center"
+              >
+                <AlertTriangle className="h-4 w-4 text-red-300" />
+              </motion.div>
+            ) : isStreaming ? (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="h-4 w-4"
+              >
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-400" />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="done"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Brain className="h-4 w-4 text-blue-400" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {isStreaming ? (
+            <span className="relative text-sm font-medium text-white/60">
+              {title}
+              <motion.span
+                className="absolute inset-0 text-sm font-medium text-white/90"
+                style={{
+                  backgroundImage: 'linear-gradient(90deg, transparent 0%, currentColor 50%, transparent 100%)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundSize: '200% 100%',
+                }}
+                animate={{ backgroundPosition: ['100% 0%', '-100% 0%'] }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+              >
+                {title}
+              </motion.span>
+            </span>
+          ) : (
             <span className="text-sm font-medium text-white/90">{title}</span>
-          </div>
+          )}
         </div>
         <motion.div animate={{ rotate: isExpanded ? 0 : -90 }} transition={{ duration: 0.2 }}>
           <ChevronDown className="h-4 w-4 text-white/60" />
@@ -120,7 +127,7 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
               )}
 
               <ReasoningSection
-                icon={<Sparkles className="h-4 w-4" />}
+                icon={<ClipboardList className="h-4 w-4" />}
                 title="Planner"
                 isStreaming={isStreaming && !plan}
               >
@@ -133,7 +140,7 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
                         {plan.queries.map((query, idx) => (
                           <div key={`${query.source}-${idx}`} className="rounded border border-white/5 bg-white/5 p-2">
                             <div className="flex items-center justify-between text-[11px] text-white/60">
-                              <span className="font-semibold text-blue-200">{query.source}</span>
+                              <span className="font-semibold text-blue-200">{capitalize(query.source)}</span>
                               <span>TopK: {query.limit ?? '—'}</span>
                             </div>
                             <p className="mt-1 text-xs text-white/70">{query.text}</p>
@@ -144,6 +151,8 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
                       <p className="text-xs text-white/60">Planner chose to skip retrieval.</p>
                     )}
                   </div>
+                ) : plannerStreamingText ? (
+                  <StreamingNote text={plannerStreamingText} />
                 ) : (
                   <LoadingState status="Analyzing your question..." />
                 )}
@@ -154,24 +163,28 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
                 title="Retrieval"
                 isStreaming={isStreaming && !retrievals}
               >
-                {retrievals ? (
+                {retrievalDocs ? (
                   <div className="space-y-2">
-                    {retrievals.length === 0 ? (
-                      <p className="text-xs text-white/60">No portfolio lookups were needed.</p>
-                    ) : (
-                      retrievals.map((r, idx) => (
-                        <div key={`${r.source}-${idx}`} className="rounded-md border border-white/5 bg-white/5 p-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-blue-300">{capitalize(r.source)}</span>
-                            <span className="text-xs text-white/40">
-                              {r.numResults} result{r.numResults !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                          <p className="mt-1 text-xs text-white/70">{r.queryText}</p>
-                        </div>
-                      ))
+                    {retrievalDocs.projects && retrievalDocs.projects.length > 0 && (
+                      <CollapsibleDocList
+                        title="Projects"
+                        items={retrievalDocs.projects}
+                        renderItem={(doc) => <ProjectDocItem doc={doc} />}
+                      />
+                    )}
+                    {retrievalDocs.resume && retrievalDocs.resume.length > 0 && (
+                      <CollapsibleDocList
+                        title="Resume"
+                        items={retrievalDocs.resume}
+                        renderItem={(doc) => <ResumeDocItem doc={doc} />}
+                      />
+                    )}
+                    {!retrievalDocs.projects?.length && !retrievalDocs.resume?.length && (
+                      <p className="text-xs text-white/60">No documents retrieved.</p>
                     )}
                   </div>
+                ) : retrievalStreamingText ? (
+                  <StreamingNote text={retrievalStreamingText} />
                 ) : (
                   <LoadingState status="Searching portfolio..." />
                 )}
@@ -207,6 +220,8 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
                       </div>
                     )}
                   </div>
+                ) : answerStreamingText ? (
+                  <StreamingNote text={answerStreamingText} />
                 ) : (
                   <LoadingState status="Drafting answer..." />
                 )}
@@ -227,29 +242,19 @@ function ReasoningSection({ icon, title, children, isStreaming }: { icon: React.
           {isStreaming ? (
             <motion.div
               key="loading"
-              initial={{ scale: 0, rotate: -90 }}
-              animate={{ scale: 1, rotate: 0 }}
-              exit={{ scale: 0, rotate: 90 }}
-              className="relative flex h-4 w-5 items-center justify-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex h-4 w-4 items-center justify-center"
             >
-              <motion.div
-                className="absolute h-3 w-3 rounded-full border-2 border-blue-400/30"
-                animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0, 0.3] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-              />
-              <motion.div
-                className="h-1 w-1 rounded-full bg-blue-400"
-                animate={{ scale: [1, 1.5, 1] }}
-                transition={{ duration: 0.8, repeat: Infinity }}
-              />
+              <div className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500/30 border-t-blue-400" />
             </motion.div>
           ) : (
             <motion.div
               key="done"
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              exit={{ scale: 0, rotate: 180 }}
-              transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="text-blue-400"
             >
               {icon}
@@ -283,88 +288,111 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StagePulse({ stage }: { stage: 'planner' | 'retrieval' | 'answer' }) {
-  if (stage === 'planner') {
-    return (
-      <motion.div className="flex gap-1">
-        {[0, 1, 2].map((i) => (
-          <motion.div
-            key={i}
-            className="h-1.5 w-1.5 rounded-full bg-blue-400"
-            animate={{
-              scale: [1, 1.4, 1],
-              opacity: [0.4, 1, 0.4],
-            }}
-            transition={{
-              duration: 0.8,
-              delay: i * 0.15,
-              repeat: Infinity,
-            }}
-          />
-        ))}
-      </motion.div>
-    );
-  }
-  if (stage === 'retrieval') {
-    return (
-      <motion.div className="relative h-4 w-16 overflow-hidden rounded bg-white/5">
-        <motion.div
-          className="absolute inset-y-0 w-1 bg-gradient-to-r from-transparent via-blue-400 to-transparent"
-          animate={{ x: [0, 64, 0] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-        />
-      </motion.div>
-    );
-  }
-  return (
-    <motion.span
-      className="inline-block h-3 w-0.5 bg-blue-400"
-      animate={{ opacity: [1, 0, 1] }}
-      transition={{ duration: 0.8, repeat: Infinity }}
-    />
-  );
-}
-
-function ProgressArc({ progress, isStreaming }: { progress: number; isStreaming: boolean }) {
-  const circumference = 2 * Math.PI * 6;
-  const strokeDashoffset = circumference * (1 - progress);
-
-  return (
-    <svg className="h-5 w-5 -rotate-90 text-white/50" viewBox="0 0 16 16" role="progressbar" aria-valuenow={progress}>
-      <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/10" />
-      <motion.circle
-        cx="8"
-        cy="8"
-        r="6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeDasharray={circumference}
-        animate={{ strokeDashoffset }}
-        transition={{ duration: 0.3, ease: 'easeOut' }}
-        className="text-blue-400"
-      />
-      {isStreaming && (
-        <motion.circle
-          cx="8"
-          cy="2"
-          r="1.5"
-          fill="currentColor"
-          className="text-blue-400"
-          animate={{ opacity: [1, 0.4, 1] }}
-          transition={{ duration: 0.8, repeat: Infinity }}
-          style={{
-            transformOrigin: '8px 8px',
-            rotate: `${progress * 360}deg`,
-          }}
-        />
-      )}
-    </svg>
-  );
-}
-
 function capitalize(value: string) {
   if (!value) return '';
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function StreamingNote({ text }: { text: string }) {
+  if (!text) return null;
+  return <p className="text-xs text-white/60 whitespace-pre-wrap leading-relaxed">{text}</p>;
+}
+
+function CollapsibleDocList<T extends { id: string }>({
+  title,
+  items,
+  renderItem,
+}: {
+  title: string;
+  items: T[];
+  renderItem: (item: T) => React.ReactNode;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="rounded border border-white/10 bg-white/5">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center justify-between px-2.5 py-1.5 text-left text-[11px] font-medium text-white/70 hover:bg-white/5"
+      >
+        <span>{title} ({items.length})</span>
+        <ChevronDown
+          className="h-3 w-3 text-white/40 transition-transform"
+          style={{ transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-1.5 border-t border-white/10 px-2.5 py-2">
+              {items.map((item) => (
+                <div key={item.id}>{renderItem(item)}</div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function ProjectDocItem({ doc }: { doc: RetrievedProjectDoc }) {
+  return (
+    <div className="rounded border border-white/5 bg-white/5 p-2">
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-xs font-medium text-blue-200">{doc.name}</span>
+        {doc._score !== undefined && (
+          <span className="shrink-0 text-[10px] text-white/40">{(doc._score * 100).toFixed(0)}%</span>
+        )}
+      </div>
+      {doc.oneLiner && (
+        <p className="mt-1 text-[11px] leading-relaxed text-white/60">{doc.oneLiner}</p>
+      )}
+      {doc.techStack && doc.techStack.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {doc.techStack.map((tech) => (
+            <span key={tech} className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">
+              {tech}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ResumeDocItem({ doc }: { doc: RetrievedResumeDoc }) {
+  const typeLabel = doc.type ? capitalize(doc.type) : 'Entry';
+  const headline = doc.title || doc.company || doc.institution || 'Untitled';
+  const subtitle = doc.company || doc.institution;
+
+  return (
+    <div className="rounded border border-white/5 bg-white/5 p-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="shrink-0 rounded bg-blue-500/20 px-1 py-0.5 text-[9px] font-medium text-blue-300">
+              {typeLabel}
+            </span>
+            <span className="truncate text-xs font-medium text-white/80">{headline}</span>
+          </div>
+          {subtitle && doc.title && subtitle !== doc.title && (
+            <p className="mt-0.5 text-[11px] text-white/50">{subtitle}</p>
+          )}
+        </div>
+        {doc._score !== undefined && (
+          <span className="shrink-0 text-[10px] text-white/40">{(doc._score * 100).toFixed(0)}%</span>
+        )}
+      </div>
+      {doc.summary && (
+        <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-white/60">{doc.summary}</p>
+      )}
+    </div>
+  );
 }
