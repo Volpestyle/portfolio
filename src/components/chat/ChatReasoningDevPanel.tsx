@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { PartialReasoningTrace } from '@portfolio/chat-contract';
+import type { PartialReasoningTrace, RetrievedProjectDoc, RetrievedResumeDoc } from '@portfolio/chat-contract';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, BookOpen, Brain, ChevronDown, Code, Database } from 'lucide-react';
 
@@ -20,6 +20,7 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
   const answer = trace.answer ?? null;
   const traceError = trace.error ?? null;
   const debug = trace.debug ?? null;
+  const retrievalDocs = trace.retrievalDocs ?? null;
   const hasData = Boolean(plan || retrievals.length || answer || traceError || debug);
   const isRetrievalStreaming = Boolean(isStreaming && plan && trace.retrieval === undefined);
   const isAnswerStreaming = Boolean(isStreaming && trace.retrieval !== undefined && !answer);
@@ -97,13 +98,23 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                     {retrievals.length === 0 ? (
                       <p className="text-xs text-purple-300/50">No retrievals</p>
                     ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {retrievals.map((r, idx) => (
-                          <div key={`${r.source}-${idx}`} className="rounded border border-purple-500/10 bg-purple-950/30 px-2 py-1">
-                            <span className="text-xs font-medium text-purple-200">{capitalize(r.source)}</span>
-                            <span className="ml-1.5 text-xs text-purple-300/50">{r.numResults}</span>
+                      <div className="space-y-1.5">
+                        {retrievalDocs?.projects && retrievalDocs.projects.length > 0 && (
+                          <DocsDropdown label={`Projects (${retrievalDocs.projects.length})`} docs={retrievalDocs.projects} renderDoc={renderProjectDoc} />
+                        )}
+                        {retrievalDocs?.resume && retrievalDocs.resume.length > 0 && (
+                          <DocsDropdown label={`Resume (${retrievalDocs.resume.length})`} docs={retrievalDocs.resume} renderDoc={renderResumeDoc} />
+                        )}
+                        {!retrievalDocs && (
+                          <div className="flex flex-wrap gap-2">
+                            {retrievals.map((r, idx) => (
+                              <div key={`${r.source}-${idx}`} className="rounded border border-purple-500/10 bg-purple-950/30 px-2 py-1">
+                                <span className="text-xs font-medium text-purple-200">{capitalize(r.source)}</span>
+                                <span className="ml-1.5 text-xs text-purple-300/50">{r.numResults}</span>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        )}
                       </div>
                     )}
                     {retrievals.length > 0 && <Collapsible label="Retrieval JSON">{JSON.stringify(retrievals, null, 2)}</Collapsible>}
@@ -229,4 +240,85 @@ function Collapsible({ label, children }: { label: string; children: string | un
 function capitalize(value: string) {
   if (!value) return '';
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function DocsDropdown<T>({
+  label,
+  docs,
+  renderDoc,
+}: {
+  label: string;
+  docs: T[];
+  renderDoc: (doc: T, idx: number) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded border border-purple-500/10 bg-purple-950/30">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between px-2 py-1.5 text-left text-[11px] font-medium text-purple-100/70 hover:bg-purple-500/5"
+      >
+        <span>{label}</span>
+        <ChevronDown className={cn('h-3 w-3 text-purple-300/40 transition-transform', open && 'rotate-180')} />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="max-h-60 overflow-auto border-t border-purple-500/10"
+          >
+            <div className="space-y-1 p-2">
+              {docs.map((doc, idx) => renderDoc(doc, idx))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function renderProjectDoc(doc: RetrievedProjectDoc, _idx: number) {
+  return (
+    <div key={doc.id} className="rounded border border-purple-500/10 bg-purple-900/20 p-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-purple-100">{doc.name}</span>
+        {typeof doc._score === 'number' && (
+          <span className="text-[10px] text-purple-300/50">{doc._score.toFixed(3)}</span>
+        )}
+      </div>
+      {doc.oneLiner && <p className="mt-0.5 text-[11px] text-purple-100/60">{doc.oneLiner}</p>}
+      {doc.techStack && doc.techStack.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {doc.techStack.map((tech) => (
+            <span key={tech} className="rounded bg-purple-500/10 px-1 py-0.5 text-[10px] text-purple-200/70">
+              {tech}
+            </span>
+          ))}
+        </div>
+      )}
+      <p className="mt-1 text-[10px] text-purple-300/40">ID: {doc.id}</p>
+    </div>
+  );
+}
+
+function renderResumeDoc(doc: RetrievedResumeDoc, _idx: number) {
+  const label = doc.title || doc.company || doc.institution || doc.id;
+  return (
+    <div key={doc.id} className="rounded border border-purple-500/10 bg-purple-900/20 p-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-purple-100">{label}</span>
+        {typeof doc._score === 'number' && (
+          <span className="text-[10px] text-purple-300/50">{doc._score.toFixed(3)}</span>
+        )}
+      </div>
+      {doc.type && <span className="text-[10px] text-purple-300/60">{capitalize(doc.type)}</span>}
+      {doc.company && doc.title && <p className="text-[11px] text-purple-100/60">{doc.company}</p>}
+      {doc.institution && <p className="text-[11px] text-purple-100/60">{doc.institution}</p>}
+      {doc.summary && <p className="mt-0.5 text-[11px] text-purple-100/50 line-clamp-2">{doc.summary}</p>}
+      <p className="mt-1 text-[10px] text-purple-300/40">ID: {doc.id}</p>
+    </div>
+  );
 }
