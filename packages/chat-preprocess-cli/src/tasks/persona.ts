@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import type { PersonaSummary, ProfileSummary } from '@portfolio/chat-contract';
+import type { PersonaProfile, PersonaSummary, ProfileSummary } from '@portfolio/chat-contract';
 import type { PreprocessContext, PreprocessTaskResult } from '../types';
 import { normalizeDistinctStrings } from '../utils';
 
@@ -11,6 +11,27 @@ type PersonaArtifact = {
 async function loadJson<T>(filePath: string): Promise<T> {
   const contents = await fs.readFile(filePath, 'utf-8');
   return JSON.parse(contents) as T;
+}
+
+function mergePersonaProfile(value?: PersonaProfile, fallback?: PersonaProfile): PersonaProfile | undefined {
+  if (!value && !fallback) return undefined;
+  const merged: PersonaProfile = {
+    ...(fallback ?? {}),
+    ...(value ?? {}),
+  };
+  if (merged.about) {
+    merged.about = normalizeDistinctStrings(merged.about);
+  }
+  if (merged.topSkills) {
+    merged.topSkills = normalizeDistinctStrings(merged.topSkills);
+  }
+  if (merged.socialLinks) {
+    merged.socialLinks = normalizeDistinctStrings(merged.socialLinks);
+  }
+  if (merged.featuredExperienceIds) {
+    merged.featuredExperienceIds = normalizeDistinctStrings(merged.featuredExperienceIds);
+  }
+  return merged;
 }
 
 function coercePersona(value: Partial<PersonaSummary>, fallback: PersonaSummary): PersonaSummary {
@@ -25,6 +46,7 @@ function coercePersona(value: Partial<PersonaSummary>, fallback: PersonaSummary)
     shortAbout: value.shortAbout?.trim() || fallback.shortAbout,
     styleGuidelines: normalizedGuidelines.length ? normalizedGuidelines : fallback.styleGuidelines,
     voiceExamples: normalizedVoiceExamples.length ? normalizedVoiceExamples : fallback.voiceExamples,
+    profile: mergePersonaProfile(value.profile, fallback.profile),
   };
 }
 
@@ -37,7 +59,7 @@ function buildPersonaFromProfile(profile: ProfileSummary): PersonaSummary {
   const headline = profile.headline ? `, ${profile.headline}` : '';
   const location = profile.location ? ` in ${profile.location}` : '';
   const role = profile.currentRole ? ` (${profile.currentRole})` : '';
-  const topSkills = normalizeDistinctStrings(profile.topSkills).slice(0, 5);
+  const topSkills = normalizeDistinctStrings(profile.topSkills);
   const skillClause = topSkills.length ? ` Common tools: ${topSkills.join(', ')}.` : '';
   const systemPersona =
     profile.systemPersona?.trim() ||
@@ -64,6 +86,23 @@ function buildPersonaFromProfile(profile: ProfileSummary): PersonaSummary {
     shortAbout,
     styleGuidelines,
     voiceExamples: voiceExamples.length ? voiceExamples : fallbackVoiceExamples,
+    profile: {
+      updatedAt: profile.updatedAt,
+      fullName: profile.fullName,
+      headline: profile.headline,
+      location: profile.location,
+      currentRole: profile.currentRole,
+      about: aboutParagraphs,
+      topSkills,
+      socialLinks: normalizeDistinctStrings(
+        (profile.socialLinks ?? [])
+          .map((link) => link?.url?.trim())
+          .filter((url): url is string => Boolean(url))
+      ),
+      featuredExperienceIds: normalizeDistinctStrings(
+        (profile.featuredExperiences ?? []).map((exp) => exp?.id?.trim()).filter((id): id is string => Boolean(id))
+      ),
+    },
   };
 }
 

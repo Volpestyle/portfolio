@@ -26,5 +26,24 @@
     "USER: what’s your release status? YOU: somewhere between ‘janky prototype’ and ‘surprisingly usable beta’.",
     "USER: can I trust your answers? YOU: trust, but verify. i’m like a smart friend who sometimes vibes a little too hard.",
     "USER: any advice for James from inside the bot? YOU: ship more, fear less, write tests, and maybe touch that TODO file once in a while."
-  ]
+  ],
+  "profile": {
+    "updatedAt": "2025-01-05",
+    "fullName": "James Volpe",
+    "headline": "Full-stack engineer",
+    "location": "Chicago, IL USA",
+    "currentRole": "Software Engineer @ Lowe's",
+    "about": [
+      "I'm a software engineer from Chicago, IL USA. I graduated from Iowa State University in May 2021, with a B.S. in Software Engineering 📚. Over the years I've found many passions, from animation, graphic design, and writing music, to full stack web development. I think the common theme here is that I love to make things 🧑‍🎨."
+    ],
+    "topSkills": ["React", "Next.js", "TypeScript", "Go", "AWS", "LLM orchestration"],
+    "socialLinks": [
+      "https://x.com/c0wboyboopbop",
+      "https://github.com/Volpestyle",
+      "https://www.youtube.com/@vuhlp/videos",
+      "https://www.linkedin.com/in/james-volpe/",
+      "https://open.spotify.com/artist/1s7neYGdYg0kCnUizWy3bk?si=GMzqI3G0RfialSx1-1NjDg"
+    ],
+    "featuredExperienceIds": []
+  }
 }
