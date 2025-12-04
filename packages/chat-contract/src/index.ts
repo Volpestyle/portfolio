@@ -291,11 +291,12 @@ export type UiPayload = {
 export const RETRIEVAL_SOURCE_VALUES = ['projects', 'resume', 'profile'] as const;
 export const RESUME_FACET_VALUES = ['experience', 'education', 'award', 'skill'] as const;
 export const RETRIEVAL_REQUEST_TOPK_MAX = 10;
+export const RETRIEVAL_REQUEST_TOPK_DEFAULT = 8;
 
 const PlannerQuerySchema: z.ZodType<PlannerQuery, z.ZodTypeDef, unknown> = z.object({
   source: z.enum(RETRIEVAL_SOURCE_VALUES),
   text: z.string().default(''),
-  limit: z.number().int().min(1).max(RETRIEVAL_REQUEST_TOPK_MAX).optional(),
+  limit: z.number().int().min(1).max(RETRIEVAL_REQUEST_TOPK_MAX).default(RETRIEVAL_REQUEST_TOPK_DEFAULT),
 });
 
 /**
@@ -304,7 +305,7 @@ const PlannerQuerySchema: z.ZodType<PlannerQuery, z.ZodTypeDef, unknown> = z.obj
 export const PlannerLLMOutputSchema: z.ZodType<PlannerLLMOutput, z.ZodTypeDef, unknown> = z.object({
   queries: z.array(PlannerQuerySchema).default([]),
   cardsEnabled: z.boolean().default(true),
-  topic: z.string().optional(),
+  topic: z.string().default(''),
 });
 
 const AnswerUiHintsSchema: z.ZodType<AnswerUiHints, z.ZodTypeDef, unknown> = z.object({
@@ -314,8 +315,8 @@ const AnswerUiHintsSchema: z.ZodType<AnswerUiHints, z.ZodTypeDef, unknown> = z.o
 
 export const AnswerPayloadSchema: z.ZodType<AnswerPayload, z.ZodTypeDef, unknown> = z.object({
   message: z.string(),
-  thoughts: z.array(z.string()).optional(),
-  uiHints: AnswerUiHintsSchema.optional(),
+  thoughts: z.array(z.string()).default([]),
+  uiHints: AnswerUiHintsSchema.default({}),
 });
 
 export type RetrievalSummary = {

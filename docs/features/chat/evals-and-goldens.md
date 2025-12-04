@@ -6,11 +6,12 @@ Companion to `docs/features/chat/chat-spec.md`. This file keeps eval coverage, c
 
 ## 1. Coverage Goals
 
-- Fact-check questions (skills/tools/locations).
-- Enumeration questions ("Which projects have you used Go on?").
-- Domain/broad asks ("What AI projects have you done?").
-- Meta/chit-chat sanity ("Hi", "How does this work?").
-- Card/answer alignment and enumeration recall (uiHints is treated as source of truth).
+- Grounding + honesty for skills, projects, experience, and bio questions.
+- UI/text alignment: cards reflect Answer.uiHints and retrieved docs.
+- Cards toggle correctness (when cardsEnabled should be on/off).
+- Zero/low‑evidence honesty and transparent fallbacks.
+- Persona voice consistency and “I” perspective.
+- Meta/chit‑chat sanity (no generic assistant drift).
 
 ---
 
@@ -20,16 +21,11 @@ Companion to `docs/features/chat/chat-spec.md`. This file keeps eval coverage, c
 type ChatEvalTestCase = {
   id: string;
   name: string;
-  category: 'binary' | 'list' | 'narrative' | 'meta' | 'edge_case';
-  input: {
-    userMessage: string;
-    conversationHistory?: ChatMessage[];
-  };
-  expected: {
-    questionType: QuestionType;
-    enumeration?: EnumerationMode;
-    scope?: ExperienceScope;
-    verdict?: Verdict;
+  category: 'skill' | 'projects' | 'experience' | 'bio' | 'meta' | 'edge_case';
+  input: { userMessage: string; conversationHistory?: ChatMessage[] };
+  expected?: {
+    cardsEnabled?: boolean;
+    plannerQueries?: Array<{ source?: PlannerQuerySource; textIncludes?: string[]; limitAtMost?: number }>;
     answerContains?: string[];
     answerNotContains?: string[];
     uiHintsProjectsMinCount?: number;
@@ -59,42 +55,21 @@ const factCheckSuite: ChatEvalSuite = {
     {
       id: 'fc-yes-react',
       name: 'Skill affirmative',
-      category: 'binary',
+      category: 'skill',
       input: { userMessage: 'Have you used React?' },
       expected: {
-        questionType: 'binary',
-        enumeration: 'sample',
-        verdict: 'yes',
+        cardsEnabled: true,
         uiHintsProjectsMinCount: 1,
       },
     },
     {
       id: 'fc-no-evidence-rust',
       name: 'Skill absent',
-      category: 'binary',
+      category: 'skill',
       input: { userMessage: 'Have you used Rust?' },
       expected: {
-        questionType: 'binary',
-        enumeration: 'sample',
-        verdict: 'no_evidence', // should not invent Rust if portfolio lacks it
         uiHintsProjectsMaxCount: 0,
-      },
-    },
-    {
-      id: 'fc-location-dc-singular',
-      name: 'Location fact-check with singular grounding',
-      category: 'binary',
-      input: { userMessage: 'Have you ever been to D.C.?' },
-      expected: {
-        questionType: 'binary',
-        enumeration: 'sample',
-        verdict: 'yes',
-        uiHintsExperiencesMinCount: 1,
-        uiHintsExperiencesMaxCount: 1, // exactly one D.C. internship
-        // Answer must mention the specific D.C. experience (e.g., NPR internship)
-        // and current location (Chicago) without filler like "related experience"
-        answerContains: ['D.C.', 'Washington'], // should reference the actual location
-        answerNotContains: ['related experience', 'various', 'several', 'multiple'],
+        answerContains: ["I don't have that in my portfolio"],
       },
     },
   ],
@@ -102,17 +77,15 @@ const factCheckSuite: ChatEvalSuite = {
 
 const enumerationSuite: ChatEvalSuite = {
   name: 'Enumeration',
-  description: 'Lists should respect uiHints + all_relevant',
+  description: 'Lists should respect uiHints + retrieved docs',
   tests: [
     {
       id: 'enum-go-projects',
       name: 'List projects by tech',
-      category: 'list',
+      category: 'projects',
       input: { userMessage: 'Which projects have you used Go on?' },
       expected: {
-        questionType: 'list',
-        enumeration: 'all_relevant',
-        verdict: 'yes',
+        cardsEnabled: true,
         uiHintsProjectsMinCount: 1,
       },
     },
@@ -122,8 +95,7 @@ const enumerationSuite: ChatEvalSuite = {
       category: 'meta',
       input: { userMessage: 'Hi there!' },
       expected: {
-        questionType: 'meta',
-        verdict: 'n/a',
+        cardsEnabled: false,
         uiHintsProjectsMaxCount: 0,
         uiHintsExperiencesMaxCount: 0,
       },
@@ -147,14 +119,14 @@ async function runChatEvalSuite(chatApi: ChatApi, openai: OpenAI, ownerId: strin
     ];
 
     try {
-      const { plan, evidence, answer, uiPayload } = await chatApi.run(openai, messages, {
+      const { plan, retrieval, answer, uiPayload } = await chatApi.run(openai, messages, {
         ownerId,
         reasoningEnabled: true,
       });
 
-      // Assert plan, evidence, answer text, and uiPayload alignment
-      // (counts, verdict, and required IDs when specified).
-      results.push(assertChatEval(test, { plan, evidence, answer, uiPayload }));
+      // Assert planner output, retrieval summaries, answer text, and uiPayload alignment
+      // (cardsEnabled, uiHints, and required IDs when specified).
+      results.push(assertChatEval(test, { plan, retrieval, answer, uiPayload }));
     } catch (err) {
       results.push({
         testId: test.id,
@@ -170,7 +142,7 @@ async function runChatEvalSuite(chatApi: ChatApi, openai: OpenAI, ownerId: strin
 }
 ```
 
-Keep assertions focused on the contract: `questionType/enumeration/scope`, `verdict/confidence`, grounded answer text, and uiHints/card expectations.
+Keep assertions focused on the contract: planner queries, grounded answer text, cardsEnabled, and uiHints/card expectations.
 
 ---
 

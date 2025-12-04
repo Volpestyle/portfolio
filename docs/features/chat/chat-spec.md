@@ -223,7 +223,7 @@ type EmbeddingIndex = {
 
 type DataProviders = {
   projects: ProjectDoc[];
-  resume: ResumeDoc[]; // ExperienceRecord.linkedProjects populated by preprocessing
+  resume: ResumeDoc[];
   profile: ProfileDoc | null; // identity context is optional but recommended
   persona: PersonaSummary; // generated during preprocessing
   embeddingIndexes: {
@@ -424,8 +424,6 @@ type ExperienceRecord = {
   summary?: string | null;
   bullets: string[];
   skills: string[]; // free-form: "LLM", "PyTorch", "Kubernetes", "React"
-
-  linkedProjects?: string[]; // ProjectDoc ids, filled by cross-corpus linking (see §3.5)
   monthsOfExperience?: number | null; // derived from start/end dates when possible
   impactSummary?: string | null;
   sizeOrScope?: string | null;
@@ -627,103 +625,6 @@ Semantic enrichment is purely free‑form:
   - Populates skills with tools/frameworks/domains.
 - There is no fixed tag vocabulary; the model can use any phrasing justified by the README or resume text. Modern embeddings plus this enrichment allow broad queries like “what AI projects have you done?” to hit projects with varied wording.
 
-#### 3.5.1 Cross-corpus linking
-
-Cross-corpus linking connects projects to the jobs/experiences where they were built. This is done **manually via the gist**, not automatically.
-
-**Design principle: Explicit is better than magic.** You know which projects you built at which company. Specify it directly in your `PortfolioRepoConfig` rather than relying on error-prone automatic matching.
-
-**How it works:**
-
-1. In your gist, add `linkedToCompanies` to each project:
-
-```json
-[
-  {
-    "repo": "you/payment-service",
-    "projectId": "payment-service",
-    "linkedToCompanies": ["Acme Corp"]
-  },
-  {
-    "repo": "you/analytics-dashboard",
-    "projectId": "analytics-dashboard",
-    "linkedToCompanies": ["Acme Corp", "BigCo"]
-  },
-  {
-    "repo": "you/side-project",
-    "projectId": "side-project"
-  }
-]
-```
-
-2. Preprocessing extracts company names from your resume and outputs them:
-
-```
-$ pnpm preprocess
-
-📋 Found experiences (use these exact company names in linkedToCompanies):
-   • "Acme Corp" — Senior Engineer (2022-01 to present)
-   • "BigCo" — Software Engineer (2020-03 to 2021-12)
-   • "StartupCo" — Intern (2019-06 to 2019-08)
-```
-
-3. Preprocessing matches `linkedToCompanies` → experiences by **exact company name match** (case-insensitive):
-
-```ts
-function linkProjectsToExperiences(
-  projects: PortfolioRepoConfig[],
-  experiences: ExperienceRecord[],
-  logger: Logger
-): void {
-  // Build company → experience lookup
-  const companyToExperiences = new Map<string, ExperienceRecord[]>();
-  for (const exp of experiences) {
-    if (exp.kind !== 'experience') continue;
-    const key = exp.company.toLowerCase().trim();
-    const list = companyToExperiences.get(key) ?? [];
-    list.push(exp);
-    companyToExperiences.set(key, list);
-  }
-
-  // For each project with linkedToCompanies, find matching experiences
-  for (const proj of projects) {
-    if (!proj.linkedToCompanies?.length) continue;
-
-    for (const companyName of proj.linkedToCompanies) {
-      const key = companyName.toLowerCase().trim();
-      const matchingExps = companyToExperiences.get(key);
-
-      if (!matchingExps) {
-        logger.warn(`No experience found for company "${companyName}" (project: ${proj.projectId})`);
-        continue;
-      }
-
-      // Add this project to each matching experience's linkedProjects
-      for (const exp of matchingExps) {
-        exp.linkedProjects = exp.linkedProjects ?? [];
-        if (!exp.linkedProjects.includes(proj.projectId)) {
-          exp.linkedProjects.push(proj.projectId);
-        }
-      }
-    }
-  }
-}
-```
-
-**Key points:**
-
-- Use the **exact company name** from the preprocessing output
-- Case-insensitive matching (so "Acme Corp" matches "acme corp")
-- One project can link to multiple companies
-- Projects without `linkedToCompanies` are treated as personal/unaffiliated
-
-**Benefits:**
-
-- Enumeration questions ("Which projects did you ship at Acme Corp?") use `linkedProjects` directly
-- Narrative answers can tie employment history to concrete portfolio projects
-- No threshold tuning, no embedding comparisons, no surprises
-- You control exactly what links to what
-
 ### 3.6 Preprocessing Failure Modes
 
 **Design principle: No silent failures.** The preprocessing pipeline fails loudly with clear error messages. No fallback documents or partial outputs—if something fails, fix it and retry.
@@ -802,8 +703,6 @@ type PreprocessValidation = {
   hasResume: boolean;
   hasProfile: boolean;
 
-  // Cross-reference checks
-  linkedProjectsExist: boolean; // all ExperienceRecord.linkedProjects point to valid ProjectDoc.id
   corporaWithEmbeddingsComplete: boolean; // projects/resume embedding coverage required
 };
 
@@ -825,10 +724,6 @@ function validatePreprocessOutput(validation: PreprocessValidation): void {
       'PREPROCESS_PROFILE_REQUIRED',
       'Profile is required. Create data/chat/profile.md with your bio and details.'
     );
-  }
-
-  if (!validation.linkedProjectsExist) {
-    throw new PreprocessError('PREPROCESS_INVALID_LINKS', 'Some linkedProjects reference non-existent project IDs');
   }
 
   if (!validation.corporaWithEmbeddingsComplete) {
@@ -1035,10 +930,6 @@ Processing steps:
 - Strip noise words from query text: `projects`, `project`, `experiences`, `experience`, `resume`.
 - If sanitization yields an empty string, fall back to the original query.
 - Prevents overly broad matches for asks like "show me your projects."
-
-**Linked project resolution**
-
-- Experiences that reference `linkedProjects` pull those projects alongside resume hits so employment-focused asks can still surface linked project cards.
 
 ### 5.3 Answer (cards-aware, evidence folded in)
 

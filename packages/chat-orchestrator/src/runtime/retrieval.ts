@@ -46,7 +46,6 @@ export type RetrievalDrivers = {
   searchProjectsByText(queryText: string, topK?: number, options?: { scope?: ExperienceScope }): Promise<ProjectDoc[]>;
   searchExperiencesByText(queryText: string, topK?: number, options?: { facets?: ResumeFacet[] }): Promise<ResumeDoc[]>;
   getProfileDoc(): Promise<ProfileDoc | undefined>;
-  getProjectsByIds(ids: string[]): Promise<ProjectDoc[]>;
 };
 
 export type RetrievalOptions = {
@@ -186,14 +185,6 @@ export function createRetrieval(options: RetrievalOptions): RetrievalDrivers {
         }
         return undefined;
       }
-    },
-
-    async getProjectsByIds(ids: string[]): Promise<ProjectDoc[]> {
-      const projectMap = await resolveProjectMap();
-      return ids
-        .map((id) => projectMap.get(id.trim().toLowerCase()))
-        .filter(Boolean)
-        .map((record) => ({ ...record })) as ProjectDoc[];
     },
   };
 }

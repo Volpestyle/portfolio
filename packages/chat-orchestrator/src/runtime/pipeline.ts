@@ -22,6 +22,7 @@ import {
   AnswerPayloadSchema,
   PlannerLLMOutputSchema,
   RETRIEVAL_REQUEST_TOPK_MAX,
+  RETRIEVAL_REQUEST_TOPK_DEFAULT,
   PlannerLLMOutput,
   parseUsage,
   estimateCostUsd,
@@ -159,7 +160,7 @@ export const SLIDING_WINDOW_CONFIG = {
 export type SlidingWindowConfig = typeof SLIDING_WINDOW_CONFIG;
 
 const MAX_TOPK = RETRIEVAL_REQUEST_TOPK_MAX;
-const DEFAULT_QUERY_LIMIT = 8;
+const DEFAULT_QUERY_LIMIT = RETRIEVAL_REQUEST_TOPK_DEFAULT;
 const MAX_BODY_SNIPPET_CHARS = 480;
 const PROJECT_BODY_SNIPPET_COUNT = 4;
 const EXPERIENCE_BODY_SNIPPET_COUNT = 4;
@@ -245,7 +246,11 @@ export function buildPlannerSystemPrompt(owner?: OwnerConfig): string {
   return applyOwnerTemplate(plannerSystemPrompt, owner);
 }
 
-export function buildAnswerSystemPrompt(persona?: PersonaSummary, owner?: OwnerConfig): string {
+export function buildAnswerSystemPrompt(
+  persona?: PersonaSummary,
+  owner?: OwnerConfig,
+  identity?: IdentityContext
+): string {
   const sections: string[] = [];
 
   if (persona?.voiceExamples?.length) {
@@ -258,6 +263,18 @@ export function buildAnswerSystemPrompt(persona?: PersonaSummary, owner?: OwnerC
 
   if (persona?.styleGuidelines?.length) {
     sections.push(['## Style Guidelines', ...persona.styleGuidelines.map((rule) => `- ${rule}`)].join('\n'));
+  }
+
+  if (identity) {
+    const identityLines = [
+      identity.fullName ? `- Name: ${identity.fullName}` : null,
+      identity.headline ? `- Headline: ${identity.headline}` : null,
+      identity.location ? `- Location: ${identity.location}` : null,
+      identity.shortAbout ? `- About: ${identity.shortAbout}` : null,
+    ].filter(Boolean) as string[];
+    if (identityLines.length) {
+      sections.push(['## Identity Context', ...identityLines].join('\n'));
+    }
   }
 
   return sections.join('\n\n');
@@ -1040,7 +1057,7 @@ function normalizeDocId(id: string): string {
   return (id ?? '').trim().toLowerCase();
 }
 
-function executeRetrievalPlan(
+async function executeRetrievalPlan(
   retrieval: RetrievalDrivers,
   plan: RetrievalPlan,
   options?: { logger?: ChatRuntimeOptions['logger']; cache?: RetrievalCache; ownerId?: string; onQueryResult?: (summary: RetrievalSummary) => void }
@@ -1084,7 +1101,7 @@ function executeRetrievalPlan(
     return profile;
   };
 
-  return Promise.all(
+  const parts = await Promise.all(
     plan.queries.map(async (query) => {
       const topK = clampQueryLimit(query.limit);
       if (query.source === 'projects') {
@@ -1109,52 +1126,69 @@ function executeRetrievalPlan(
         });
         return { projects: [], resumeDocs: results, profile: undefined } as const;
       }
-      const profile = await fetchProfile();
+      const profileDoc = await fetchProfile();
       options?.onQueryResult?.({
         source: 'profile',
         queryText: query.text,
         requestedTopK: 1,
         effectiveTopK: 1,
-        numResults: profile ? 1 : 0,
+        numResults: profileDoc ? 1 : 0,
       });
-      return { projects: [], resumeDocs: [], profile } as const;
+      return { projects: [], resumeDocs: [], profile: profileDoc } as const;
     })
-  ).then((parts) => {
-    const projects = dedupeById(
-      parts.flatMap((p) => p.projects),
-      (p) => p.id
-    );
-    const resumeDocs = dedupeById(parts.flatMap((p) => p.resumeDocs), (d) => d.id);
-    const resumeSplit = splitResumeDocs(resumeDocs);
-    const profile = parts.find((p) => p.profile)?.profile;
+  );
 
-    const summaries: RetrievalSummary[] = plan.queries.map((query) => ({
-      source: query.source,
-      queryText: query.text,
-      requestedTopK: clampQueryLimit(query.limit),
-      effectiveTopK: clampQueryLimit(query.limit),
-      numResults:
-        query.source === 'projects'
-          ? projects.length
-          : query.source === 'resume'
-            ? resumeDocs.length
-            : profile
-              ? 1
-              : 0,
-    }));
+  const projects = dedupeById(
+    parts.flatMap((p) => p.projects),
+    (p) => p.id
+  );
+  const resumeDocs = dedupeById(parts.flatMap((p) => p.resumeDocs), (d) => d.id);
+  const resumeSplit = splitResumeDocs(resumeDocs);
+  let profile = parts.find((p) => p.profile)?.profile;
 
-    return {
-      result: {
-        projects,
-        experiences: Array.from(resumeSplit.experience.values()),
-        education: Array.from(resumeSplit.education.values()),
-        awards: Array.from(resumeSplit.award.values()),
-        skills: Array.from(resumeSplit.skill.values()),
-        profile,
-      },
-      summaries,
+  // Include profile for meta/bio/greeting turns where planner emitted no queries.
+  let profileSummary: RetrievalSummary | null = null;
+  if (!plan.queries.length && !profile) {
+    profile = await fetchProfile();
+    profileSummary = {
+      source: 'profile',
+      queryText: '',
+      requestedTopK: 1,
+      effectiveTopK: 1,
+      numResults: profile ? 1 : 0,
     };
-  });
+  }
+
+  const summaries: RetrievalSummary[] = plan.queries.map((query) => ({
+    source: query.source,
+    queryText: query.text,
+    requestedTopK: clampQueryLimit(query.limit),
+    effectiveTopK: clampQueryLimit(query.limit),
+    numResults:
+      query.source === 'projects'
+        ? projects.length
+        : query.source === 'resume'
+          ? resumeDocs.length
+          : profile
+            ? 1
+            : 0,
+  }));
+
+  if (profileSummary) {
+    summaries.push(profileSummary);
+  }
+
+  return {
+    result: {
+      projects,
+      experiences: Array.from(resumeSplit.experience.values()),
+      education: Array.from(resumeSplit.education.values()),
+      awards: Array.from(resumeSplit.award.values()),
+      skills: Array.from(resumeSplit.skill.values()),
+      profile,
+    },
+    summaries,
+  };
 }
 
 // --- Answer helpers ---
@@ -1164,8 +1198,22 @@ function buildAnswerUserContent(input: {
   conversationSnippet: string;
   plan: RetrievalPlan;
   retrieved: RetrievalResult;
+  identity?: IdentityContext;
 }): string {
-  const { userMessage, conversationSnippet, plan, retrieved } = input;
+  const { userMessage, conversationSnippet, plan, retrieved, identity } = input;
+
+  const identitySection =
+    identity && (identity.fullName || identity.headline || identity.location || identity.shortAbout)
+      ? [
+          '## Identity Context',
+          identity.fullName ? `Name: ${identity.fullName}` : null,
+          identity.headline ? `Headline: ${identity.headline}` : null,
+          identity.location ? `Location: ${identity.location}` : null,
+          identity.shortAbout ? `About: ${identity.shortAbout}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : '';
 
   return [
     `## Conversation`,
@@ -1202,6 +1250,7 @@ function buildAnswerUserContent(input: {
     ),
     '',
     retrieved.profile ? `## Profile\n${JSON.stringify(retrieved.profile, null, 2)}` : '',
+    identitySection,
     '',
     `## Cards Enabled: ${plan.cardsEnabled !== false}`,
     plan.cardsEnabled !== false
@@ -1548,13 +1597,23 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       emitStageEvent('answer', 'start');
       emitReasoning({ stage: 'answer', notes: 'Drafting answer...' });
 
+      const identity = options?.identityContext ?? (retrieved.profile
+        ? {
+            fullName: retrieved.profile.fullName,
+            headline: retrieved.profile.headline ?? undefined,
+            location: retrieved.profile.location ?? undefined,
+            shortAbout: (retrieved.profile as { shortAbout?: string }).shortAbout ?? undefined,
+          }
+        : undefined);
+
       const userContent = buildAnswerUserContent({
         userMessage: userText,
         conversationSnippet,
         plan,
         retrieved,
+        identity,
       });
-      const systemPrompt = buildAnswerSystemPrompt(runtimePersona, owner);
+      const systemPrompt = buildAnswerSystemPrompt(runtimePersona, owner, identity);
       if (logPrompts) {
         logger?.('chat.pipeline.prompt', {
           stage: 'answer',
