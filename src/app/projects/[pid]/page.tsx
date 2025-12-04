@@ -38,7 +38,7 @@ export default async function ProjectDetail({ params }: PageContext) {
   const enrichedRepoInfo = await augmentRepoWithKnowledge(repoInfo);
 
   return (
-    <div className="-mx-8 -my-8 bg-black/10 backdrop-blur-sm">
+    <div className="-mx-8 -my-8 bg-black/10">
       <ProjectContent pid={pid} repoInfo={enrichedRepoInfo} readme={readme} />
     </div>
   );

@@ -160,7 +160,7 @@ export function ProjectCard({ project, repo, variant = 'default', onOpen, isExpa
   }
 
   return (
-    <Card className="relative flex h-full flex-col border-white bg-black/5 p-4 text-white backdrop-blur-sm">
+    <Card className="relative flex h-full flex-col border-white/30 bg-black/5 p-4 text-white backdrop-blur-sm">
       <motion.h2 className="mb-2 flex items-center justify-between text-xl font-bold">
         <Link
           href={projectLink}
