@@ -1,5 +1,11 @@
 import { useCallback } from 'react';
-import type { ChatMessage, ChatTextPart, PartialReasoningTrace, ReasoningTraceError } from '@portfolio/chat-contract';
+import type {
+  ChatMessage,
+  ChatTextPart,
+  PartialReasoningTrace,
+  ReasoningStage,
+  ReasoningTraceError,
+} from '@portfolio/chat-contract';
 import { parseChatStream, type ChatStreamEvent } from './chatStreamParser';
 import type { ApplyUiActionOptions } from './chatUiState';
 import { isTypewriterDebugEnabled, typewriterDebug, typewriterPreview } from './typewriterDebug';
@@ -158,7 +164,30 @@ export function useChatStream({
         if (event.type === 'reasoning') {
           const itemId = typeof event.itemId === 'string' ? event.itemId : mutableAssistant.id;
           registerItem(itemId);
-          const trace = coerceReasoningTrace((event as { trace?: unknown }).trace);
+          const stage = isReasoningStage((event as { stage?: unknown }).stage) ? ((event as { stage?: unknown }).stage as ReasoningStage) : undefined;
+          const delta = typeof (event as { delta?: unknown }).delta === 'string' ? (event as { delta?: string }).delta : undefined;
+          const notes = typeof (event as { notes?: unknown }).notes === 'string' ? (event as { notes?: string }).notes : undefined;
+          const progress =
+            typeof (event as { progress?: unknown }).progress === 'number'
+              ? (event as { progress?: number }).progress
+              : undefined;
+
+          let trace = coerceReasoningTrace((event as { trace?: unknown }).trace);
+          if (stage && (delta || notes || typeof progress === 'number')) {
+            trace = {
+              ...(trace ?? { plan: null, retrieval: null, answer: null, error: null }),
+              streaming: {
+                ...((trace ?? {}).streaming ?? {}),
+                [stage]: {
+                  ...(trace?.streaming?.[stage] ?? {}),
+                  text: delta,
+                  notes,
+                  progress,
+                },
+              },
+            };
+          }
+
           if (trace) {
             applyReasoningTrace(itemId, trace);
           }
@@ -265,15 +294,37 @@ function coerceReasoningTrace(input: unknown): PartialReasoningTrace | undefined
     return undefined;
   }
   const record = input as Partial<PartialReasoningTrace>;
-  const hasKnownField = 'plan' in record || 'retrieval' in record || 'answer' in record || 'error' in record;
+  const hasKnownField =
+    'plan' in record ||
+    'retrieval' in record ||
+    'retrievalDocs' in record ||
+    'answer' in record ||
+    'error' in record ||
+    'streaming' in record ||
+    'debug' in record;
   if (!hasKnownField) {
     return undefined;
   }
+  const streaming =
+    'streaming' in record && record.streaming && typeof record.streaming === 'object'
+      ? (record.streaming as PartialReasoningTrace['streaming'])
+      : undefined;
+  const debug =
+    'debug' in record && record.debug && typeof record.debug === 'object'
+      ? (record.debug as PartialReasoningTrace['debug'])
+      : undefined;
+  const retrievalDocs =
+    'retrievalDocs' in record && record.retrievalDocs && typeof record.retrievalDocs === 'object'
+      ? (record.retrievalDocs as PartialReasoningTrace['retrievalDocs'])
+      : undefined;
   return {
     plan: 'plan' in record ? (record.plan ?? null) : null,
     retrieval: 'retrieval' in record ? (record.retrieval ?? null) : null,
+    retrievalDocs,
     answer: 'answer' in record ? (record.answer ?? null) : null,
     error: 'error' in record ? (record.error ?? null) : null,
+    debug,
+    streaming,
   };
 }
 
@@ -305,4 +356,8 @@ function coerceAttachment(input: unknown): ChatAttachment | undefined {
     return undefined;
   }
   return { type, id, data: record.data } as ChatAttachment;
+}
+
+function isReasoningStage(value: unknown): value is ReasoningStage {
+  return value === 'planner' || value === 'retrieval' || value === 'answer';
 }

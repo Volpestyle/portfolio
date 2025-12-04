@@ -627,12 +627,15 @@ function mergeReasoningTraces(
   const merged: PartialReasoningTrace = {
     plan: incoming.plan ?? existing?.plan ?? null,
     retrieval: incoming.retrieval ?? existing?.retrieval ?? null,
+    retrievalDocs: incoming.retrievalDocs ?? existing?.retrievalDocs ?? null,
     answer: incoming.answer ?? existing?.answer ?? null,
     error: mergeReasoningErrors(existing?.error, incoming.error, {
       plan: incoming.plan ?? existing?.plan ?? null,
       retrieval: incoming.retrieval ?? existing?.retrieval ?? null,
       answer: incoming.answer ?? existing?.answer ?? null,
     }),
+    debug: mergeReasoningDebug(existing?.debug, incoming.debug),
+    streaming: mergeStreaming(existing?.streaming, incoming.streaming),
   };
   if (existing && reasoningTracesEqual(existing, merged)) {
     return existing;
@@ -644,9 +647,83 @@ function reasoningTracesEqual(a: PartialReasoningTrace, b: PartialReasoningTrace
   return (
     a.plan === b.plan &&
     a.retrieval === b.retrieval &&
+    a.retrievalDocs === b.retrievalDocs &&
     a.answer === b.answer &&
-    a.error === b.error
+    a.error === b.error &&
+    debugEqual(a.debug, b.debug) &&
+    streamingEqual(a.streaming, b.streaming)
   );
+}
+
+function mergeReasoningDebug(
+  existing: PartialReasoningTrace['debug'],
+  incoming: PartialReasoningTrace['debug']
+): PartialReasoningTrace['debug'] {
+  if (!existing && !incoming) return undefined;
+  if (!incoming) return existing;
+  const base = existing ?? {};
+  return {
+    ...base,
+    ...incoming,
+    plannerPrompt: incoming.plannerPrompt ?? base.plannerPrompt,
+    answerPrompt: incoming.answerPrompt ?? base.answerPrompt,
+    plannerRawResponse: incoming.plannerRawResponse ?? base.plannerRawResponse,
+    answerRawResponse: incoming.answerRawResponse ?? base.answerRawResponse,
+    retrievalDocs: incoming.retrievalDocs ?? base.retrievalDocs,
+  };
+}
+
+function debugEqual(a: PartialReasoningTrace['debug'], b: PartialReasoningTrace['debug']): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return (
+    a.plannerPrompt?.system === b.plannerPrompt?.system &&
+    a.plannerPrompt?.user === b.plannerPrompt?.user &&
+    a.answerPrompt?.system === b.answerPrompt?.system &&
+    a.answerPrompt?.user === b.answerPrompt?.user &&
+    a.plannerRawResponse === b.plannerRawResponse &&
+    a.answerRawResponse === b.answerRawResponse &&
+    JSON.stringify(a.retrievalDocs) === JSON.stringify(b.retrievalDocs)
+  );
+}
+
+function mergeStreaming(
+  existing: PartialReasoningTrace['streaming'],
+  incoming: PartialReasoningTrace['streaming']
+): PartialReasoningTrace['streaming'] {
+  if (!existing && !incoming) return undefined;
+  if (!incoming) return existing;
+  const merged: NonNullable<PartialReasoningTrace['streaming']> = { ...(existing ?? {}) };
+  for (const [stage, chunk] of Object.entries(incoming)) {
+    if (!chunk || typeof chunk !== 'object') continue;
+    const current = merged[stage as keyof NonNullable<PartialReasoningTrace['streaming']>] ?? {};
+    const combinedText = [current.text ?? '', (chunk as { text?: string }).text ?? ''].join('');
+    merged[stage as keyof NonNullable<PartialReasoningTrace['streaming']>] = {
+      text: combinedText.length ? combinedText : undefined,
+      notes: (chunk as { notes?: string }).notes ?? current.notes,
+      progress: (chunk as { progress?: number }).progress ?? current.progress,
+    };
+  }
+  return merged;
+}
+
+function streamingEqual(
+  a: PartialReasoningTrace['streaming'],
+  b: PartialReasoningTrace['streaming']
+): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  const stages = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const stage of stages) {
+    const left = (a as NonNullable<typeof a>)[stage as keyof NonNullable<typeof a>];
+    const right = (b as NonNullable<typeof b>)[stage as keyof NonNullable<typeof b>];
+    if (!left && !right) continue;
+    if (!left || !right) return false;
+    if (left.text !== right.text || left.notes !== right.notes || left.progress !== right.progress) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function mergeReasoningErrors(
