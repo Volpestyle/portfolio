@@ -1,7 +1,9 @@
 import { z } from 'zod';
 export * from './cost';
 
-export type SocialPlatform = 'x' | 'github' | 'youtube' | 'linkedin' | 'spotify';
+export const SOCIAL_PLATFORM_VALUES = ['x', 'github', 'youtube', 'linkedin', 'spotify'] as const;
+
+export type SocialPlatform = (typeof SOCIAL_PLATFORM_VALUES)[number];
 
 export type ProfileSocialLink = {
   platform: SocialPlatform;
@@ -292,6 +294,8 @@ export type RetrievalPlan = PlannerLLMOutput & {
 export type AnswerUiHints = {
   projects?: string[];
   experiences?: string[];
+  education?: string[];
+  links?: SocialPlatform[];
 };
 
 export type AnswerPayload = {
@@ -303,6 +307,8 @@ export type AnswerPayload = {
 export type UiPayload = {
   showProjects: string[];
   showExperiences: string[];
+  showEducation: string[];
+  showLinks: SocialPlatform[];
 };
 
 export const RETRIEVAL_SOURCE_VALUES = ['projects', 'resume', 'profile'] as const;
@@ -328,6 +334,8 @@ export const PlannerLLMOutputSchema: z.ZodType<PlannerLLMOutput, z.ZodTypeDef, u
 const AnswerUiHintsSchema: z.ZodType<AnswerUiHints, z.ZodTypeDef, unknown> = z.object({
   projects: z.array(z.string()).default([]),
   experiences: z.array(z.string()).default([]),
+  education: z.array(z.string()).default([]),
+  links: z.array(z.enum(SOCIAL_PLATFORM_VALUES)).default([]),
 });
 
 export const AnswerPayloadSchema: z.ZodType<AnswerPayload, z.ZodTypeDef, unknown> = z.object({
