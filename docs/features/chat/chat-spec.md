@@ -26,7 +26,7 @@ At a high level:
 - **Pipeline**
   - Planner → Retrieval → Answer (no Evidence stage).
   - All LLM stages use the OpenAI Responses API with structured JSON output.
-  - Planner emits search queries + cards toggle; Answer owns uiHints (card IDs).
+  - Planner emits search queries; Answer owns uiHints (card IDs) and implicitly decides whether cards should render.
 - **Outputs**
   - Streamed answer text in first person ("I…").
   - Answer‑aligned UI hints (uiHints.projects / uiHints.experiences) that map to retrieved docs.
@@ -36,7 +36,7 @@ At a high level:
 
 - Grounded – Only asserts facts present in the owner's portfolio data.
 - Answer‑aligned UI – Cards and lists shown to the user come from Answer.uiHints (validated against retrieval).
-- Query‑aware – Planner emits targeted queries and a cards toggle; Answer infers tone/structure from the question.
+- Query‑aware – Planner emits targeted queries; Answer infers tone/structure from the question and whether cards belong.
 - Observable – Every turn has a structured reasoning trace and token metrics.
 - Composable – Orchestrator and UI are decoupled via a clean SSE contract.
 - Reusable – Driven by OwnerConfig and data providers; domain-agnostic.
@@ -78,7 +78,7 @@ For a given owner (person / team / org), users should be able to:
 
 Per chat turn, the engine MUST:
 
-- Build a set of retrieval queries across `projects`, `resume`, and/or `profile`, plus a `cardsEnabled` flag. Empty queries are allowed for greetings/meta or when the conversation already contains the needed facts.
+- Build a set of retrieval queries across `projects`, `resume`, and/or `profile`. Empty queries are allowed for greetings/meta or when the conversation already contains the needed facts.
 - Run retrieval over precomputed indexes when queries are present:
   - BM25 shortlist.
   - Embedding re‑ranking.
@@ -290,7 +290,7 @@ Quick at-a-glance view of purpose, inputs/outputs, and primary tech. See §5 for
 
 | Stage     | Purpose                                                           | Inputs                                                                                | Outputs                                                                                                  | Primary tech                                                                                                               |
 | --------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Planner   | Decide what to search + whether cards should render               | Latest user message + short history; OwnerConfig + persona baked into system prompt   | PlannerLLMOutput (`queries[]`, `cardsEnabled`, optional `topic`)                                         | OpenAI Responses API (json schema) with `ModelConfig.plannerModel` (nano class)                                            |
+| Planner   | Decide what to search                                             | Latest user message + short history; OwnerConfig + persona baked into system prompt   | PlannerLLMOutput (`queries[]`, optional `topic`)                                                         | OpenAI Responses API (json schema) with `ModelConfig.plannerModel` (nano class)                                            |
 | Retrieval | Turn planner queries into ranked document sets                    | PlannerLLMOutput.queries + corpora (projects/resume/profile) + embedding indexes      | Retrieved docs per source (scored and filtered)                                                          | MiniSearch BM25 + text-embedding-3-large re-rank + recency scoring (projects/resume); profile short-circuited              |
 | Answer    | Turn retrieval into first-person text + UI hints (cards)         | PlannerLLMOutput + retrieved docs + persona/profile + short history                   | AnswerPayload (message + optional thoughts + optional uiHints.projects/experiences)                      | OpenAI Responses API with `ModelConfig.answerModel` (nano or mini; mini recommended for voice adherence), streaming tokens |
 
@@ -757,12 +757,11 @@ When `incrementalBuild: true`:
 
 ### 4.1 Core Types & Reasoning
 
-Appendix A is the single source of truth for: `PlannerLLMOutput` (queries/cards toggle/topic), `AnswerPayload` (message/thoughts/uiHints), `UiPayload`, `ModelConfig`, and the `ReasoningTrace` / `PartialReasoningTrace` shapes. ReasoningTrace is a structured dev trace (plan → retrieval → answerMeta); PartialReasoningTrace streams when reasoning is enabled and mirrors the three pipeline stages (`planner`, `retrieval`, `answer`).
+Appendix A is the single source of truth for: `PlannerLLMOutput` (queries/topic), `AnswerPayload` (message/thoughts/uiHints), `UiPayload`, `ModelConfig`, and the `ReasoningTrace` / `PartialReasoningTrace` shapes. ReasoningTrace is a structured dev trace (plan → retrieval → answerMeta); PartialReasoningTrace streams when reasoning is enabled and mirrors the three pipeline stages (`planner`, `retrieval`, `answer`).
 
 ### 4.2 Planner Output (`PlannerLLMOutput`)
 
 - `queries`: array of `{ source: 'projects' | 'resume' | 'profile'; text: string; limit?: number }`.
-- `cardsEnabled`: boolean (default true).
 - `topic?`: short telemetry label for logging only.
 
 Constraints and expectations:
@@ -770,7 +769,8 @@ Constraints and expectations:
 - Queries may be empty for greetings/meta or when the latest turns already contain the necessary facts.
 - `limit` defaults to 8 when omitted; runtime clamps to safe bounds.
 - Queries should encode scope in text (e.g., “professional Go experience”, “AI/LLM projects”).
-- Use `cardsEnabled = false` for rollups/counts or pure bio/meta asks where cards add no value.
+- Resume retrieval automatically prioritizes work/education entries over skills/awards; no manual facets are needed.
+- Planner does **not** decide whether to show cards; the Answer stage does that by emitting or omitting uiHints.
 
 ### 4.3 AnswerPayload (combined)
 
@@ -781,7 +781,7 @@ Constraints and expectations:
 Constraints:
 
 - uiHints IDs must be subsets of retrieved docs; invalid IDs are dropped during UI derivation. For `links`, only platforms present in `profile.socialLinks` (derived from `data/chat/profile.json`) are allowed.
-- Omit uiHints (or leave arrays empty) when no cards/links are relevant. `cardsEnabled = false` means do not return uiHints at all.
+- Omit uiHints (or leave arrays empty) when no cards/links are relevant.
 - Order matters; the UI preserves the returned order.
 
 ### 4.4 UiPayload (derived from Answer.uiHints)
@@ -800,7 +800,7 @@ type UiPayload = {
 Rules:
 
 - Always filter to retrieved doc IDs (and `profile.socialLinks` for links) and clamp lengths (implementation default: 10 per type).
-- When `cardsEnabled = false`, return empty UiPayload (no projects, experiences, education, or links) even if uiHints was present.
+- Empty or missing uiHints yields an empty UiPayload (no projects, experiences, education, or links).
 - No banner/core-evidence metadata; cards/links alone represent the UI surface.
 
 ### 4.5 Reasoning & Streaming Contract
@@ -811,7 +811,7 @@ Rules:
 
 ### 4.6 Cross-Stage Invariants
 
-- Cards toggle: `cardsEnabled = false` empties all UiPayload arrays (projects/experiences/education/links); avoid card-facing language in that case.
+- Cards flow: Answer controls cards by emitting uiHints; when uiHints are empty/missing, UiPayload is empty even if retrieval returned docs.
 - uiHints subset: Only IDs present in retrieved docs (and profile.socialLinks for links) are allowed; drop/ignore hallucinated IDs.
 - Retrieval reuse: If queries are empty, retrieval is skipped; Answer must honestly state when no relevant portfolio data is available.
 - UI alignment: Cards shown must align with the textual answer; uiHints is the only source of truth for card IDs.
@@ -883,21 +883,21 @@ const SLIDING_WINDOW_CONFIG = {
 
 ### 5.1 Planner
 
-- Purpose: Normalize the user's ask into search queries and a cards toggle.
+- Purpose: Normalize the user's ask into search queries.
 - Model: `ModelConfig.plannerModel`.
 - Inputs:
   - Planner system prompt from `pipelinePrompts.ts` with OwnerConfig/Persona placeholders resolved.
   - Conversation window (last ~3 user + 3 assistant messages).
   - Latest user message.
 - Output:
-  - `PlannerLLMOutput` JSON (`queries`, `cardsEnabled`, `topic?`).
+  - `PlannerLLMOutput` JSON (`queries`, `topic?`).
 
 **Responsibilities (from the simplified prompt)**
 
 - Build targeted `queries` with explicit sources and key terms.
-- Set `cardsEnabled` (default true) — false for rollups/counts, pure bio, or meta/greetings.
 - Use empty `queries` for greetings/meta or when recent conversation suffices.
 - Fill `topic` with a short telemetry label (2–5 words).
+- Planner does **not** decide whether cards render; the Answer stage does that by emitting/omitting uiHints.
 
 **Query construction & routing**
 
@@ -914,11 +914,6 @@ const SLIDING_WINDOW_CONFIG = {
   - Bio/intro → `profile`.
   - Location → `profile` + `resume`.
 - Default `limit` per query is 8 unless the model sets a lower/higher number within bounds.
-
-**Cards toggle**
-
-- `cardsEnabled = true` for most questions (project/experience cards are helpful).
-- `cardsEnabled = false` for rollups (“What languages do you know?”), pure bio, or meta/greetings.
 
 ### 5.2 Retrieval
 
@@ -954,7 +949,7 @@ Processing steps:
   - Identity context (OwnerConfig + ProfileDoc).
   - Conversation window.
   - Latest user message.
-  - PlannerLLMOutput (cardsEnabled/topic).
+  - PlannerLLMOutput (topic).
   - Retrieved docs (projects, resume, profile).
 - Output:
   - AnswerPayload JSON with optional uiHints.
@@ -963,7 +958,7 @@ Processing steps:
 
 - Grounding: only state facts from retrieved docs; if nothing relevant, say so (“I don’t have that in my portfolio”).
 - Voice: speak as “I”; match persona voice/style guidelines and injected voice examples.
-- UI hints: list relevant project/experience IDs (ordered) when cardsEnabled is true and cards are helpful; omit or leave arrays empty otherwise. Only include IDs present in retrieved docs.
+- UI hints: include only when the projects/experiences directly support the answer; omit or leave arrays empty for greetings/meta/off-topic responses or when evidence is missing. Only include IDs present in retrieved docs.
 - Answer length: keep text concise when cards are present; expand when no cards or few docs.
 - Streaming: tokens stream; uiHints can surface as soon as valid JSON is parsable.
 
@@ -975,7 +970,7 @@ Processing steps:
 
 - Empty `queries`: Skip retrieval; Answer uses profile/persona/context to respond (for greetings/meta) and returns empty uiHints.
 - Retrieval but zero relevant docs: Answer states the gap transparently and leaves uiHints empty; UiPayload will be empty.
-- Cards toggle: When `cardsEnabled = false`, Answer should avoid card-facing language and omit uiHints.
+- No cards: When uiHints are empty/missing, avoid card-facing language and let UiPayload stay empty.
 
 ---
 
@@ -1073,15 +1068,14 @@ done: {}
 
 ### 6.3 UI Derivation (Answer‑Aligned)
 
-Planner sets `cardsEnabled`; Answer returns `uiHints`. The UI layer derives cards strictly from Answer.uiHints filtered to retrieved docs.
+Planner decides what to search; Answer decides whether cards show by emitting or omitting `uiHints`. The UI layer derives cards strictly from Answer.uiHints filtered to retrieved docs.
 
 Algorithm (buildUi):
 
 1. Create sets of retrieved project/experience IDs and allowed link platforms from `profile.socialLinks`.
-2. If `cardsEnabled = false`, return empty arrays for projects/experiences/education/links.
-3. Filter `answer.uiHints?.projects` / `answer.uiHints?.experiences` to retrieved IDs; filter `answer.uiHints?.links` to allowed platforms.
-4. Clamp lengths (default max 10 per type).
-5. Emit UiPayload. No banner/core-evidence metadata.
+2. Filter `answer.uiHints?.projects` / `answer.uiHints?.experiences` / `answer.uiHints?.education` to retrieved IDs; filter `answer.uiHints?.links` to allowed platforms.
+3. Clamp lengths (default max 10 per type).
+4. Emit UiPayload. No banner/core-evidence metadata. If uiHints are empty/missing, UiPayload arrays are empty.
 
 UI events can fire as soon as valid uiHints are available (during answer streaming or at completion).
 
@@ -1179,14 +1173,14 @@ Per chat turn, log:
 
 - LLM usage per stage (model, tokens, cost).
 - **Planner:**
-  - queries (source/text/limit), cardsEnabled, topic.
+  - queries (source/text/limit), topic.
   - planner model + reasoning effort when set.
 - **Retrieval:**
   - For each query: source, queryText, requestedLimit, effectiveLimit, numResults.
   - Cache hit/miss info and retrieval latency per source.
 - **Answer:**
   - uiHints.projects.length, uiHints.experiences.length.
-  - cardsEnabled flag and whether uiHints were emitted early.
+  - Whether uiHints were emitted early.
   - Length of final message and presence/size of thoughts.
   - TTFT and total streaming duration.
 - **SSE:**
@@ -1202,7 +1196,7 @@ Per chat turn, log:
 
 ### 8.4 Evals & Graders (cards-aware)
 
-Coverage focuses on grounding, UI/text alignment, cards toggle behavior, zero-result honesty, and persona adherence. See `docs/features/chat/evals-and-goldens.md` for the active suites and runner sketch.
+Coverage focuses on grounding, UI/text alignment, card alignment (uiHints vs text), zero-result honesty, and persona adherence. See `docs/features/chat/evals-and-goldens.md` for the active suites and runner sketch.
 
 ### 8.5 Chat Eval Sets
 
@@ -1215,7 +1209,6 @@ type ChatEvalTestCase = {
   category: 'skill' | 'projects' | 'experience' | 'bio' | 'meta' | 'edge_case';
   input: { userMessage: string; conversationHistory?: ChatMessage[] };
   expected?: {
-    cardsEnabled?: boolean;
     plannerQueries?: Array<{ source?: PlannerQuerySource; textIncludes?: string[]; limitAtMost?: number }>;
     answerContains?: string[];
     answerNotContains?: string[];
@@ -1249,7 +1242,6 @@ const factCheckSuite: ChatEvalSuite = {
       category: 'skill',
       input: { userMessage: 'Have you used React?' },
       expected: {
-        cardsEnabled: true,
         uiHintsProjectsMinCount: 1,
       },
     },
@@ -1346,7 +1338,7 @@ chatApi.run(openaiClient, messages, {
 
 - Richer evals:
   - Streaming order/latency checks for planner/retrieval/answer deltas.
-  - UI alignment checks for uiHints vs text when cardsEnabled toggles.
+  - UI alignment checks for uiHints vs text when cards are shown vs omitted.
 - Additional UI actions via ui_actions SSE events:
   - e.g. highlightCard, scrollToTimeline, filterByTag.
 
@@ -1383,7 +1375,6 @@ export interface PlannerQuery {
 
 export interface PlannerLLMOutput {
   queries: PlannerQuery[];
-  cardsEnabled: boolean;
   topic?: string;
 }
 
@@ -1423,21 +1414,21 @@ export interface UiPayload {
   /**
    * Ordered list of project IDs to render as cards.
    * Derived from Answer.uiHints filtered to retrieved IDs.
-   * Empty array when cardsEnabled=false or no relevant projects were found.
+   * Empty array when no relevant projects were found or uiHints omit projects.
    */
   showProjects: string[];
 
   /**
    * Ordered list of resume experience IDs to render as cards.
    * Derived from Answer.uiHints filtered to retrieved IDs.
-   * Empty array when cardsEnabled=false or no relevant experiences were found.
+   * Empty array when no relevant experiences were found or uiHints omit experiences.
    */
   showExperiences: string[];
 
   /**
    * Ordered list of education IDs to render as cards.
    * Derived from Answer.uiHints filtered to retrieved IDs.
-   * Empty array when cardsEnabled=false or no relevant education entries were found.
+   * Empty array when no relevant education entries were found or uiHints omit education.
    */
   showEducation: string[];
 
@@ -1463,7 +1454,6 @@ export interface ReasoningTrace {
   answer?: {
     model: string;
     uiHints?: AnswerPayload['uiHints'];
-    cardsEnabled: boolean;
   };
   truncationApplied?: boolean;
 }
@@ -1480,7 +1470,6 @@ export type PartialReasoningTrace = Partial<ReasoningTrace>;
     { "source": "resume", "text": "Go golang", "limit": 6 },
     { "source": "projects", "text": "Go golang backend", "limit": 6 }
   ],
-  "cardsEnabled": true,
   "topic": "Go experience"
 }
 
@@ -1490,14 +1479,20 @@ export type PartialReasoningTrace = Partial<ReasoningTrace>;
     { "source": "resume", "text": "AI ML machine learning LLM PyTorch TensorFlow" },
     { "source": "projects", "text": "AI ML machine learning LLM" }
   ],
-  "cardsEnabled": true,
   "topic": "AI experience"
+}
+
+// Education-focused
+{
+  "queries": [
+    { "source": "resume", "text": "education Iowa State University" }
+  ],
+  "topic": "education"
 }
 
 // Greeting
 {
   "queries": [],
-  "cardsEnabled": false,
   "topic": "greeting"
 }
 ```

@@ -8,7 +8,7 @@ Companion to `docs/features/chat/chat-spec.md`. This file keeps eval coverage, c
 
 - Grounding + honesty for skills, projects, experience, and bio questions.
 - UI/text alignment: cards reflect Answer.uiHints and retrieved docs.
-- Cards toggle correctness (when cardsEnabled should be on/off).
+- Card presence/absence correctness (uiHints included only when relevant).
 - Zero/low‑evidence honesty and transparent fallbacks.
 - Persona voice consistency and “I” perspective.
 - Meta/chit‑chat sanity (no generic assistant drift).
@@ -24,7 +24,6 @@ type ChatEvalTestCase = {
   category: 'skill' | 'projects' | 'experience' | 'bio' | 'meta' | 'edge_case';
   input: { userMessage: string; conversationHistory?: ChatMessage[] };
   expected?: {
-    cardsEnabled?: boolean;
     plannerQueries?: Array<{ source?: PlannerQuerySource; textIncludes?: string[]; limitAtMost?: number }>;
     answerContains?: string[];
     answerNotContains?: string[];
@@ -58,7 +57,6 @@ const factCheckSuite: ChatEvalSuite = {
       category: 'skill',
       input: { userMessage: 'Have you used React?' },
       expected: {
-        cardsEnabled: true,
         uiHintsProjectsMinCount: 1,
       },
     },
@@ -85,7 +83,6 @@ const enumerationSuite: ChatEvalSuite = {
       category: 'projects',
       input: { userMessage: 'Which projects have you used Go on?' },
       expected: {
-        cardsEnabled: true,
         uiHintsProjectsMinCount: 1,
       },
     },
@@ -95,7 +92,6 @@ const enumerationSuite: ChatEvalSuite = {
       category: 'meta',
       input: { userMessage: 'Hi there!' },
       expected: {
-        cardsEnabled: false,
         uiHintsProjectsMaxCount: 0,
         uiHintsExperiencesMaxCount: 0,
       },
@@ -125,7 +121,7 @@ async function runChatEvalSuite(chatApi: ChatApi, openai: OpenAI, ownerId: strin
       });
 
       // Assert planner output, retrieval summaries, answer text, and uiPayload alignment
-      // (cardsEnabled, uiHints, and required IDs when specified).
+      // (uiHints and required IDs when specified).
       results.push(assertChatEval(test, { plan, retrieval, answer, uiPayload }));
     } catch (err) {
       results.push({
@@ -142,7 +138,7 @@ async function runChatEvalSuite(chatApi: ChatApi, openai: OpenAI, ownerId: strin
 }
 ```
 
-Keep assertions focused on the contract: planner queries, grounded answer text, cardsEnabled, and uiHints/card expectations.
+Keep assertions focused on the contract: planner queries, grounded answer text, and uiHints/card expectations.
 
 ---
 

@@ -25,7 +25,7 @@ Companion to `docs/features/chat/chat-spec.md`. The spec is the source of truth 
 ## 2. Pipeline & Conversation Management
 
 - Runtime pipeline: **Planner → Retrieval → Answer**, all using the OpenAI Responses API with JSON schemas.
-- Planner outputs `queries[]`, `cardsEnabled`, and optional `topic`, built from a sliding conversation snippet, OwnerConfig, and persona; prompts live in `packages/chat-orchestrator/src/pipelinePrompts.ts`.
+- Planner outputs `queries[]` and optional `topic`, built from a sliding conversation snippet, OwnerConfig, and persona; prompts live in `packages/chat-orchestrator/src/pipelinePrompts.ts`.
 - Retrieval executes planner queries across projects/resume/profile using BM25 shortlist, embedding re-rank, and recency-aware scoring; profile inclusion is deterministic when requested; defaults `topK=8`, clamped to max 50; process-level caches keep searchers warm.
 - Answer streams a first-person message plus optional `thoughts` (dev-only) and `uiHints.projects/experiences`; uiHints are validated against retrieved docs and clamped (default max 10 per type) before emitting UI payloads.
 - Conversation truncation: sliding window keeps the latest turns within ~8k tokens, always retains the latest user message and at least 3 recent turns; max user message size 500 tokens; tiktoken-backed counts; truncation is surfaced via reasoning trace metadata.
@@ -35,9 +35,9 @@ Companion to `docs/features/chat/chat-spec.md`. The spec is the source of truth 
 ## 3. Streaming & UI Plumbing
 
 - SSE events: `stage`, `reasoning`, `ui`, `token`, `item`, `attachment`, `ui_actions`, `done`, `error`.
-- Stage events fire `start/complete` for `planner`, `retrieval`, and `answer`, with meta like `topic`, `cardsEnabled`, `docsFound`, `sources`, `tokenCount`, and `durationMs`.
+- Stage events fire `start/complete` for `planner`, `retrieval`, and `answer`, with meta like `topic`, `docsFound`, `sources`, `tokenCount`, and `durationMs`.
 - Reasoning emits partial traces/deltas when `reasoningEnabled` is true (planner plan, retrieval summaries, answer/uiHints notes); consumers build dev tooling from these traces.
-- UI derivation: if `cardsEnabled=false`, emit empty `showProjects/showExperiences`; otherwise filter Answer.uiHints to retrieved IDs, dedupe, and clamp (projects first up to 10 total). UI events can fire during answer streaming as soon as valid uiHints exist.
+- UI derivation: filter Answer.uiHints to retrieved IDs, dedupe, and clamp (projects first up to 10 total). Empty/missing uiHints yield empty UI payloads. UI events can fire during answer streaming as soon as valid uiHints exist.
 - Error semantics: always emit an `error` event before closing a broken stream. Codes include `llm_timeout`, `llm_error`, `retrieval_error`, `internal_error`, `stream_interrupted`, `rate_limited`, and `budget_exceeded`. Partial answers keep streamed tokens plus an error when interruptions occur; retries must mint a new `responseAnchorId` per spec.
 - Typical sequence: `stage: planner_start` → reasoning delta(s) → `stage: planner_complete` → `stage: retrieval_start` → retrieval notes → `stage: retrieval_complete` → `stage: answer_start` → `token` + `ui` events → `stage: answer_complete` → `done`.
 
