@@ -1155,8 +1155,8 @@ If the Answer stage fails after emitting some tokens:
   - Portfolio documents are treated as data, not instructions.
   - Prompts for Planner / Answer explicitly instruct models to ignore instructions embedded in documents.
 - **Moderation**
-  - Input moderation is enabled by default in the Next.js route; flagged inputs short-circuit with a brief, non-streamed refusal (HTTP 200 is acceptable).
-  - Output moderation is also enabled by default in the current route; refusals are non-streamed with the configured refusal message/banner. Adjust route options if you want it disabled.
+  - Input moderation is optional and defaults to **off** in the Next.js route; when enabled, flagged inputs short-circuit with a brief, non-streamed refusal (HTTP 200 is acceptable).
+  - Output moderation is also optional and defaults to **off** in the current route; when enabled, refusals are non-streamed with the configured refusal message/banner. Adjust route options per deployment needs.
 
 > **Implementation note:** Moderation hooks live in the Next.js `/api/chat` route. The orchestrator focuses on Planner → Retrieval → Answer and assumes inputs are already moderated.
 
