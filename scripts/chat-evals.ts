@@ -76,9 +76,6 @@ async function runChatEvalCase(test: ChatEvalTestCase, client: OpenAI): Promise<
     if (typeof test.expected.planQueriesMax === 'number' && queryCount > test.expected.planQueriesMax) {
       errors.push(`plan queries count ${queryCount} exceeds max ${test.expected.planQueriesMax}`);
     }
-    if (typeof test.expected.cardsEnabled === 'boolean' && Boolean(plan.cardsEnabled) !== test.expected.cardsEnabled) {
-      errors.push(`cardsEnabled expected ${test.expected.cardsEnabled} but got ${Boolean(plan.cardsEnabled)}`);
-    }
   }
 
   if (

@@ -57,7 +57,6 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                   <div className="space-y-2">
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
                       {plan.model && <span className="text-purple-300/60">Model: <span className="text-purple-100">{plan.model}</span></span>}
-                      <span className="text-purple-300/60">Cards: <span className="text-purple-100">{plan.cardsEnabled !== false ? 'On' : 'Off'}</span></span>
                       {plan.topic && <span className="text-purple-300/60">Topic: <span className="text-purple-100">{plan.topic}</span></span>}
                     </div>
                     {plan.queries.length > 0 ? (

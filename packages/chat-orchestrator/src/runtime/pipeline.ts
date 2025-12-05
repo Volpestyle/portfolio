@@ -111,7 +111,6 @@ export type PipelineStage = 'planner' | 'retrieval' | 'answer';
 export type StageStatus = 'start' | 'complete';
 export type StageMeta = {
   topic?: string | null;
-  cardsEnabled?: boolean;
   docsFound?: number;
   sources?: RetrievalSummary['source'][];
   tokenCount?: number;
@@ -1089,12 +1088,12 @@ async function runStreamingJsonResponse<T>({
 function normalizePlannerOutput(plan: PlannerLLMOutput, model?: string): RetrievalPlan {
   const queries: RetrievalPlan['queries'] = Array.isArray(plan.queries)
     ? plan.queries
-      .map((query) => ({
-        source: query?.source,
-        text: sanitizePlannerQueryText(query?.text ?? ''),
-        limit: clampQueryLimit(query?.limit),
-      }))
-      .filter((query) => query.source === 'projects' || query.source === 'resume' || query.source === 'profile')
+        .map((query) => ({
+          source: query?.source,
+          text: sanitizePlannerQueryText(query?.text ?? ''),
+          limit: clampQueryLimit(query?.limit),
+        }))
+        .filter((query) => query.source === 'projects' || query.source === 'resume' || query.source === 'profile')
     : [];
 
   const deduped: RetrievalPlan['queries'] = [];
@@ -1108,7 +1107,6 @@ function normalizePlannerOutput(plan: PlannerLLMOutput, model?: string): Retriev
 
   return {
     queries: deduped,
-    cardsEnabled: plan.cardsEnabled !== false,
     topic: plan.topic?.trim() || undefined,
     model,
   };
@@ -1276,9 +1274,9 @@ async function executeRetrievalPlan(
         ? cappedResult.projects.length
         : query.source === 'resume'
           ? cappedResult.experiences.length +
-            cappedResult.education.length +
-            cappedResult.awards.length +
-            cappedResult.skills.length
+          cappedResult.education.length +
+          cappedResult.awards.length +
+          cappedResult.skills.length
           : cappedResult.profile
             ? 1
             : 0,
@@ -1300,7 +1298,7 @@ function buildAnswerUserContent(input: {
   retrieved: RetrievalResult;
   identity?: IdentityContext;
 }): string {
-  const { userMessage, conversationSnippet, plan, retrieved, identity } = input;
+  const { userMessage, conversationSnippet, retrieved, identity } = input;
 
   const identitySection =
     identity && (identity.fullName || identity.headline || identity.location || identity.shortAbout)
@@ -1388,16 +1386,13 @@ function buildAnswerUserContent(input: {
     retrieved.profile ? `## Profile\n${JSON.stringify(retrieved.profile, null, 2)}` : '',
     identitySection,
     '',
-    `## Cards Enabled: ${plan.cardsEnabled !== false}`,
-    plan.cardsEnabled !== false
-      ? 'Include **relevant** project/experience/education IDs in uiHints. Only pick from retrieved docs. For links, only use platforms that exist in profile.socialLinks (x, github, youtube, linkedin, spotify).'
-      : 'Cards are disabled for this turn. Do NOT include uiHints (projects, experiences, education, or links).',
+    'Only include uiHints when the retrieved docs directly support your answer. Skip uiHints for greetings, meta chit-chat, or when evidence is missing. For links, only use platforms that exist in profile.socialLinks (x, github, youtube, linkedin, spotify).',
   ]
     .filter(Boolean)
     .join('\n');
 }
 
-function buildUi(uiHints: AnswerUiHints | undefined, retrieved: RetrievalResult, cardsEnabled: boolean): UiPayload {
+function buildUi(uiHints: AnswerUiHints | undefined, retrieved: RetrievalResult): UiPayload {
   const normalizedLinks = new Set<SocialPlatform>(
     (retrieved.profile?.socialLinks ?? [])
       .map((link) => normalizeDocId((link as { platform?: string }).platform ?? '') as SocialPlatform)
@@ -1407,10 +1402,6 @@ function buildUi(uiHints: AnswerUiHints | undefined, retrieved: RetrievalResult,
   const projectIds = new Set(retrieved.projects.map((p) => normalizeDocId(p.id)));
   const experienceIds = new Set(retrieved.experiences.map((e) => normalizeDocId(e.id)));
   const educationIds = new Set(retrieved.education.map((e) => normalizeDocId(e.id)));
-
-  if (!cardsEnabled) {
-    return { showProjects: [], showExperiences: [], showEducation: [], showLinks: [] };
-  }
 
   const showLinks = (uiHints?.links ?? [])
     .map(normalizeDocId)
@@ -1872,7 +1863,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         }
         plan = normalizePlannerOutput(rawPlan, plannerModel);
         timings.planMs = performance.now() - tPlan;
-        emitStageEvent('planner', 'complete', { topic: plan.topic ?? null, cardsEnabled: plan.cardsEnabled }, timings.planMs);
+        emitStageEvent('planner', 'complete', { topic: plan.topic ?? null }, timings.planMs);
       } catch (error) {
         cleanupAborters();
         logger?.('chat.pipeline.error', { stage: 'plan', error: formatLogValue(error) });
@@ -2063,7 +2054,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         answer.thoughts = undefined;
       }
 
-      const ui = buildUi(answer.uiHints, retrieved, plan.cardsEnabled !== false);
+      const ui = buildUi(answer.uiHints, retrieved);
       try {
         runOptions?.onUiEvent?.(ui);
       } catch (error) {

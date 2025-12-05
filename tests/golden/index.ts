@@ -14,7 +14,6 @@ export type ChatEvalTestCase = {
   expected: {
     planQueriesMin?: number;
     planQueriesMax?: number;
-    cardsEnabled?: boolean;
     uiHintsProjectsMinCount?: number;
     uiHintsProjectsMaxCount?: number;
     uiHintsExperiencesMinCount?: number;
@@ -44,7 +43,6 @@ export const factCheckSuite: ChatEvalSuite = {
       input: { userMessage: 'Have you used React?' },
       expected: {
         planQueriesMin: 1,
-        cardsEnabled: true,
         answerContains: ['react'],
       },
     },
@@ -55,7 +53,6 @@ export const factCheckSuite: ChatEvalSuite = {
       input: { userMessage: 'Have you used Rust?' },
       expected: {
         planQueriesMin: 1,
-        cardsEnabled: true,
         uiHintsProjectsMaxCount: 0,
       },
     },
@@ -66,7 +63,6 @@ export const factCheckSuite: ChatEvalSuite = {
       input: { userMessage: 'Are you based in Seattle?' },
       expected: {
         planQueriesMin: 1,
-        cardsEnabled: true,
       },
     },
     {
@@ -76,7 +72,6 @@ export const factCheckSuite: ChatEvalSuite = {
       input: { userMessage: 'ever been to Seattle?' },
       expected: {
         planQueriesMin: 1,
-        cardsEnabled: true,
         uiHintsExperiencesMinCount: 0,
       },
     },
@@ -87,7 +82,6 @@ export const factCheckSuite: ChatEvalSuite = {
       input: { userMessage: 'ever been to d.c?' },
       expected: {
         planQueriesMin: 1,
-        cardsEnabled: true,
         uiHintsProjectsMaxCount: 0,
         uiHintsExperiencesMinCount: 0,
       },
@@ -99,7 +93,6 @@ export const factCheckSuite: ChatEvalSuite = {
       input: { userMessage: 'ever been to Washington?' },
       expected: {
         planQueriesMin: 1,
-        cardsEnabled: true,
         uiHintsExperiencesMinCount: 0,
       },
     },
@@ -117,7 +110,6 @@ export const enumerationSuite: ChatEvalSuite = {
       input: { userMessage: 'Which projects have you used Go on?' },
       expected: {
         planQueriesMin: 1,
-        cardsEnabled: true,
         uiHintsProjectsMinCount: 1,
       },
     },
@@ -128,7 +120,6 @@ export const enumerationSuite: ChatEvalSuite = {
       input: { userMessage: 'Which jobs used React?' },
       expected: {
         planQueriesMin: 1,
-        cardsEnabled: true,
         uiHintsExperiencesMinCount: 1,
       },
     },
@@ -146,7 +137,6 @@ export const narrativeSuite: ChatEvalSuite = {
       input: { userMessage: 'Tell me about your AWS background.' },
       expected: {
         planQueriesMin: 1,
-        cardsEnabled: true,
         uiHintsExperiencesMinCount: 1,
       },
     },
@@ -157,7 +147,6 @@ export const narrativeSuite: ChatEvalSuite = {
       input: { userMessage: 'React vs Vue in your work?' },
       expected: {
         planQueriesMin: 1,
-        cardsEnabled: true,
         uiHintsProjectsMinCount: 1,
       },
     },
@@ -175,7 +164,6 @@ export const metaSuite: ChatEvalSuite = {
       input: { userMessage: 'Hi there!' },
       expected: {
         planQueriesMax: 0,
-        cardsEnabled: false,
         uiHintsProjectsMaxCount: 0,
         uiHintsExperiencesMaxCount: 0,
       },
@@ -187,7 +175,6 @@ export const metaSuite: ChatEvalSuite = {
       input: { userMessage: 'How does this chat work?' },
       expected: {
         planQueriesMax: 0,
-        cardsEnabled: false,
         uiHintsProjectsMaxCount: 0,
         uiHintsExperiencesMaxCount: 0,
       },
@@ -206,7 +193,6 @@ export const edgeCaseSuite: ChatEvalSuite = {
       input: { userMessage: 'Have you built production apps in Rust?' },
       expected: {
         planQueriesMin: 1,
-        cardsEnabled: true,
         uiHintsProjectsMaxCount: 0,
       },
     },
@@ -217,7 +203,6 @@ export const edgeCaseSuite: ChatEvalSuite = {
       input: { userMessage: 'Can you do my taxes?' },
       expected: {
         planQueriesMax: 0,
-        cardsEnabled: false,
         uiHintsProjectsMaxCount: 0,
         uiHintsExperiencesMaxCount: 0,
       },

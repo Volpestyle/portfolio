@@ -273,7 +273,6 @@ export type ChatRequestMessage = {
 // Chat pipeline contract (planner/retrieval/answer)
 export type RetrievalSource = 'projects' | 'resume' | 'profile';
 export type ExperienceScope = 'employment_only' | 'any_experience';
-export type ResumeFacet = 'experience' | 'education' | 'award' | 'skill';
 
 export type PlannerQuery = {
   source: RetrievalSource;
@@ -283,7 +282,6 @@ export type PlannerQuery = {
 
 export type PlannerLLMOutput = {
   queries: PlannerQuery[];
-  cardsEnabled: boolean;
   topic?: string;
 };
 
@@ -312,7 +310,6 @@ export type UiPayload = {
 };
 
 export const RETRIEVAL_SOURCE_VALUES = ['projects', 'resume', 'profile'] as const;
-export const RESUME_FACET_VALUES = ['experience', 'education', 'award', 'skill'] as const;
 export const RETRIEVAL_REQUEST_TOPK_MAX = 10;
 export const RETRIEVAL_REQUEST_TOPK_DEFAULT = 8;
 
@@ -327,7 +324,6 @@ const PlannerQuerySchema: z.ZodType<PlannerQuery, z.ZodTypeDef, unknown> = z.obj
  */
 export const PlannerLLMOutputSchema: z.ZodType<PlannerLLMOutput, z.ZodTypeDef, unknown> = z.object({
   queries: z.array(PlannerQuerySchema).default([]),
-  cardsEnabled: z.boolean().default(true),
   topic: z.string().default(''),
 });
 

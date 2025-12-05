@@ -19,6 +19,20 @@ const DEFAULT_MINISEARCH_OPTIONS: Required<Pick<MiniSearchOptions, 'fuzzy' | 'pr
   limit: 50,
 };
 
+/**
+ * Converts a comma-delimited query string into MiniSearch format.
+ * Multi-word terms are wrapped in quotes for phrase matching.
+ * Example: "React Native, AWS, machine learning" -> "\"React Native\" AWS \"machine learning\""
+ */
+export function normalizeCommaDelimitedQuery(query: string): string {
+  return query
+    .split(',')
+    .map((term) => term.trim())
+    .filter((term) => term.length > 0)
+    .map((term) => (term.includes(' ') ? `"${term}"` : term))
+    .join(' ');
+}
+
 export function createMiniSearchIndex(docs: SearchableDoc[], options?: MiniSearchOptions): MiniSearchIndex {
   const index = new MiniSearch<SearchableDoc>({
     fields: ['text'],
@@ -37,7 +51,8 @@ export function runMiniSearch(
   query: string,
   options?: MiniSearchOptions
 ): Array<{ id: string; score: number }> {
-  const results: SearchResult[] = searcher.search(query, {
+  const normalizedQuery = normalizeCommaDelimitedQuery(query);
+  const results: SearchResult[] = searcher.search(normalizedQuery, {
     fuzzy: options?.fuzzy ?? DEFAULT_MINISEARCH_OPTIONS.fuzzy,
     prefix: options?.prefix ?? DEFAULT_MINISEARCH_OPTIONS.prefix,
   });

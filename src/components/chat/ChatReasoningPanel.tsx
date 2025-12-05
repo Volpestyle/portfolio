@@ -128,22 +128,21 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
               >
                 {plan ? (
                   <div className="space-y-2 text-xs text-white/70">
-                    <InfoRow label="Cards" value={plan.cardsEnabled === false ? 'Disabled' : 'Enabled'} />
                     {plan.topic && <InfoRow label="Topic" value={plan.topic} />}
                     {hasQueries ? (
                       <div className="space-y-1">
                         {plan.queries.map((query, idx) => (
                           <div key={`${query.source}-${idx}`} className="rounded border border-white/5 bg-white/5 p-2">
-                            <div className="flex items-center justify-between text-[11px] text-white/60">
-                              <span className="font-semibold text-blue-200">{capitalize(query.source)}</span>
-                              <span>TopK: {query.limit ?? '—'}</span>
-                            </div>
-                            <p className="mt-1 text-xs text-white/70">{query.text}</p>
-                          </div>
-                        ))}
+                        <div className="flex items-center justify-between text-[11px] text-white/60">
+                          <span className="font-semibold text-blue-200">{capitalize(query.source)}</span>
+                          <span>TopK: {query.limit ?? '—'}</span>
+                        </div>
+                        <p className="mt-1 text-xs text-white/70">{query.text}</p>
                       </div>
-                    ) : (
-                      <p className="text-xs text-white/60">Planner chose to skip retrieval.</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-white/60">Planner chose to skip retrieval.</p>
                     )}
                   </div>
                 ) : plannerStreamingText ? (
