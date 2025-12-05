@@ -192,11 +192,22 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
               >
                 {answer ? (
                   <div className="space-y-2 text-xs text-white/70">
-                    {answer.uiHints && (answer.uiHints.projects?.length || answer.uiHints.experiences?.length) ? (
-                      <div className="flex flex-wrap gap-3 text-[11px] text-white/60">
-                        <span>Projects: {answer.uiHints.projects?.length ?? 0}</span>
-                        <span>Experiences: {answer.uiHints.experiences?.length ?? 0}</span>
-                      </div>
+                    {answer.uiHints ? (
+                      (() => {
+                        const projects = answer.uiHints.projects?.length ?? 0;
+                        const experiences = answer.uiHints.experiences?.length ?? 0;
+                        const links = answer.uiHints.links?.length ?? 0;
+                        const hasUi = projects > 0 || experiences > 0 || links > 0;
+                        return hasUi ? (
+                          <div className="flex flex-wrap gap-3 text-[11px] text-white/60">
+                            <span>Projects: {projects}</span>
+                            <span>Experiences: {experiences}</span>
+                            <span>Links: {links}</span>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-white/60">No cards suggested for this turn.</p>
+                        );
+                      })()
                     ) : (
                       <p className="text-xs text-white/60">No cards suggested for this turn.</p>
                     )}

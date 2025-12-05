@@ -132,6 +132,7 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                       <div className="flex gap-3 text-xs text-purple-300/60">
                         <span>Projects: <span className="text-purple-100">{answer.uiHints.projects?.length ?? 0}</span></span>
                         <span>Experiences: <span className="text-purple-100">{answer.uiHints.experiences?.length ?? 0}</span></span>
+                        <span>Links: <span className="text-purple-100">{answer.uiHints.links?.length ?? 0}</span></span>
                       </div>
                     )}
                     {answer.thoughts && answer.thoughts.length > 0 && (

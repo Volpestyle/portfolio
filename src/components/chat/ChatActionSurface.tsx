@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
-import type { ProjectSummary, ResumeEntry } from '@portfolio/chat-contract';
+import type { ProfileSocialLink, ProjectSummary, ResumeEntry } from '@portfolio/chat-contract';
 import type { ChatSurfaceState } from '@portfolio/chat-next-ui';
 import { useChat } from '@/hooks/useChat';
 import { useProjectListCache } from '@/hooks/useProjectListCache';
@@ -16,6 +16,7 @@ import { useProjectDetail } from '@/hooks/useProjectDetail';
 import { useProjectDocument } from '@/hooks/useProjectDocument';
 import { ExperienceList } from '@/components/chat/attachments/ExperienceList';
 import { cardTransitions, staggerConfig } from '@/lib/animations';
+import { getSocialIcon, resolveSocialLink } from '@/lib/profile/socialLinks';
 
 function useSurfaceProjects(surface: ChatSurfaceState) {
   const { projectCache } = useChat();
@@ -97,85 +98,192 @@ function useSurfaceExperiences(surface: ChatSurfaceState) {
   const { experienceCache } = useChat();
   const normalizedIds = (surface.visibleExperienceIds ?? []).map((id) => id?.trim().toLowerCase()).filter(Boolean);
 
-  return normalizedIds.map((id) => experienceCache[id]).filter((exp): exp is ResumeEntry => Boolean(exp));
+  return normalizedIds
+    .map((id) => experienceCache[id])
+    .filter((exp): exp is ResumeEntry => Boolean(exp && (exp.type === 'experience' || !exp.type)));
+}
+
+function useSurfaceEducation(surface: ChatSurfaceState) {
+  const { experienceCache } = useChat();
+  const normalizedIds = (surface.visibleEducationIds ?? []).map((id) => id?.trim().toLowerCase()).filter(Boolean);
+
+  return normalizedIds
+    .map((id) => experienceCache[id])
+    .filter((exp): exp is ResumeEntry => Boolean(exp && exp.type === 'education'));
+}
+
+function useSurfaceLinks(surface: ChatSurfaceState) {
+  const normalizedIds = (surface.visibleLinkIds ?? []).map((id) => id?.trim().toLowerCase()).filter(Boolean);
+  const seen = new Set<string>();
+
+  return normalizedIds
+    .map((id) => resolveSocialLink(id))
+    .filter((link): link is ProfileSocialLink => {
+      if (!link) return false;
+      const key = link.platform;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
 }
 
 export function ChatActionSurface({ surface }: { surface: ChatSurfaceState }) {
   const { focusedProject, filteredVisible, highlightedSkills, focusedAutoExpandToken } = useSurfaceProjects(surface);
   const visibleExperiences = useSurfaceExperiences(surface);
+  const visibleEducation = useSurfaceEducation(surface);
+  const visibleLinks = useSurfaceLinks(surface);
 
-  const shouldRender =
+  const hasCardContent =
     Boolean(focusedProject) ||
     filteredVisible.length > 0 ||
     highlightedSkills.length > 0 ||
-    visibleExperiences.length > 0;
+    visibleExperiences.length > 0 ||
+    visibleEducation.length > 0;
+
+  const shouldRender = hasCardContent || visibleLinks.length > 0;
   if (!shouldRender) {
     return null;
   }
 
   return (
-    <motion.div
-      className="-mx-4 mt-3 rounded-xl border-t border-white/10 bg-white/5 px-4 py-2 text-white backdrop-blur-sm sm:mx-0"
-      initial="hidden"
-      animate="visible"
-      variants={staggerConfig.container}
-    >
-      <motion.div className="space-y-4" variants={staggerConfig.section}>
-        {focusedProject ? (
-          <motion.section variants={staggerConfig.item}>
-            <p className="text-[11px] uppercase tracking-wide text-white/60">Focused project</p>
-            <motion.div className="mt-2" variants={staggerConfig.container} initial="hidden" animate="visible">
-              <motion.div variants={staggerConfig.item}>
-                <SurfaceProjectCard project={focusedProject} autoExpandToken={focusedAutoExpandToken} />
-              </motion.div>
-            </motion.div>
-          </motion.section>
-        ) : null}
-
-        {filteredVisible.length ? (
-          <motion.section variants={staggerConfig.item}>
-            <p className="text-[11px] uppercase tracking-wide text-white/60">Projects </p>
-            <motion.div className="mt-2 space-y-3" variants={staggerConfig.container} initial="hidden" animate="visible">
-              {filteredVisible.map((project) => (
-                <motion.div key={`surface-${project.slug ?? project.name}`} variants={staggerConfig.item}>
-                  <SurfaceProjectCard project={project} />
+    <>
+      {hasCardContent ? (
+        <motion.div
+          className="-mx-4 mt-3 rounded-xl border-t border-white/10 bg-white/5 px-4 py-2 text-white backdrop-blur-sm sm:mx-0"
+          initial="hidden"
+          animate="visible"
+          variants={staggerConfig.container}
+        >
+          <motion.div className="space-y-4" variants={staggerConfig.section}>
+            {focusedProject ? (
+              <motion.section variants={staggerConfig.item}>
+                <p className="text-[11px] uppercase tracking-wide text-white/60">Focused project</p>
+                <motion.div className="mt-2" variants={staggerConfig.container} initial="hidden" animate="visible">
+                  <motion.div variants={staggerConfig.item}>
+                    <SurfaceProjectCard project={focusedProject} autoExpandToken={focusedAutoExpandToken} />
+                  </motion.div>
                 </motion.div>
-              ))}
-            </motion.div>
-          </motion.section>
-        ) : null}
+              </motion.section>
+            ) : null}
 
-        {visibleExperiences.length ? (
-          <motion.section variants={staggerConfig.item}>
-            <p className="text-[11px] uppercase tracking-wide text-white/60">Resume</p>
-            <motion.div className="mt-2" variants={staggerConfig.item}>
-              <ExperienceList experiences={visibleExperiences} />
-            </motion.div>
-          </motion.section>
-        ) : null}
+            {filteredVisible.length ? (
+              <motion.section variants={staggerConfig.item}>
+                <p className="text-[11px] uppercase tracking-wide text-white/60">Projects </p>
+                <motion.div className="mt-2 space-y-3" variants={staggerConfig.container} initial="hidden" animate="visible">
+                  {filteredVisible.map((project) => (
+                    <motion.div key={`surface-${project.slug ?? project.name}`} variants={staggerConfig.item}>
+                      <SurfaceProjectCard project={project} />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </motion.section>
+            ) : null}
 
-        {highlightedSkills.length ? (
-          <motion.section variants={staggerConfig.item}>
-            <p className="text-[11px] uppercase tracking-wide text-white/60">Skill highlights</p>
-            <motion.div className="mt-2 flex flex-wrap gap-2" variants={staggerConfig.container} initial="hidden" animate="visible">
-              {highlightedSkills.map((skill) => (
-                <motion.span
-                  key={skill}
-                  variants={staggerConfig.item}
-                  className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs text-white/80"
-                >
-                  {skill}
-                </motion.span>
-              ))}
+            {visibleExperiences.length || visibleEducation.length ? (
+              <motion.section variants={staggerConfig.item}>
+                <p className="text-[11px] uppercase tracking-wide text-white/60">Resume</p>
+                <motion.div className="mt-2" variants={staggerConfig.item}>
+                  <ExperienceList experiences={visibleExperiences} education={visibleEducation} />
+                </motion.div>
+              </motion.section>
+            ) : null}
+
+            {highlightedSkills.length ? (
+              <motion.section variants={staggerConfig.item}>
+                <p className="text-[11px] uppercase tracking-wide text-white/60">Skill highlights</p>
+                <motion.div className="mt-2 flex flex-wrap gap-2" variants={staggerConfig.container} initial="hidden" animate="visible">
+                  {highlightedSkills.map((skill) => (
+                    <motion.span
+                      key={skill}
+                      variants={staggerConfig.item}
+                      className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs text-white/80"
+                    >
+                      {skill}
+                    </motion.span>
+                  ))}
+                </motion.div>
+              </motion.section>
+            ) : null}
+          </motion.div>
+        </motion.div>
+      ) : null}
+
+      {visibleLinks.length ? (
+        <motion.div
+          className="mt-3 flex flex-wrap gap-3"
+          initial="hidden"
+          animate="visible"
+          variants={staggerConfig.container}
+        >
+          {visibleLinks.map((link) => (
+            <motion.div key={`surface-link-${link.platform}`} variants={staggerConfig.item}>
+              <SurfaceLinkButton link={link} />
             </motion.div>
-          </motion.section>
-        ) : null}
-      </motion.div>
-    </motion.div>
+          ))}
+        </motion.div>
+      ) : null}
+    </>
   );
 }
 
 type ActiveDocState = { path: string; label?: string } | null;
+
+function SurfaceLinkButton({ link }: { link: ProfileSocialLink }) {
+  const icon = getSocialIcon(link.platform);
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <motion.div
+      className="h-10"
+      style={{ width: '2.75rem' }}
+      animate={{
+        width: isHovered ? '8rem' : '2.75rem',
+      }}
+      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+    >
+      <a
+        href={link.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group relative inline-flex h-10 w-full items-center justify-center overflow-hidden rounded-full text-white transition-colors duration-200 hover:bg-white hover:text-black"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <motion.div
+          animate={{
+            x: isHovered ? 32 : 0,
+            opacity: isHovered ? 0 : 1,
+          }}
+          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+          className="absolute"
+        >
+          <SurfaceLinkIcon icon={icon} />
+        </motion.div>
+        <motion.span
+          animate={{
+            opacity: isHovered ? 1 : 0,
+          }}
+          transition={{ duration: 0.15 }}
+          className="whitespace-nowrap text-sm font-medium"
+        >
+          {link.label}
+        </motion.span>
+      </a>
+    </motion.div>
+  );
+}
+
+function SurfaceLinkIcon({ icon }: { icon: { path: string } }) {
+  return (
+    <span className="flex h-5 w-5 items-center justify-center">
+      <svg aria-hidden="true" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 fill-current">
+        <path d={icon.path} />
+      </svg>
+    </span>
+  );
+}
 
 type ViewState = 'card' | 'detail' | 'document';
 

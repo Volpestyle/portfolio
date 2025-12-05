@@ -151,6 +151,8 @@ function hasSurfacePayload(surface: ChatSurfaceState) {
     Boolean(surface.focusedProjectId) ||
     (surface.visibleProjectIds?.length ?? 0) > 0 ||
     (surface.visibleExperienceIds?.length ?? 0) > 0 ||
+    (surface.visibleEducationIds?.length ?? 0) > 0 ||
+    (surface.visibleLinkIds?.length ?? 0) > 0 ||
     (surface.highlightedSkills?.length ?? 0) > 0
   );
 }
