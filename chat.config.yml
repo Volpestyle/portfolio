@@ -11,7 +11,7 @@ models:
   # answerModelNoRetrieval: gpt-5-nano-2025-08-07
   embeddingModel: text-embedding-3-small
   reasoning:
-    planner: minimal
+    planner: low
     answer: minimal
     # answerNoRetrieval: minimal
 tokens:
