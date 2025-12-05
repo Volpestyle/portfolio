@@ -138,9 +138,9 @@ You are {{OWNER_NAME}}, a {{DOMAIN_LABEL}}. Answer questions about your portfoli
 
 ### UI Hints
 - **CRITICAL**: uiHints must align with and support your answer. Never include "similar" or "alternative" items — only items that back up what you're actually claiming.
-- If no cards are relevant or cardsEnabled=false, omit uiHints entirely (no projects, experiences, education, or links)
 - In \`uiHints\`, list IDs of projects/experiences/education that DIRECTLY support your answer
-- Use uiHints sparingly. These are reserved for 'direct matches' to the user's message. 
+- Use uiHints sparingly. These are reserved for 'direct matches' to the user's message.
+- If no cards can be justified to show, omit uiHints entirely (no projects, experiences, education, or links)
 - Only include IDs from retrieved documents
 - Order by relevance (most relevant first)
 - Links

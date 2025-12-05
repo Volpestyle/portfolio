@@ -1,5 +1,5 @@
 {
-  "snapshotDate": "2025-12-03",
+  "snapshotDate": "2025-12-05",
   "experiences": [
     {
       "id": "lowes-software-engineer",
@@ -8,38 +8,38 @@
       "location": "Charlotte, NC",
       "startDate": "2025-03-01",
       "endDate": null,
-      "summary": "Lead engineer on micro-frontend architecture and BFF services for Lowe's Returns Android and web applications.",
+      "summary": "Led frontend and BFF work for Lowe's Returns Android and Web apps, improving scalability and developer velocity.",
       "bullets": [
-        "Led adoption of a micro-frontend architecture for the Lowe’s Returns Android app to improve scalability and developer velocity.",
+        "Led adoption of a micro-frontend architecture for the Lowe’s Returns Android app, improving scalability and developer velocity.",
         "Implemented new UX flows in React, Ionic, and Capacitor for the Returns Android application used by sales-floor associates.",
-        "Built and maintained a Node.js + Fastify Backend-for-Frontend (BFF) service powering the Returns Android and web apps, including optimized REST APIs, request validation, and cross-service orchestration."
+        "Built and maintained a Node.js + Fastify Backend-for-Frontend (BFF) service powering the Returns Android and Web apps, including optimized REST APIs, request validation, and cross-service orchestration."
       ],
       "skills": [
-        "Micro-frontend architecture",
         "React",
         "Ionic",
         "Capacitor",
         "Node.js",
         "Fastify",
         "REST APIs",
-        "Backend-for-Frontend (BFF)",
+        "Micro-frontends",
         "Android"
       ],
       "linkedProjects": [],
       "experienceType": "full_time"
     },
     {
-      "id": "freelance-full-stack",
+      "id": "freelance-full-stack-developer",
       "company": "Freelance",
       "title": "Full-stack Web Developer",
       "location": "Remote",
       "startDate": "2023-01-01",
       "endDate": "2025-02-01",
-      "summary": "Delivered end-to-end full-stack web applications for startups and SMBs, from scoping through deployment and CI/CD.",
+      "summary": "Delivered end-to-end web applications for startups and SMBs, owning scoping, architecture, development, and deployment.",
       "bullets": [
-        "Delivered end-to-end web applications for startups and SMBs sourced through Upwork, including scoping, architecture, and full-stack development.",
-        "Developed applications using Next.js, Node.js, and Go.",
-        "Deployed workloads to AWS using custom CDK stacks and implemented CI/CD pipelines using GitHub Actions."
+        "Delivered end-to-end web applications for startups and SMBs, covering scoping, architecture, and full-stack development.",
+        "Developed with Next.js, Node.js, and Go.",
+        "Deployed applications on AWS using custom CDKs and set up CI/CD pipelines with GitHub Actions.",
+        "Sourced clients through Upwork and managed project delivery."
       ],
       "skills": [
         "Next.js",
@@ -48,8 +48,6 @@
         "AWS",
         "AWS CDK",
         "GitHub Actions",
-        "Full-stack development",
-        "Architecture",
         "CI/CD"
       ],
       "linkedProjects": [],
@@ -62,80 +60,106 @@
       "location": "Seattle, WA",
       "startDate": "2021-07-01",
       "endDate": "2023-01-01",
-      "summary": "Implemented and launched new React experiences for the AWS IAM Console and supported production operations.",
+      "summary": "Implemented React experiences on the AWS IAM Console and supported operational health through on-call responsibilities.",
       "bullets": [
         "Led implementation and launch of new React user experiences on the AWS Identity and Access Management (IAM) Console, impacting thousands of customers.",
-        "Participated in a monthly on-call rotation resolving customer issues, triaging CloudWatch alarms, and debugging service degradations in collaboration with backend teams.",
+        "Participated in a monthly on-call rotation: resolved customer issues, triaged CloudWatch alarms, debugged service degradations, and collaborated with backend teams.",
         "Presented weekly operational status updates to the broader Identity organization.",
-        "Voluntarily left AWS to relocate closer to family in Chicago and was not affected by layoffs."
+        "Voluntarily left AWS to relocate closer to family in Chicago; was not affected by layoffs."
       ],
-      "skills": ["React", "Front-end development", "AWS IAM", "CloudWatch", "On-call operations", "Incident triage"],
+      "skills": [
+        "React",
+        "AWS IAM",
+        "CloudWatch",
+        "On-call operations",
+        "Incident triage"
+      ],
       "linkedProjects": [],
       "experienceType": "full_time"
     },
     {
-      "id": "workiva-intern",
+      "id": "workiva-software-engineer-intern",
       "company": "Workiva",
       "title": "Software Engineer Intern",
       "location": "Ames, IA",
       "startDate": "2020-05-01",
       "endDate": "2020-08-01",
-      "summary": "Contributed to a Dart and React-based web application using Agile practices and automated testing.",
+      "summary": "Contributed to a Dart + React–based web application and participated in Agile development and testing.",
       "bullets": [
-        "Contributed to development of a Dart- and React-based web application (Wdesk).",
-        "Worked within Agile development methodologies, participating in code reviews and writing unit and integration tests."
+        "Contributed to development on a Dart + React–based web application (Wdesk).",
+        "Worked in Agile development processes, participated in code review, and wrote unit and integration tests."
       ],
-      "skills": ["Dart", "React", "Agile", "Unit testing", "Integration testing", "Code review"],
+      "skills": [
+        "Dart",
+        "React",
+        "Agile",
+        "Unit testing",
+        "Integration testing"
+      ],
       "linkedProjects": [],
       "experienceType": "internship"
     },
     {
-      "id": "npr-intern",
+      "id": "npr-web-software-developer-intern",
       "company": "NPR",
       "title": "Web Software Developer Intern",
       "location": "Washington, D.C.",
       "startDate": "2019-05-01",
       "endDate": "2019-08-01",
-      "summary": "Developed a full-stack discrepancy logger web application and containerized it for CI/CD.",
+      "summary": "Sole developer of a full-stack Audio Engineering discrepancy logger using the MEAN/Node stack, containerized for CI/CD.",
       "bullets": [
-        "Developed an Audio Engineering discrepancy logger web application using MongoDB, Express.js, Angular, and Node.js as the sole developer.",
-        "Containerized the application with Docker to support CI/CD."
+        "Built an Audio Engineering discrepancy logger web application using MongoDB, Express.js, Angular, and Node.js as the sole developer.",
+        "Containerized the application with Docker for CI/CD."
       ],
-      "skills": ["MongoDB", "Express.js", "Angular", "Node.js", "Docker", "Full-stack development", "CI/CD"],
+      "skills": [
+        "MongoDB",
+        "Express.js",
+        "Angular",
+        "Node.js",
+        "Docker",
+        "CI/CD"
+      ],
       "linkedProjects": [],
       "experienceType": "internship"
     }
   ],
   "education": [
     {
-      "id": "isu-bs-se",
+      "id": "iowa-state-bs-software-engineering",
       "institution": "Iowa State University",
       "degree": "B.S.",
       "field": "Software Engineering",
-      "location": "Ames, IA",
+      "location": "Ames, Iowa",
       "startDate": "2017-08-01",
       "endDate": "2021-05-01",
-      "summary": "Bachelor of Science in Software Engineering with a 3.01 GPA.",
-      "bullets": ["GPA: 3.01"],
+      "summary": "Bachelor of Science in Software Engineering.",
+      "bullets": [
+        "GPA: 3.01"
+      ],
       "skills": []
     }
   ],
   "awards": [
     {
-      "id": "technical-education-senior-award",
+      "id": "technical-education-senior-award-2021",
       "title": "Technical Education Senior Award",
+      "issuer": "Iowa State University",
       "date": "2021-05-01",
-      "summary": "Awarded for outstanding work and dedication in the area of Technical Education.",
-      "bullets": [],
+      "summary": "Awarded for outstanding work and dedication in Technical Education.",
+      "bullets": [
+        "Awarded to students who exhibited outstanding work and dedication in the area of Technical Education."
+      ],
       "skills": []
     },
     {
-      "id": "wsc-logo-design",
-      "title": "WSC Logo Design",
+      "id": "wsc-logo-design-1st-place-2017",
+      "title": "WSC Logo Design — 1st Place",
       "issuer": "Wheaton Sport Center",
       "date": "2017-05-01",
-      "summary": "Won 1st place prize of $1,000 in a logo design competition hosted by the Wheaton Sport Center in Wheaton, IL.",
-      "bullets": [],
+      "summary": "First place prize in a logo design competition; $1,000 award.",
+      "bullets": [
+        "Won 1st place prize of $1,000 for a logo design competition hosted by the Wheaton Sport Center in Wheaton, IL."
+      ],
       "skills": []
     }
   ],
@@ -143,7 +167,8 @@
     {
       "id": "languages-frameworks",
       "name": "Languages & Frameworks",
-      "category": "technical",
+      "category": "Technical",
+      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": [
         "React",
         "TypeScript",
@@ -163,16 +188,32 @@
       ]
     },
     {
-      "id": "platforms",
-      "name": "Platforms",
-      "category": "technical",
-      "skills": ["AWS", "Google Vertex AI", "RAG", "Hadoop ecosystem", "Druid", "BigQuery"]
+      "id": "platforms-infrastructure",
+      "name": "Platforms & Infrastructure",
+      "category": "Technical",
+      "summary": "Cloud, AI, and big data platforms.",
+      "skills": [
+        "AWS",
+        "Google Vertex AI",
+        "RAG",
+        "Hadoop ecosystem",
+        "Druid",
+        "BigQuery"
+      ]
     },
     {
       "id": "databases",
-      "name": "Databases & Data APIs",
-      "category": "technical",
-      "skills": ["MongoDB", "GraphQL", "DynamoDB", "Redis", "PostgreSQL"]
+      "name": "Databases & APIs",
+      "category": "Technical",
+      "summary": "Datastores and API technologies.",
+      "skills": [
+        "MongoDB",
+        "GraphQL",
+        "DynamoDB",
+        "Redis",
+        "PostgreSQL",
+        "REST APIs"
+      ]
     }
   ]
 }
