@@ -15,7 +15,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { useProjectDetail } from '@/hooks/useProjectDetail';
 import { useProjectDocument } from '@/hooks/useProjectDocument';
 import { ExperienceList } from '@/components/chat/attachments/ExperienceList';
-import { cardTransitions } from '@/lib/animations';
+import { cardTransitions, staggerConfig } from '@/lib/animations';
 
 function useSurfaceProjects(surface: ChatSurfaceState) {
   const { projectCache } = useChat();
@@ -114,54 +114,64 @@ export function ChatActionSurface({ surface }: { surface: ChatSurfaceState }) {
   }
 
   return (
-    <div className="-mx-4 mt-3 rounded-xl border-t border-white/10 bg-white/5 px-4 py-2 text-white backdrop-blur-sm sm:mx-0">
-      <div className="space-y-4">
+    <motion.div
+      className="-mx-4 mt-3 rounded-xl border-t border-white/10 bg-white/5 px-4 py-2 text-white backdrop-blur-sm sm:mx-0"
+      initial="hidden"
+      animate="visible"
+      variants={staggerConfig.container}
+    >
+      <motion.div className="space-y-4" variants={staggerConfig.section}>
         {focusedProject ? (
-          <section>
+          <motion.section variants={staggerConfig.item}>
             <p className="text-[11px] uppercase tracking-wide text-white/60">Focused project</p>
-            <div className="mt-2">
-              <SurfaceProjectCard project={focusedProject} autoExpandToken={focusedAutoExpandToken} />
-            </div>
-          </section>
+            <motion.div className="mt-2" variants={staggerConfig.container} initial="hidden" animate="visible">
+              <motion.div variants={staggerConfig.item}>
+                <SurfaceProjectCard project={focusedProject} autoExpandToken={focusedAutoExpandToken} />
+              </motion.div>
+            </motion.div>
+          </motion.section>
         ) : null}
 
         {filteredVisible.length ? (
-          <section>
+          <motion.section variants={staggerConfig.item}>
             <p className="text-[11px] uppercase tracking-wide text-white/60">Projects </p>
-            <div className="mt-2 space-y-3">
+            <motion.div className="mt-2 space-y-3" variants={staggerConfig.container} initial="hidden" animate="visible">
               {filteredVisible.map((project) => (
-                <SurfaceProjectCard key={`surface-${project.slug ?? project.name}`} project={project} />
+                <motion.div key={`surface-${project.slug ?? project.name}`} variants={staggerConfig.item}>
+                  <SurfaceProjectCard project={project} />
+                </motion.div>
               ))}
-            </div>
-          </section>
+            </motion.div>
+          </motion.section>
         ) : null}
 
         {visibleExperiences.length ? (
-          <section>
+          <motion.section variants={staggerConfig.item}>
             <p className="text-[11px] uppercase tracking-wide text-white/60">Resume</p>
-            <div className="mt-2">
+            <motion.div className="mt-2" variants={staggerConfig.item}>
               <ExperienceList experiences={visibleExperiences} />
-            </div>
-          </section>
+            </motion.div>
+          </motion.section>
         ) : null}
 
         {highlightedSkills.length ? (
-          <section>
+          <motion.section variants={staggerConfig.item}>
             <p className="text-[11px] uppercase tracking-wide text-white/60">Skill highlights</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <motion.div className="mt-2 flex flex-wrap gap-2" variants={staggerConfig.container} initial="hidden" animate="visible">
               {highlightedSkills.map((skill) => (
-                <span
+                <motion.span
                   key={skill}
+                  variants={staggerConfig.item}
                   className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs text-white/80"
                 >
                   {skill}
-                </span>
+                </motion.span>
               ))}
-            </div>
-          </section>
+            </motion.div>
+          </motion.section>
         ) : null}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
