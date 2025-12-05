@@ -776,12 +776,12 @@ Constraints and expectations:
 
 - `message`: first-person text answer.
 - `thoughts?`: optional dev-only trace.
-- `uiHints?`: `{ projects?: string[]; experiences?: string[] }` ordered by relevance.
+- `uiHints?`: `{ projects?: string[]; experiences?: string[]; links?: SocialPlatform[] }` ordered by relevance.
 
 Constraints:
 
-- uiHints IDs must be subsets of retrieved docs; invalid IDs are dropped during UI derivation.
-- Omit uiHints (or leave arrays empty) when `cardsEnabled = false` or no cards are relevant.
+- uiHints IDs must be subsets of retrieved docs; invalid IDs are dropped during UI derivation. For `links`, only platforms present in `profile.socialLinks` (derived from `data/chat/profile.json`) are allowed.
+- Omit uiHints (or leave arrays empty) when no cards/links are relevant. `cardsEnabled = false` means do not return uiHints at all.
 - Order matters; the UI preserves the returned order.
 
 ### 4.4 UiPayload (derived from Answer.uiHints)
@@ -792,14 +792,16 @@ Simplified UI contract:
 type UiPayload = {
   showProjects: string[];
   showExperiences: string[];
+  showEducation: string[];
+  showLinks: SocialPlatform[];
 };
 ```
 
 Rules:
 
-- Always filter to retrieved doc IDs and clamp lengths (implementation default: 10 per type).
-- When `cardsEnabled = false`, return empty arrays even if uiHints was present.
-- No banner/core-evidence metadata; cards alone represent the UI surface.
+- Always filter to retrieved doc IDs (and `profile.socialLinks` for links) and clamp lengths (implementation default: 10 per type).
+- When `cardsEnabled = false`, return empty UiPayload (no projects, experiences, education, or links) even if uiHints was present.
+- No banner/core-evidence metadata; cards/links alone represent the UI surface.
 
 ### 4.5 Reasoning & Streaming Contract
 
@@ -809,8 +811,8 @@ Rules:
 
 ### 4.6 Cross-Stage Invariants
 
-- Cards toggle: `cardsEnabled = false` forces empty UiPayload; Answer should avoid card-facing language in that case.
-- uiHints subset: Only IDs present in retrieved docs are allowed; drop/ignore hallucinated IDs.
+- Cards toggle: `cardsEnabled = false` empties all UiPayload arrays (projects/experiences/education/links); avoid card-facing language in that case.
+- uiHints subset: Only IDs present in retrieved docs (and profile.socialLinks for links) are allowed; drop/ignore hallucinated IDs.
 - Retrieval reuse: If queries are empty, retrieval is skipped; Answer must honestly state when no relevant portfolio data is available.
 - UI alignment: Cards shown must align with the textual answer; uiHints is the only source of truth for card IDs.
 
@@ -1049,7 +1051,7 @@ stage: answer_start        ← Typing indicator
 token: "Yes"               ← Answer tokens stream
 reasoning: { stage: 'answer', delta: 'thinking about uiHints...' } (optional)
     ↓
-ui: { showProjects, showExperiences } (emitted when uiHints are known)
+ui: { showProjects, showExperiences, showLinks } (emitted when uiHints are known)
 stage: answer_complete
 done: {}
 ```
@@ -1075,9 +1077,9 @@ Planner sets `cardsEnabled`; Answer returns `uiHints`. The UI layer derives card
 
 Algorithm (buildUi):
 
-1. If `cardsEnabled = false`, return `{ showProjects: [], showExperiences: [] }`.
-2. Create sets of retrieved project and experience IDs.
-3. Filter `answer.uiHints?.projects` / `answer.uiHints?.experiences` to retrieved IDs.
+1. Create sets of retrieved project/experience IDs and allowed link platforms from `profile.socialLinks`.
+2. If `cardsEnabled = false`, return empty arrays for projects/experiences/education/links.
+3. Filter `answer.uiHints?.projects` / `answer.uiHints?.experiences` to retrieved IDs; filter `answer.uiHints?.links` to allowed platforms.
 4. Clamp lengths (default max 10 per type).
 5. Emit UiPayload. No banner/core-evidence metadata.
 
@@ -1408,6 +1410,8 @@ export interface AnswerPayload {
   uiHints?: {
     projects?: string[];
     experiences?: string[];
+    education?: string[];
+    links?: SocialPlatform[];
   };
 }
 
@@ -1429,6 +1433,19 @@ export interface UiPayload {
    * Empty array when cardsEnabled=false or no relevant experiences were found.
    */
   showExperiences: string[];
+
+  /**
+   * Ordered list of education IDs to render as cards.
+   * Derived from Answer.uiHints filtered to retrieved IDs.
+   * Empty array when cardsEnabled=false or no relevant education entries were found.
+   */
+  showEducation: string[];
+
+  /**
+   * Ordered list of profile link platforms to render as CTA buttons.
+   * Derived from Answer.uiHints filtered to profile.socialLinks.
+   */
+  showLinks: SocialPlatform[];
 }
 
 // ================================
@@ -1492,7 +1509,8 @@ export type PartialReasoningTrace = Partial<ReasoningTrace>;
   "message": "Yep—I’ve used Go in production. At Datadog I built Go microservices, and I also shipped a personal Go service.",
   "uiHints": {
     "projects": ["proj_go_service"],
-    "experiences": ["exp_datadog_2022"]
+    "experiences": ["exp_datadog_2022"],
+    "links": ["github"]
   }
 }
 
@@ -1507,6 +1525,8 @@ export type PartialReasoningTrace = Partial<ReasoningTrace>;
 ```json
 {
   "showProjects": ["proj_go_service"],
-  "showExperiences": ["exp_datadog_2022"]
+  "showExperiences": ["exp_datadog_2022"],
+  "showEducation": [],
+  "showLinks": ["github"]
 }
 ```

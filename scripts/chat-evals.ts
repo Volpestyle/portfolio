@@ -64,7 +64,7 @@ async function runChatEvalCase(test: ChatEvalTestCase, client: OpenAI): Promise<
   const errors: string[] = [];
   const plan = response.reasoningTrace?.plan;
   const answer = response.message ?? '';
-  const ui = response.ui ?? { showProjects: [], showExperiences: [] };
+  const ui = response.ui ?? { showProjects: [], showExperiences: [], showEducation: [], showLinks: [] };
 
   if (!plan) errors.push('Missing plan in reasoningTrace');
 

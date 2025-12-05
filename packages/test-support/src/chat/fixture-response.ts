@@ -42,7 +42,7 @@ export function buildChatFixtureResponse({
     ],
     answer: {
       model: answerModel,
-      uiHints: { projects: [projectId], experiences: [] },
+      uiHints: { projects: [projectId], experiences: [], links: [] },
       thoughts: ['Introduce the project and why it stands out', 'Invite the user to explore the card for more context'],
       message: "Here's a featured project from my portfolio.",
     },
@@ -86,7 +86,7 @@ export function buildChatFixtureResponse({
     {
       type: 'ui',
       itemId: anchorId,
-      ui: { showProjects: [projectId], showExperiences: [] },
+      ui: { showProjects: [projectId], showExperiences: [], showEducation: [], showLinks: [] },
     },
     {
       type: 'reasoning',

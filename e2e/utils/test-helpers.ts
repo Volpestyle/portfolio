@@ -87,7 +87,7 @@ export async function mockChatStream(page: Page) {
       type: 'ui',
       itemId: anchorId,
       anchorId,
-      ui: { showProjects: [project.slug], showExperiences: [] },
+      ui: { showProjects: [project.slug], showExperiences: [], showEducation: [], showLinks: [] },
     },
     {
       type: 'attachment',
@@ -101,7 +101,7 @@ export async function mockChatStream(page: Page) {
       trace: {
         answer: {
           model: 'gpt-5-nano-2025-08-07',
-          uiHints: { projects: [project.slug], experiences: [] },
+          uiHints: { projects: [project.slug], experiences: [], links: [] },
           thoughts: ['Introduce the featured project', 'Invite the user to open the inline docs'],
           message: "Here's a featured project from my portfolio.",
         },
