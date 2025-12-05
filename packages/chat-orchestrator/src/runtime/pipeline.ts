@@ -19,6 +19,7 @@ import type {
   TokenUsage,
   UiPayload,
   ChatStreamError,
+  SocialPlatform,
 } from '@portfolio/chat-contract';
 import {
   DEFAULT_CHAT_HISTORY_LIMIT,
@@ -1274,7 +1275,10 @@ async function executeRetrievalPlan(
       query.source === 'projects'
         ? cappedResult.projects.length
         : query.source === 'resume'
-          ? cappedResult.experiences.length
+          ? cappedResult.experiences.length +
+            cappedResult.education.length +
+            cappedResult.awards.length +
+            cappedResult.skills.length
           : cappedResult.profile
             ? 1
             : 0,
@@ -1361,25 +1365,57 @@ function buildAnswerUserContent(input: {
       2
     ),
     '',
+    `## Retrieved Education (${retrieved.education.length})`,
+    JSON.stringify(
+      retrieved.education.map((e) => ({
+        id: e.id,
+        relevance: e._score ?? 0,
+        institution: e.institution,
+        degree: e.degree,
+        field: e.field,
+        location: e.location,
+        startDate: e.startDate,
+        endDate: e.endDate,
+        isCurrent: e.isCurrent,
+        summary: normalizeSnippet(e.summary),
+        skills: e.skills,
+        bullets: e.bullets?.slice(0, EXPERIENCE_BODY_SNIPPET_COUNT),
+      })),
+      null,
+      2
+    ),
+    '',
     retrieved.profile ? `## Profile\n${JSON.stringify(retrieved.profile, null, 2)}` : '',
     identitySection,
     '',
     `## Cards Enabled: ${plan.cardsEnabled !== false}`,
     plan.cardsEnabled !== false
-      ? 'Only include **relevant** project/experience IDs in uiHints. We show these to user. If no relevant docs, do not include uiHints.'
-      : 'Do NOT include uiHints (no cards will be shown).',
+      ? 'Include **relevant** project/experience/education IDs in uiHints. Only pick from retrieved docs. For links, only use platforms that exist in profile.socialLinks (x, github, youtube, linkedin, spotify).'
+      : 'Cards are disabled for this turn. Do NOT include uiHints (projects, experiences, education, or links).',
   ]
     .filter(Boolean)
     .join('\n');
 }
 
 function buildUi(uiHints: AnswerUiHints | undefined, retrieved: RetrievalResult, cardsEnabled: boolean): UiPayload {
-  if (!cardsEnabled) {
-    return { showProjects: [], showExperiences: [] };
-  }
+  const normalizedLinks = new Set<SocialPlatform>(
+    (retrieved.profile?.socialLinks ?? [])
+      .map((link) => normalizeDocId((link as { platform?: string }).platform ?? '') as SocialPlatform)
+      .filter((platform): platform is SocialPlatform => Boolean(platform))
+  );
 
   const projectIds = new Set(retrieved.projects.map((p) => normalizeDocId(p.id)));
   const experienceIds = new Set(retrieved.experiences.map((e) => normalizeDocId(e.id)));
+  const educationIds = new Set(retrieved.education.map((e) => normalizeDocId(e.id)));
+
+  if (!cardsEnabled) {
+    return { showProjects: [], showExperiences: [], showEducation: [], showLinks: [] };
+  }
+
+  const showLinks = (uiHints?.links ?? [])
+    .map(normalizeDocId)
+    .filter((id): id is SocialPlatform => Boolean(id) && normalizedLinks.has(id as SocialPlatform))
+    .slice(0, MAX_DISPLAY_ITEMS);
 
   const showProjects = (uiHints?.projects ?? [])
     .map(normalizeDocId)
@@ -1391,7 +1427,12 @@ function buildUi(uiHints: AnswerUiHints | undefined, retrieved: RetrievalResult,
     .filter((id) => id && experienceIds.has(id))
     .slice(0, MAX_DISPLAY_ITEMS);
 
-  return { showProjects, showExperiences };
+  const showEducation = (uiHints?.education ?? [])
+    .map(normalizeDocId)
+    .filter((id) => id && educationIds.has(id))
+    .slice(0, MAX_DISPLAY_ITEMS);
+
+  return { showProjects, showExperiences, showEducation, showLinks };
 }
 
 function resolveResumeEntry(resumeMaps: ResumeMaps, id: string): ResumeDoc | undefined {
@@ -1433,6 +1474,7 @@ function buildAttachmentPayloads(
 
   ui.showProjects.forEach(addProject);
   ui.showExperiences.forEach(addResume);
+  ui.showEducation.forEach(addResume);
   return attachments;
 }
 
@@ -1734,7 +1776,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           logger?.('chat.pipeline.error', { stage: 'window', error: formatLogValue(error) });
           return finalize({
             message: '',
-            ui: { showProjects: [], showExperiences: [] },
+            ui: { showProjects: [], showExperiences: [], showEducation: [], showLinks: [] },
             usage: stageUsages,
             error: buildStreamError('internal_error', error.message, false),
           });
@@ -1839,7 +1881,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         emitReasoning(buildErrorTrace('planner', error as Error));
         return finalize({
           message: '',
-          ui: { showProjects: [], showExperiences: [] },
+          ui: { showProjects: [], showExperiences: [], showEducation: [], showLinks: [] },
           usage: stageUsages,
           error: buildStreamError(timeout ? 'llm_timeout' : 'llm_error', message, true),
         });
@@ -1888,7 +1930,16 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           emitStageEvent(
             'retrieval',
             'complete',
-            { docsFound: retrieved.projects.length + retrieved.experiences.length + (retrieved.profile ? 1 : 0), sources: retrievalSummaries.map((r) => r.source) },
+            {
+              docsFound:
+                retrieved.projects.length +
+                retrieved.experiences.length +
+                retrieved.education.length +
+                retrieved.awards.length +
+                retrieved.skills.length +
+                (retrieved.profile ? 1 : 0),
+              sources: retrievalSummaries.map((r) => r.source),
+            },
             timings.retrievalMs
           );
         } catch (error) {
@@ -1897,7 +1948,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           emitReasoning(buildErrorTrace('retrieval', error as Error));
           return finalize({
             message: '',
-            ui: { showProjects: [], showExperiences: [] },
+            ui: { showProjects: [], showExperiences: [], showEducation: [], showLinks: [] },
             usage: stageUsages,
             error: buildStreamError('retrieval_error', 'I hit an internal retrieval issue—please try again.', true),
           });
@@ -2002,7 +2053,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         const timeout = timedOut();
         return finalize({
           message: '',
-          ui: { showProjects: [], showExperiences: [] },
+          ui: { showProjects: [], showExperiences: [], showEducation: [], showLinks: [] },
           usage: stageUsages,
           error: buildStreamError(timeout ? 'llm_timeout' : 'llm_error', 'I had trouble generating a reply—please try again.', true),
         });
