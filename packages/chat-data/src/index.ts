@@ -1,14 +1,5 @@
 import { z } from 'zod';
-import type {
-  ExperienceRecord,
-  EducationRecord,
-  AwardRecord,
-  SkillRecord,
-  ResumeEntry,
-  ProfileSummary,
-  ProjectContext,
-  SocialPlatform,
-} from '@portfolio/chat-contract';
+import { SOCIAL_PLATFORM_VALUES, type ExperienceRecord, type EducationRecord, type AwardRecord, type SkillRecord, type ResumeEntry, type ProfileSummary, type ProjectContext, type SocialPlatform } from '@portfolio/chat-contract';
 
 const projectTimeframeSchema = z
   .object({
@@ -58,7 +49,7 @@ export const projectDatasetSchema = z.object({
 export type ProjectRecord = z.infer<typeof projectRecordSchema>;
 export type ProjectDataset = z.infer<typeof projectDatasetSchema>;
 
-const socialPlatformSchema = z.enum(['x', 'github', 'youtube', 'linkedin', 'spotify']);
+const socialPlatformSchema = z.enum(SOCIAL_PLATFORM_VALUES);
 
 const embeddingIndexMetaSchema = z.object({
   schemaVersion: z.number(),
