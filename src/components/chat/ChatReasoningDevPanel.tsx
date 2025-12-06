@@ -56,10 +56,18 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
               <DevSection icon={<Brain className="h-4 w-4" />} title="Planner" isStreaming={isStreaming && !plan}>
                 {plan ? (
                   <div className="space-y-2">
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                      {plan.model && <span className="text-purple-300/60">Model: <span className="text-purple-100">{plan.model}</span></span>}
-                      {plan.topic && <span className="text-purple-300/60">Topic: <span className="text-purple-100">{plan.topic}</span></span>}
-                    </div>
+                    <ModelMeta
+                      model={plan.model}
+                      effort={plan.effort}
+                      usage={plan.usage}
+                      durationMs={plan.durationMs}
+                      costUsd={plan.costUsd}
+                    />
+                    {plan.topic && (
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                        <span className="text-purple-300/60">Topic: <span className="text-purple-100">{plan.topic}</span></span>
+                      </div>
+                    )}
                     {plan.queries.length > 0 ? (
                       <div className="space-y-1.5">
                         {plan.queries.map((q, idx) => (
@@ -139,7 +147,13 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
               <DevSection icon={<BookOpen className="h-4 w-4" />} title="Answer" isStreaming={isAnswerStreaming}>
                 {answer ? (
                   <div className="space-y-2">
-                    {answer.model && <p className="text-xs text-purple-300/60">Model: <span className="text-purple-100">{answer.model}</span></p>}
+                    <ModelMeta
+                      model={answer.model}
+                      effort={answer.effort}
+                      usage={answer.usage}
+                      durationMs={answer.durationMs}
+                      costUsd={answer.costUsd}
+                    />
                     {answer.uiHints && (
                       <div className="flex gap-3 text-xs text-purple-300/60">
                         <span>Projects: <span className="text-purple-100">{answer.uiHints.projects?.length ?? 0}</span></span>
@@ -208,6 +222,58 @@ function DevSection({
   );
 }
 
+function ModelMeta({
+  model,
+  effort,
+  usage,
+  durationMs,
+  costUsd,
+}: {
+  model?: string;
+  effort?: string | null;
+  usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+  durationMs?: number;
+  costUsd?: number;
+}) {
+  const tokens = usage ? formatTokens(usage) : null;
+  const duration = formatDuration(durationMs);
+  const cost = formatCost(costUsd);
+
+  if (!model && !effort && !tokens && !duration && !cost) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-purple-300/60">
+      {model && (
+        <span>
+          Model: <span className="text-purple-100">{model}</span>
+        </span>
+      )}
+      {effort && (
+        <span>
+          Effort: <span className="text-purple-100">{capitalize(effort)}</span>
+        </span>
+      )}
+      {tokens && (
+        <span>
+          Tokens: <span className="text-purple-100">{tokens}</span>
+        </span>
+      )}
+      {duration && (
+        <span>
+          Time: <span className="text-purple-100">{duration}</span>
+        </span>
+      )}
+      {cost && (
+        <span>
+          Cost: <span className="text-purple-100">{cost}</span>
+        </span>
+      )}
+    </div>
+  );
+}
+
 function ErrorBanner({ error }: { error: PartialReasoningTrace['error'] }) {
   if (!error) return null;
   return (
@@ -248,6 +314,28 @@ function Collapsible({ label, children }: { label: string; children: string | un
       </AnimatePresence>
     </div>
   );
+}
+
+function formatTokens(usage: { promptTokens?: number; completionTokens?: number; totalTokens?: number }) {
+  const prompt = usage.promptTokens ?? 0;
+  const completion = usage.completionTokens ?? 0;
+  const total = usage.totalTokens ?? prompt + completion;
+  if (!prompt && !completion && !total) return null;
+  return `${prompt.toLocaleString()} in / ${completion.toLocaleString()} out (${total.toLocaleString()} total)`;
+}
+
+function formatDuration(value?: number) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return null;
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}s`;
+  }
+  return `${Math.round(value)}ms`;
+}
+
+function formatCost(value?: number) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) return null;
+  if (value < 0.001) return '<$0.001';
+  return `$${value.toFixed(3)}`;
 }
 
 function capitalize(value: string) {
