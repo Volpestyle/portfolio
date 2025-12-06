@@ -1347,9 +1347,9 @@ async function executeRetrievalPlan(
             ? 1
             : 0
           : cappedResult.experiences.length +
-            cappedResult.education.length +
-            cappedResult.awards.length +
-            cappedResult.skills.length,
+          cappedResult.education.length +
+          cappedResult.awards.length +
+          cappedResult.skills.length,
     embeddingModel: options?.embeddingModel,
   }));
 

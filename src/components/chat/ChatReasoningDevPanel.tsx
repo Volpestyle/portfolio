@@ -244,31 +244,36 @@ function ModelMeta({
   }
 
   return (
-    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-purple-300/60">
+    <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
       {model && (
-        <span>
-          Model: <span className="text-purple-100">{model}</span>
-        </span>
+        <>
+          <span className="text-purple-300/60">Model</span>
+          <span className="text-purple-100">{model}</span>
+        </>
       )}
       {effort && (
-        <span>
-          Effort: <span className="text-purple-100">{capitalize(effort)}</span>
-        </span>
+        <>
+          <span className="text-purple-300/60">Effort</span>
+          <span className="text-purple-100">{capitalize(effort)}</span>
+        </>
       )}
       {tokens && (
-        <span>
-          Tokens: <span className="text-purple-100">{tokens}</span>
-        </span>
+        <>
+          <span className="text-purple-300/60">Tokens</span>
+          <span className="text-purple-100">{tokens}</span>
+        </>
       )}
       {duration && (
-        <span>
-          Time: <span className="text-purple-100">{duration}</span>
-        </span>
+        <>
+          <span className="text-purple-300/60">Time</span>
+          <span className="text-purple-100">{duration}</span>
+        </>
       )}
       {cost && (
-        <span>
-          Cost: <span className="text-purple-100">{cost}</span>
-        </span>
+        <>
+          <span className="text-purple-300/60">Cost</span>
+          <span className="text-purple-100">{cost}</span>
+        </>
       )}
     </div>
   );
