@@ -46,6 +46,9 @@ export type ChatConfig = {
       refusalBanner?: string;
     };
   };
+  cost?: {
+    budgetUsd?: number;
+  };
 };
 
 export type ResolvedModerationOptions = {
@@ -155,6 +158,12 @@ const normalizeString = (value: unknown): string | undefined => {
   return trimmed.length ? trimmed : undefined;
 };
 
+const normalizeNumber = (value: unknown): number | undefined => {
+  if (typeof value !== 'number') return undefined;
+  if (!Number.isFinite(value)) return undefined;
+  return value > 0 ? value : undefined;
+};
+
 export function resolveChatModelConfig(config?: ChatConfig): Partial<ModelConfig> | undefined {
   if (!config?.models) return undefined;
   const base = config.models.default;
@@ -198,6 +207,10 @@ export function resolveChatModelConfig(config?: ChatConfig): Partial<ModelConfig
     reasoning,
     answerTemperature: normalizeTemperature(config.models.answerTemperature),
   });
+}
+
+export function resolveCostBudget(config?: ChatConfig): number | undefined {
+  return normalizeNumber(config?.cost?.budgetUsd);
 }
 
 export function resolveChatRuntimeOptions(config?: ChatConfig): ChatRuntimeOptions | undefined {
