@@ -4,8 +4,8 @@ models:
   # answerModelNoRetrieval: gpt-5-nano-2025-08-07
   embeddingModel: text-embedding-3-small
   reasoning:
-    planner: low
-    answer: minimal
+    planner: minimal
+    answer: low
     # answerNoRetrieval: minimal
 tokens:
   planner: 15000
