@@ -28,3 +28,12 @@ retrieval:
     textWeight: 0.3
     semanticWeight: 0.5
     recencyLambda: 0.2
+moderation:
+  input:
+    enabled: false
+    # model: omni-moderation-latest
+  output:
+    enabled: false
+    # model: omni-moderation-latest
+    # refusalMessage: I can only answer questions about my portfolio and professional background.
+    # refusalBanner: That request was blocked by my safety filters.

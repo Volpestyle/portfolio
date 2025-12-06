@@ -8,7 +8,7 @@ import {
 import { shouldServeFixturesForRequest } from '@/lib/test-flags';
 import { buildRateLimitHeaders, enforceChatRateLimit } from '@/lib/rate-limit';
 import { getOpenAIClient } from '@/server/openai/client';
-import { chatApi, chatLogger, chatOwnerId, chatRuntimeOptions } from '@/server/chat/pipeline';
+import { chatApi, chatLogger, chatOwnerId, chatRuntimeOptions, chatModerationOptions } from '@/server/chat/pipeline';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,10 +32,14 @@ const chatHandler = createNextChatHandler({
     return buildChatFixtureResponse({ answerModel, headers });
   },
   inputModeration: {
-    enabled: false,
+    enabled: chatModerationOptions?.input?.enabled ?? false,
+    model: chatModerationOptions?.input?.model,
   },
   outputModeration: {
-    enabled: true,
+    enabled: chatModerationOptions?.output?.enabled ?? false,
+    model: chatModerationOptions?.output?.model,
+    refusalMessage: chatModerationOptions?.output?.refusalMessage,
+    refusalBanner: chatModerationOptions?.output?.refusalBanner,
   },
   runtimeCost: {
     getClients: getRuntimeCostClients,

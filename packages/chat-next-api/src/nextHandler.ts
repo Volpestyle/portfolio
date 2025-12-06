@@ -101,13 +101,13 @@ export function createNextChatHandler(options: NextChatHandlerOptions) {
     throw new Error('Missing modelConfig.answerModel in chat config.');
   }
   const outputModeration = {
-    enabled: options.outputModeration?.enabled ?? process.env.CHAT_OUTPUT_MODERATION_ENABLED === 'true',
-    model: options.outputModeration?.model ?? process.env.CHAT_OUTPUT_MODERATION_MODEL,
+    enabled: options.outputModeration?.enabled ?? false,
+    model: options.outputModeration?.model,
     refusalMessage: options.outputModeration?.refusalMessage ?? DEFAULT_MODERATION_REFUSAL_MESSAGE,
     refusalBanner: options.outputModeration?.refusalBanner ?? DEFAULT_MODERATION_REFUSAL_BANNER,
   };
   const inputModeration = {
-    enabled: options.inputModeration?.enabled ?? true,
+    enabled: options.inputModeration?.enabled ?? false,
     model: options.inputModeration?.model,
   };
   const budgetExceededMessage = options.runtimeCost?.budgetExceededMessage ?? DEFAULT_BUDGET_EXCEEDED_MESSAGE;
