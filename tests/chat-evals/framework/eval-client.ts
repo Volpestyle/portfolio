@@ -20,7 +20,7 @@ export function createEvalClient(options: CreateEvalClientOptions): EvalClient {
     async runPipeline(messages: ChatRequestMessage[]): Promise<PipelineResponse> {
       const response = await chatApi.run(openaiClient, messages, {
         softTimeoutMs: config.timeout.softTimeoutMs,
-        reasoningEnabled: config.reasoning.enabled,
+        reasoningEnabled: true,
       });
 
       // Map usage from ChatbotResponse to PipelineUsage format
@@ -40,7 +40,7 @@ export function createEvalClient(options: CreateEvalClientOptions): EvalClient {
       };
     },
 
-    async computeSimilarity(actual: string, golden: string): Promise<number> {
+    async computeSimilarity(actual: string, golden: string) {
       return computeSemanticSimilarity(openaiClient, actual, golden, config.models.similarityModel);
     },
 

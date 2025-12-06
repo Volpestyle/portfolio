@@ -1,6 +1,7 @@
 // LLM-as-a-judge for evaluating chatbot responses
 
 import type OpenAI from 'openai';
+import { estimateCostUsd, parseUsage } from '@portfolio/chat-contract';
 import type { JudgeInput, JudgeResult } from './types';
 
 const JUDGE_SYSTEM_PROMPT = `You are an eval judge for a portfolio chatbot. Your job is to score how well the ACTUAL response compares to the GOLDEN reference response.
@@ -62,17 +63,37 @@ export async function runJudge(
         strict: true,
       },
     },
-    temperature: 0,
   });
 
   const content = response.output_text ?? '{}';
+  const usage = parseUsage(response.usage, { allowZero: true });
+  const costUsd = usage ? estimateCostUsd(model, usage) : null;
+  const usageEntry =
+    usage && (usage.totalTokens > 0 || costUsd !== null)
+      ? {
+        stage: 'judge',
+        model,
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        totalTokens: usage.totalTokens,
+        costUsd: costUsd ?? undefined,
+      }
+      : undefined;
+
   try {
     const parsed = JSON.parse(content) as { score?: number; reasoning?: string };
     return {
       score: typeof parsed.score === 'number' ? Math.min(1, Math.max(0, parsed.score)) : 0,
       reasoning: parsed.reasoning ?? 'No reasoning provided',
+      usage: usageEntry,
+      costUsd: costUsd ?? undefined,
     };
   } catch {
-    return { score: 0, reasoning: 'Failed to parse judge response' };
+    return {
+      score: 0,
+      reasoning: 'Failed to parse judge response',
+      usage: usageEntry,
+      costUsd: costUsd ?? undefined,
+    };
   }
 }

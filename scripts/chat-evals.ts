@@ -13,6 +13,7 @@ import { parse as parseYaml } from 'yaml';
 import { createChatApi } from '@portfolio/chat-next-api';
 import { getOpenAIClient } from '../src/server/openai/client';
 import { chatProviders } from '../src/server/chat/bootstrap';
+import type { ProfileSummary } from '@portfolio/chat-contract';
 import personaFile from '../generated/persona.json';
 import profileFile from '../generated/profile.json';
 import {
@@ -44,7 +45,8 @@ function loadEvalConfig(): EvalConfig {
         softTimeoutMs: parsed.timeout?.softTimeoutMs ?? 60000,
       },
       reasoning: {
-        enabled: parsed.reasoning?.enabled ?? true,
+        planner: parsed.reasoning?.planner ?? 'minimal',
+        answer: parsed.reasoning?.answer ?? 'low',
       },
       thresholds: {
         minSemanticSimilarity: parsed.thresholds?.minSemanticSimilarity ?? 0.75,
@@ -62,7 +64,7 @@ function loadEvalConfig(): EvalConfig {
         similarityModel: 'text-embedding-3-small',
       },
       timeout: { softTimeoutMs: 60000 },
-      reasoning: { enabled: true },
+      reasoning: { planner: 'minimal', answer: 'low' },
       thresholds: { minSemanticSimilarity: 0.75, minJudgeScore: 0.7 },
     };
   }
@@ -98,9 +100,10 @@ async function main() {
         answerModel: config.models.answerModel,
         answerModelNoRetrieval: config.models.answerModelNoRetrieval,
         embeddingModel: config.models.embeddingModel,
+        reasoning: config.reasoning,
       },
       persona: personaFile,
-      profile: profileFile,
+      profile: profileFile as ProfileSummary,
     },
   });
 

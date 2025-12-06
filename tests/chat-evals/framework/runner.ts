@@ -36,7 +36,7 @@ export async function runMultiTurnEval(
     conversationHistory.push({ role: 'assistant', content: actualResponse });
 
     // Evaluate: semantic similarity + LLM-as-a-judge in parallel
-    const [semanticSimilarity, judgeResult] = await Promise.all([
+    const [similarityResult, judgeResult] = await Promise.all([
       client.computeSimilarity(actualResponse, turn.goldenResponse),
       client.runJudge({
         userMessage: turn.userMessage,
@@ -47,10 +47,22 @@ export async function runMultiTurnEval(
     ]);
 
     const elapsedMs = Math.round(performance.now() - turnStart);
+    const semanticSimilarity = similarityResult.similarity;
 
     const passed =
       semanticSimilarity >= config.thresholds.minSemanticSimilarity &&
       judgeResult.score >= config.thresholds.minJudgeScore;
+
+    const pipelineUsage = response.usage ?? [];
+    const evalUsage = [
+      ...(similarityResult.usage ?? []),
+      ...(judgeResult.usage ? [judgeResult.usage] : []),
+    ];
+    const usage = [...pipelineUsage, ...evalUsage];
+
+    const pipelineCostUsd = response.totalCostUsd ?? 0;
+    const evalCostUsd = (similarityResult.costUsd ?? 0) + (judgeResult.costUsd ?? 0);
+    const totalCostUsd = pipelineCostUsd + evalCostUsd;
 
     turnResults.push({
       turnIndex: i,
@@ -62,8 +74,10 @@ export async function runMultiTurnEval(
       judgeReasoning: judgeResult.reasoning,
       passed,
       elapsedMs,
-      usage: response.usage,
-      totalCostUsd: response.totalCostUsd,
+      usage: usage.length ? usage : undefined,
+      totalCostUsd,
+      pipelineCostUsd: pipelineCostUsd || undefined,
+      evalCostUsd: evalCostUsd || undefined,
     });
 
     // Log turn result

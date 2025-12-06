@@ -2,21 +2,22 @@
 # Configure models and settings for running chat evals
 
 models:
-  # Pipeline models (what's being tested)
-  plannerModel: gpt-4o-mini
-  answerModel: gpt-4o-mini
-  answerModelNoRetrieval: gpt-4o-mini
+  # Pipeline models (what's being tested) - should match chat.config.yml
+  plannerModel: gpt-5-nano-2025-08-07
+  answerModel: gpt-5-nano-2025-08-07
+  # answerModelNoRetrieval: gpt-5-mini-2025-08-07
   embeddingModel: text-embedding-3-small
 
   # Eval models (grading)
-  judgeModel: gpt-4o
+  judgeModel: gpt-5-mini-2025-08-07
   similarityModel: text-embedding-3-small
 
 timeout:
   softTimeoutMs: 60000
 
 reasoning:
-  enabled: true
+  planner: minimal
+  answer: low
 
 # Scoring thresholds
 thresholds:

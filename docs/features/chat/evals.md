@@ -165,3 +165,4 @@ Commands:
 Notes:
 
 - The runner uses `src/server/chat/bootstrap.ts`, so the same pipeline/logger is exercised as the app. Log output includes planner/retrieval/answer events and token spend (`chat.pipeline.tokens`). In dev, you can also open `/debug/chat` after a run to inspect the in-memory buffer.
+- Cost totals in the CLI summary/report include both pipeline calls and the eval overhead (semantic-similarity embeddings + judge model).

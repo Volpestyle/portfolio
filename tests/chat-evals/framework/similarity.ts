@@ -1,13 +1,38 @@
 // Semantic similarity computation using embeddings
 
 import type OpenAI from 'openai';
+import { estimateCostUsd, parseUsage, type TokenUsage } from '@portfolio/chat-contract';
+import type { PipelineUsage, SimilarityResult } from './types';
 
-export async function getEmbedding(client: OpenAI, text: string, model: string): Promise<number[]> {
+const buildUsage = (stage: string, model: string, usage: TokenUsage | null): PipelineUsage | undefined => {
+  if (!usage) return undefined;
+  const costUsd = estimateCostUsd(model, usage);
+  if (usage.totalTokens <= 0 && costUsd === null) return undefined;
+  return {
+    stage,
+    model,
+    promptTokens: usage.promptTokens,
+    completionTokens: usage.completionTokens,
+    totalTokens: usage.totalTokens,
+    costUsd: costUsd ?? undefined,
+  };
+};
+
+export async function getEmbedding(
+  client: OpenAI,
+  text: string,
+  model: string,
+  stage: string
+): Promise<{ embedding: number[]; usage?: PipelineUsage }> {
   const response = await client.embeddings.create({
     model,
     input: text,
   });
-  return response.data[0]!.embedding;
+  const usage = parseUsage(response.usage, { allowZero: true });
+  return {
+    embedding: response.data[0]!.embedding,
+    usage: buildUsage(stage, model, usage),
+  };
 }
 
 export function cosineSimilarity(a: number[], b: number[]): number {
@@ -27,10 +52,21 @@ export async function computeSemanticSimilarity(
   actual: string,
   golden: string,
   model: string
-): Promise<number> {
+): Promise<SimilarityResult> {
   const [actualEmb, goldenEmb] = await Promise.all([
-    getEmbedding(client, actual, model),
-    getEmbedding(client, golden, model),
+    getEmbedding(client, actual, model, 'similarity:actual'),
+    getEmbedding(client, golden, model, 'similarity:golden'),
   ]);
-  return cosineSimilarity(actualEmb, goldenEmb);
+
+  const similarity = cosineSimilarity(actualEmb.embedding, goldenEmb.embedding);
+  const usage: PipelineUsage[] = [];
+  if (actualEmb.usage) usage.push(actualEmb.usage);
+  if (goldenEmb.usage) usage.push(goldenEmb.usage);
+  const totalCostUsd = usage.reduce((sum, u) => sum + (u.costUsd ?? 0), 0);
+
+  return {
+    similarity,
+    usage: usage.length ? usage : undefined,
+    costUsd: totalCostUsd || undefined,
+  };
 }

@@ -1,6 +1,6 @@
 // Shared types for chat evals
 
-import type { ChatRequestMessage } from '@portfolio/chat-contract';
+import type { ChatRequestMessage, StageReasoningConfig } from '@portfolio/chat-contract';
 
 // --- Config ---
 
@@ -16,9 +16,7 @@ export type EvalConfig = {
   timeout: {
     softTimeoutMs: number;
   };
-  reasoning: {
-    enabled: boolean;
-  };
+  reasoning: StageReasoningConfig;
   thresholds: {
     minSemanticSimilarity: number;
     minJudgeScore: number;
@@ -53,6 +51,14 @@ export type ChatEvalSuite = {
 export type JudgeResult = {
   score: number;
   reasoning: string;
+  usage?: PipelineUsage;
+  costUsd?: number;
+};
+
+export type SimilarityResult = {
+  similarity: number;
+  usage?: PipelineUsage[];
+  costUsd?: number;
 };
 
 export type TurnEvalResult = {
@@ -68,6 +74,8 @@ export type TurnEvalResult = {
   // Token/cost metrics
   usage?: PipelineUsage[];
   totalCostUsd?: number;
+  pipelineCostUsd?: number;
+  evalCostUsd?: number;
 };
 
 export type TestResult = {
@@ -106,7 +114,7 @@ export type EvalClient = {
   /** Run the chat pipeline with conversation history */
   runPipeline(messages: ChatRequestMessage[]): Promise<PipelineResponse>;
   /** Compute semantic similarity between two texts (0-1) */
-  computeSimilarity(actual: string, golden: string): Promise<number>;
+  computeSimilarity(actual: string, golden: string): Promise<SimilarityResult>;
   /** Run LLM-as-a-judge to score the response */
   runJudge(input: JudgeInput): Promise<JudgeResult>;
 };
