@@ -1,5 +1,5 @@
 // Chat eval suites for the portfolio chat runtime.
-// Shape mirrors the schema documented in docs/features/chat/evals-and-goldens.md.
+// Shape mirrors the schema documented in docs/features/chat/evals.md.
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 

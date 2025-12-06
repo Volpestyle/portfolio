@@ -46,7 +46,7 @@ At a high level:
 Companion docs:
 
 - Runtime cookbook and guardrails: `docs/features/chat/implementation-notes.md`.
-- Chat evals: `docs/features/chat/evals-and-goldens.md`.
+- Chat evals: `docs/features/chat/evals.md`.
 
 ---
 
@@ -85,7 +85,7 @@ Per chat turn, the engine MUST:
   - Recency‑aware scoring.
 - Produce an AnswerPayload:
   - `message` in first person (“I”).
-  - Optional `thoughts` (dev-only).
+  - Optional `thoughts`.
   - Optional `uiHints` with ordered project/experience IDs (subset of retrieved docs).
 - Stream back to the frontend:
   - Answer tokens.
@@ -95,12 +95,12 @@ Per chat turn, the engine MUST:
 ### 1.3 Non‑Functional Requirements
 
 - **Latency**
-  - Planner uses a nano-class model; Answer uses nano or mini (mini recommended for voice adherence).
+  - Planner uses a nano-class model; Answer model size is configurable (larger = better voice adherence).
   - Answer streams tokens as soon as they're available.
   - Target: time-to-first-visible-activity < 500ms, full response < 3s for typical turns.
-  - Note: Traditional TTFT (time-to-first-answer-token) is less critical here because the reasoning trace provides continuous visible feedback throughout the pipeline. Users see plan → retrieval summary → answer tokens as each stage completes. This progressive disclosure keeps perceived latency low even though multiple LLM calls run sequentially before the answer streams.
+  - Note: Traditional TTFT is less critical here because the reasoning trace provides continuous visible feedback. Users see plan → retrieval summary → answer tokens as each stage completes.
 - **Cost**
-  - Runtime: Planner → nano; Answer → nano or mini.
+  - Runtime: Planner → nano; Answer → configurable (trade-off: larger model = better voice, higher cost).
   - Preprocessing (offline): full-size model and text‑embedding‑3‑large for one‑time work.
   - Track tokens & estimated USD cost for both preprocessing and runtime.
   - See `docs/features/chat/rate-limits-and-cost-guards.md` for cost alarms and rate limiting.
@@ -203,22 +203,16 @@ type OwnerConfig = {
 };
 
 type ModelConfig = {
-  plannerModel: string; // nano model id
-  answerModel: string; // nano or mini model id (mini recommended for voice adherence)
+  plannerModel: string; // nano-class model id
+  answerModel: string; // larger model = better voice/style adherence
+  answerModelNoRetrieval?: string; // optional lighter model for no-retrieval turns (greetings/meta)
   embeddingModel: string; // embedding model id
-  answerTemperature?: number; // optional Answer-stage temperature (0-2; undefined uses model default)
+  answerTemperature?: number; // optional (0-2; undefined uses model default)
   reasoning?: {
-    planner?: ReasoningEffort; // minimal | low | medium | high (reasoning-capable models only)
+    planner?: ReasoningEffort; // minimal | low | medium | high
     answer?: ReasoningEffort;
+    answerNoRetrieval?: ReasoningEffort; // defaults to 'minimal'
   };
-};
-
-type EmbeddingIndex = {
-  meta: {
-    schemaVersion: string;
-    buildId: string;
-  };
-  entries: { id: string; vector: number[] }[];
 };
 
 type DataProviders = {
@@ -227,7 +221,7 @@ type DataProviders = {
   profile: ProfileDoc | null; // identity context is optional but recommended
   persona: PersonaSummary; // generated during preprocessing
   embeddingIndexes: {
-    projects: EmbeddingIndex;
+    projects: EmbeddingIndex; // see Appendix A for EmbeddingIndex shape
     resume: EmbeddingIndex;
   };
 };
@@ -244,55 +238,25 @@ models:
     answer: low
 */
 
-// Server wiring uses createChatApi (packages/chat-next-api),
-// which wraps createChatRuntime under the hood.
-type ChatApiConfig = {
-  retrieval: RetrievalOptions; // project/experience/profile repositories + semantic rankers
-  runtimeOptions?: ChatRuntimeOptions; // owner, modelConfig, persona, identityContext, tokenLimits, logger
-};
-
-const chatApi = createChatApi({
-  retrieval: {
-    projectRepository,
-    experienceRepository,
-    profileRepository,
-    projectSemanticRanker,
-    experienceSemanticRanker,
-  },
-  runtimeOptions: {
-    owner: ownerConfig,
-    modelConfig,
-    persona,
-    identityContext,
-  },
-});
-
-chatApi.run(openaiClient, messages, {
-  ownerId: ownerConfig.ownerId,
-  reasoningEnabled, // emit reasoning when true
-  onAnswerToken,
-  onUiEvent,
-  onReasoningUpdate,
-});
+// Server wiring: see §9.2 for createChatApi usage example.
 ```
 
-Model IDs for Planner/Answer/Embeddings come from `chat.config.yml`; the strings in this spec are placeholders, not hardcoded defaults.
+**Configuration notes:**
 
-Planner quality note: on reasoning-capable models, set `reasoning.planner` to `low` or higher—`minimal` tends to reduce plan accuracy and produces less inclusive retrieval coverage.
-
-Reasoning emission is a per-run option (`reasoningEnabled`), not part of the runtime config.
-
-Placeholders note: In prompts (see `packages/chat-orchestrator/src/pipelinePrompts.ts`) we use `{{OWNER_NAME}}` and `{{DOMAIN_LABEL}}` as template placeholders. Runtime must replace those using `OwnerConfig.ownerName` and `OwnerConfig.domainLabel` before sending prompts to the LLM.
+- Model IDs for Planner/Answer/Embeddings come from `chat.config.yml`; the strings in this spec are placeholders.
+- Planner quality: on reasoning-capable models, set `reasoning.planner` to `low` or higher—`minimal` tends to reduce plan accuracy.
+- Reasoning emission is a per-run option (`reasoningEnabled`), not part of the runtime config.
+- Prompts use `{{OWNER_NAME}}` and `{{DOMAIN_LABEL}}` placeholders, replaced at runtime from `OwnerConfig`.
 
 ### 2.3 Pipeline Overview
 
 Quick at-a-glance view of purpose, inputs/outputs, and primary tech. See §5 for detailed behavior and prompts.
 
-| Stage     | Purpose                                                           | Inputs                                                                                | Outputs                                                                                                  | Primary tech                                                                                                               |
-| --------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Planner   | Decide what to search                                             | Latest user message + short history; OwnerConfig + persona baked into system prompt   | PlannerLLMOutput (`queries[]`, optional `topic`)                                                         | OpenAI Responses API (json schema) with `ModelConfig.plannerModel` (nano class)                                            |
-| Retrieval | Turn planner queries into ranked document sets                    | PlannerLLMOutput.queries + corpora (projects/resume/profile) + embedding indexes      | Retrieved docs per source (scored and filtered)                                                          | MiniSearch BM25 + text-embedding-3-large re-rank + recency scoring (projects/resume); profile short-circuited              |
-| Answer    | Turn retrieval into first-person text + UI hints (cards)         | PlannerLLMOutput + retrieved docs + persona/profile + short history                   | AnswerPayload (message + optional thoughts + optional uiHints.projects/experiences)                      | OpenAI Responses API with `ModelConfig.answerModel` (nano or mini; mini recommended for voice adherence), streaming tokens |
+| Stage     | Purpose                                        | Inputs                                                                              | Outputs                                                             | Primary tech                                                                        |
+| --------- | ---------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Planner   | Decide what to search                          | Latest user message + short history; OwnerConfig + persona baked into system prompt | PlannerLLMOutput (`queries[]`, optional `topic` + `thoughts`)       | OpenAI Responses API (json schema) with `ModelConfig.plannerModel`                  |
+| Retrieval | Turn planner queries into ranked document sets | PlannerLLMOutput.queries + corpora (projects/resume/profile) + embedding indexes    | Retrieved docs per source (scored and filtered)                     | MiniSearch BM25 + embedding re-rank + recency scoring; profile short-circuited      |
+| Answer    | Turn retrieval into first-person text + UI hints | PlannerLLMOutput + retrieved docs + persona/profile + short history               | AnswerPayload (message + optional thoughts + optional uiHints)      | OpenAI Responses API with `ModelConfig.answerModel`, streaming tokens               |
 
 ---
 
@@ -540,9 +504,11 @@ type PersonaSummary = {
     headline?: string;
     location?: string;
     currentRole?: string;
-    about?: string[];
     topSkills?: string[];
-    socialLinks?: string[]; // URL-only list
+    socialLinks?: Array<{
+      url: string;
+      blurb?: string | null;
+    }>;
     featuredExperienceIds?: string[];
   };
   generatedAt: string;
@@ -550,7 +516,7 @@ type PersonaSummary = {
 ```
 
 - **Profile is required.** It is ingested from a Markdown file in `data/chat/profile.md` using a full-size model to structure into a single ProfileDoc (with `id` typically set to `"profile"`). If `profile.md` is missing or empty, preprocessing fails with `PREPROCESS_PROFILE_REQUIRED`.
-- Persona is synthesized from the resume + projects + profile using a full-size model and stored as a PersonaSummary. All three sources are required to produce a high-quality, grounded persona.
+- Persona is derived deterministically from `profile.json` fields (systemPersona, shortAbout derived from about paragraphs, styleGuidelines, voiceExamples) and stored as a PersonaSummary. The persona snapshot intentionally omits the full about paragraphs to keep the Answer system prompt lean; retrieval uses the profile doc for richer bio text.
 
 #### 3.3.1 Profile ingestion
 
@@ -755,66 +721,50 @@ When `incrementalBuild: true`:
 
 ## 4. Runtime Contracts & Types
 
-### 4.1 Core Types & Reasoning
+### 4.1 Core Types
 
-Appendix A is the single source of truth for: `PlannerLLMOutput` (queries/topic), `AnswerPayload` (message/thoughts/uiHints), `UiPayload`, `ModelConfig`, and the `ReasoningTrace` / `PartialReasoningTrace` shapes. ReasoningTrace is a structured dev trace (plan → retrieval → answerMeta); PartialReasoningTrace streams when reasoning is enabled and mirrors the three pipeline stages (`planner`, `retrieval`, `answer`).
+**Appendix A is the single source of truth** for all pipeline type definitions: `PlannerQuery`, `PlannerLLMOutput`, `AnswerPayload`, `UiPayload`, `EmbeddingIndex`, and `ReasoningTrace` / `PartialReasoningTrace`.
 
-### 4.2 Planner Output (`PlannerLLMOutput`)
+This section describes behavioral constraints; see Appendix A for full schemas.
 
-- `queries`: array of `{ source: 'projects' | 'resume' | 'profile'; text: string; limit?: number }`.
-- `topic?`: short telemetry label for logging only.
+### 4.2 Planner Output
 
-Constraints and expectations:
+`PlannerLLMOutput` contains `queries[]`, optional `topic`, and optional `thoughts`. Constraints:
 
 - Queries may be empty for greetings/meta or when the latest turns already contain the necessary facts.
-- `limit` defaults to 8 when omitted; runtime clamps to safe bounds.
-- Queries should encode scope in text (e.g., “professional Go experience”, “AI/LLM projects”).
-- Resume retrieval automatically prioritizes work/education entries over skills/awards; no manual facets are needed.
-- Planner does **not** decide whether to show cards; the Answer stage does that by emitting or omitting uiHints.
+- `limit` defaults to 8 when omitted; runtime clamps to safe bounds (3–10).
+- Resume retrieval automatically prioritizes work/education entries over skills/awards.
 
-### 4.3 AnswerPayload (combined)
+### 4.3 AnswerPayload
 
-- `message`: first-person text answer.
-- `thoughts?`: optional dev-only trace.
-- `uiHints?`: `{ projects?: string[]; experiences?: string[]; links?: SocialPlatform[] }` ordered by relevance.
+`AnswerPayload` contains `message`, optional `thoughts`, and optional `uiHints`. Constraints:
 
-Constraints:
-
-- uiHints IDs must be subsets of retrieved docs; invalid IDs are dropped during UI derivation. For `links`, only platforms present in `profile.socialLinks` (derived from `data/chat/profile.json`) are allowed.
 - Omit uiHints (or leave arrays empty) when no cards/links are relevant.
 - Order matters; the UI preserves the returned order.
 
-### 4.4 UiPayload (derived from Answer.uiHints)
+### 4.4 UiPayload
 
-Simplified UI contract:
+`UiPayload` is derived from `Answer.uiHints` filtered to retrieved doc IDs. Rules:
 
-```ts
-type UiPayload = {
-  showProjects: string[];
-  showExperiences: string[];
-  showEducation: string[];
-  showLinks: SocialPlatform[];
-};
-```
+- Clamp lengths (implementation default: 10 per type).
+- Empty or missing uiHints yields an empty UiPayload.
 
-Rules:
+### 4.5 Reasoning & Streaming
 
-- Always filter to retrieved doc IDs (and `profile.socialLinks` for links) and clamp lengths (implementation default: 10 per type).
-- Empty or missing uiHints yields an empty UiPayload (no projects, experiences, education, or links).
-- No banner/core-evidence metadata; cards/links alone represent the UI surface.
-
-### 4.5 Reasoning & Streaming Contract
-
-- `reasoning` SSE events may contain partial text deltas and structured trace fragments: `{ stage: 'planner' | 'retrieval' | 'answer', trace, delta?, notes?, progress? }`.
-- Stages stream cumulatively: planner (plan JSON), retrieval (per-query fetch progress + ranked summaries), answer (uiHints/metadata as soon as parsable plus token thinking).
-- Final trace is emitted on stage completion; deltas are append-only text to show “what the model is thinking” during streaming.
+- `reasoning` SSE events contain partial text deltas and structured trace fragments.
+- Stages stream cumulatively: planner → retrieval → answer.
+- Final trace is emitted on stage completion; deltas are append-only.
 
 ### 4.6 Cross-Stage Invariants
 
-- Cards flow: Answer controls cards by emitting uiHints; when uiHints are empty/missing, UiPayload is empty even if retrieval returned docs.
-- uiHints subset: Only IDs present in retrieved docs (and profile.socialLinks for links) are allowed; drop/ignore hallucinated IDs.
-- Retrieval reuse: If queries are empty, retrieval is skipped; Answer must honestly state when no relevant portfolio data is available.
-- UI alignment: Cards shown must align with the textual answer; uiHints is the only source of truth for card IDs.
+These invariants are enforced throughout the pipeline:
+
+- **Grounding:** Only assert facts present in retrieved docs or supplied context (persona, profile, identity). If nothing relevant, say so.
+- **Planner scope:** Planner decides what to search; it does **not** decide whether cards render.
+- **Answer controls cards:** Answer decides whether cards show by emitting or omitting `uiHints`.
+- **uiHints subset:** Only IDs present in retrieved docs (and `profile.socialLinks` for links) are allowed; hallucinated IDs are dropped.
+- **UI alignment:** Cards shown must align with the textual answer; `uiHints` is the single source of truth for card IDs.
+- **Retrieval reuse:** If queries are empty, retrieval is skipped; Answer uses profile/persona context.
 
 ---
 
@@ -829,11 +779,11 @@ All LLM interactions use the OpenAI Responses API with:
 
 ### 5.0 Model Strategy
 
-All runtime model IDs are read from `chat.config.yml`. We refer to them using placeholder class names: nano model (low cost/latency), mini model (deeper reasoning when needed), and full-size model (strongest quality).
+All runtime model IDs are read from `chat.config.yml`.
 
-- Offline (preprocess) – full-size model for enrichment & persona + text-embedding-3-large for embeddings.
-- Online Planner – nano by default for cost/latency.
-- Online Answer – nano or mini. Mini is recommended when voice examples are important, as it adheres to persona/voice guidelines more reliably than nano. Trade-off is slightly higher cost/latency.
+- **Offline (preprocess):** Full-size model for enrichment & persona + text-embedding-3-large for embeddings.
+- **Online Planner:** Nano-class model for cost/latency.
+- **Online Answer:** The larger the model, the better it adheres to persona voice/style. Trade-off is cost/latency.
 
 #### 5.0.1 Token Budgets & Sliding Window
 
@@ -844,21 +794,9 @@ Sliding-window truncation keeps conversations going indefinitely while honoring 
 | **Planner** | 16,000           | 1,000             | Sliding window + system prompt                 |
 | **Answer**  | 16,000           | 2,000             | Sliding window + retrieved context + plan info |
 
-Runtime defaults:
-
-- Conversation window budget: ~8k tokens; always keep the last 3 turns.
-- Max user message: ~500 tokens; reject if longer.
-- Answer sees retrieved docs + planner output; Planner sees the windowed history.
-- UI should surface a subtle "context truncated" hint when turns are dropped.
-- Token counts are computed with tiktoken (o200k_base), not character-length heuristics.
-
-Implementation details and the tokenizer guardrails live in `docs/features/chat/implementation-notes.md#21-sliding-window--token-budgets`.
-
 ### 5.0.2 Sliding Window Algorithm
 
 The orchestrator uses tiktoken (`o200k_base` encoding) for token counting.
-
-**Configuration:**
 
 ```ts
 const SLIDING_WINDOW_CONFIG = {
@@ -877,9 +815,7 @@ const SLIDING_WINDOW_CONFIG = {
    - Continue adding older turns while total tokens ≤ `maxConversationTokens`.
 4. Return truncated messages and a `truncationApplied` flag.
 
-**Error handling:**
-
-- If the user message exceeds 500 tokens, return an error to the client before the pipeline runs.
+UI should surface a subtle "context truncated" hint when turns are dropped. Implementation details live in `docs/features/chat/implementation-notes.md#21-sliding-window--token-budgets`.
 
 ### 5.1 Planner
 
@@ -890,29 +826,36 @@ const SLIDING_WINDOW_CONFIG = {
   - Conversation window (last ~3 user + 3 assistant messages).
   - Latest user message.
 - Output:
-  - `PlannerLLMOutput` JSON (`queries`, `topic?`).
+  - `PlannerLLMOutput` JSON (`queries`, `topic?`, `thoughts?`).
 
-**Responsibilities (from the simplified prompt)**
+**Responsibilities**
 
 - Build targeted `queries` with explicit sources and key terms.
 - Use empty `queries` for greetings/meta or when recent conversation suffices.
 - Fill `topic` with a short telemetry label (2–5 words).
-- Planner does **not** decide whether cards render; the Answer stage does that by emitting/omitting uiHints.
+- Emit 1–3 short `thoughts` describing how you picked sources or filters.
 
 **Query construction & routing**
 
-- Include key terms from the question; expand broad topics:
-  - AI/ML: “AI, ML, machine learning, LLM”.
-  - Frontend: “frontend, UI, UX, user interface”.
-  - Backend: “backend, server, API, database”.
-- Keep specific tools narrow (“Rust”, “Go”).
-- Locations: include variants (“New York, NYC, NY”).
+The `text` field is optional. Omit it for broad queries like "show me your projects" or "what jobs have you had?" — this fetches all items from that source. Use `text` only when filtering by specific skills, tools, or topics.
+
+- Output a comma-separated list of search terms in the `text` field which best encapsulates the user's intent.
+- How the search engine works:
+  - Each comma-separated term is searched independently.
+  - Multi-word phrases (e.g. "React Native") are matched as exact phrases.
+  - Single words use fuzzy matching (typo-tolerant) and prefix matching.
+  - More matching terms = higher relevance score.
+  - The engine searches: job titles, company names, skills, summaries, bullet points, locations.
+- For broad topics, expand: "AI" → "AI, ML, machine learning, LLM".
+- For specific tools, keep narrow: "Rust" or "React Native".
+- Include location variants: "Seattle, Washington, WA, Pacific Northwest, PNW".
 - Source guidance:
   - Skills/tools → `projects` + `resume`.
   - Employment → `resume`.
+  - Education → `resume`.
   - Projects → `projects`.
-  - Bio/intro → `profile`.
-  - Location → `profile` + `resume`.
+  - Bio/About → `profile`.
+  - Location/current role → no retrieval needed (use persona/profile context).
 - Default `limit` per query is 8 unless the model sets a lower/higher number within bounds.
 
 ### 5.2 Retrieval
@@ -945,22 +888,24 @@ Processing steps:
 - Model: `ModelConfig.answerModel`.
 - Inputs:
   - Answer system prompt from `pipelinePrompts.ts`.
-  - Persona summary (PersonaSummary).
-  - Identity context (OwnerConfig + ProfileDoc).
-  - Conversation window.
-  - Latest user message.
-  - PlannerLLMOutput (topic).
-  - Retrieved docs (projects, resume, profile).
+- Persona summary (PersonaSummary).
+- Identity context (OwnerConfig + ProfileDoc).
+- Conversation window.
+- Latest user message.
+  - PlannerLLMOutput (topic/thoughts).
+- Retrieved docs (projects, resume, profile).
 - Output:
   - AnswerPayload JSON with optional uiHints.
 
 **Behavior (per new prompt)**
 
-- Grounding: only state facts from retrieved docs; if nothing relevant, say so (“I don’t have that in my portfolio”).
-- Voice: speak as “I”; match persona voice/style guidelines and injected voice examples.
-- UI hints: include only when the projects/experiences directly support the answer; omit or leave arrays empty for greetings/meta/off-topic responses or when evidence is missing. Only include IDs present in retrieved docs.
-- Answer length: keep text concise when cards are present; expand when no cards or few docs.
+- Domain: Only messages about work, experience, resume, skills, and background are within scope. For out-of-scope messages, refer to style guidelines and voice examples. Beyond portfolio knowledge, the chatbot can provide simple code snippets, project ideas, or mock interviews.
+- Grounding: only state facts from retrieved docs or the supplied context (persona, profile, identity); if nothing relevant, say so ("I don't have that in my portfolio"). Not all questions require retrieval—answer from supplied context alone when appropriate.
+- Voice: speak as "I"; match persona voice/style guidelines and injected voice examples.
+- UI hints: include only when the projects/experiences directly support the answer; omit or leave arrays empty for greetings/meta/off-topic responses or when evidence is missing. Only include IDs present in retrieved docs. For links, only include platforms that strongly support the response (e.g., user asks for social profile or how to contact).
+- Answer length: keep text concise when cards are present; expand when no cards or few docs. For conversations not closely related to the portfolio, prefer shorter responses (1–3 sentences).
 - Streaming: tokens stream; uiHints can surface as soon as valid JSON is parsable.
+- Thoughts: For no-retrieval turns (greetings/meta), the `thoughts` field is cleared to reduce noise.
 
 **Temperature**
 
@@ -1196,11 +1141,11 @@ Per chat turn, log:
 
 ### 8.4 Evals & Graders (cards-aware)
 
-Coverage focuses on grounding, UI/text alignment, card alignment (uiHints vs text), zero-result honesty, and persona adherence. See `docs/features/chat/evals-and-goldens.md` for the active suites and runner sketch.
+Coverage focuses on grounding, UI/text alignment, card alignment (uiHints vs text), zero-result honesty, and persona adherence. See `docs/features/chat/evals.md` for the active suites and runner sketch.
 
 ### 8.5 Chat Eval Sets
 
-Chat evals validate end-to-end behavior. Schema (source of truth lives in `docs/features/chat/evals-and-goldens.md`):
+Chat evals validate end-to-end behavior. Schema (source of truth lives in `docs/features/chat/evals.md`):
 
 ```ts
 type ChatEvalTestCase = {
@@ -1259,7 +1204,7 @@ const factCheckSuite: ChatEvalSuite = {
 };
 ```
 
-Full chat eval suites and runner sketch: `docs/features/chat/evals-and-goldens.md`; suites live in `tests/golden/index.ts`.
+Full chat eval suites and runner sketch: `docs/features/chat/evals.md`; suites live in `tests/golden/index.ts`.
 
 ---
 
@@ -1376,6 +1321,8 @@ export interface PlannerQuery {
 export interface PlannerLLMOutput {
   queries: PlannerQuery[];
   topic?: string;
+  useProfileContext?: boolean; // hint to include profile context in answer (reserved for future use)
+  thoughts?: string[]; // optional rationale for query/source selection
 }
 
 // ================================
@@ -1390,7 +1337,7 @@ export interface AnswerPayload {
   message: string;
 
   /**
-   * Optional dev-only chain-of-thought / rationale.
+   * Chain-of-thought / rationale.
    * Not shown to end users.
    */
   thoughts?: string[];
@@ -1440,7 +1387,7 @@ export interface UiPayload {
 }
 
 // ================================
-// Reasoning trace (dev-only)
+// Reasoning trace
 // ================================
 
 export interface ReasoningTrace {

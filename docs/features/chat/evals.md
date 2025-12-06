@@ -147,3 +147,21 @@ Keep assertions focused on the contract: planner queries, grounded answer text, 
 - Full suites in `tests/golden/index.ts` (fact-check, enumeration, narrative, meta, edge cases).
 - Runner wiring sits next to the chat API integration helpers.
 - Metrics/grade scripts can emit JSON for dashboards; the shapes above are the expected contract.
+
+---
+
+## 5. Running evals locally (with logging)
+
+Prereqs:
+
+- `OPENAI_API_KEY` set, and `generated/` artifacts up to date (run `pnpm chat:preprocess` if needed).
+- `CHAT_DEBUG_LOG` optional: `1` (default dev), `2` (includes raw queries), or `3` (same with aggressive redaction).
+
+Commands:
+
+- Run the suites: `pnpm chat:evals`
+- Capture logs: `CHAT_DEBUG_LOG=2 pnpm chat:evals > chat-evals.log`
+
+Notes:
+
+- The runner uses `src/server/chat/bootstrap.ts`, so the same pipeline/logger is exercised as the app. Log output includes planner/retrieval/answer events and token spend (`chat.pipeline.tokens`). In dev, you can also open `/debug/chat` after a run to inspect the in-memory buffer.

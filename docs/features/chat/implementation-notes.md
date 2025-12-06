@@ -27,7 +27,7 @@ Companion to `docs/features/chat/chat-spec.md`. The spec is the source of truth 
 - Runtime pipeline: **Planner → Retrieval → Answer**, all using the OpenAI Responses API with JSON schemas.
 - Planner outputs `queries[]` and optional `topic`, built from a sliding conversation snippet, OwnerConfig, and persona; prompts live in `packages/chat-orchestrator/src/pipelinePrompts.ts`.
 - Retrieval executes planner queries across projects/resume/profile using BM25 shortlist, embedding re-rank, and recency-aware scoring; profile inclusion is deterministic when requested; defaults `topK=8`, clamped to max 50; process-level caches keep searchers warm.
-- Answer streams a first-person message plus optional `thoughts` (dev-only) and `uiHints.projects/experiences`; uiHints are validated against retrieved docs and clamped (default max 10 per type) before emitting UI payloads.
+- Answer streams a first-person message plus optional `thoughts` and `uiHints.projects/experiences`; uiHints are validated against retrieved docs and clamped (default max 10 per type) before emitting UI payloads.
 - Conversation truncation: sliding window keeps the latest turns within ~8k tokens, always retains the latest user message and at least 3 recent turns; max user message size 500 tokens; tiktoken-backed counts; truncation is surfaced via reasoning trace metadata.
 
 ---
