@@ -275,10 +275,10 @@ export type PlannerQuery = {
 };
 
 export type PlannerLLMOutput = {
+  thoughts?: string[];
   queries: PlannerQuery[];
   topic?: string;
   useProfileContext?: boolean;
-  thoughts?: string[];
 };
 
 export type RetrievalPlan = PlannerLLMOutput & {
@@ -296,10 +296,29 @@ export type AnswerUiHints = {
   links?: SocialPlatform[];
 };
 
+export type CardSelectionReason = {
+  id: string;
+  name: string;
+  reason: string;
+};
+
+export type CardSelectionCategory = {
+  included: CardSelectionReason[];
+  excluded: CardSelectionReason[];
+};
+
+export type CardSelectionReasoning = {
+  projects?: CardSelectionCategory | null;
+  experiences?: CardSelectionCategory | null;
+  education?: CardSelectionCategory | null;
+  links?: CardSelectionCategory | null;
+};
+
 export type AnswerPayload = {
-  message: string;
   thoughts?: string[];
+  cardReasoning?: CardSelectionReasoning | null;
   uiHints?: AnswerUiHints;
+  message: string;
 };
 
 export type UiPayload = {
@@ -323,10 +342,10 @@ const PlannerQuerySchema: z.ZodType<PlannerQuery, z.ZodTypeDef, unknown> = z.obj
  * Schema for parsing raw Planner LLM output (per simplified spec).
  */
 export const PlannerLLMOutputSchema: z.ZodType<PlannerLLMOutput, z.ZodTypeDef, unknown> = z.object({
+  thoughts: z.array(z.string()).default([]),
   queries: z.array(PlannerQuerySchema).default([]),
   topic: z.string().default(''),
   useProfileContext: z.boolean().default(false),
-  thoughts: z.array(z.string()).default([]),
 });
 
 const AnswerUiHintsSchema = z.object({
@@ -336,10 +355,29 @@ const AnswerUiHintsSchema = z.object({
   links: z.array(z.enum(SOCIAL_PLATFORM_VALUES)).default([]),
 });
 
+const CardSelectionReasonSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  reason: z.string(),
+});
+
+const CardSelectionCategorySchema = z.object({
+  included: z.array(CardSelectionReasonSchema),
+  excluded: z.array(CardSelectionReasonSchema),
+});
+
+const CardSelectionReasoningSchema = z.object({
+  projects: CardSelectionCategorySchema.nullable().optional(),
+  experiences: CardSelectionCategorySchema.nullable().optional(),
+  education: CardSelectionCategorySchema.nullable().optional(),
+  links: CardSelectionCategorySchema.nullable().optional(),
+});
+
 export const AnswerPayloadSchema = z.object({
-  message: z.string(),
   thoughts: z.array(z.string()).default([]),
+  cardReasoning: CardSelectionReasoningSchema.nullable().optional(),
   uiHints: AnswerUiHintsSchema.default({}),
+  message: z.string(),
 });
 
 export type RetrievalSummary = {
@@ -390,6 +428,7 @@ export type AnswerReasoning = {
   model?: string;
   uiHints?: AnswerUiHints;
   thoughts?: string[];
+  cardReasoning?: CardSelectionReasoning | null;
   effort?: ReasoningEffort;
   durationMs?: number;
   usage?: TokenUsage;
