@@ -1,179 +1,140 @@
 #!/usr/bin/env tsx
 
-import { performance } from 'node:perf_hooks';
-import type OpenAI from 'openai';
-import type { ChatRequestMessage } from '@portfolio/chat-contract';
-import { chatApi } from '../src/server/chat/bootstrap';
+/**
+ * Chat Evals CLI
+ *
+ * Thin entry point that loads config, creates clients, and runs eval suites.
+ * All logic is in tests/golden/lib/
+ */
+
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { resolve, join } from 'node:path';
+import { parse as parseYaml } from 'yaml';
+import { createChatApi } from '@portfolio/chat-next-api';
 import { getOpenAIClient } from '../src/server/openai/client';
-import chatEvalSuites, { type ChatEvalTestCase, type ChatEvalSuite } from '../tests/golden';
+import { chatProviders } from '../src/server/chat/bootstrap';
+import personaFile from '../generated/persona.json';
+import profileFile from '../generated/profile.json';
+import {
+  chatEvalSuites,
+  createEvalClient,
+  runAllSuites,
+  printSummary,
+  buildOutputReport,
+  type EvalConfig,
+} from '../tests/chat-evals';
 
-type AssertionResult = {
-  testId: string;
-  testName: string;
-  passed: boolean;
-  errors: string[];
-  elapsedMs: number;
-};
+// --- Config Loading ---
 
-function buildMessages(test: ChatEvalTestCase): ChatRequestMessage[] {
-  const history = test.input.conversationHistory ?? [];
-  return [...history, { role: 'user', content: test.input.userMessage }];
+function loadEvalConfig(): EvalConfig {
+  const configPath = resolve(process.cwd(), 'chat-eval.config.yml');
+  try {
+    const raw = readFileSync(configPath, 'utf-8');
+    const parsed = parseYaml(raw) as Partial<EvalConfig>;
+    return {
+      models: {
+        plannerModel: parsed.models?.plannerModel ?? 'gpt-4o-mini',
+        answerModel: parsed.models?.answerModel ?? 'gpt-4o-mini',
+        answerModelNoRetrieval: parsed.models?.answerModelNoRetrieval,
+        embeddingModel: parsed.models?.embeddingModel ?? 'text-embedding-3-small',
+        judgeModel: parsed.models?.judgeModel ?? 'gpt-4o',
+        similarityModel: parsed.models?.similarityModel ?? 'text-embedding-3-small',
+      },
+      timeout: {
+        softTimeoutMs: parsed.timeout?.softTimeoutMs ?? 60000,
+      },
+      reasoning: {
+        enabled: parsed.reasoning?.enabled ?? true,
+      },
+      thresholds: {
+        minSemanticSimilarity: parsed.thresholds?.minSemanticSimilarity ?? 0.75,
+        minJudgeScore: parsed.thresholds?.minJudgeScore ?? 0.7,
+      },
+    };
+  } catch {
+    console.warn('Could not load chat-eval.config.yml, using defaults');
+    return {
+      models: {
+        plannerModel: 'gpt-4o-mini',
+        answerModel: 'gpt-4o-mini',
+        embeddingModel: 'text-embedding-3-small',
+        judgeModel: 'gpt-4o',
+        similarityModel: 'text-embedding-3-small',
+      },
+      timeout: { softTimeoutMs: 60000 },
+      reasoning: { enabled: true },
+      thresholds: { minSemanticSimilarity: 0.75, minJudgeScore: 0.7 },
+    };
+  }
 }
 
-function assertStringContains(text: string, substrings?: string[]): string[] {
-  if (!substrings?.length) return [];
-  const lower = text.toLowerCase();
-  return substrings
-    .filter((snippet) => !lower.includes(snippet.toLowerCase()))
-    .map((snippet) => `Missing substring in answer: "${snippet}"`);
-}
+// --- Main ---
 
-function assertStringNotContains(text: string, substrings?: string[]): string[] {
-  if (!substrings?.length) return [];
-  const lower = text.toLowerCase();
-  return substrings
-    .filter((snippet) => lower.includes(snippet.toLowerCase()))
-    .map((snippet) => `Answer unexpectedly contains "${snippet}"`);
-}
+async function main() {
+  const config = loadEvalConfig();
 
-function assertIdInclusion(ids: string[], mustInclude?: string[], mustNotInclude?: string[]): string[] {
-  const errors: string[] = [];
-  if (mustInclude?.length) {
-    for (const required of mustInclude) {
-      if (!ids.includes(required)) {
-        errors.push(`Missing required id: ${required}`);
-      }
-    }
-  }
-  if (mustNotInclude?.length) {
-    for (const forbidden of mustNotInclude) {
-      if (ids.includes(forbidden)) {
-        errors.push(`Contains forbidden id: ${forbidden}`);
-      }
-    }
-  }
-  return errors;
-}
-
-async function runChatEvalCase(test: ChatEvalTestCase, client: OpenAI): Promise<AssertionResult> {
-  const messages = buildMessages(test);
-  const start = performance.now();
-  const response = await chatApi.run(client, messages, { softTimeoutMs: 60000, reasoningEnabled: true });
-  const elapsedMs = Math.round(performance.now() - start);
-
-  const errors: string[] = [];
-  const plan = response.reasoningTrace?.plan;
-  const answer = response.message ?? '';
-  const ui = response.ui ?? { showProjects: [], showExperiences: [], showEducation: [], showLinks: [] };
-
-  if (!plan) errors.push('Missing plan in reasoningTrace');
-
-  if (plan) {
-    const queryCount = plan.queries?.length ?? 0;
-    if (typeof test.expected.planQueriesMin === 'number' && queryCount < test.expected.planQueriesMin) {
-      errors.push(`plan queries count ${queryCount} is below min ${test.expected.planQueriesMin}`);
-    }
-    if (typeof test.expected.planQueriesMax === 'number' && queryCount > test.expected.planQueriesMax) {
-      errors.push(`plan queries count ${queryCount} exceeds max ${test.expected.planQueriesMax}`);
-    }
-  }
-
-  if (
-    typeof test.expected.uiHintsProjectsMinCount === 'number' &&
-    ui.showProjects.length < test.expected.uiHintsProjectsMinCount
-  ) {
-    errors.push(
-      `ui.showProjects count ${ui.showProjects.length} is below min ${test.expected.uiHintsProjectsMinCount}`
-    );
-  }
-  if (
-    typeof test.expected.uiHintsProjectsMaxCount === 'number' &&
-    ui.showProjects.length > test.expected.uiHintsProjectsMaxCount
-  ) {
-    errors.push(
-      `ui.showProjects count ${ui.showProjects.length} exceeds max ${test.expected.uiHintsProjectsMaxCount}`
-    );
-  }
-  if (
-    typeof test.expected.uiHintsExperiencesMinCount === 'number' &&
-    ui.showExperiences.length < test.expected.uiHintsExperiencesMinCount
-  ) {
-    errors.push(
-      `ui.showExperiences count ${ui.showExperiences.length} is below min ${test.expected.uiHintsExperiencesMinCount}`
-    );
-  }
-  if (
-    typeof test.expected.uiHintsExperiencesMaxCount === 'number' &&
-    ui.showExperiences.length > test.expected.uiHintsExperiencesMaxCount
-  ) {
-    errors.push(
-      `ui.showExperiences count ${ui.showExperiences.length} exceeds max ${test.expected.uiHintsExperiencesMaxCount}`
-    );
-  }
-
-  errors.push(
-    ...assertIdInclusion(ui.showProjects, test.expected.mustIncludeProjectIds, test.expected.mustNotIncludeProjectIds),
-    ...assertIdInclusion(ui.showExperiences, test.expected.mustIncludeExperienceIds, undefined)
+  console.log('Chat Evals - Semantic Similarity + LLM-as-a-Judge\n');
+  console.log('Pipeline models:', config.models.plannerModel, '/', config.models.answerModel);
+  console.log('Judge model:', config.models.judgeModel);
+  console.log(
+    'Thresholds: similarity >=',
+    config.thresholds.minSemanticSimilarity,
+    ', judge >=',
+    config.thresholds.minJudgeScore
   );
 
-  errors.push(...assertStringContains(answer, test.expected.answerContains));
-  errors.push(...assertStringNotContains(answer, test.expected.answerNotContains));
+  const openaiClient = await getOpenAIClient();
 
-  return {
-    testId: test.id,
-    testName: test.name,
-    passed: errors.length === 0,
-    errors,
-    elapsedMs,
-  };
-}
+  // Create chat API with eval config models + persona/profile for context
+  const chatApi = createChatApi({
+    retrieval: {
+      projectRepository: chatProviders.projectRepository,
+      experienceRepository: chatProviders.experienceRepository,
+      profileRepository: chatProviders.profileRepository,
+    },
+    runtimeOptions: {
+      modelConfig: {
+        plannerModel: config.models.plannerModel,
+        answerModel: config.models.answerModel,
+        answerModelNoRetrieval: config.models.answerModelNoRetrieval,
+        embeddingModel: config.models.embeddingModel,
+      },
+      persona: personaFile,
+      profile: profileFile,
+    },
+  });
 
-async function runChatEvalSuite(suite: ChatEvalSuite, client: OpenAI): Promise<AssertionResult[]> {
-  const results: AssertionResult[] = [];
-  for (const test of suite.tests) {
-    const result = await runChatEvalCase(test, client);
-    results.push(result);
-    const status = result.passed ? 'PASS' : 'FAIL';
-    console.log(`\n[${status}] ${suite.name} :: ${test.id} — ${test.name} (${result.elapsedMs} ms)`);
-    if (!result.passed) {
-      for (const err of result.errors) {
-        console.log(`  - ${err}`);
-      }
-    }
-  }
-  return results;
-}
+  // Create eval client (decoupled from test logic)
+  const evalClient = createEvalClient({
+    openaiClient,
+    chatApi,
+    config,
+  });
 
-async function runAllChatEvals() {
-  const client = await getOpenAIClient();
-  const allResults: AssertionResult[] = [];
-  for (const suite of chatEvalSuites) {
-    console.log('\n================================================');
-    console.log(`Suite: ${suite.name}`);
-    console.log(suite.description);
-    const suiteResults = await runChatEvalSuite(suite, client);
-    allResults.push(...suiteResults);
-  }
+  // Run all suites
+  const results = await runAllSuites(chatEvalSuites, evalClient, config);
 
-  const summary = allResults.map((r) => ({
-    id: r.testId,
-    name: r.testName,
-    passed: r.passed,
-    errors: r.errors.length,
-    ms: r.elapsedMs,
-  }));
+  // Print summary
+  printSummary(results);
 
-  console.log('\nSummary');
-  console.table(summary);
+  // Build and save output report
+  const report = buildOutputReport(results, config);
+  const outputDir = resolve(process.cwd(), 'tests/chat-evals/output');
+  mkdirSync(outputDir, { recursive: true });
 
-  const failed = allResults.filter((r) => !r.passed);
+  // Generate timestamped filename
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const outputPath = join(outputDir, `eval-${timestamp}.json`);
+  writeFileSync(outputPath, JSON.stringify(report, null, 2));
+  console.log(`\nOutput saved to: ${outputPath}`);
+
+  const failed = results.filter((r) => !r.passed);
   if (failed.length > 0) {
-    console.error(`\n${failed.length} chat eval(s) failed.`);
     process.exit(1);
   }
 }
 
-runAllChatEvals().catch((error) => {
+main().catch((error) => {
   console.error('chat-evals failed', error);
   process.exit(1);
 });

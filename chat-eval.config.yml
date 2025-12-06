@@ -1,0 +1,26 @@
+# Chat Eval Configuration
+# Configure models and settings for running chat evals
+
+models:
+  # Pipeline models (what's being tested)
+  plannerModel: gpt-4o-mini
+  answerModel: gpt-4o-mini
+  answerModelNoRetrieval: gpt-4o-mini
+  embeddingModel: text-embedding-3-small
+
+  # Eval models (grading)
+  judgeModel: gpt-4o
+  similarityModel: text-embedding-3-small
+
+timeout:
+  softTimeoutMs: 60000
+
+reasoning:
+  enabled: true
+
+# Scoring thresholds
+thresholds:
+  # Minimum semantic similarity (0-1) to pass
+  minSemanticSimilarity: 0.75
+  # Minimum judge score (0-1) to pass
+  minJudgeScore: 0.7

@@ -1,4 +1,7 @@
-import 'server-only';
+// Only import server-only in Next.js environment (not when running with tsx/node directly)
+if (typeof process !== 'undefined' && process.env.NEXT_RUNTIME) {
+  import('server-only').catch(() => {});
+}
 
 import { CloudWatchClient, PutMetricDataCommand, StandardUnit } from '@aws-sdk/client-cloudwatch';
 import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
