@@ -34,8 +34,7 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
 
   // Determine current pipeline stage for spinner visibility
   // Only the current active stage should show a spinner
-  const hasRetrieval = trace.retrieval !== undefined;
-  const answerStarted = Boolean(answerStreamingText) || answer !== null;
+  const hasRetrieval = Boolean(trace.retrieval && trace.retrieval.length > 0);
 
   // Derive effective streaming state from trace content, not just the prop
   // This handles the case where typewriter finishes before reasoning completes
@@ -144,7 +143,7 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
               <ReasoningSection
                 icon={<ClipboardList className="h-4 w-4" />}
                 title="Planner"
-                isStreaming={effectivelyStreaming && !hasRetrieval}
+                isStreaming={effectivelyStreaming && !plan?.durationMs}
               >
                 {plan ? (
                   <div className="space-y-2 text-xs text-white/70">
@@ -182,14 +181,14 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
                 ) : plannerStreamingText ? (
                   <StreamingNote text={plannerStreamingText} />
                 ) : (
-                  <LoadingState status="Analyzing your question..." />
+                  <LoadingState />
                 )}
               </ReasoningSection>
 
               <ReasoningSection
                 icon={<Search className="h-4 w-4" />}
                 title="Retrieval"
-                isStreaming={effectivelyStreaming && hasRetrieval && !answerStarted}
+                isStreaming={effectivelyStreaming && !hasRetrieval}
               >
                 {retrievalDocs ? (
                   <div className="space-y-2">
@@ -214,14 +213,14 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
                 ) : retrievalStreamingText ? (
                   <StreamingNote text={retrievalStreamingText} />
                 ) : (
-                  <LoadingState status="Searching portfolio..." />
+                  <LoadingState />
                 )}
               </ReasoningSection>
 
               <ReasoningSection
                 icon={<BookOpen className="h-4 w-4" />}
                 title="Answer"
-                isStreaming={effectivelyStreaming && (Boolean(answerStreamingText) || (hasRetrieval && !answer))}
+                isStreaming={effectivelyStreaming && hasRetrieval && !answer?.durationMs}
               >
                 {answer ? (
                   <div className="space-y-2 text-xs text-white/70">
@@ -280,7 +279,7 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
                 ) : answerStreamingText ? (
                   <StreamingNote text={answerStreamingText} />
                 ) : (
-                  <LoadingState status="Drafting answer..." />
+                  <LoadingState />
                 )}
               </ReasoningSection>
             </div>
@@ -335,35 +334,27 @@ function ReasoningSection({
   );
 }
 
-function LoadingState({ status }: { status: string }) {
+function LoadingState() {
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-3">
-        <div className="relative h-4 w-4">
-          <div className="absolute inset-0 animate-spin rounded-full border-2 border-blue-500/20 border-t-blue-400/80" />
-        </div>
-        <span className="text-xs text-white/50">{status}</span>
-      </div>
-      <div className="space-y-1.5">
-        <motion.div
-          className="h-3 w-3/4 rounded bg-white/10"
-          animate={{ opacity: [0.3, 0.6, 0.3] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <motion.div
-          className="h-3 w-1/2 rounded bg-white/10"
-          animate={{ opacity: [0.3, 0.6, 0.3] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut', delay: 0.2 }}
-        />
-      </div>
+    <div className="space-y-1.5">
+      <motion.div
+        className="h-3 w-3/4 rounded bg-white/10"
+        animate={{ opacity: [0.3, 0.6, 0.3] }}
+        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        className="h-3 w-1/2 rounded bg-white/10"
+        animate={{ opacity: [0.3, 0.6, 0.3] }}
+        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut', delay: 0.2 }}
+      />
     </div>
   );
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between text-xs">
-      <span className="text-white/50">{label}</span>
+    <div className="flex items-center gap-2 text-xs">
+      <span className="text-white/50">{label}:</span>
       <span className="text-white/80">{value}</span>
     </div>
   );

@@ -7,11 +7,12 @@ import { ChevronDown } from 'lucide-react';
 type CollapsibleSectionProps = {
   title: string;
   icon?: React.ReactNode;
+  count?: number;
   children: React.ReactNode;
   defaultExpanded?: boolean;
 };
 
-export function CollapsibleSection({ title, icon, children, defaultExpanded = true }: CollapsibleSectionProps) {
+export function CollapsibleSection({ title, icon, count, children, defaultExpanded = false }: CollapsibleSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   return (
@@ -22,19 +23,27 @@ export function CollapsibleSection({ title, icon, children, defaultExpanded = tr
     >
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="group flex w-full items-center justify-between text-left"
+        className="group -mx-2 flex w-[calc(100%+16px)] items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/5"
       >
         <span className="flex items-center gap-1.5">
           {icon ? <span className="text-white/40 transition-colors group-hover:text-white/60">{icon}</span> : null}
-          <p className="font-mono text-xs uppercase tracking-wider text-white/50 transition-colors group-hover:text-white/70">{title}</p>
+          <p className="font-mono text-xs uppercase tracking-wider text-white/50 transition-colors group-hover:text-white/70">
+            {title}
+            {count !== undefined ? <span className="ml-1 text-white/30">({count})</span> : null}
+          </p>
         </span>
-        <motion.div
-          animate={{ rotate: isExpanded ? 0 : -90 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="text-white/40 transition-colors group-hover:text-white/60"
-        >
-          <ChevronDown className="h-3 w-3" />
-        </motion.div>
+        <span className="flex items-center gap-1">
+          <span className="font-mono text-[10px] text-white/30 transition-colors group-hover:text-white/50">
+            {isExpanded ? 'Hide' : 'Show'}
+          </span>
+          <motion.div
+            animate={{ rotate: isExpanded ? 0 : -90 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="text-white/40 transition-colors group-hover:text-white/60"
+          >
+            <ChevronDown className="h-3 w-3" />
+          </motion.div>
+        </span>
       </button>
 
       <AnimatePresence initial={false}>

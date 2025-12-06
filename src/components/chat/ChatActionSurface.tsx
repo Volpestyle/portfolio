@@ -145,7 +145,7 @@ export function ChatActionSurface({ surface }: { surface: ChatSurfaceState }) {
         >
           <motion.div className="space-y-4" variants={staggerConfig.section}>
             {visibleProjects.length ? (
-              <CollapsibleSection title="Projects" icon={<FolderKanban className="h-3 w-3" />}>
+              <CollapsibleSection title="Projects" icon={<FolderKanban className="h-3 w-3" />} count={visibleProjects.length}>
                 <div className="space-y-3">
                   <AnimatePresence initial={false}>
                     {visibleProjects.map((project) => (
@@ -165,13 +165,13 @@ export function ChatActionSurface({ surface }: { surface: ChatSurfaceState }) {
             ) : null}
 
             {visibleExperiences.length || visibleEducation.length ? (
-              <CollapsibleSection title="Resume" icon={<FileText className="h-3 w-3" />}>
+              <CollapsibleSection title="Resume" icon={<FileText className="h-3 w-3" />} count={visibleExperiences.length + visibleEducation.length}>
                 <ExperienceList experiences={visibleExperiences} education={visibleEducation} />
               </CollapsibleSection>
             ) : null}
 
             {highlightedSkills.length ? (
-              <CollapsibleSection title="Skill highlights" icon={<Sparkles className="h-3 w-3" />}>
+              <CollapsibleSection title="Skill highlights" icon={<Sparkles className="h-3 w-3" />} count={highlightedSkills.length}>
                 <div className="flex flex-wrap gap-2">
                   <AnimatePresence initial={false}>
                     {highlightedSkills.map((skill) => (
@@ -195,18 +195,18 @@ export function ChatActionSurface({ surface }: { surface: ChatSurfaceState }) {
       ) : null}
 
       {visibleLinks.length ? (
-        <motion.div
-          className="mt-3 flex flex-wrap gap-3"
-          initial="hidden"
-          animate="visible"
-          variants={staggerConfig.container}
-        >
+        <div className="mt-3 flex flex-wrap gap-3">
           {visibleLinks.map((link) => (
-            <motion.div key={`surface-link-${link.platform}`} variants={staggerConfig.item}>
+            <motion.div
+              key={`surface-link-${link.platform}`}
+              initial={{ opacity: 0, y: 8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
               <SurfaceLinkButton link={link} />
             </motion.div>
           ))}
-        </motion.div>
+        </div>
       ) : null}
     </>
   );
@@ -234,10 +234,11 @@ function SurfaceLinkButton({ link }: { link: ProfileSocialLink }) {
       href={link.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="relative inline-flex h-10 items-center justify-center overflow-hidden rounded-full text-white transition-colors duration-200 hover:bg-white hover:text-black"
+      className="relative inline-flex h-10 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-black/70 px-3 text-white shadow-sm transition-colors duration-200 hover:bg-white hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       initial={false}
+      style={{ width: collapsedWidth }}
       animate={{ width: isHovered ? expandedWidth : collapsedWidth }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
     >

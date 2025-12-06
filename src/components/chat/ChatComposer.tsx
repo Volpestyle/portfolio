@@ -1,6 +1,8 @@
 'use client';
 
 import { FormEvent, useCallback, useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, LayoutGroup } from 'framer-motion';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { AnimatedSendButton } from '@/components/ui/AnimatedSendButton';
@@ -15,6 +17,15 @@ export function ChatComposer({ isBusy, hasMessages, onSend }: ChatComposerProps)
   const [value, setValue] = useState('');
   const [textareaHeight, setTextareaHeight] = useState(40);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check if we're on mobile (below sm breakpoint)
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -39,9 +50,22 @@ export function ChatComposer({ isBusy, hasMessages, onSend }: ChatComposerProps)
 
   const isSendDisabled = isBusy || !value.trim();
 
-  return (
-    <form className={cn(hasMessages ? 'mt-2' : '')} onSubmit={handleSubmit}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+  const isFixedMode = hasMessages && isMobile;
+
+  const formContent = (
+    <motion.form
+      layoutId="chat-composer"
+      className={cn(
+        isFixedMode
+          ? 'fixed bottom-0 left-0 right-0 z-50 bg-black px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-2'
+          : hasMessages
+            ? 'mt-2'
+            : ''
+      )}
+      onSubmit={handleSubmit}
+      transition={{ type: 'tween', duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+    >
+      <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:flex-row sm:items-end">
         <Textarea
           ref={textareaRef}
           value={value}
@@ -59,6 +83,16 @@ export function ChatComposer({ isBusy, hasMessages, onSend }: ChatComposerProps)
         />
         <AnimatedSendButton disabled={isSendDisabled} height={textareaHeight} />
       </div>
-    </form>
+    </motion.form>
   );
+
+  // Use portal to escape the transform context on mobile when there are messages
+  if (isFixedMode && typeof document !== 'undefined') {
+    return createPortal(
+      <LayoutGroup>{formContent}</LayoutGroup>,
+      document.body
+    );
+  }
+
+  return <LayoutGroup>{formContent}</LayoutGroup>;
 }

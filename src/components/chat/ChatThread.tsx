@@ -7,10 +7,12 @@ import { ChatActionSurface } from '@/components/chat/ChatActionSurface';
 import { InlineUiPortal, InlineUiPortalAnchor, InlineUiPortalProvider } from '@/components/chat/InlineUiPortal';
 import { useChat } from '@/hooks/useChat';
 import { ChatReasoningDisplay } from '@/components/chat/ChatReasoningDisplay';
+import { cn } from '@/lib/utils';
 
 interface ChatThreadProps {
   messages: ChatMessage[];
   isBusy: boolean;
+  hasMessages: boolean;
 }
 
 function ThinkingSpinner() {
@@ -26,7 +28,7 @@ function ThinkingSpinner() {
   );
 }
 
-export function ChatThread({ messages, isBusy }: ChatThreadProps) {
+export function ChatThread({ messages, isBusy, hasMessages }: ChatThreadProps) {
   const { uiState, reasoningTraces, reasoningEnabled, completionTimes } = useChat();
   const isDev = process.env.NODE_ENV === 'development';
   const surfaces = uiState.surfaces ?? [];
@@ -74,7 +76,10 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
 
   return (
     <InlineUiPortalProvider>
-      <div className="flex flex-col gap-3" aria-live="polite" data-testid="chat-thread">
+      <div className={cn(
+        "flex flex-col gap-3",
+        hasMessages && "pb-24 sm:pb-0"
+      )} aria-live="polite" data-testid="chat-thread">
         {messages.map((message, idx) => {
           const isInProgress = streamingAssistantMessageId === message.id;
 
