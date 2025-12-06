@@ -169,7 +169,8 @@ export type ProfileSummary = {
   updatedAt?: string;
   fullName: string;
   headline: string;
-  location?: string;
+  domainLabel?: string;
+  currentLocation?: string;
   currentRole?: string;
   about: string[] | string;
   topSkills: string[];
@@ -185,11 +186,13 @@ export type PersonaProfile = {
   updatedAt?: string;
   fullName?: string;
   headline?: string;
-  location?: string;
+  currentLocation?: string;
   currentRole?: string;
-  about?: string[];
   topSkills?: string[];
-  socialLinks?: string[];
+  socialLinks?: Array<{
+    url: string;
+    blurb?: string;
+  }>;
   featuredExperienceIds?: string[];
 };
 
@@ -276,13 +279,15 @@ export type ExperienceScope = 'employment_only' | 'any_experience';
 
 export type PlannerQuery = {
   source: RetrievalSource;
-  text: string;
-  limit?: number;
+  text?: string | null; // Optional for profile queries (profile is fetched as-is, not searched)
+  limit?: number | null;
 };
 
 export type PlannerLLMOutput = {
   queries: PlannerQuery[];
   topic?: string;
+  useProfileContext?: boolean;
+  thoughts?: string[];
 };
 
 export type RetrievalPlan = PlannerLLMOutput & {
@@ -315,8 +320,8 @@ export const RETRIEVAL_REQUEST_TOPK_DEFAULT = 8;
 
 const PlannerQuerySchema: z.ZodType<PlannerQuery, z.ZodTypeDef, unknown> = z.object({
   source: z.enum(RETRIEVAL_SOURCE_VALUES),
-  text: z.string().default(''),
-  limit: z.number().int().min(1).max(RETRIEVAL_REQUEST_TOPK_MAX).default(RETRIEVAL_REQUEST_TOPK_DEFAULT),
+  text: z.string().nullable().optional(), // Optional for profile queries
+  limit: z.number().int().min(1).max(RETRIEVAL_REQUEST_TOPK_MAX).nullable().optional(),
 });
 
 /**
@@ -325,6 +330,8 @@ const PlannerQuerySchema: z.ZodType<PlannerQuery, z.ZodTypeDef, unknown> = z.obj
 export const PlannerLLMOutputSchema: z.ZodType<PlannerLLMOutput, z.ZodTypeDef, unknown> = z.object({
   queries: z.array(PlannerQuerySchema).default([]),
   topic: z.string().default(''),
+  useProfileContext: z.boolean().default(false),
+  thoughts: z.array(z.string()).default([]),
 });
 
 const AnswerUiHintsSchema: z.ZodType<AnswerUiHints, z.ZodTypeDef, unknown> = z.object({
@@ -342,7 +349,7 @@ export const AnswerPayloadSchema: z.ZodType<AnswerPayload, z.ZodTypeDef, unknown
 
 export type RetrievalSummary = {
   source: RetrievalSource;
-  queryText: string;
+  queryText?: string | null; // Optional for profile queries
   requestedTopK: number;
   effectiveTopK: number;
   numResults: number;

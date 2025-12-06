@@ -3,7 +3,6 @@ import type {
   AnswerUiHints,
   ChatRequestMessage,
   ModelConfig,
-  OwnerConfig,
   PartialReasoningTrace,
   PersonaSummary,
   ReasoningEffort,
@@ -20,6 +19,7 @@ import type {
   UiPayload,
   ChatStreamError,
   SocialPlatform,
+  ProfileSummary,
 } from '@portfolio/chat-contract';
 import {
   DEFAULT_CHAT_HISTORY_LIMIT,
@@ -83,15 +83,19 @@ export type ChatbotResponse = {
   error?: ChatStreamError;
 };
 
-export type IdentityContext = {
+type ProfileContext = {
   fullName?: string;
   headline?: string;
-  location?: string;
+  domainLabel?: string;
+  currentLocation?: string;
+  currentRole?: string;
   shortAbout?: string;
+  topSkills?: string[];
+  socialLinks?: Array<{ platform?: string; url?: string; blurb?: string | null }>;
+  featuredExperienceIds?: string[];
 };
 
 export type ChatRuntimeOptions = {
-  owner?: OwnerConfig;
   ownerId?: string;
   modelConfig?: Partial<ModelConfig>;
   tokenLimits?: {
@@ -102,7 +106,7 @@ export type ChatRuntimeOptions = {
     minRelevanceScore?: number;
   };
   persona?: PersonaSummary;
-  identityContext?: IdentityContext;
+  profile?: ProfileSummary;
   logger?: (event: string, payload: Record<string, unknown>) => void;
   logPrompts?: boolean;
 };
@@ -238,57 +242,50 @@ function extractFirstJsonBlock(raw: string): string | null {
   return null;
 }
 
-const DEFAULT_OWNER_IDENTITY = {
-  ownerName: 'Portfolio Owner',
+const DEFAULT_PROFILE_IDENTITY = {
+  fullName: 'Portfolio Owner',
   domainLabel: 'portfolio owner',
 };
 
-export function applyOwnerTemplate(prompt: string, owner?: OwnerConfig): string {
-  const ownerName = owner?.ownerName?.trim() || DEFAULT_OWNER_IDENTITY.ownerName;
-  const domainLabel = owner?.domainLabel?.trim() || DEFAULT_OWNER_IDENTITY.domainLabel;
+function applyProfileTemplate(prompt: string, profileContext?: ProfileContext): string {
+  const ownerName = profileContext?.fullName?.trim() || DEFAULT_PROFILE_IDENTITY.fullName;
+  const domainLabel = profileContext?.domainLabel?.trim() || profileContext?.headline?.trim() || DEFAULT_PROFILE_IDENTITY.domainLabel;
   return prompt.replace(/{{OWNER_NAME}}/g, ownerName).replace(/{{DOMAIN_LABEL}}/g, domainLabel);
 }
 
-export function buildPlannerSystemPrompt(owner?: OwnerConfig): string {
-  return applyOwnerTemplate(plannerSystemPrompt, owner);
+function formatProfileContextForPrompt(profileContext?: ProfileContext): string {
+  if (!profileContext) return '';
+  const lines: string[] = [];
+  if (profileContext.fullName) lines.push(`- Name: ${profileContext.fullName}`);
+  if (profileContext.headline) lines.push(`- Headline: ${profileContext.headline}`);
+  if (profileContext.currentLocation) lines.push(`- Location: ${profileContext.currentLocation}`);
+  if (profileContext.currentRole) lines.push(`- Current Role: ${profileContext.currentRole}`);
+  if (profileContext.shortAbout) lines.push(`- About: ${profileContext.shortAbout}`);
+  if (profileContext.topSkills?.length) lines.push(`- Top Skills: ${profileContext.topSkills.join(', ')}`);
+  if (profileContext.socialLinks?.length) {
+    const platforms = profileContext.socialLinks
+      .map((link) => link.platform)
+      .filter(Boolean)
+      .join(', ');
+    if (platforms) lines.push(`- Social Platforms: ${platforms}`);
+  }
+  return lines.length ? ['## Profile Context', ...lines].join('\n') : '';
+}
+
+export function buildPlannerSystemPrompt(profileContext?: ProfileContext): string {
+  const base = applyProfileTemplate(plannerSystemPrompt, profileContext);
+  const profileSection = formatProfileContextForPrompt(profileContext);
+  return profileSection ? `${base}\n\n${profileSection}` : base;
 }
 
 export function buildAnswerSystemPrompt(
   persona?: PersonaSummary,
-  owner?: OwnerConfig,
-  identity?: IdentityContext
+  profileContext?: ProfileContext
 ): string {
   const sections: string[] = [];
 
   if (persona?.systemPersona?.trim()) {
-    sections.push(['## Persona', persona.systemPersona.trim()].join('\n'));
-  }
-
-  if (persona?.profile) {
-    const lines: string[] = [];
-    if (persona.profile.fullName) lines.push(`- Name: ${persona.profile.fullName}`);
-    if (persona.profile.headline) lines.push(`- Headline: ${persona.profile.headline}`);
-    if (persona.profile.currentRole) lines.push(`- Current role: ${persona.profile.currentRole}`);
-    if (persona.profile.location) lines.push(`- Location: ${persona.profile.location}`);
-    if (persona.shortAbout) lines.push(`- Short about: ${persona.shortAbout}`);
-    if (persona.profile.topSkills?.length) lines.push(`- Top skills: ${persona.profile.topSkills.join(', ')}`);
-    if (persona.profile.about?.length) {
-      lines.push('- About:');
-      persona.profile.about.forEach((paragraph) => {
-        if (paragraph?.trim()) {
-          lines.push(`  - ${paragraph.trim()}`);
-        }
-      });
-    }
-    if (persona.profile.socialLinks?.length) {
-      lines.push(`- Social links: ${persona.profile.socialLinks.join(', ')}`);
-    }
-    if (persona.profile.featuredExperienceIds?.length) {
-      lines.push(`- Featured experience IDs: ${persona.profile.featuredExperienceIds.join(', ')}`);
-    }
-    if (lines.length) {
-      sections.push(['## Profile Snapshot', ...lines].join('\n'));
-    }
+    sections.push(`## System Persona\n${persona.systemPersona.trim()}`);
   }
 
   if (persona?.voiceExamples?.length) {
@@ -297,22 +294,15 @@ export function buildAnswerSystemPrompt(
     );
   }
 
-  sections.push(applyOwnerTemplate(answerSystemPrompt, owner));
+  sections.push(applyProfileTemplate(answerSystemPrompt, profileContext));
 
   if (persona?.styleGuidelines?.length) {
     sections.push(['## Style Guidelines', ...persona.styleGuidelines.map((rule) => `- ${rule}`)].join('\n'));
   }
 
-  if (identity) {
-    const identityLines = [
-      identity.fullName ? `- Name: ${identity.fullName}` : null,
-      identity.headline ? `- Headline: ${identity.headline}` : null,
-      identity.location ? `- Location: ${identity.location}` : null,
-      identity.shortAbout ? `- About: ${identity.shortAbout}` : null,
-    ].filter(Boolean) as string[];
-    if (identityLines.length) {
-      sections.push(['## Identity Context', ...identityLines].join('\n'));
-    }
+  const profileSection = formatProfileContextForPrompt(profileContext);
+  if (profileSection) {
+    sections.push(profileSection);
   }
 
   return sections.join('\n\n');
@@ -495,6 +485,51 @@ function normalizeSnippet(text?: string | null, maxChars = MAX_BODY_SNIPPET_CHAR
   return normalized.length > maxChars ? normalized.slice(0, maxChars) : normalized;
 }
 
+
+function sanitizeProfileContext(profile?: ProfileContext): ProfileContext | undefined {
+  if (!profile) return undefined;
+  const sanitized: ProfileContext = {
+    fullName: profile.fullName,
+    headline: profile.headline,
+    domainLabel: profile.domainLabel,
+    currentLocation: profile.currentLocation,
+    currentRole: profile.currentRole,
+    shortAbout: profile.shortAbout,
+    topSkills: profile.topSkills?.filter(Boolean).slice(0, 12),
+    socialLinks: profile.socialLinks
+      ?.filter((link) => link?.url)
+      .map((link) => ({
+        platform: link.platform,
+        url: link.url,
+        blurb: link.blurb,
+      })),
+    featuredExperienceIds: profile.featuredExperienceIds?.filter(Boolean),
+  };
+  const hasData = Object.values(sanitized).some((value) => {
+    if (Array.isArray(value)) {
+      return value.length > 0;
+    }
+    return Boolean(value);
+  });
+  return hasData ? sanitized : undefined;
+}
+
+function buildProfileContext(profile?: ProfileSummary, persona?: PersonaSummary): ProfileContext | undefined {
+  const personaProfile = persona?.profile;
+  const candidate: ProfileContext = {
+    fullName: profile?.fullName ?? personaProfile?.fullName,
+    headline: profile?.headline ?? personaProfile?.headline,
+    domainLabel: profile?.domainLabel ?? profile?.headline ?? personaProfile?.headline,
+    currentLocation: profile?.currentLocation ?? personaProfile?.currentLocation,
+    currentRole: profile?.currentRole ?? personaProfile?.currentRole,
+    shortAbout: profile?.shortAbout,
+    topSkills: profile?.topSkills?.length ? profile.topSkills : personaProfile?.topSkills,
+    socialLinks: (profile?.socialLinks as ProfileContext['socialLinks']) ?? personaProfile?.socialLinks,
+    featuredExperienceIds: personaProfile?.featuredExperienceIds,
+  };
+  return sanitizeProfileContext(candidate);
+}
+
 const normalizeModel = (value?: string) => {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
@@ -543,7 +578,7 @@ function resolveReasoningParams(model: string, allowReasoning: boolean, effort?:
   return { effort };
 }
 
-function clampQueryLimit(_value?: number): number {
+function clampQueryLimit(_value?: number | null): number {
   // Always fan out to the maximum so the answer stage can decide relevance.
   return MAX_TOPK;
 }
@@ -561,8 +596,7 @@ function trimRetrievedDocs(result: RetrievalResult, maxTotal: number): Retrieval
     result.experiences.length +
     result.education.length +
     result.awards.length +
-    result.skills.length +
-    (result.profile ? 1 : 0);
+    result.skills.length;
 
   if (total <= maxTotal) {
     return result;
@@ -1088,26 +1122,38 @@ async function runStreamingJsonResponse<T>({
 function normalizePlannerOutput(plan: PlannerLLMOutput, model?: string): RetrievalPlan {
   const queries: RetrievalPlan['queries'] = Array.isArray(plan.queries)
     ? plan.queries
-        .map((query) => ({
-          source: query?.source,
-          text: sanitizePlannerQueryText(query?.text ?? ''),
+      .map((query) => {
+        const source = query?.source;
+        const text = source === 'profile' ? undefined : sanitizePlannerQueryText(query?.text ?? '');
+        return {
+          source,
+          // Profile retrieval is a fetch-all; ignore any planner-provided text.
+          text,
           limit: clampQueryLimit(query?.limit),
-        }))
-        .filter((query) => query.source === 'projects' || query.source === 'resume' || query.source === 'profile')
+        };
+      })
+      .filter((query) => query.source === 'projects' || query.source === 'resume')
     : [];
 
   const deduped: RetrievalPlan['queries'] = [];
   const seen = new Set<string>();
   for (const query of queries) {
-    const key = `${query.source}:${query.text.toLowerCase()}:${query.limit ?? DEFAULT_QUERY_LIMIT}`;
+    const key = `${query.source}:${(query.text ?? '').toLowerCase()}:${query.limit ?? DEFAULT_QUERY_LIMIT}`;
     if (seen.has(key)) continue;
     seen.add(key);
     deduped.push(query);
   }
+  const thoughts = Array.isArray(plan.thoughts)
+    ? plan.thoughts
+      .map((thought) => (typeof thought === 'string' ? thought.trim() : ''))
+      .filter(Boolean)
+    : [];
 
   return {
     queries: deduped,
     topic: plan.topic?.trim() || undefined,
+    useProfileContext: Boolean(plan.useProfileContext),
+    thoughts: thoughts.length ? thoughts : undefined,
     model,
   };
 }
@@ -1210,11 +1256,12 @@ async function executeRetrievalPlan(
   const parts = await Promise.all(
     plan.queries.map(async (query) => {
       const topK = clampQueryLimit(query.limit);
+      const queryText = query.text ?? '';
       if (query.source === 'projects') {
-        const results = await fetchProjects(query.text, topK);
+        const results = await fetchProjects(queryText, topK);
         options?.onQueryResult?.({
           source: 'projects',
-          queryText: query.text,
+          queryText,
           requestedTopK: topK,
           effectiveTopK: topK,
           numResults: results.length,
@@ -1222,20 +1269,21 @@ async function executeRetrievalPlan(
         return { projects: results, resumeDocs: [], profile: undefined } as const;
       }
       if (query.source === 'resume') {
-        const results = await fetchResume(query.text, topK);
+        const results = await fetchResume(queryText, topK);
         options?.onQueryResult?.({
           source: 'resume',
-          queryText: query.text,
+          queryText,
           requestedTopK: topK,
           effectiveTopK: topK,
           numResults: results.length,
         });
         return { projects: [], resumeDocs: results, profile: undefined } as const;
       }
+      // Profile queries don't use text - profile is fetched as-is
       const profileDoc = await fetchProfile();
       options?.onQueryResult?.({
         source: 'profile',
-        queryText: query.text,
+        queryText: undefined,
         requestedTopK: 1,
         effectiveTopK: 1,
         numResults: profileDoc ? 1 : 0,
@@ -1272,14 +1320,10 @@ async function executeRetrievalPlan(
     numResults:
       query.source === 'projects'
         ? cappedResult.projects.length
-        : query.source === 'resume'
-          ? cappedResult.experiences.length +
-          cappedResult.education.length +
-          cappedResult.awards.length +
-          cappedResult.skills.length
-          : cappedResult.profile
-            ? 1
-            : 0,
+        : cappedResult.experiences.length +
+        cappedResult.education.length +
+        cappedResult.awards.length +
+        cappedResult.skills.length,
     embeddingModel: options?.embeddingModel,
   }));
 
@@ -1291,34 +1335,26 @@ async function executeRetrievalPlan(
 
 // --- Answer helpers ---
 
-function buildAnswerUserContent(input: {
-  userMessage: string;
-  conversationSnippet: string;
-  plan: RetrievalPlan;
-  retrieved: RetrievalResult;
-  identity?: IdentityContext;
-}): string {
-  const { userMessage, conversationSnippet, retrieved, identity } = input;
+function buildPlannerUserContent(conversationSnippet: string, userMessage: string): string {
+  return [
+    `Conversation:\n${conversationSnippet}`,
+    '',
+    `Latest user message: "${userMessage}"`,
+    'Return ONLY the RetrievalPlan JSON.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
 
-  const identitySection =
-    identity && (identity.fullName || identity.headline || identity.location || identity.shortAbout)
-      ? [
-        '## Identity Context',
-        identity.fullName ? `Name: ${identity.fullName}` : null,
-        identity.headline ? `Headline: ${identity.headline}` : null,
-        identity.location ? `Location: ${identity.location}` : null,
-        identity.shortAbout ? `About: ${identity.shortAbout}` : null,
-      ]
-        .filter(Boolean)
-        .join('\n')
-      : '';
+function buildAnswerUserContent(input: {
+  conversationSnippet: string;
+  retrieved: RetrievalResult;
+}): string {
+  const { conversationSnippet, retrieved } = input;
 
   return [
     `## Conversation`,
     conversationSnippet,
-    '',
-    `## Latest Question`,
-    userMessage,
     '',
     `## Retrieved Projects (${retrieved.projects.length})`,
     JSON.stringify(
@@ -1382,19 +1418,15 @@ function buildAnswerUserContent(input: {
       null,
       2
     ),
-    '',
-    retrieved.profile ? `## Profile\n${JSON.stringify(retrieved.profile, null, 2)}` : '',
-    identitySection,
-    '',
-    'Only include uiHints when the retrieved docs directly support your answer. Skip uiHints for greetings, meta chit-chat, or when evidence is missing. For links, only use platforms that exist in profile.socialLinks (x, github, youtube, linkedin, spotify).',
   ]
     .filter(Boolean)
     .join('\n');
 }
 
-function buildUi(uiHints: AnswerUiHints | undefined, retrieved: RetrievalResult): UiPayload {
+function buildUi(uiHints: AnswerUiHints | undefined, retrieved: RetrievalResult, profileContext?: ProfileContext): UiPayload {
+  const socialLinks = profileContext?.socialLinks ?? retrieved.profile?.socialLinks ?? [];
   const normalizedLinks = new Set<SocialPlatform>(
-    (retrieved.profile?.socialLinks ?? [])
+    socialLinks
       .map((link) => normalizeDocId((link as { platform?: string }).platform ?? '') as SocialPlatform)
       .filter((platform): platform is SocialPlatform => Boolean(platform))
   );
@@ -1632,8 +1664,7 @@ function createAbortSignal(runOptions?: RunChatPipelineOptions): { signal: Abort
 
 export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRuntimeOptions) {
   const modelConfig = resolveModelConfig(options);
-  const ownerId = options?.owner?.ownerId ?? options?.ownerId ?? 'default';
-  const owner = options?.owner;
+  const ownerId = options?.ownerId ?? 'default';
   const plannerModel = modelConfig.plannerModel;
   const embeddingModel = modelConfig.embeddingModel;
   const stageReasoning = options?.modelConfig?.reasoning;
@@ -1641,6 +1672,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
   const minRelevanceScore = Math.max(0, Math.min(1, options?.retrieval?.minRelevanceScore ?? DEFAULT_MIN_RELEVANCE_SCORE));
   const logger = options?.logger;
   const runtimePersona = options?.persona;
+  const runtimeProfileContext = buildProfileContext(options?.profile, runtimePersona);
   const baseLogPrompts = options?.logPrompts ?? false;
   const plannerCache = new Map<string, RetrievalPlan>();
   const retrievalCache: RetrievalCache = {
@@ -1814,13 +1846,8 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           rawPlan = cachedPlan;
         } else {
           logger?.('chat.cache.planner', { event: 'miss', key: plannerKey });
-          const userContent = [
-            `Conversation:\n${conversationSnippet}`,
-            '',
-            `Latest user message: "${userText}"`,
-            'Return ONLY the RetrievalPlan JSON.',
-          ].join('\n');
-          const systemPrompt = buildPlannerSystemPrompt(owner);
+          const userContent = buildPlannerUserContent(conversationSnippet, userText);
+          const systemPrompt = buildPlannerSystemPrompt(runtimeProfileContext);
           if (plannerPromptDebug) {
             plannerPromptDebug.system = systemPrompt;
             plannerPromptDebug.user = userContent;
@@ -1927,8 +1954,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
                 retrieved.experiences.length +
                 retrieved.education.length +
                 retrieved.awards.length +
-                retrieved.skills.length +
-                (retrieved.profile ? 1 : 0),
+                retrieved.skills.length,
               sources: retrievalSummaries.map((r) => r.source),
             },
             timings.retrievalMs
@@ -1956,7 +1982,6 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
                   retrievalDocs: {
                     projects: retrieved.projects,
                     resume: [...retrieved.experiences, ...retrieved.education, ...retrieved.awards, ...retrieved.skills],
-                    profile: retrieved.profile ?? null,
                   },
                 }
                 : undefined,
@@ -1964,38 +1989,21 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         });
       }
 
+      const allowProfileContext = Boolean(runtimeProfileContext && (plan.useProfileContext || !hasQueries));
+      const profileContextForAnswer = allowProfileContext ? runtimeProfileContext : undefined;
+
       emitStageEvent('answer', 'start');
       emitReasoning({ stage: 'answer', notes: 'Drafting answer...' });
-
-      const identity = options?.identityContext
-        ?? (retrieved.profile
-          ? {
-            fullName: retrieved.profile.fullName,
-            headline: retrieved.profile.headline ?? undefined,
-            location: retrieved.profile.location ?? undefined,
-            shortAbout: (retrieved.profile as { shortAbout?: string }).shortAbout ?? undefined,
-          }
-          : runtimePersona?.profile
-            ? {
-              fullName: runtimePersona.profile.fullName,
-              headline: runtimePersona.profile.headline,
-              location: runtimePersona.profile.location,
-              shortAbout: runtimePersona.shortAbout ?? runtimePersona.profile.about?.[0],
-            }
-            : undefined);
 
       const answerModel = hasQueries
         ? modelConfig.answerModel
         : modelConfig.answerModelNoRetrieval ?? modelConfig.answerModel;
 
       const userContent = buildAnswerUserContent({
-        userMessage: userText,
         conversationSnippet,
-        plan,
         retrieved,
-        identity,
       });
-      const systemPrompt = buildAnswerSystemPrompt(runtimePersona, owner, identity);
+      const systemPrompt = buildAnswerSystemPrompt(runtimePersona, profileContextForAnswer);
       if (answerPromptDebug) {
         answerPromptDebug.system = systemPrompt;
         answerPromptDebug.user = userContent;
@@ -2054,7 +2062,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         answer.thoughts = undefined;
       }
 
-      const ui = buildUi(answer.uiHints, retrieved);
+      const ui = buildUi(answer.uiHints, retrieved, profileContextForAnswer);
       try {
         runOptions?.onUiEvent?.(ui);
       } catch (error) {

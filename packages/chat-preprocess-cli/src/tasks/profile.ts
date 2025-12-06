@@ -8,7 +8,7 @@ type ProfileSource = {
   updatedAt?: string;
   fullName: string;
   headline: string;
-  location?: string;
+  currentLocation?: string;
   currentRole?: string;
   about: string | string[];
   topSkills?: string[];
@@ -130,7 +130,7 @@ export async function runProfileTask(context: PreprocessContext): Promise<Prepro
     updatedAt: profileSource.updatedAt ?? 'unspecified',
     fullName: ensureRequired(profileSource.fullName, 'fullName'),
     headline: ensureRequired(profileSource.headline, 'headline'),
-    location: profileSource.location?.trim(),
+    currentLocation: profileSource.currentLocation?.trim(),
     currentRole: currentExperience || undefined,
     about: aboutString,
     topSkills: normalizeDistinctStrings(profileSource.topSkills),

@@ -4,7 +4,6 @@ import YAML from 'yaml';
 import type { ChatRuntimeOptions } from '@portfolio/chat-orchestrator';
 import {
   RETRIEVAL_REQUEST_TOPK_MAX,
-  type OwnerConfig,
   type ModelConfig,
   type StageReasoningConfig,
 } from '@portfolio/chat-contract';
@@ -16,7 +15,6 @@ type RetrievalWeightsConfig = {
 };
 
 export type ChatConfig = {
-  owner?: OwnerConfig;
   models?: {
     default?: string;
     plannerModel?: string;
@@ -35,6 +33,31 @@ export type ChatConfig = {
     maxTopK?: number;
     minRelevanceScore?: number;
     weights?: RetrievalWeightsConfig;
+  };
+  moderation?: {
+    input?: {
+      enabled?: boolean;
+      model?: string;
+    };
+    output?: {
+      enabled?: boolean;
+      model?: string;
+      refusalMessage?: string;
+      refusalBanner?: string;
+    };
+  };
+};
+
+export type ResolvedModerationOptions = {
+  input?: {
+    enabled?: boolean;
+    model?: string;
+  };
+  output?: {
+    enabled?: boolean;
+    model?: string;
+    refusalMessage?: string;
+    refusalBanner?: string;
   };
 };
 
@@ -121,6 +144,17 @@ function trimModelConfig(config?: Partial<ModelConfig>): Partial<ModelConfig> | 
   return Object.fromEntries(entries) as Partial<ModelConfig>;
 }
 
+const normalizeBoolean = (value: unknown): boolean | undefined => {
+  if (typeof value === 'boolean') return value;
+  return undefined;
+};
+
+const normalizeString = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : undefined;
+};
+
 export function resolveChatModelConfig(config?: ChatConfig): Partial<ModelConfig> | undefined {
   if (!config?.models) return undefined;
   const base = config.models.default;
@@ -180,10 +214,33 @@ export function resolveChatRuntimeOptions(config?: ChatConfig): ChatRuntimeOptio
   if (tokenLimits) {
     runtime.tokenLimits = tokenLimits;
   }
-  if (config.owner) {
-    runtime.owner = config.owner;
-  }
   return Object.keys(runtime).length ? runtime : undefined;
+}
+
+export function resolveModerationOptions(config?: ChatConfig): ResolvedModerationOptions | undefined {
+  if (!config?.moderation) return undefined;
+  const normalized: ResolvedModerationOptions = {};
+  const inputEnabled = normalizeBoolean(config.moderation.input?.enabled);
+  const inputModel = normalizeString(config.moderation.input?.model);
+  if (inputEnabled !== undefined || inputModel) {
+    normalized.input = {};
+    if (inputEnabled !== undefined) normalized.input.enabled = inputEnabled;
+    if (inputModel) normalized.input.model = inputModel;
+  }
+
+  const outputEnabled = normalizeBoolean(config.moderation.output?.enabled);
+  const outputModel = normalizeString(config.moderation.output?.model);
+  const refusalMessage = normalizeString(config.moderation.output?.refusalMessage);
+  const refusalBanner = normalizeString(config.moderation.output?.refusalBanner);
+  if (outputEnabled !== undefined || outputModel || refusalMessage || refusalBanner) {
+    normalized.output = {};
+    if (outputEnabled !== undefined) normalized.output.enabled = outputEnabled;
+    if (outputModel) normalized.output.model = outputModel;
+    if (refusalMessage) normalized.output.refusalMessage = refusalMessage;
+    if (refusalBanner) normalized.output.refusalBanner = refusalBanner;
+  }
+
+  return Object.keys(normalized).length ? normalized : undefined;
 }
 
 const clampTopK = (value: number | undefined): number | undefined => {
