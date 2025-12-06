@@ -25,6 +25,7 @@
     "chat:preprocess": "tsx scripts/chat-preprocess.ts",
     "chat:preprocess:profile": "CHAT_PREPROCESS_TASKS='profile,persona' pnpm chat:preprocess --seeOutput",
     "chat:evals": "tsx --env-file .env.test scripts/chat-evals.ts",
+    "chat:evals:refresh-fixtures": "tsx scripts/refresh-eval-fixtures.ts",
     "export:chat:unified": "tsx scripts/chat/export-chat-core.ts",
     "sync:local": "tsx scripts/sync-env-to-github.ts --env=.env.local --environment=dev",
     "sync:dev": "tsx scripts/sync-env-to-github.ts --env=.env.development --environment=dev",

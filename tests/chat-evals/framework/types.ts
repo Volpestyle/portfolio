@@ -12,6 +12,21 @@ export type EvalConfig = {
     embeddingModel: string;
     judgeModel: string;
     similarityModel: string;
+    answerTemperature?: number;
+  };
+  tokens?: {
+    planner?: number;
+    answer?: number;
+  };
+  retrieval?: {
+    defaultTopK?: number;
+    maxTopK?: number;
+    minRelevanceScore?: number;
+    weights?: {
+      textWeight?: number;
+      semanticWeight?: number;
+      recencyLambda?: number;
+    };
   };
   timeout: {
     softTimeoutMs: number;

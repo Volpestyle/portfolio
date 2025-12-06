@@ -33,6 +33,10 @@ export function createEvalClient(options: CreateEvalClientOptions): EvalClient {
         costUsd: u.costUsd,
       }));
 
+      if (response.error) {
+        throw new Error(`chat pipeline error (${response.error.code}): ${response.error.message}`);
+      }
+
       return {
         message: response.message ?? '',
         usage,

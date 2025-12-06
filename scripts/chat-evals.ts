@@ -7,15 +7,16 @@
  * All logic is in tests/golden/lib/
  */
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { createChatApi } from '@portfolio/chat-next-api';
 import { getOpenAIClient } from '../src/server/openai/client';
-import { chatProviders } from '../src/server/chat/bootstrap';
-import type { ProfileSummary } from '@portfolio/chat-contract';
-import personaFile from '../generated/persona.json';
-import profileFile from '../generated/profile.json';
+import { createFixtureChatServer, personaFile, profileFile } from '../tests/chat-evals/fixtures/bootstrap';
+import {
+  RETRIEVAL_REQUEST_TOPK_DEFAULT,
+  RETRIEVAL_REQUEST_TOPK_MAX,
+  type ProfileSummary,
+} from '@portfolio/chat-contract';
 import {
   chatEvalSuites,
   createEvalClient,
@@ -25,49 +26,192 @@ import {
   type EvalConfig,
 } from '../tests/chat-evals';
 
+const DEFAULT_EVAL_CONFIG: EvalConfig = {
+  models: {
+    plannerModel: 'gpt-4o-mini',
+    answerModel: 'gpt-4o-mini',
+    embeddingModel: 'text-embedding-3-small',
+    judgeModel: 'gpt-4o',
+    similarityModel: 'text-embedding-3-small',
+  },
+  timeout: { softTimeoutMs: 60000 },
+  reasoning: { planner: 'minimal', answer: 'low' },
+  thresholds: { minSemanticSimilarity: 0.75, minJudgeScore: 0.7 },
+};
+
+const assertRange = (value: number, min: number, max: number, name: string) => {
+  if (Number.isNaN(value) || value < min || value > max) {
+    throw new Error(`${name} must be between ${min} and ${max}`);
+  }
+};
+
+const normalizeTopK = (value: unknown, name: string): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${name} must be a number between 1 and ${RETRIEVAL_REQUEST_TOPK_MAX}`);
+  }
+  const intVal = Math.floor(value);
+  assertRange(intVal, 1, RETRIEVAL_REQUEST_TOPK_MAX, name);
+  return intVal;
+};
+
+const normalizeWeight = (value: unknown, name: string): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${name} must be a non-negative number`);
+  }
+  assertRange(value, 0, 5, name);
+  return value;
+};
+
+const normalizeMinRelevanceScore = (value: unknown): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error('retrieval.minRelevanceScore must be a number between 0 and 1');
+  }
+  assertRange(value, 0, 1, 'retrieval.minRelevanceScore');
+  return value;
+};
+
+const normalizeTokenLimit = (value: unknown, name: string): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  const intVal = Math.floor(value);
+  if (intVal <= 0) {
+    throw new Error(`${name} must be greater than 0`);
+  }
+  return intVal;
+};
+
+const normalizeTemperature = (value: unknown): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error('models.answerTemperature must be a number between 0 and 2');
+  }
+  assertRange(value, 0, 2, 'models.answerTemperature');
+  return value;
+};
+
+const normalizeThreshold = (value: unknown, name: string, fallback: number): number => {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${name} must be a number between 0 and 1`);
+  }
+  assertRange(value, 0, 1, name);
+  return value;
+};
+
 // --- Config Loading ---
 
 function loadEvalConfig(): EvalConfig {
   const configPath = resolve(process.cwd(), 'chat-eval.config.yml');
-  try {
-    const raw = readFileSync(configPath, 'utf-8');
-    const parsed = parseYaml(raw) as Partial<EvalConfig>;
-    return {
-      models: {
-        plannerModel: parsed.models?.plannerModel ?? 'gpt-4o-mini',
-        answerModel: parsed.models?.answerModel ?? 'gpt-4o-mini',
-        answerModelNoRetrieval: parsed.models?.answerModelNoRetrieval,
-        embeddingModel: parsed.models?.embeddingModel ?? 'text-embedding-3-small',
-        judgeModel: parsed.models?.judgeModel ?? 'gpt-4o',
-        similarityModel: parsed.models?.similarityModel ?? 'text-embedding-3-small',
-      },
-      timeout: {
-        softTimeoutMs: parsed.timeout?.softTimeoutMs ?? 60000,
-      },
-      reasoning: {
-        planner: parsed.reasoning?.planner ?? 'minimal',
-        answer: parsed.reasoning?.answer ?? 'low',
-      },
-      thresholds: {
-        minSemanticSimilarity: parsed.thresholds?.minSemanticSimilarity ?? 0.75,
-        minJudgeScore: parsed.thresholds?.minJudgeScore ?? 0.7,
-      },
-    };
-  } catch {
-    console.warn('Could not load chat-eval.config.yml, using defaults');
-    return {
-      models: {
-        plannerModel: 'gpt-4o-mini',
-        answerModel: 'gpt-4o-mini',
-        embeddingModel: 'text-embedding-3-small',
-        judgeModel: 'gpt-4o',
-        similarityModel: 'text-embedding-3-small',
-      },
-      timeout: { softTimeoutMs: 60000 },
-      reasoning: { planner: 'minimal', answer: 'low' },
-      thresholds: { minSemanticSimilarity: 0.75, minJudgeScore: 0.7 },
-    };
+  if (!existsSync(configPath)) {
+    console.warn('chat-eval.config.yml not found, using defaults');
+    return DEFAULT_EVAL_CONFIG;
   }
+
+  const raw = readFileSync(configPath, 'utf-8');
+  const parsed = parseYaml(raw) as Partial<EvalConfig>;
+  const models = parsed.models ?? {};
+
+  const answerModel = models.answerModel?.trim();
+  if (!answerModel) {
+    throw new Error('chat-eval.config.yml is missing models.answerModel');
+  }
+
+  const plannerModel = models.plannerModel?.trim() || answerModel;
+  const embeddingModel = models.embeddingModel?.trim() || DEFAULT_EVAL_CONFIG.models.embeddingModel;
+  const judgeModel = models.judgeModel?.trim() || DEFAULT_EVAL_CONFIG.models.judgeModel;
+  const similarityModel =
+    models.similarityModel?.trim() || DEFAULT_EVAL_CONFIG.models.similarityModel;
+
+  const retrievalWeights = parsed.retrieval?.weights;
+  const weights = retrievalWeights
+    ? {
+        textWeight: normalizeWeight(retrievalWeights.textWeight, 'retrieval.weights.textWeight'),
+        semanticWeight: normalizeWeight(
+          retrievalWeights.semanticWeight,
+          'retrieval.weights.semanticWeight'
+        ),
+        recencyLambda: normalizeWeight(
+          retrievalWeights.recencyLambda,
+          'retrieval.weights.recencyLambda'
+        ),
+      }
+    : undefined;
+
+  const retrieval = parsed.retrieval
+    ? {
+        defaultTopK: normalizeTopK(parsed.retrieval.defaultTopK, 'retrieval.defaultTopK'),
+        maxTopK: normalizeTopK(parsed.retrieval.maxTopK, 'retrieval.maxTopK'),
+        minRelevanceScore: normalizeMinRelevanceScore(parsed.retrieval.minRelevanceScore),
+        weights: weights &&
+          (weights.textWeight !== undefined ||
+            weights.semanticWeight !== undefined ||
+            weights.recencyLambda !== undefined)
+          ? weights
+          : undefined,
+      }
+    : undefined;
+
+  if (retrieval?.maxTopK && retrieval.defaultTopK && retrieval.defaultTopK > retrieval.maxTopK) {
+    throw new Error('retrieval.defaultTopK cannot exceed retrieval.maxTopK');
+  }
+
+  const normalizedRetrieval = retrieval
+    ? {
+        ...retrieval,
+        defaultTopK:
+          retrieval.defaultTopK ??
+          (retrieval.maxTopK !== undefined
+            ? Math.min(RETRIEVAL_REQUEST_TOPK_DEFAULT, retrieval.maxTopK)
+            : undefined),
+      }
+    : undefined;
+
+  const tokens = parsed.tokens
+    ? {
+        planner: normalizeTokenLimit(parsed.tokens.planner, 'tokens.planner'),
+        answer: normalizeTokenLimit(parsed.tokens.answer, 'tokens.answer'),
+      }
+    : undefined;
+
+  return {
+    models: {
+      plannerModel,
+      answerModel,
+      answerModelNoRetrieval: models.answerModelNoRetrieval?.trim() || undefined,
+      embeddingModel,
+      judgeModel,
+      similarityModel,
+      answerTemperature: normalizeTemperature(models.answerTemperature),
+    },
+    tokens,
+    retrieval: normalizedRetrieval,
+    timeout: {
+      softTimeoutMs: normalizeTokenLimit(parsed.timeout?.softTimeoutMs, 'timeout.softTimeoutMs') ??
+        DEFAULT_EVAL_CONFIG.timeout.softTimeoutMs,
+    },
+    reasoning: {
+      planner: parsed.reasoning?.planner ?? DEFAULT_EVAL_CONFIG.reasoning.planner,
+      answer: parsed.reasoning?.answer ?? DEFAULT_EVAL_CONFIG.reasoning.answer,
+      answerNoRetrieval: parsed.reasoning?.answerNoRetrieval,
+    },
+    thresholds: {
+      minSemanticSimilarity: normalizeThreshold(
+        parsed.thresholds?.minSemanticSimilarity,
+        'thresholds.minSemanticSimilarity',
+        DEFAULT_EVAL_CONFIG.thresholds.minSemanticSimilarity
+      ),
+      minJudgeScore: normalizeThreshold(
+        parsed.thresholds?.minJudgeScore,
+        'thresholds.minJudgeScore',
+        DEFAULT_EVAL_CONFIG.thresholds.minJudgeScore
+      ),
+    },
+  };
 }
 
 // --- Main ---
@@ -88,23 +232,22 @@ async function main() {
   const openaiClient = await getOpenAIClient();
 
   // Create chat API with eval config models + persona/profile for context
-  const chatApi = createChatApi({
-    retrieval: {
-      projectRepository: chatProviders.projectRepository,
-      experienceRepository: chatProviders.experienceRepository,
-      profileRepository: chatProviders.profileRepository,
-    },
+  // Uses frozen fixture data for stable, reproducible evals
+  const { chatApi } = createFixtureChatServer({
     runtimeOptions: {
       modelConfig: {
         plannerModel: config.models.plannerModel,
         answerModel: config.models.answerModel,
         answerModelNoRetrieval: config.models.answerModelNoRetrieval,
         embeddingModel: config.models.embeddingModel,
+        answerTemperature: config.models.answerTemperature,
         reasoning: config.reasoning,
       },
+      tokenLimits: config.tokens,
       persona: personaFile,
       profile: profileFile as ProfileSummary,
     },
+    retrievalOverrides: config.retrieval,
   });
 
   // Create eval client (decoupled from test logic)
