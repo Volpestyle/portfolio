@@ -13,7 +13,7 @@ import type { RateLimitResult } from './rateLimit';
 type FixtureResponder = (options: { answerModel: string; headers?: HeadersInit }) => Promise<Response> | Response;
 
 type RuntimeCostHooks = {
-  getClients: (ownerId: string) => Promise<RuntimeCostClients | null>;
+  getClients: () => Promise<RuntimeCostClients | null>;
   shouldThrottleForBudget: (clients: RuntimeCostClients, logger?: ChatServerLogger) => Promise<RuntimeCostState>;
   recordRuntimeCost: (
     clients: RuntimeCostClients,
@@ -25,7 +25,6 @@ type RuntimeCostHooks = {
 
 export type NextChatHandlerOptions = {
   chatApi: ChatApi;
-  chatOwnerId: string;
   chatLogger: ChatServerLogger;
   chatRuntimeOptions?: ChatRuntimeOptions;
   getOpenAIClient: () => Promise<OpenAI>;
@@ -101,13 +100,13 @@ export function createNextChatHandler(options: NextChatHandlerOptions) {
     throw new Error('Missing modelConfig.answerModel in chat config.');
   }
   const outputModeration = {
-    enabled: options.outputModeration?.enabled ?? process.env.CHAT_OUTPUT_MODERATION_ENABLED === 'true',
-    model: options.outputModeration?.model ?? process.env.CHAT_OUTPUT_MODERATION_MODEL,
+    enabled: options.outputModeration?.enabled ?? false,
+    model: options.outputModeration?.model,
     refusalMessage: options.outputModeration?.refusalMessage ?? DEFAULT_MODERATION_REFUSAL_MESSAGE,
     refusalBanner: options.outputModeration?.refusalBanner ?? DEFAULT_MODERATION_REFUSAL_BANNER,
   };
   const inputModeration = {
-    enabled: options.inputModeration?.enabled ?? true,
+    enabled: options.inputModeration?.enabled ?? false,
     model: options.inputModeration?.model,
   };
   const budgetExceededMessage = options.runtimeCost?.budgetExceededMessage ?? DEFAULT_BUDGET_EXCEEDED_MESSAGE;
@@ -116,14 +115,13 @@ export function createNextChatHandler(options: NextChatHandlerOptions) {
     async POST(request: NextRequest): Promise<Response> {
       const correlationId = randomUUID();
       const body = ((await request.json()) as ChatPostBody) ?? {};
-      const validation = validateChatPostBody(body, options.chatOwnerId);
+      const validation = validateChatPostBody(body);
       if (!validation.ok) {
         return new Response(validation.error, { status: validation.status });
       }
       const {
         messages,
         responseAnchorId,
-        ownerId,
         reasoningEnabled: requestedReasoningEnabled,
         conversationId,
       } = validation.value;
@@ -167,7 +165,7 @@ export function createNextChatHandler(options: NextChatHandlerOptions) {
           });
         }
 
-        const runtimeCostClients = options.runtimeCost ? await options.runtimeCost.getClients(ownerId) : null;
+        const runtimeCostClients = options.runtimeCost ? await options.runtimeCost.getClients() : null;
         if (runtimeCostClients && options.runtimeCost) {
           try {
             const costState = await options.runtimeCost.shouldThrottleForBudget(runtimeCostClients, options.chatLogger);
@@ -210,7 +208,7 @@ export function createNextChatHandler(options: NextChatHandlerOptions) {
           }
           const stream = createChatSseStream(options.chatApi, client, messages, {
             anchorId: responseAnchorId,
-            runOptions: { ownerId, reasoningEnabled },
+            runOptions: { reasoningEnabled },
             outputModeration: outputModeration.enabled
               ? {
                   enabled: outputModeration.enabled,

@@ -1,17 +1,18 @@
 'use client';
 
-import { createPortal } from 'react-dom';
 import type { ChatMessage, PartialReasoningTrace } from '@portfolio/chat-contract';
 import type { ChatSurfaceState } from '@portfolio/chat-next-ui';
 import { ChatMessageBubble } from '@/components/chat/ChatMessageBubble';
 import { ChatActionSurface } from '@/components/chat/ChatActionSurface';
-import { InlineUiPortalAnchor, InlineUiPortalProvider, useInlineUiPortal } from '@/components/chat/InlineUiPortal';
+import { InlineUiPortal, InlineUiPortalAnchor, InlineUiPortalProvider } from '@/components/chat/InlineUiPortal';
 import { useChat } from '@/hooks/useChat';
 import { ChatReasoningDisplay } from '@/components/chat/ChatReasoningDisplay';
+import { cn } from '@/lib/utils';
 
 interface ChatThreadProps {
   messages: ChatMessage[];
   isBusy: boolean;
+  hasMessages: boolean;
 }
 
 function ThinkingSpinner() {
@@ -27,7 +28,7 @@ function ThinkingSpinner() {
   );
 }
 
-export function ChatThread({ messages, isBusy }: ChatThreadProps) {
+export function ChatThread({ messages, isBusy, hasMessages }: ChatThreadProps) {
   const { uiState, reasoningTraces, reasoningEnabled, completionTimes } = useChat();
   const isDev = process.env.NODE_ENV === 'development';
   const surfaces = uiState.surfaces ?? [];
@@ -46,7 +47,7 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
   const lastAssistantCompleted = lastAssistantMessageId ? Boolean(completionTimes[lastAssistantMessageId]) : false;
   const lastAssistantAnimated = lastAssistantMessage?.animated !== false;
   const streamingAssistantMessageId =
-    lastAssistantMessageId && (isBusy || lastAssistantAnimated || !lastAssistantCompleted)
+    lastAssistantMessageId && (!lastAssistantCompleted || lastAssistantAnimated)
       ? lastAssistantMessageId
       : undefined;
 
@@ -75,7 +76,10 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
 
   return (
     <InlineUiPortalProvider>
-      <div className="flex flex-col gap-3" aria-live="polite" data-testid="chat-thread">
+      <div className={cn(
+        "flex flex-col gap-3",
+        hasMessages && "pb-24 sm:pb-0"
+      )} aria-live="polite" data-testid="chat-thread">
         {messages.map((message, idx) => {
           const isInProgress = streamingAssistantMessageId === message.id;
 
@@ -91,11 +95,9 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
 
           // Check if next message is the streaming assistant message
           const nextIsStreaming = nextMessage?.role === 'assistant' && nextMessage.id === streamingAssistantMessageId;
-          const streamingTrace = streamingAssistantMessageId ? reasoningTraces[streamingAssistantMessageId] ?? null : null;
-          const streamingHasUserReasoning = hasRenderableTrace(streamingTrace);
           const shouldRenderStreamingReasoning =
-            nextIsStreaming && ((reasoningEnabled && streamingHasUserReasoning) || isDev);
-          const shouldShowStreamingSpinner = nextIsStreaming && (!reasoningEnabled || !streamingHasUserReasoning);
+            nextIsStreaming && ((reasoningEnabled && hasRenderableCurrentTrace) || isDev);
+          const shouldShowStreamingSpinner = nextIsStreaming && (!reasoningEnabled || !hasRenderableCurrentTrace);
 
           return (
             <div key={message.id} className="flex flex-col gap-2">
@@ -121,7 +123,7 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
                     <>
                       {shouldRenderStreamingReasoning ? (
                         <ChatReasoningDisplay
-                          trace={streamingTrace}
+                          trace={currentTrace}
                           show={reasoningEnabled}
                           isStreaming={true}
                         />
@@ -139,25 +141,12 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
         <InlineUiPortalAnchor anchorId={fallbackAnchorId} />
       </div>
       {actionableSurfaces.map((surface) => (
-        <ChatActionSurfacePortal key={surface.anchorId} surface={surface} fallbackAnchorId={fallbackAnchorId} />
+        <InlineUiPortal key={surface.anchorId} anchorId={surface.anchorId} fallbackAnchorId={fallbackAnchorId}>
+          <ChatActionSurface surface={surface} />
+        </InlineUiPortal>
       ))}
     </InlineUiPortalProvider>
   );
-}
-
-function ChatActionSurfacePortal({
-  surface,
-  fallbackAnchorId,
-}: {
-  surface: ChatSurfaceState;
-  fallbackAnchorId: string;
-}) {
-  const { getAnchor } = useInlineUiPortal();
-  const target = getAnchor(surface.anchorId) || getAnchor(fallbackAnchorId);
-  if (!target) {
-    return null;
-  }
-  return createPortal(<ChatActionSurface surface={surface} />, target);
 }
 
 function hasSurfacePayload(surface: ChatSurfaceState) {
@@ -165,6 +154,8 @@ function hasSurfacePayload(surface: ChatSurfaceState) {
     Boolean(surface.focusedProjectId) ||
     (surface.visibleProjectIds?.length ?? 0) > 0 ||
     (surface.visibleExperienceIds?.length ?? 0) > 0 ||
+    (surface.visibleEducationIds?.length ?? 0) > 0 ||
+    (surface.visibleLinkIds?.length ?? 0) > 0 ||
     (surface.highlightedSkills?.length ?? 0) > 0
   );
 }

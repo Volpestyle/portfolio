@@ -12,7 +12,7 @@ export default function ChatDock() {
   return (
     <ChatQueryProvider>
       <div className="relative w-full max-w-3xl rounded-2xl shadow-2xl">
-        <ChatThread messages={messages} isBusy={isBusy} />
+        <ChatThread messages={messages} isBusy={isBusy} hasMessages={hasMessages} />
         <ChatComposer hasMessages={hasMessages} onSend={send} isBusy={isBusy} />
         {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
       </div>

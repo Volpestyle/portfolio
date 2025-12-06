@@ -1,9 +1,9 @@
 import type {
   AnswerPayload,
   AnswerUiHints,
+  CardSelectionReasoning,
   ChatRequestMessage,
   ModelConfig,
-  OwnerConfig,
   PartialReasoningTrace,
   PersonaSummary,
   ReasoningEffort,
@@ -19,6 +19,8 @@ import type {
   TokenUsage,
   UiPayload,
   ChatStreamError,
+  SocialPlatform,
+  ProfileSummary,
 } from '@portfolio/chat-contract';
 import {
   DEFAULT_CHAT_HISTORY_LIMIT,
@@ -34,8 +36,6 @@ import type OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import type { ResponseFormatTextJSONSchemaConfig } from 'openai/resources/responses/responses';
 import type { Reasoning } from 'openai/resources/shared';
-import { performance } from 'node:perf_hooks';
-import { inspect } from 'node:util';
 import { getEncoding } from 'js-tiktoken';
 import { z } from 'zod';
 import { answerSystemPrompt, plannerSystemPrompt } from '../pipelinePrompts';
@@ -50,6 +50,7 @@ import {
   type ResumeDoc,
   type SkillDoc,
 } from './retrieval';
+import { buildPartialReasoningTrace, mergeReasoningTraces } from './reasoningMerge';
 
 // --- Types ---
 
@@ -82,16 +83,19 @@ export type ChatbotResponse = {
   error?: ChatStreamError;
 };
 
-export type IdentityContext = {
+type ProfileContext = {
   fullName?: string;
   headline?: string;
-  location?: string;
+  domainLabel?: string;
+  currentLocation?: string;
+  currentRole?: string;
   shortAbout?: string;
+  topSkills?: string[];
+  socialLinks?: Array<{ platform?: string; url?: string; blurb?: string | null }>;
+  featuredExperienceIds?: string[];
 };
 
 export type ChatRuntimeOptions = {
-  owner?: OwnerConfig;
-  ownerId?: string;
   modelConfig?: Partial<ModelConfig>;
   tokenLimits?: {
     planner?: number;
@@ -101,7 +105,7 @@ export type ChatRuntimeOptions = {
     minRelevanceScore?: number;
   };
   persona?: PersonaSummary;
-  identityContext?: IdentityContext;
+  profile?: ProfileSummary;
   logger?: (event: string, payload: Record<string, unknown>) => void;
   logPrompts?: boolean;
 };
@@ -110,7 +114,6 @@ export type PipelineStage = 'planner' | 'retrieval' | 'answer';
 export type StageStatus = 'start' | 'complete';
 export type StageMeta = {
   topic?: string | null;
-  cardsEnabled?: boolean;
   docsFound?: number;
   sources?: RetrievalSummary['source'][];
   tokenCount?: number;
@@ -121,7 +124,6 @@ export type RunChatPipelineOptions = {
   abortSignal?: AbortSignal;
   softTimeoutMs?: number;
   onReasoningUpdate?: (update: ReasoningUpdate) => void;
-  ownerId?: string;
   reasoningEnabled?: boolean;
   onStageEvent?: (stage: PipelineStage, status: StageStatus, meta?: StageMeta, durationMs?: number) => void;
   onUiEvent?: (ui: UiPayload) => void;
@@ -153,6 +155,7 @@ type JsonResponseArgs<T> = {
   temperature?: number;
   onTextDelta?: (delta: string) => void;
   onRawResponse?: (raw: string) => void;
+  onParsedDelta?: (candidate: unknown) => void;
 };
 
 // --- Constants ---
@@ -167,11 +170,13 @@ export type SlidingWindowConfig = typeof SLIDING_WINDOW_CONFIG;
 
 const MAX_TOPK = RETRIEVAL_REQUEST_TOPK_MAX;
 const DEFAULT_QUERY_LIMIT = RETRIEVAL_REQUEST_TOPK_DEFAULT;
+const MIN_QUERY_LIMIT = 3;
 const MAX_BODY_SNIPPET_CHARS = 480;
 const PROJECT_BODY_SNIPPET_COUNT = 4;
 const EXPERIENCE_BODY_SNIPPET_COUNT = 4;
 const MAX_DISPLAY_ITEMS = 10;
 const DEFAULT_MIN_RELEVANCE_SCORE = 0.5; // 50% of top normalized score
+const UiHintsSchema = AnswerPayloadSchema.shape.uiHints;
 
 // --- Utilities ---
 
@@ -238,81 +243,163 @@ function extractFirstJsonBlock(raw: string): string | null {
   return null;
 }
 
-const DEFAULT_OWNER_IDENTITY = {
-  ownerName: 'Portfolio Owner',
+function tryParseJsonLoose(raw: string): unknown | undefined {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
+
+function repairJsonLikeSnapshot(raw: string): string | null {
+  const start = raw.indexOf('{');
+  const candidate = start === -1 ? raw : raw.slice(start);
+  let value = candidate.trim();
+  if (!value) return null;
+
+  // Strip trailing comma when it appears outside of a string
+  let inString = false;
+  let escape = false;
+  for (let i = value.length - 1; i >= 0; i -= 1) {
+    const ch = value[i]!;
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) {
+      continue;
+    }
+    if (ch === ',') {
+      value = value.slice(0, i) + value.slice(i + 1);
+      break;
+    }
+    if (ch !== ' ' && ch !== '\n' && ch !== '\r' && ch !== '\t') {
+      break;
+    }
+  }
+
+  // Balance braces/brackets and close a hanging string so the snapshot is parseable
+  const stack: string[] = [];
+  inString = false;
+  escape = false;
+  for (const ch of value) {
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '{' || ch === '[') {
+      stack.push(ch);
+    } else if (ch === '}' || ch === ']') {
+      const top = stack[stack.length - 1];
+      if ((ch === '}' && top === '{') || (ch === ']' && top === '[')) {
+        stack.pop();
+      }
+    }
+  }
+
+  if (inString) {
+    value += '"';
+  }
+  while (stack.length) {
+    const opener = stack.pop()!;
+    value += opener === '{' ? '}' : ']';
+  }
+  return value;
+}
+
+function parseStreamingJsonCandidate(snapshot: string): unknown | undefined {
+  const block = extractFirstJsonBlock(snapshot) ?? snapshot;
+  const parsed = tryParseJsonLoose(block);
+  if (typeof parsed !== 'undefined') {
+    return parsed;
+  }
+  const repaired = repairJsonLikeSnapshot(block);
+  if (!repaired) return undefined;
+  return tryParseJsonLoose(repaired);
+}
+
+const DEFAULT_PROFILE_IDENTITY = {
+  fullName: 'Portfolio Owner',
   domainLabel: 'portfolio owner',
 };
 
-export function applyOwnerTemplate(prompt: string, owner?: OwnerConfig): string {
-  const ownerName = owner?.ownerName?.trim() || DEFAULT_OWNER_IDENTITY.ownerName;
-  const domainLabel = owner?.domainLabel?.trim() || DEFAULT_OWNER_IDENTITY.domainLabel;
+function applyProfileTemplate(prompt: string, profileContext?: ProfileContext): string {
+  const ownerName = profileContext?.fullName?.trim() || DEFAULT_PROFILE_IDENTITY.fullName;
+  const domainLabel = profileContext?.domainLabel?.trim() || profileContext?.headline?.trim() || DEFAULT_PROFILE_IDENTITY.domainLabel;
   return prompt.replace(/{{OWNER_NAME}}/g, ownerName).replace(/{{DOMAIN_LABEL}}/g, domainLabel);
 }
 
-export function buildPlannerSystemPrompt(owner?: OwnerConfig): string {
-  return applyOwnerTemplate(plannerSystemPrompt, owner);
+function formatProfileContextForPrompt(profileContext?: ProfileContext): string {
+  if (!profileContext) return '';
+  const lines: string[] = [];
+  if (profileContext.fullName) lines.push(`- Name: ${profileContext.fullName}`);
+  if (profileContext.headline) lines.push(`- Headline: ${profileContext.headline}`);
+  if (profileContext.currentLocation) lines.push(`- Location: ${profileContext.currentLocation}`);
+  if (profileContext.currentRole) lines.push(`- Current Role: ${profileContext.currentRole}`);
+  if (profileContext.shortAbout) lines.push(`- About: ${profileContext.shortAbout}`);
+  if (profileContext.topSkills?.length) lines.push(`- Top Skills: ${profileContext.topSkills.join(', ')}`);
+  if (profileContext.socialLinks?.length) {
+    const platforms = profileContext.socialLinks
+      .map((link) => link.platform)
+      .filter(Boolean)
+      .join(', ');
+    if (platforms) lines.push(`- Social Platforms: ${platforms}`);
+  }
+  return lines.length ? ['## Profile Context', ...lines].join('\n') : '';
+}
+
+export function buildPlannerSystemPrompt(profileContext?: ProfileContext): string {
+  const base = applyProfileTemplate(plannerSystemPrompt, profileContext);
+  const profileSection = formatProfileContextForPrompt(profileContext);
+  return profileSection ? `${base}\n\n${profileSection}` : base;
 }
 
 export function buildAnswerSystemPrompt(
   persona?: PersonaSummary,
-  owner?: OwnerConfig,
-  identity?: IdentityContext
+  profileContext?: ProfileContext
 ): string {
   const sections: string[] = [];
 
   if (persona?.systemPersona?.trim()) {
-    sections.push(['## Persona', persona.systemPersona.trim()].join('\n'));
-  }
-
-  if (persona?.profile) {
-    const lines: string[] = [];
-    if (persona.profile.fullName) lines.push(`- Name: ${persona.profile.fullName}`);
-    if (persona.profile.headline) lines.push(`- Headline: ${persona.profile.headline}`);
-    if (persona.profile.currentRole) lines.push(`- Current role: ${persona.profile.currentRole}`);
-    if (persona.profile.location) lines.push(`- Location: ${persona.profile.location}`);
-    if (persona.shortAbout) lines.push(`- Short about: ${persona.shortAbout}`);
-    if (persona.profile.topSkills?.length) lines.push(`- Top skills: ${persona.profile.topSkills.join(', ')}`);
-    if (persona.profile.about?.length) {
-      lines.push('- About:');
-      persona.profile.about.forEach((paragraph) => {
-        if (paragraph?.trim()) {
-          lines.push(`  - ${paragraph.trim()}`);
-        }
-      });
-    }
-    if (persona.profile.socialLinks?.length) {
-      lines.push(`- Social links: ${persona.profile.socialLinks.join(', ')}`);
-    }
-    if (persona.profile.featuredExperienceIds?.length) {
-      lines.push(`- Featured experience IDs: ${persona.profile.featuredExperienceIds.join(', ')}`);
-    }
-    if (lines.length) {
-      sections.push(['## Profile Snapshot', ...lines].join('\n'));
-    }
+    sections.push(`## System Persona\n${persona.systemPersona.trim()}`);
   }
 
   if (persona?.voiceExamples?.length) {
     sections.push(
-      ['## Voice Examples\nMatch this tone:', ...persona.voiceExamples.map((example) => `- ${example}`)].join('\n')
+      [
+        '## Voice Examples',
+        'Match this voice/tone as closely as possible.',
+        ...persona.voiceExamples.map((example) => `- ${example}`),
+      ].join('\n')
     );
   }
 
-  sections.push(applyOwnerTemplate(answerSystemPrompt, owner));
+  sections.push(applyProfileTemplate(answerSystemPrompt, profileContext));
 
   if (persona?.styleGuidelines?.length) {
     sections.push(['## Style Guidelines', ...persona.styleGuidelines.map((rule) => `- ${rule}`)].join('\n'));
   }
 
-  if (identity) {
-    const identityLines = [
-      identity.fullName ? `- Name: ${identity.fullName}` : null,
-      identity.headline ? `- Headline: ${identity.headline}` : null,
-      identity.location ? `- Location: ${identity.location}` : null,
-      identity.shortAbout ? `- About: ${identity.shortAbout}` : null,
-    ].filter(Boolean) as string[];
-    if (identityLines.length) {
-      sections.push(['## Identity Context', ...identityLines].join('\n'));
-    }
+  const profileSection = formatProfileContextForPrompt(profileContext);
+  if (profileSection) {
+    sections.push(profileSection);
   }
 
   return sections.join('\n\n');
@@ -480,11 +567,7 @@ function formatLogValue(value: unknown): string {
       2
     );
   } catch {
-    try {
-      return inspect(value, { depth: 5, breakLength: 140 });
-    } catch {
-      return String(value);
-    }
+    return String(value);
   }
 }
 
@@ -493,6 +576,51 @@ function normalizeSnippet(text?: string | null, maxChars = MAX_BODY_SNIPPET_CHAR
   const normalized = text.replace(/\s+/g, ' ').trim();
   if (!normalized) return undefined;
   return normalized.length > maxChars ? normalized.slice(0, maxChars) : normalized;
+}
+
+
+function sanitizeProfileContext(profile?: ProfileContext): ProfileContext | undefined {
+  if (!profile) return undefined;
+  const sanitized: ProfileContext = {
+    fullName: profile.fullName,
+    headline: profile.headline,
+    domainLabel: profile.domainLabel,
+    currentLocation: profile.currentLocation,
+    currentRole: profile.currentRole,
+    shortAbout: profile.shortAbout,
+    topSkills: profile.topSkills?.filter(Boolean).slice(0, 12),
+    socialLinks: profile.socialLinks
+      ?.filter((link) => link?.url)
+      .map((link) => ({
+        platform: link.platform,
+        url: link.url,
+        blurb: link.blurb,
+      })),
+    featuredExperienceIds: profile.featuredExperienceIds?.filter(Boolean),
+  };
+  const hasData = Object.values(sanitized).some((value) => {
+    if (Array.isArray(value)) {
+      return value.length > 0;
+    }
+    return Boolean(value);
+  });
+  return hasData ? sanitized : undefined;
+}
+
+function buildProfileContext(profile?: ProfileSummary, persona?: PersonaSummary): ProfileContext | undefined {
+  const personaProfile = persona?.profile;
+  const candidate: ProfileContext = {
+    fullName: profile?.fullName ?? personaProfile?.fullName,
+    headline: profile?.headline ?? personaProfile?.headline,
+    domainLabel: profile?.domainLabel ?? profile?.headline ?? personaProfile?.headline,
+    currentLocation: profile?.currentLocation ?? personaProfile?.currentLocation,
+    currentRole: profile?.currentRole ?? personaProfile?.currentRole,
+    shortAbout: profile?.shortAbout,
+    topSkills: profile?.topSkills?.length ? profile.topSkills : personaProfile?.topSkills,
+    socialLinks: (profile?.socialLinks as ProfileContext['socialLinks']) ?? personaProfile?.socialLinks,
+    featuredExperienceIds: personaProfile?.featuredExperienceIds,
+  };
+  return sanitizeProfileContext(candidate);
 }
 
 const normalizeModel = (value?: string) => {
@@ -543,9 +671,18 @@ function resolveReasoningParams(model: string, allowReasoning: boolean, effort?:
   return { effort };
 }
 
-function clampQueryLimit(_value?: number): number {
-  // Always fan out to the maximum so the answer stage can decide relevance.
-  return MAX_TOPK;
+function coerceReasoningEffort(value?: unknown): ReasoningEffort | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'none' || normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high'
+    ? (normalized as ReasoningEffort)
+    : undefined;
+}
+
+function clampQueryLimit(_value?: number | null): number {
+  const parsed = typeof _value === 'number' && Number.isFinite(_value) ? Math.floor(_value) : DEFAULT_QUERY_LIMIT;
+  if (parsed <= 0) return DEFAULT_QUERY_LIMIT;
+  return Math.max(MIN_QUERY_LIMIT, Math.min(MAX_TOPK, parsed));
 }
 
 function sanitizePlannerQueryText(text: string): string {
@@ -561,8 +698,7 @@ function trimRetrievedDocs(result: RetrievalResult, maxTotal: number): Retrieval
     result.experiences.length +
     result.education.length +
     result.awards.length +
-    result.skills.length +
-    (result.profile ? 1 : 0);
+    result.skills.length;
 
   if (total <= maxTotal) {
     return result;
@@ -789,6 +925,7 @@ async function runStreamingJsonResponse<T>({
   temperature,
   onTextDelta,
   onRawResponse,
+  onParsedDelta,
 }: JsonResponseArgs<T>): Promise<T> {
   let attempt = 0;
   let lastError: unknown = null;
@@ -911,21 +1048,19 @@ async function runStreamingJsonResponse<T>({
           const trimmed = streamedText.trim();
           if (!trimmed) return;
 
-          let parsedCandidate: unknown;
-          try {
-            const jsonCandidate = extractFirstJsonBlock(trimmed) ?? trimmed;
-            parsedCandidate = JSON.parse(jsonCandidate);
-          } catch {
-            parsedCandidate = undefined;
-          }
-
-          if (parsedCandidate) {
+          const parsedCandidate = parseStreamingJsonCandidate(trimmed);
+          if (typeof parsedCandidate !== 'undefined') {
             streamedParsed = parsedCandidate;
             const messageValue =
               typeof (parsedCandidate as { message?: unknown }).message === 'string'
                 ? ((parsedCandidate as { message: string }).message as string)
                 : null;
             emitMessageDelta?.(messageValue);
+            try {
+              onParsedDelta?.(parsedCandidate);
+            } catch (err) {
+              logger?.('chat.pipeline.error', { stage: `${stageLabel}_parsed_delta`, model, error: formatLogValue(err) });
+            }
           } else {
             const partialMessage = extractMessageFromPartialJson(trimmed);
             if (partialMessage && partialMessage.length > lastEmittedMessage.length) {
@@ -1024,6 +1159,14 @@ async function runStreamingJsonResponse<T>({
         emitMessageDelta(finalMessage);
       }
 
+      try {
+        if (typeof candidate !== 'undefined') {
+          onParsedDelta?.(candidate);
+        }
+      } catch (err) {
+        logger?.('chat.pipeline.error', { stage: `${stageLabel}_parsed_delta_final`, model, error: formatLogValue(err) });
+      }
+
       if (candidate && typeof candidate === 'object' && typeof (candidate as { message?: unknown }).message === 'string') {
         const currentMessage = (candidate as { message: string }).message as string;
         (candidate as { message: string }).message = sanitizeMessageSnapshot(
@@ -1088,27 +1231,38 @@ async function runStreamingJsonResponse<T>({
 function normalizePlannerOutput(plan: PlannerLLMOutput, model?: string): RetrievalPlan {
   const queries: RetrievalPlan['queries'] = Array.isArray(plan.queries)
     ? plan.queries
-      .map((query) => ({
-        source: query?.source,
-        text: sanitizePlannerQueryText(query?.text ?? ''),
-        limit: clampQueryLimit(query?.limit),
-      }))
+      .map((query) => {
+        const source = query?.source;
+        const text = source === 'profile' ? undefined : sanitizePlannerQueryText(query?.text ?? '');
+        return {
+          source,
+          // Profile retrieval is a fetch-all; ignore any planner-provided text.
+          text,
+          limit: clampQueryLimit(query?.limit),
+        };
+      })
       .filter((query) => query.source === 'projects' || query.source === 'resume' || query.source === 'profile')
     : [];
 
   const deduped: RetrievalPlan['queries'] = [];
   const seen = new Set<string>();
   for (const query of queries) {
-    const key = `${query.source}:${query.text.toLowerCase()}:${query.limit ?? DEFAULT_QUERY_LIMIT}`;
+    const key = `${query.source}:${(query.text ?? '').toLowerCase()}:${query.limit ?? DEFAULT_QUERY_LIMIT}`;
     if (seen.has(key)) continue;
     seen.add(key);
     deduped.push(query);
   }
+  const thoughts = Array.isArray(plan.thoughts)
+    ? plan.thoughts
+      .map((thought) => (typeof thought === 'string' ? thought.trim() : ''))
+      .filter(Boolean)
+    : [];
 
   return {
     queries: deduped,
-    cardsEnabled: plan.cardsEnabled !== false,
     topic: plan.topic?.trim() || undefined,
+    useProfileContext: Boolean(plan.useProfileContext),
+    thoughts: thoughts.length ? thoughts : undefined,
     model,
   };
 }
@@ -1167,13 +1321,12 @@ function normalizeDocId(id: string): string {
 async function executeRetrievalPlan(
   retrieval: RetrievalDrivers,
   plan: RetrievalPlan,
-  options?: { logger?: ChatRuntimeOptions['logger']; cache?: RetrievalCache; ownerId?: string; embeddingModel?: string; minRelevanceScore?: number; onQueryResult?: (summary: RetrievalSummary) => void }
+  options?: { logger?: ChatRuntimeOptions['logger']; cache?: RetrievalCache; embeddingModel?: string; minRelevanceScore?: number; onQueryResult?: (summary: RetrievalSummary) => void }
 ): Promise<ExecutedRetrievalResult> {
   const cache = options?.cache;
-  const ownerKey = options?.ownerId ?? 'default';
 
   const fetchProjects = async (query: string, topK: number): Promise<ProjectDoc[]> => {
-    const cacheKey = `${ownerKey}:${query}:${topK}`;
+    const cacheKey = `${query}:${topK}`;
     if (cache?.projects.has(cacheKey)) {
       options?.logger?.('chat.pipeline.retrieval.cache', { source: 'projects', hit: true, key: cacheKey });
       return cache.projects.get(cacheKey) ?? [];
@@ -1184,7 +1337,7 @@ async function executeRetrievalPlan(
   };
 
   const fetchResume = async (query: string, topK: number): Promise<ResumeDoc[]> => {
-    const cacheKey = `${ownerKey}:${query}:${topK}`;
+    const cacheKey = `${query}:${topK}`;
     if (cache?.resume.has(cacheKey)) {
       options?.logger?.('chat.pipeline.retrieval.cache', { source: 'resume', hit: true, key: cacheKey });
       return cache.resume.get(cacheKey) ?? [];
@@ -1195,7 +1348,7 @@ async function executeRetrievalPlan(
   };
 
   const fetchProfile = async (): Promise<ProfileDoc | undefined> => {
-    const cacheKey = `${ownerKey}:profile`;
+    const cacheKey = 'profile';
     if (cache?.profile?.has(cacheKey)) {
       options?.logger?.('chat.pipeline.retrieval.cache', { source: 'profile', hit: true, key: cacheKey });
       return cache.profile?.get(cacheKey) ?? undefined;
@@ -1211,11 +1364,12 @@ async function executeRetrievalPlan(
   const parts = await Promise.all(
     plan.queries.map(async (query) => {
       const topK = clampQueryLimit(query.limit);
+      const queryText = query.text ?? '';
       if (query.source === 'projects') {
-        const results = await fetchProjects(query.text, topK);
+        const results = await fetchProjects(queryText, topK);
         options?.onQueryResult?.({
           source: 'projects',
-          queryText: query.text,
+          queryText,
           requestedTopK: topK,
           effectiveTopK: topK,
           numResults: results.length,
@@ -1223,20 +1377,21 @@ async function executeRetrievalPlan(
         return { projects: results, resumeDocs: [], profile: undefined } as const;
       }
       if (query.source === 'resume') {
-        const results = await fetchResume(query.text, topK);
+        const results = await fetchResume(queryText, topK);
         options?.onQueryResult?.({
           source: 'resume',
-          queryText: query.text,
+          queryText,
           requestedTopK: topK,
           effectiveTopK: topK,
           numResults: results.length,
         });
         return { projects: [], resumeDocs: results, profile: undefined } as const;
       }
+      // Profile queries don't use text - profile is fetched as-is
       const profileDoc = await fetchProfile();
       options?.onQueryResult?.({
         source: 'profile',
-        queryText: query.text,
+        queryText: undefined,
         requestedTopK: 1,
         effectiveTopK: 1,
         numResults: profileDoc ? 1 : 0,
@@ -1273,11 +1428,14 @@ async function executeRetrievalPlan(
     numResults:
       query.source === 'projects'
         ? cappedResult.projects.length
-        : query.source === 'resume'
-          ? cappedResult.experiences.length
-          : cappedResult.profile
+        : query.source === 'profile'
+          ? cappedResult.profile
             ? 1
-            : 0,
+            : 0
+          : cappedResult.experiences.length +
+          cappedResult.education.length +
+          cappedResult.awards.length +
+          cappedResult.skills.length,
     embeddingModel: options?.embeddingModel,
   }));
 
@@ -1289,34 +1447,26 @@ async function executeRetrievalPlan(
 
 // --- Answer helpers ---
 
-function buildAnswerUserContent(input: {
-  userMessage: string;
-  conversationSnippet: string;
-  plan: RetrievalPlan;
-  retrieved: RetrievalResult;
-  identity?: IdentityContext;
-}): string {
-  const { userMessage, conversationSnippet, plan, retrieved, identity } = input;
+function buildPlannerUserContent(conversationSnippet: string, userMessage: string): string {
+  return [
+    `Conversation:\n${conversationSnippet}`,
+    '',
+    `Latest user message: "${userMessage}"`,
+    'Return ONLY the RetrievalPlan JSON.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
 
-  const identitySection =
-    identity && (identity.fullName || identity.headline || identity.location || identity.shortAbout)
-      ? [
-        '## Identity Context',
-        identity.fullName ? `Name: ${identity.fullName}` : null,
-        identity.headline ? `Headline: ${identity.headline}` : null,
-        identity.location ? `Location: ${identity.location}` : null,
-        identity.shortAbout ? `About: ${identity.shortAbout}` : null,
-      ]
-        .filter(Boolean)
-        .join('\n')
-      : '';
+function buildAnswerUserContent(input: {
+  conversationSnippet: string;
+  retrieved: RetrievalResult;
+}): string {
+  const { conversationSnippet, retrieved } = input;
 
   return [
     `## Conversation`,
     conversationSnippet,
-    '',
-    `## Latest Question`,
-    userMessage,
     '',
     `## Retrieved Projects (${retrieved.projects.length})`,
     JSON.stringify(
@@ -1361,25 +1511,46 @@ function buildAnswerUserContent(input: {
       2
     ),
     '',
-    retrieved.profile ? `## Profile\n${JSON.stringify(retrieved.profile, null, 2)}` : '',
-    identitySection,
-    '',
-    `## Cards Enabled: ${plan.cardsEnabled !== false}`,
-    plan.cardsEnabled !== false
-      ? 'Only include **relevant** project/experience IDs in uiHints. We show these to user. If no relevant docs, do not include uiHints.'
-      : 'Do NOT include uiHints (no cards will be shown).',
+    `## Retrieved Education (${retrieved.education.length})`,
+    JSON.stringify(
+      retrieved.education.map((e) => ({
+        id: e.id,
+        relevance: e._score ?? 0,
+        institution: e.institution,
+        degree: e.degree,
+        field: e.field,
+        location: e.location,
+        startDate: e.startDate,
+        endDate: e.endDate,
+        isCurrent: e.isCurrent,
+        summary: normalizeSnippet(e.summary),
+        skills: e.skills,
+        bullets: e.bullets?.slice(0, EXPERIENCE_BODY_SNIPPET_COUNT),
+      })),
+      null,
+      2
+    ),
   ]
     .filter(Boolean)
     .join('\n');
 }
 
-function buildUi(uiHints: AnswerUiHints | undefined, retrieved: RetrievalResult, cardsEnabled: boolean): UiPayload {
-  if (!cardsEnabled) {
-    return { showProjects: [], showExperiences: [] };
-  }
+function buildUi(uiHints: AnswerUiHints | undefined, retrieved: RetrievalResult, profileContext?: ProfileContext): UiPayload {
+  const socialLinks = profileContext?.socialLinks ?? retrieved.profile?.socialLinks ?? [];
+  const normalizedLinks = new Set<SocialPlatform>(
+    socialLinks
+      .map((link) => normalizeDocId((link as { platform?: string }).platform ?? '') as SocialPlatform)
+      .filter((platform): platform is SocialPlatform => Boolean(platform))
+  );
 
   const projectIds = new Set(retrieved.projects.map((p) => normalizeDocId(p.id)));
   const experienceIds = new Set(retrieved.experiences.map((e) => normalizeDocId(e.id)));
+  const educationIds = new Set(retrieved.education.map((e) => normalizeDocId(e.id)));
+
+  const showLinks = (uiHints?.links ?? [])
+    .map(normalizeDocId)
+    .filter((id): id is SocialPlatform => Boolean(id) && normalizedLinks.has(id as SocialPlatform))
+    .slice(0, MAX_DISPLAY_ITEMS);
 
   const showProjects = (uiHints?.projects ?? [])
     .map(normalizeDocId)
@@ -1391,7 +1562,32 @@ function buildUi(uiHints: AnswerUiHints | undefined, retrieved: RetrievalResult,
     .filter((id) => id && experienceIds.has(id))
     .slice(0, MAX_DISPLAY_ITEMS);
 
-  return { showProjects, showExperiences };
+  const showEducation = (uiHints?.education ?? [])
+    .map(normalizeDocId)
+    .filter((id) => id && educationIds.has(id))
+    .slice(0, MAX_DISPLAY_ITEMS);
+
+  return { showProjects, showExperiences, showEducation, showLinks };
+}
+
+function uiPayloadEquals(a: UiPayload | null | undefined, b: UiPayload | null | undefined): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  const eq = (x: string[], y: string[]) => x.length === y.length && x.every((val, idx) => val === y[idx]);
+  return (
+    eq(a.showProjects, b.showProjects) &&
+    eq(a.showExperiences, b.showExperiences) &&
+    eq(a.showEducation, b.showEducation) &&
+    eq(a.showLinks as unknown as string[], b.showLinks as unknown as string[])
+  );
+}
+
+function coerceUiHints(candidate: unknown): AnswerUiHints | undefined {
+  if (!candidate || typeof candidate !== 'object') return undefined;
+  if (!Object.prototype.hasOwnProperty.call(candidate, 'uiHints')) return undefined;
+  const parsed = UiHintsSchema.safeParse((candidate as { uiHints?: unknown }).uiHints);
+  if (!parsed.success) return undefined;
+  return parsed.data;
 }
 
 function resolveResumeEntry(resumeMaps: ResumeMaps, id: string): ResumeDoc | undefined {
@@ -1433,6 +1629,7 @@ function buildAttachmentPayloads(
 
   ui.showProjects.forEach(addProject);
   ui.showExperiences.forEach(addResume);
+  ui.showEducation.forEach(addResume);
   return attachments;
 }
 
@@ -1485,69 +1682,6 @@ function buildRetrievalDocs(retrieved: RetrievalResult): RetrievalDocs {
 
 // --- Reasoning trace helpers ---
 
-function buildPartialReasoningTrace(seed?: Partial<PartialReasoningTrace>): PartialReasoningTrace {
-  return {
-    plan: seed?.plan ?? null,
-    retrieval: seed?.retrieval ?? null,
-    retrievalDocs: seed?.retrievalDocs ?? null,
-    answer: seed?.answer ?? null,
-    error: seed?.error ?? null,
-    debug: seed?.debug ?? null,
-    streaming: seed?.streaming,
-  };
-}
-
-function mergeReasoningTraces(current: PartialReasoningTrace, incoming: PartialReasoningTrace): PartialReasoningTrace {
-  return {
-    plan: incoming.plan ?? current.plan,
-    retrieval: incoming.retrieval ?? current.retrieval,
-    retrievalDocs: incoming.retrievalDocs ?? current.retrievalDocs,
-    answer: incoming.answer ?? current.answer,
-    error: incoming.error ?? current.error,
-    debug: mergeReasoningDebug(current.debug, incoming.debug),
-    streaming: mergeStreaming(current.streaming, incoming.streaming),
-  };
-}
-
-function mergeReasoningDebug(
-  current: PartialReasoningTrace['debug'],
-  incoming: PartialReasoningTrace['debug']
-): PartialReasoningTrace['debug'] {
-  if (!current && !incoming) return undefined;
-  if (!incoming) return current;
-  const base = current ?? {};
-  return {
-    ...base,
-    ...incoming,
-    plannerPrompt: incoming.plannerPrompt ?? base.plannerPrompt,
-    answerPrompt: incoming.answerPrompt ?? base.answerPrompt,
-    plannerRawResponse: incoming.plannerRawResponse ?? base.plannerRawResponse,
-    answerRawResponse: incoming.answerRawResponse ?? base.answerRawResponse,
-    retrievalDocs: incoming.retrievalDocs ?? base.retrievalDocs,
-  };
-}
-
-function mergeStreaming(
-  current: PartialReasoningTrace['streaming'],
-  incoming: PartialReasoningTrace['streaming']
-): PartialReasoningTrace['streaming'] {
-  if (!current && !incoming) return undefined;
-  if (!incoming) return current;
-  const merged: NonNullable<PartialReasoningTrace['streaming']> = { ...(current ?? {}) };
-  for (const [stage, chunk] of Object.entries(incoming)) {
-    if (!chunk || typeof chunk !== 'object') continue;
-    const key = stage as ReasoningStage;
-    const existing = merged[key] ?? {};
-    const combinedText = [existing.text ?? '', (chunk as { text?: string }).text ?? ''].join('');
-    merged[key] = {
-      text: combinedText.length ? combinedText : undefined,
-      notes: (chunk as { notes?: string }).notes ?? existing.notes,
-      progress: (chunk as { progress?: number }).progress ?? existing.progress,
-    };
-  }
-  return merged;
-}
-
 function buildErrorTrace(stage: ReasoningStage, error: Error): ReasoningUpdate {
   const message = error instanceof Error ? error.message : 'Unknown error';
   const traceError: ReasoningTraceError = {
@@ -1599,8 +1733,6 @@ function createAbortSignal(runOptions?: RunChatPipelineOptions): { signal: Abort
 
 export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRuntimeOptions) {
   const modelConfig = resolveModelConfig(options);
-  const ownerId = options?.owner?.ownerId ?? options?.ownerId ?? 'default';
-  const owner = options?.owner;
   const plannerModel = modelConfig.plannerModel;
   const embeddingModel = modelConfig.embeddingModel;
   const stageReasoning = options?.modelConfig?.reasoning;
@@ -1608,6 +1740,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
   const minRelevanceScore = Math.max(0, Math.min(1, options?.retrieval?.minRelevanceScore ?? DEFAULT_MIN_RELEVANCE_SCORE));
   const logger = options?.logger;
   const runtimePersona = options?.persona;
+  const runtimeProfileContext = buildProfileContext(options?.profile, runtimePersona);
   const baseLogPrompts = options?.logPrompts ?? false;
   const plannerCache = new Map<string, RetrievalPlan>();
   const retrievalCache: RetrievalCache = {
@@ -1615,7 +1748,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
     resume: new Map(),
     profile: new Map(),
   };
-  const buildPlannerCacheKey = (snippet: string, ownerKey: string) => JSON.stringify({ ownerId: ownerKey, snippet });
+  const buildPlannerCacheKey = (snippet: string) => JSON.stringify({ snippet });
 
   const createReasoningEmitter = (runOptions?: RunChatPipelineOptions) => {
     const allowReasoning = Boolean(runOptions?.reasoningEnabled && runOptions?.onReasoningUpdate);
@@ -1647,7 +1780,6 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       const tStart = performance.now();
       const devDebugEnabled = process.env.NODE_ENV !== 'production';
       const timings: Record<string, number> = {};
-      const effectiveOwnerId = runOptions?.ownerId ?? ownerId;
       const { signal: runSignal, cleanup: cleanupAborters, timedOut } = createAbortSignal(runOptions);
       const stageUsages: StageUsage[] = [];
       const missingCostWarned = new Set<string>();
@@ -1734,7 +1866,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           logger?.('chat.pipeline.error', { stage: 'window', error: formatLogValue(error) });
           return finalize({
             message: '',
-            ui: { showProjects: [], showExperiences: [] },
+            ui: { showProjects: [], showExperiences: [], showEducation: [], showLinks: [] },
             usage: stageUsages,
             error: buildStreamError('internal_error', error.message, false),
           });
@@ -1766,9 +1898,45 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         reasoningEmitter.emit(update);
       };
 
-      const plannerKey = buildPlannerCacheKey(conversationSnippet, effectiveOwnerId);
+      const plannerKey = buildPlannerCacheKey(conversationSnippet);
       emitStageEvent('planner', 'start');
-      emitReasoning({ stage: 'planner', notes: 'Planning retrieval...' });
+
+      // Track streamed planner fields for progressive reasoning panel updates
+      let lastStreamedPlannerThoughts: string[] | undefined;
+      let lastStreamedPlannerQueries: PlannerLLMOutput['queries'] | undefined;
+      let lastStreamedPlannerTopic: string | undefined;
+
+      const emitPlannerStreamingDelta = (candidate: unknown) => {
+        if (!candidate || typeof candidate !== 'object') return;
+
+        const typed = candidate as Partial<PlannerLLMOutput>;
+
+        const thoughts = Array.isArray(typed.thoughts) ? typed.thoughts : undefined;
+        const queries = Array.isArray(typed.queries) ? typed.queries : undefined;
+        const topic = typeof typed.topic === 'string' ? typed.topic : undefined;
+
+        const thoughtsChanged = thoughts && JSON.stringify(thoughts) !== JSON.stringify(lastStreamedPlannerThoughts);
+        const queriesChanged = queries && JSON.stringify(queries) !== JSON.stringify(lastStreamedPlannerQueries);
+        const topicChanged = topic !== undefined && topic !== lastStreamedPlannerTopic;
+
+        if (thoughtsChanged || queriesChanged || topicChanged) {
+          if (thoughtsChanged) lastStreamedPlannerThoughts = thoughts;
+          if (queriesChanged) lastStreamedPlannerQueries = queries;
+          if (topicChanged) lastStreamedPlannerTopic = topic;
+
+          emitReasoning({
+            stage: 'planner',
+            trace: buildPartialReasoningTrace({
+              plan: {
+                thoughts: lastStreamedPlannerThoughts,
+                queries: lastStreamedPlannerQueries ?? [],
+                topic: lastStreamedPlannerTopic,
+                useProfileContext: typed.useProfileContext,
+              },
+            }),
+          });
+        }
+      };
 
       let plan: RetrievalPlan;
       try {
@@ -1781,13 +1949,8 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           rawPlan = cachedPlan;
         } else {
           logger?.('chat.cache.planner', { event: 'miss', key: plannerKey });
-          const userContent = [
-            `Conversation:\n${conversationSnippet}`,
-            '',
-            `Latest user message: "${userText}"`,
-            'Return ONLY the RetrievalPlan JSON.',
-          ].join('\n');
-          const systemPrompt = buildPlannerSystemPrompt(owner);
+          const userContent = buildPlannerUserContent(conversationSnippet, userText);
+          const systemPrompt = buildPlannerSystemPrompt(runtimeProfileContext);
           if (plannerPromptDebug) {
             plannerPromptDebug.system = systemPrompt;
             plannerPromptDebug.user = userContent;
@@ -1822,6 +1985,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
                 plannerRawResponse = raw;
               }
             },
+            onParsedDelta: emitPlannerStreamingDelta,
           });
           rawPlan = normalizePlannerOutput(plannerOutput, plannerModel);
           if (!cachedPlan) {
@@ -1830,7 +1994,15 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         }
         plan = normalizePlannerOutput(rawPlan, plannerModel);
         timings.planMs = performance.now() - tPlan;
-        emitStageEvent('planner', 'complete', { topic: plan.topic ?? null, cardsEnabled: plan.cardsEnabled }, timings.planMs);
+        const plannerUsage = stageUsages.find((entry) => entry.stage === 'planner');
+        plan = {
+          ...plan,
+          effort: coerceReasoningEffort(plannerReasoning?.effort ?? stageReasoning?.planner),
+          durationMs: timings.planMs,
+          usage: plannerUsage?.usage,
+          costUsd: plannerUsage?.costUsd,
+        };
+        emitStageEvent('planner', 'complete', { topic: plan.topic ?? null }, timings.planMs);
       } catch (error) {
         cleanupAborters();
         logger?.('chat.pipeline.error', { stage: 'plan', error: formatLogValue(error) });
@@ -1839,7 +2011,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         emitReasoning(buildErrorTrace('planner', error as Error));
         return finalize({
           message: '',
-          ui: { showProjects: [], showExperiences: [] },
+          ui: { showProjects: [], showExperiences: [], showEducation: [], showLinks: [] },
           usage: stageUsages,
           error: buildStreamError(timeout ? 'llm_timeout' : 'llm_error', message, true),
         });
@@ -1871,13 +2043,11 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
 
       if (hasQueries) {
         emitStageEvent('retrieval', 'start');
-        emitReasoning({ stage: 'retrieval', notes: 'Running portfolio searches...' });
         try {
           const tRetrieval = performance.now();
           const executed = await executeRetrievalPlan(retrieval, plan, {
             logger,
             cache: retrievalCache,
-            ownerId: effectiveOwnerId,
             embeddingModel,
             minRelevanceScore,
             onQueryResult: (summary) => emitReasoning({ stage: 'retrieval', notes: `${summary.source}: ${summary.numResults} results` }),
@@ -1888,7 +2058,15 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           emitStageEvent(
             'retrieval',
             'complete',
-            { docsFound: retrieved.projects.length + retrieved.experiences.length + (retrieved.profile ? 1 : 0), sources: retrievalSummaries.map((r) => r.source) },
+            {
+              docsFound:
+                retrieved.projects.length +
+                retrieved.experiences.length +
+                retrieved.education.length +
+                retrieved.awards.length +
+                retrieved.skills.length,
+              sources: retrievalSummaries.map((r) => r.source),
+            },
             timings.retrievalMs
           );
         } catch (error) {
@@ -1897,7 +2075,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           emitReasoning(buildErrorTrace('retrieval', error as Error));
           return finalize({
             message: '',
-            ui: { showProjects: [], showExperiences: [] },
+            ui: { showProjects: [], showExperiences: [], showEducation: [], showLinks: [] },
             usage: stageUsages,
             error: buildStreamError('retrieval_error', 'I hit an internal retrieval issue—please try again.', true),
           });
@@ -1914,7 +2092,6 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
                   retrievalDocs: {
                     projects: retrieved.projects,
                     resume: [...retrieved.experiences, ...retrieved.education, ...retrieved.awards, ...retrieved.skills],
-                    profile: retrieved.profile ?? null,
                   },
                 }
                 : undefined,
@@ -1922,38 +2099,76 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         });
       }
 
-      emitStageEvent('answer', 'start');
-      emitReasoning({ stage: 'answer', notes: 'Drafting answer...' });
-
-      const identity = options?.identityContext
-        ?? (retrieved.profile
-          ? {
-            fullName: retrieved.profile.fullName,
-            headline: retrieved.profile.headline ?? undefined,
-            location: retrieved.profile.location ?? undefined,
-            shortAbout: (retrieved.profile as { shortAbout?: string }).shortAbout ?? undefined,
+      const allowProfileContext = Boolean(runtimeProfileContext && (plan.useProfileContext || !hasQueries));
+      const profileContextForAnswer = allowProfileContext ? runtimeProfileContext : undefined;
+      let latestUiPayload: UiPayload | null = null;
+      let uiEmittedDuringStreaming = false;
+      const emitUiFromHints = (hints?: AnswerUiHints): UiPayload | undefined => {
+        if (!hints) return undefined;
+        const nextUi = buildUi(hints, retrieved, profileContextForAnswer);
+        if (uiPayloadEquals(latestUiPayload, nextUi)) {
+          return nextUi;
+        }
+        latestUiPayload = nextUi;
+        if (runOptions?.onUiEvent) {
+          try {
+            uiEmittedDuringStreaming = true;
+            runOptions.onUiEvent(nextUi);
+          } catch (error) {
+            logger?.('chat.pipeline.error', { stage: 'ui_emit', error: formatLogValue(error) });
           }
-          : runtimePersona?.profile
-            ? {
-              fullName: runtimePersona.profile.fullName,
-              headline: runtimePersona.profile.headline,
-              location: runtimePersona.profile.location,
-              shortAbout: runtimePersona.shortAbout ?? runtimePersona.profile.about?.[0],
-            }
-            : undefined);
+        }
+        return nextUi;
+      };
+      let lastStreamedThoughts: string[] | undefined;
+      let lastStreamedCardReasoning: CardSelectionReasoning | null | undefined;
+
+      const emitAnswerStreamingDelta = (candidate: unknown) => {
+        if (!candidate || typeof candidate !== 'object') return;
+
+        const typed = candidate as Partial<AnswerPayload>;
+
+        // Stream thoughts to reasoning panel
+        const thoughts = Array.isArray(typed.thoughts) ? typed.thoughts : undefined;
+        const thoughtsChanged = thoughts && JSON.stringify(thoughts) !== JSON.stringify(lastStreamedThoughts);
+
+        // Stream cardReasoning to reasoning panel
+        const cardReasoning = typed.cardReasoning !== undefined ? typed.cardReasoning : undefined;
+        const cardReasoningChanged = cardReasoning !== undefined && JSON.stringify(cardReasoning) !== JSON.stringify(lastStreamedCardReasoning);
+
+        if (thoughtsChanged || cardReasoningChanged) {
+          if (thoughtsChanged) lastStreamedThoughts = thoughts;
+          if (cardReasoningChanged) lastStreamedCardReasoning = cardReasoning;
+
+          emitReasoning({
+            stage: 'answer',
+            trace: buildPartialReasoningTrace({
+              answer: {
+                thoughts: lastStreamedThoughts,
+                cardReasoning: lastStreamedCardReasoning,
+              },
+            }),
+          });
+        }
+
+        // Stream uiHints
+        const hints = coerceUiHints(candidate);
+        if (hints) {
+          emitUiFromHints(hints);
+        }
+      };
+
+      emitStageEvent('answer', 'start');
 
       const answerModel = hasQueries
         ? modelConfig.answerModel
         : modelConfig.answerModelNoRetrieval ?? modelConfig.answerModel;
 
       const userContent = buildAnswerUserContent({
-        userMessage: userText,
         conversationSnippet,
-        plan,
         retrieved,
-        identity,
       });
-      const systemPrompt = buildAnswerSystemPrompt(runtimePersona, owner, identity);
+      const systemPrompt = buildAnswerSystemPrompt(runtimePersona, profileContextForAnswer);
       if (answerPromptDebug) {
         answerPromptDebug.system = systemPrompt;
         answerPromptDebug.user = userContent;
@@ -1971,6 +2186,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       const answerReasoning = resolveReasoningParams(answerModel, Boolean(runOptions?.reasoningEnabled), answerReasoningEffort);
       let answer: AnswerPayload;
       try {
+        const tAnswer = performance.now();
         answer = await runStreamingJsonResponse<AnswerPayload>({
           client,
           model: answerModel,
@@ -1994,7 +2210,9 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
               answerRawResponse = raw;
             }
           },
+          onParsedDelta: emitAnswerStreamingDelta,
         });
+        timings.answerMs = performance.now() - tAnswer;
       } catch (error) {
         cleanupAborters();
         logger?.('chat.pipeline.error', { stage: 'answer', error: formatLogValue(error) });
@@ -2002,35 +2220,51 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         const timeout = timedOut();
         return finalize({
           message: '',
-          ui: { showProjects: [], showExperiences: [] },
+          ui: { showProjects: [], showExperiences: [], showEducation: [], showLinks: [] },
           usage: stageUsages,
           error: buildStreamError(timeout ? 'llm_timeout' : 'llm_error', 'I had trouble generating a reply—please try again.', true),
         });
       }
 
       if (!hasQueries) {
-        answer.thoughts = undefined;
+        answer.uiHints = undefined;
+        answer.cardReasoning = undefined;
       }
 
-      const ui = buildUi(answer.uiHints, retrieved, plan.cardsEnabled !== false);
-      try {
-        runOptions?.onUiEvent?.(ui);
-      } catch (error) {
-        logger?.('chat.pipeline.error', { stage: 'ui_emit', error: formatLogValue(error) });
+      const ui = emitUiFromHints(answer.uiHints) ?? buildUi(answer.uiHints, retrieved, profileContextForAnswer);
+      const shouldEmitFinalUi =
+        !latestUiPayload || !uiPayloadEquals(latestUiPayload, ui) || !uiEmittedDuringStreaming;
+      if (shouldEmitFinalUi) {
+        latestUiPayload = ui;
+        try {
+          runOptions?.onUiEvent?.(ui);
+        } catch (error) {
+          logger?.('chat.pipeline.error', { stage: 'ui_emit', error: formatLogValue(error) });
+        }
+      } else if (!latestUiPayload) {
+        latestUiPayload = ui;
       }
 
       const projectMap = new Map(retrieved.projects.map((p) => [normalizeDocId(p.id), p]));
       const resumeMaps: ResumeMaps = splitResumeDocs([...retrieved.experiences, ...retrieved.education, ...retrieved.awards, ...retrieved.skills]);
       const attachments = buildAttachmentPayloads(ui, projectMap, resumeMaps);
 
+      const answerUsage = stageUsages.find((entry) => entry.stage === 'answer');
+      const answerTrace: PartialReasoningTrace['answer'] = {
+        model: answerModel,
+        uiHints: answer.uiHints,
+        thoughts: answer.thoughts,
+        cardReasoning: answer.cardReasoning,
+        effort: coerceReasoningEffort(answerReasoning?.effort ?? answerReasoningEffort),
+        durationMs: timings.answerMs,
+        usage: answerUsage?.usage,
+        costUsd: answerUsage?.costUsd,
+      };
+
       const reasoningTrace: ReasoningTrace = {
         plan,
         retrieval: retrievalSummaries,
-        answer: {
-          model: answerModel,
-          uiHints: answer.uiHints,
-          thoughts: answer.thoughts,
-        },
+        answer: answerTrace,
       };
 
       emitReasoning({

@@ -1,4 +1,4 @@
-import type { ProfileSummary, ExperienceRecord, ProjectDetail, ResumeEntry } from '@portfolio/chat-contract';
+import type { ProfileSummary, ProjectDetail, ResumeEntry } from '@portfolio/chat-contract';
 import type { ProjectRecord, ResumeSearchQuery } from '../index';
 
 export type ProjectSearchIndexEntry = {
@@ -52,7 +52,7 @@ export interface ExperienceRepository {
   /**
    * Optional semantic embedding accessor used for LLM-powered ranking.
    */
-  getEmbedding?(experience: ExperienceRecord): Promise<number[] | undefined>;
+  getEmbedding?(experience: ResumeEntry): Promise<number[] | undefined>;
 }
 
 export interface ProfileRepository {

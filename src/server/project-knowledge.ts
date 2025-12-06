@@ -1,12 +1,9 @@
 import type { RepoData } from '@portfolio/chat-contract';
 import { getChatDataProviders } from '@/server/chat/dataProviders';
-
-function normalizeKey(value?: string | null): string {
-  return value?.trim().toLowerCase() ?? '';
-}
+import { normalizeProjectKey } from '@/lib/projects/normalize';
 
 async function resolveProjectRecord(repoName: string) {
-  const normalized = normalizeKey(repoName);
+  const normalized = normalizeProjectKey(repoName);
   if (!normalized) {
     return undefined;
   }

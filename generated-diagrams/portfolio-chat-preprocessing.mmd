@@ -6,7 +6,7 @@ flowchart LR
     GIST["GitHub Gist\n(PortfolioRepoConfig[])"]
     GH["GitHub Repos\n(README-only)"]
     RESUME_PDF[["Resume PDF"]]
-    PROFILE_MD[["data/chat/profile.md"]]
+    PROFILE_JSON[["data/chat/profile.json"]]
   end
 
   %% === Preprocess CLI ===
@@ -52,7 +52,7 @@ flowchart LR
   STRUCT_RESUME --> EMB_RES
   EMB_RES --> GEN_RES_EMB
 
-  PROFILE_MD --> STRUCT_PROFILE --> GEN_PROF
+  PROFILE_JSON --> STRUCT_PROFILE --> GEN_PROF
   STRUCT_PROFILE --> PERSONA --> GEN_PERSONA
 
   GEN_PROJ --> LINK

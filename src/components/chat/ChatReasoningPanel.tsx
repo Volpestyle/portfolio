@@ -2,7 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { PartialReasoningTrace, RetrievedProjectDoc, RetrievedResumeDoc } from '@portfolio/chat-contract';
+import type {
+  PartialReasoningTrace,
+  RetrievedProjectDoc,
+  RetrievedResumeDoc,
+  CardSelectionReasoning,
+  CardSelectionReason,
+} from '@portfolio/chat-contract';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, Brain, ChevronDown, Search, BookOpen, ClipboardList } from 'lucide-react';
 
@@ -16,18 +22,31 @@ interface ChatReasoningPanelProps {
 export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, className }: ChatReasoningPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const plan = trace.plan;
-  const retrievals = trace.retrieval ?? null;
+  const planQueries = plan?.queries?.filter((query) => query.source !== 'profile') ?? [];
   const retrievalDocs = trace.retrievalDocs ?? null;
   const answer = trace.answer ?? null;
   const traceError = trace.error ?? null;
   const streaming = trace.streaming ?? {};
   const plannerStreamingText = streaming.planner?.text || streaming.planner?.notes;
+  const planThoughts = plan?.thoughts?.filter(Boolean) ?? [];
   const retrievalStreamingText = streaming.retrieval?.text || streaming.retrieval?.notes;
   const answerStreamingText = streaming.answer?.text || streaming.answer?.notes;
 
+  // Determine current pipeline stage for spinner visibility
+  // Only the current active stage should show a spinner
+  const hasRetrieval = Boolean(trace.retrieval && trace.retrieval.length > 0);
+
+  // Derive effective streaming state from trace content, not just the prop
+  // This handles the case where typewriter finishes before reasoning completes
+  // Key insight: if the trace is incomplete (no answer, no error), we're still streaming
+  // even if the streaming text is temporarily empty (e.g., during schema parsing)
+  const hasStartedProcessing = Boolean(plan || plannerStreamingText || retrievalStreamingText || answerStreamingText);
+  const isIncomplete = !traceError && !answer;
+  const effectivelyStreaming = isStreaming || (hasStartedProcessing && isIncomplete);
+
   const title = useMemo(() => {
     if (traceError) return 'Reasoning failed';
-    if (isStreaming) return 'Thinking...';
+    if (effectivelyStreaming) return 'Thinking...';
     if (durationMs) {
       const seconds = Math.round(durationMs / 1000);
       const minutes = Math.floor(seconds / 60);
@@ -36,9 +55,9 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
       return `Thought for ${minutes}m ${remainingSeconds}s`;
     }
     return 'How I answered';
-  }, [durationMs, isStreaming, traceError]);
+  }, [durationMs, effectivelyStreaming, traceError]);
 
-  const hasQueries = (plan?.queries?.length ?? 0) > 0;
+  const hasQueries = planQueries.length > 0;
 
   return (
     <div className={cn('w-full rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm', className)}>
@@ -58,7 +77,7 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
               >
                 <AlertTriangle className="h-4 w-4 text-red-300" />
               </motion.div>
-            ) : isStreaming ? (
+            ) : effectivelyStreaming ? (
               <motion.div
                 key="loading"
                 initial={{ opacity: 0 }}
@@ -74,7 +93,7 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
               </motion.div>
             )}
           </AnimatePresence>
-          {isStreaming ? (
+          {effectivelyStreaming ? (
             <span className="relative text-sm font-medium text-white/60">
               {title}
               <motion.span
@@ -124,39 +143,52 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
               <ReasoningSection
                 icon={<ClipboardList className="h-4 w-4" />}
                 title="Planner"
-                isStreaming={isStreaming && !plan}
+                isStreaming={effectivelyStreaming && !plan?.durationMs}
               >
                 {plan ? (
                   <div className="space-y-2 text-xs text-white/70">
-                    <InfoRow label="Cards" value={plan.cardsEnabled === false ? 'Disabled' : 'Enabled'} />
-                    {plan.topic && <InfoRow label="Topic" value={plan.topic} />}
-                    {hasQueries ? (
+                    {planThoughts.length > 0 && (
                       <div className="space-y-1">
-                        {plan.queries.map((query, idx) => (
-                          <div key={`${query.source}-${idx}`} className="rounded border border-white/5 bg-white/5 p-2">
-                            <div className="flex items-center justify-between text-[11px] text-white/60">
-                              <span className="font-semibold text-blue-200">{capitalize(query.source)}</span>
-                              <span>TopK: {query.limit ?? '—'}</span>
-                            </div>
-                            <p className="mt-1 text-xs text-white/70">{query.text}</p>
+                        {planThoughts.map((thought, idx) => (
+                          <div key={idx} className="flex gap-2">
+                            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-500/20 text-[10px] font-medium text-blue-300">
+                              {idx + 1}
+                            </span>
+                            <span className="flex-1 text-white/80">{thought}</span>
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <p className="text-xs text-white/60">Planner chose to skip retrieval.</p>
                     )}
+                    {hasQueries ? (
+                      <div className="space-y-1">
+                        {planQueries.map((query, idx) => (
+                          <div key={`${query.source}-${idx}`} className="rounded border border-white/5 bg-white/5 p-2">
+                            <div className="flex items-center justify-between text-[11px] text-white/60">
+                              <span className="font-semibold text-blue-200">{capitalize(query.source)}</span>
+                              {query.text && <span>TopK: {query.limit ?? '—'}</span>}
+                            </div>
+                            {query.text ? (
+                              <p className="mt-1 text-xs text-white/70">{query.text}</p>
+                            ) : (
+                              <p className="mt-1 text-xs text-white/50 italic">No query text provided</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    {plan.topic && <InfoRow label="Topic" value={plan.topic} />}
                   </div>
                 ) : plannerStreamingText ? (
                   <StreamingNote text={plannerStreamingText} />
                 ) : (
-                  <LoadingState status="Analyzing your question..." />
+                  <LoadingState />
                 )}
               </ReasoningSection>
 
               <ReasoningSection
                 icon={<Search className="h-4 w-4" />}
                 title="Retrieval"
-                isStreaming={isStreaming && !retrievals}
+                isStreaming={effectivelyStreaming && !hasRetrieval}
               >
                 {retrievalDocs ? (
                   <div className="space-y-2">
@@ -181,25 +213,17 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
                 ) : retrievalStreamingText ? (
                   <StreamingNote text={retrievalStreamingText} />
                 ) : (
-                  <LoadingState status="Searching portfolio..." />
+                  <LoadingState />
                 )}
               </ReasoningSection>
 
               <ReasoningSection
                 icon={<BookOpen className="h-4 w-4" />}
                 title="Answer"
-                isStreaming={isStreaming && !answer}
+                isStreaming={effectivelyStreaming && hasRetrieval && !answer?.durationMs}
               >
                 {answer ? (
                   <div className="space-y-2 text-xs text-white/70">
-                    {answer.uiHints && (answer.uiHints.projects?.length || answer.uiHints.experiences?.length) ? (
-                      <div className="flex flex-wrap gap-3 text-[11px] text-white/60">
-                        <span>Projects: {answer.uiHints.projects?.length ?? 0}</span>
-                        <span>Experiences: {answer.uiHints.experiences?.length ?? 0}</span>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-white/60">No cards suggested for this turn.</p>
-                    )}
                     {answer.thoughts && answer.thoughts.length > 0 && (
                       <div className="space-y-1">
                         {answer.thoughts.map((thought, idx) => (
@@ -212,11 +236,50 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
                         ))}
                       </div>
                     )}
+                    <CardReasoningSection cardReasoning={answer.cardReasoning ?? undefined} />
+                    {answer.uiHints ? (
+                      (() => {
+                        const projects = answer.uiHints.projects?.length ?? 0;
+                        const experiences = answer.uiHints.experiences?.length ?? 0;
+                        const links = answer.uiHints.links?.length ?? 0;
+                        const hasUi = projects > 0 || experiences > 0 || links > 0;
+                        return hasUi ? (
+                          <div className="flex flex-wrap gap-3 text-[11px] text-white/60">
+                            <span>Projects: {projects}</span>
+                            <span>Experiences: {experiences}</span>
+                            <span>Links: {links}</span>
+                          </div>
+                        ) : null;
+                      })()
+                    ) : null}
+                    {answerStreamingText && effectivelyStreaming && (
+                      <motion.span
+                        className="inline-flex gap-0.5"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                      >
+                        <motion.span
+                          className="h-1.5 w-1.5 rounded-full bg-blue-400"
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
+                        />
+                        <motion.span
+                          className="h-1.5 w-1.5 rounded-full bg-blue-400"
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut', delay: 0.15 }}
+                        />
+                        <motion.span
+                          className="h-1.5 w-1.5 rounded-full bg-blue-400"
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
+                        />
+                      </motion.span>
+                    )}
                   </div>
                 ) : answerStreamingText ? (
                   <StreamingNote text={answerStreamingText} />
                 ) : (
-                  <LoadingState status="Drafting answer..." />
+                  <LoadingState />
                 )}
               </ReasoningSection>
             </div>
@@ -271,21 +334,27 @@ function ReasoningSection({
   );
 }
 
-function LoadingState({ status }: { status: string }) {
+function LoadingState() {
   return (
-    <div className="flex items-center gap-3">
-      <div className="relative h-4 w-4">
-        <div className="absolute inset-0 animate-spin rounded-full border-2 border-blue-500/20 border-t-blue-400/80" />
-      </div>
-      <span className="text-xs text-white/50">{status}</span>
+    <div className="space-y-1.5">
+      <motion.div
+        className="h-3 w-3/4 rounded bg-white/10"
+        animate={{ opacity: [0.3, 0.6, 0.3] }}
+        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        className="h-3 w-1/2 rounded bg-white/10"
+        animate={{ opacity: [0.3, 0.6, 0.3] }}
+        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut', delay: 0.2 }}
+      />
     </div>
   );
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between text-xs">
-      <span className="text-white/50">{label}</span>
+    <div className="flex items-center gap-2 text-xs">
+      <span className="text-white/50">{label}:</span>
       <span className="text-white/80">{value}</span>
     </div>
   );
@@ -298,7 +367,32 @@ function capitalize(value: string) {
 
 function StreamingNote({ text }: { text: string }) {
   if (!text) return null;
-  return <p className="whitespace-pre-wrap text-xs leading-relaxed text-white/60">{text}</p>;
+  return (
+    <div className="space-y-1">
+      <p className="whitespace-pre-wrap text-xs leading-relaxed text-white/70">{text}</p>
+      <motion.span
+        className="inline-flex gap-0.5"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <motion.span
+          className="h-1.5 w-1.5 rounded-full bg-blue-400"
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <motion.span
+          className="h-1.5 w-1.5 rounded-full bg-blue-400"
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut', delay: 0.15 }}
+        />
+        <motion.span
+          className="h-1.5 w-1.5 rounded-full bg-blue-400"
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
+        />
+      </motion.span>
+    </div>
+  );
 }
 
 function CollapsibleDocList<T extends { id: string }>({
@@ -394,6 +488,102 @@ function ResumeDocItem({ doc }: { doc: RetrievedResumeDoc }) {
         )}
       </div>
       {doc.summary && <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-white/60">{doc.summary}</p>}
+    </div>
+  );
+}
+
+function CardReasoningSection({ cardReasoning }: { cardReasoning?: CardSelectionReasoning }) {
+  if (!cardReasoning) return null;
+
+  const categories = [
+    { key: 'projects', label: 'Projects', data: cardReasoning.projects, hideExcluded: false },
+    { key: 'experiences', label: 'Experiences', data: cardReasoning.experiences, hideExcluded: false },
+    { key: 'education', label: 'Education', data: cardReasoning.education, hideExcluded: false },
+    { key: 'links', label: 'Links', data: cardReasoning.links, hideExcluded: true },
+  ].filter((c) => c.data && ((c.data.included?.length ?? 0) > 0 || (c.data.excluded?.length ?? 0) > 0));
+
+  if (categories.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <h5 className="text-[11px] font-medium text-white/60">Card Selection</h5>
+      {categories.map(({ key, label, data, hideExcluded }) => (
+        <CollapsibleCardReasoning
+          key={key}
+          label={label}
+          included={data?.included ?? []}
+          excluded={data?.excluded ?? []}
+          hideExcluded={hideExcluded}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CollapsibleCardReasoning({
+  label,
+  included,
+  excluded,
+  hideExcluded = false,
+}: {
+  label: string;
+  included: CardSelectionReason[];
+  excluded: CardSelectionReason[];
+  hideExcluded?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const showExcluded = !hideExcluded && excluded.length > 0;
+
+  return (
+    <div className="rounded border border-white/10 bg-white/5">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center justify-between px-2.5 py-1.5 text-left text-[11px] font-medium text-white/70 hover:bg-white/5"
+      >
+        <span>
+          {label} ({included.length} shown{!hideExcluded ? `, ${excluded.length} excluded` : ''})
+        </span>
+        <ChevronDown
+          className="h-3 w-3 text-white/40 transition-transform"
+          style={{ transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-2 border-t border-white/10 p-2">
+              {included.length > 0 && (
+                <div className="space-y-1">
+                  <span className="text-[10px] font-medium text-green-400">Included</span>
+                  {included.map((item) => (
+                    <div key={item.id} className="rounded bg-green-500/10 p-1.5">
+                      <span className="text-xs font-medium text-white/80">{item.name}</span>
+                      <p className="text-[11px] text-white/60">{item.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {showExcluded && (
+                <div className="space-y-1">
+                  <span className="text-[10px] font-medium text-red-400/80">Excluded</span>
+                  {excluded.map((item) => (
+                    <div key={item.id} className="rounded bg-red-500/10 p-1.5">
+                      <span className="text-xs font-medium text-white/60">{item.name}</span>
+                      <p className="text-[11px] text-white/50">{item.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

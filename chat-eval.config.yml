@@ -1,0 +1,40 @@
+# Chat Eval Configuration
+# Configure models and settings for running chat evals
+
+models:
+  # Pipeline models
+  plannerModel: gpt-5-nano-2025-08-07
+  answerModel: gpt-5-nano-2025-08-07
+  # answerModelNoRetrieval: gpt-5-mini-2025-08-07
+  embeddingModel: text-embedding-3-small
+
+  # Eval models (grading)
+  judgeModel: gpt-5-mini-2025-08-07
+  similarityModel: text-embedding-3-small
+
+timeout:
+  softTimeoutMs: 60000
+
+reasoning:
+  planner: minimal
+  answer: low
+
+tokens:
+  planner: 15000
+  answer: 15000
+
+retrieval:
+  defaultTopK: 8
+  maxTopK: 10
+  minRelevanceScore: 0.3
+  weights:
+    textWeight: 0.3
+    semanticWeight: 0.5
+    recencyLambda: 0.05
+
+# Scoring thresholds
+thresholds:
+  # Minimum semantic similarity (0-1) to pass
+  minSemanticSimilarity: 0.75
+  # Minimum judge score (0-1) to pass
+  minJudgeScore: 0.7

@@ -25,6 +25,7 @@ This document explains how the `infra/cdk` package provisions the production pla
 - **Data layer**:
   - `BlogPostsTable` DynamoDB table with a `byStatusPublishedAt` GSI for CMS filtering.
   - `RevalidationTable` DynamoDB table backing Next.js tag cache metadata.
+  - `ChatRuntimeCostTable` DynamoDB table for chat runtime budget enforcement.
   - `RevalidationQueue` FIFO SQS queue (plus DLQ) for background incremental revalidation.
 - **Secrets & IAM**:
   - Optional Secrets Manager references (environment + repo secrets) that are granted to regional Lambdas.
@@ -50,6 +51,7 @@ Refer to [Infrastructure Overview](./infra.md) for a visual summary of these com
 - The admin UI uses signed requests to invoke `BlogPublishFunction`, which writes CMS metadata to `BlogPostsTable` and manages scheduling through the shared scheduler role.
 - Media uploads flow to `BlogMediaBucket` via presigned URLs; content snapshots land in `BlogContentBucket`.
 - Environment variables such as `MEDIA_BUCKET`, `CONTENT_BUCKET`, and `SCHEDULER_ROLE_ARN` are injected automatically so API routes know where to persist assets.
+- Blog publishes and scheduler callbacks call `/api/revalidate` via `REVALIDATE_ENDPOINT` and `REVALIDATE_SECRET` to keep caches and CloudFront aligned.
 
 ## Deploying & Validating
 
@@ -77,6 +79,7 @@ Useful scripts:
 
 - Every Lambda has a dedicated CloudWatch Log Group with a finite retention window (2 weeks by default).
 - CloudFront and S3 metrics capture cache hit ratios and origin latency; use the distribution ID output after deploy.
+- Optional OpenAI cost metrics (when `OPENAI_COST_METRICS_ENABLED=true`) feed a rolling 30-day CloudWatch alarm; alerts go to `OPENAI_COST_ALERT_EMAIL`.
 - DynamoDB tables enable PITR (blog posts) and secondary indexes for operational recovery.
 - For troubleshooting, see `../operations/log-diving.md`.
 

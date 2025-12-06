@@ -9,25 +9,32 @@ Companion to `docs/features/chat/chat-spec.md`. The spec is the source of truth 
 ### 1.1 Rate Limiting (Upstash, Sliding Window)
 
 - Limits: 5/minute, 40/hour, 120/day keyed by IP; enforced in the Next.js `/api/chat` route via Upstash Redis sliding windows.
-- Fail-closed behavior: missing/unknown IP or Redis errors return HTTP 503/400; quota breaches return HTTP 429 with `RateLimit-*` headers.
-- Local dev: bypass when Redis creds are absent; when present, `ENABLE_DEV_RATE_LIMIT=false` opts out, otherwise limits apply even in dev.
+- Missing creds or init failures: fail-closed in production; in dev, if Upstash secrets are missing the limiter is bypassed.
+- Local dev toggle: `ENABLE_DEV_RATE_LIMIT=false` opts out when creds are present; otherwise limits apply in dev.
 - Touchpoints: `src/lib/rate-limit.ts` and `src/app/api/chat/route.ts` (middleware wiring).
 
 ### 1.2 Cost Monitoring & Alarms
 
-- Monthly runtime budget guard (default `$10`, override via `CHAT_MONTHLY_BUDGET_USD`) with warn/critical/exceeded thresholds at `$8 / $9.50 / $10`.
+- Runtime budget guard only runs when `chat.config.yml` sets `cost.budgetUsd` to a positive number. Without that setting the guard is disabled entirely.
 - Scope: runtime Planner/Retrieval/Answer calls (plus embeddings); preprocessing is tracked separately.
-- Storage & signals: DynamoDB item keyed by owner/env/month for month-to-date spend; CloudWatch publishes per-turn and month-to-date metrics; optional SNS topic via `COST_ALERT_TOPIC_ARN` or `CHAT_COST_ALERT_TOPIC_ARN`.
-- Enforcement: the `/api/chat` route short-circuits when already over budget; if a turn crosses the limit mid-stream, the stream finishes and then emits SSE `error` with `code: "budget_exceeded"`; subsequent turns are blocked by the preflight guard.
+- Storage & signals: DynamoDB `COST_TABLE_NAME` (injected by CDK) stores month-to-date spend per env; CloudWatch publishes turn + MTD metrics; optional SNS alerts via `COST_ALERT_TOPIC_ARN` / `CHAT_COST_ALERT_TOPIC_ARN`.
+- Thresholds: warn/critical/exceeded at 80%/95%/100% of the configured budget. Budget defaults to disabled unless set in config.
+- Enforcement: `/api/chat` blocks new turns when the budget is exceeded; if a turn pushes the state to `exceeded` at the end of a run, the stream emits an SSE `error` with `code: "budget_exceeded"` before closing.
+
+### 1.3 Moderation
+
+- Input moderation (enabled via `moderation.input.enabled` + optional `model`) runs before the pipeline. Flagged requests return a 200 with `error: { code: "input_moderated" }`.
+- Output moderation (enabled via `moderation.output.enabled` + optional `model`) runs on streamed answer text. Refusals return the configured `refusalMessage` and optional `refusalBanner`.
+- Wiring lives in `src/app/api/chat/route.ts` and uses the settings resolved from `chat.config.yml`.
 
 ---
 
 ## 2. Pipeline & Conversation Management
 
 - Runtime pipeline: **Planner → Retrieval → Answer**, all using the OpenAI Responses API with JSON schemas.
-- Planner outputs `queries[]`, `cardsEnabled`, and optional `topic`, built from a sliding conversation snippet, OwnerConfig, and persona; prompts live in `packages/chat-orchestrator/src/pipelinePrompts.ts`.
+- Planner outputs `queries[]` and optional `topic`, built from a sliding conversation snippet, OwnerConfig, and persona; prompts live in `packages/chat-orchestrator/src/pipelinePrompts.ts`.
 - Retrieval executes planner queries across projects/resume/profile using BM25 shortlist, embedding re-rank, and recency-aware scoring; profile inclusion is deterministic when requested; defaults `topK=8`, clamped to max 50; process-level caches keep searchers warm.
-- Answer streams a first-person message plus optional `thoughts` (dev-only) and `uiHints.projects/experiences`; uiHints are validated against retrieved docs and clamped (default max 10 per type) before emitting UI payloads.
+- Answer streams a first-person message plus optional `thoughts`, `cardReasoning` (structured inclusion/exclusion reasoning for debugging), and `uiHints.projects/experiences`; uiHints are validated against retrieved docs and clamped (default max 10 per type) before emitting UI payloads.
 - Conversation truncation: sliding window keeps the latest turns within ~8k tokens, always retains the latest user message and at least 3 recent turns; max user message size 500 tokens; tiktoken-backed counts; truncation is surfaced via reasoning trace metadata.
 
 ---
@@ -35,9 +42,9 @@ Companion to `docs/features/chat/chat-spec.md`. The spec is the source of truth 
 ## 3. Streaming & UI Plumbing
 
 - SSE events: `stage`, `reasoning`, `ui`, `token`, `item`, `attachment`, `ui_actions`, `done`, `error`.
-- Stage events fire `start/complete` for `planner`, `retrieval`, and `answer`, with meta like `topic`, `cardsEnabled`, `docsFound`, `sources`, `tokenCount`, and `durationMs`.
+- Stage events fire `start/complete` for `planner`, `retrieval`, and `answer`, with meta like `topic`, `docsFound`, `sources`, `tokenCount`, and `durationMs`.
 - Reasoning emits partial traces/deltas when `reasoningEnabled` is true (planner plan, retrieval summaries, answer/uiHints notes); consumers build dev tooling from these traces.
-- UI derivation: if `cardsEnabled=false`, emit empty `showProjects/showExperiences`; otherwise filter Answer.uiHints to retrieved IDs, dedupe, and clamp (projects first up to 10 total). UI events can fire during answer streaming as soon as valid uiHints exist.
+- UI derivation: filter Answer.uiHints to retrieved IDs, dedupe, and clamp (projects first up to 10 total). Empty/missing uiHints yield empty UI payloads. UI events can fire during answer streaming as soon as valid uiHints exist.
 - Error semantics: always emit an `error` event before closing a broken stream. Codes include `llm_timeout`, `llm_error`, `retrieval_error`, `internal_error`, `stream_interrupted`, `rate_limited`, and `budget_exceeded`. Partial answers keep streamed tokens plus an error when interruptions occur; retries must mint a new `responseAnchorId` per spec.
 - Typical sequence: `stage: planner_start` → reasoning delta(s) → `stage: planner_complete` → `stage: retrieval_start` → retrieval notes → `stage: retrieval_complete` → `stage: answer_start` → `token` + `ui` events → `stage: answer_complete` → `done`.
 

@@ -1,7 +1,10 @@
 import { z } from 'zod';
+import type { TokenUsage } from './cost';
 export * from './cost';
 
-export type SocialPlatform = 'x' | 'github' | 'youtube' | 'linkedin' | 'spotify';
+export const SOCIAL_PLATFORM_VALUES = ['x', 'github', 'youtube', 'linkedin', 'spotify'] as const;
+
+export type SocialPlatform = (typeof SOCIAL_PLATFORM_VALUES)[number];
 
 export type ProfileSocialLink = {
   platform: SocialPlatform;
@@ -167,7 +170,8 @@ export type ProfileSummary = {
   updatedAt?: string;
   fullName: string;
   headline: string;
-  location?: string;
+  domainLabel?: string;
+  currentLocation?: string;
   currentRole?: string;
   about: string[] | string;
   topSkills: string[];
@@ -183,11 +187,13 @@ export type PersonaProfile = {
   updatedAt?: string;
   fullName?: string;
   headline?: string;
-  location?: string;
+  currentLocation?: string;
   currentRole?: string;
-  about?: string[];
   topSkills?: string[];
-  socialLinks?: string[];
+  socialLinks?: Array<{
+    url: string;
+    blurb?: string;
+  }>;
   featuredExperienceIds?: string[];
 };
 
@@ -198,14 +204,6 @@ export type PersonaSummary = {
   voiceExamples?: string[];
   profile?: PersonaProfile;
   generatedAt?: string;
-};
-
-export type OwnerConfig = {
-  ownerId: string;
-  ownerName: string;
-  ownerPronouns?: string;
-  domainLabel: string;
-  portfolioKind?: 'individual' | 'team' | 'organization';
 };
 
 export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high';
@@ -239,8 +237,6 @@ export type DataProviders = {
 
 export type ChatRole = 'user' | 'assistant';
 
-export type BannerMode = 'idle' | 'thinking' | 'hover' | 'chat';
-
 export type BannerState =
   | { mode: 'idle' }
   | { mode: 'thinking' }
@@ -271,74 +267,122 @@ export type ChatRequestMessage = {
 // Chat pipeline contract (planner/retrieval/answer)
 export type RetrievalSource = 'projects' | 'resume' | 'profile';
 export type ExperienceScope = 'employment_only' | 'any_experience';
-export type ResumeFacet = 'experience' | 'education' | 'award' | 'skill';
 
 export type PlannerQuery = {
   source: RetrievalSource;
-  text: string;
-  limit?: number;
+  text?: string | null; // Optional for profile queries (profile is fetched as-is, not searched)
+  limit?: number | null;
 };
 
 export type PlannerLLMOutput = {
+  thoughts?: string[];
   queries: PlannerQuery[];
-  cardsEnabled: boolean;
   topic?: string;
+  useProfileContext?: boolean;
 };
 
 export type RetrievalPlan = PlannerLLMOutput & {
   model?: string;
+  effort?: ReasoningEffort;
+  durationMs?: number;
+  usage?: TokenUsage;
+  costUsd?: number;
 };
 
 export type AnswerUiHints = {
   projects?: string[];
   experiences?: string[];
+  education?: string[];
+  links?: SocialPlatform[];
+};
+
+export type CardSelectionReason = {
+  id: string;
+  name: string;
+  reason: string;
+};
+
+export type CardSelectionCategory = {
+  included: CardSelectionReason[];
+  excluded: CardSelectionReason[];
+};
+
+export type CardSelectionReasoning = {
+  projects?: CardSelectionCategory | null;
+  experiences?: CardSelectionCategory | null;
+  education?: CardSelectionCategory | null;
+  links?: CardSelectionCategory | null;
 };
 
 export type AnswerPayload = {
-  message: string;
   thoughts?: string[];
+  cardReasoning?: CardSelectionReasoning | null;
   uiHints?: AnswerUiHints;
+  message: string;
 };
 
 export type UiPayload = {
   showProjects: string[];
   showExperiences: string[];
+  showEducation: string[];
+  showLinks: SocialPlatform[];
 };
 
 export const RETRIEVAL_SOURCE_VALUES = ['projects', 'resume', 'profile'] as const;
-export const RESUME_FACET_VALUES = ['experience', 'education', 'award', 'skill'] as const;
 export const RETRIEVAL_REQUEST_TOPK_MAX = 10;
 export const RETRIEVAL_REQUEST_TOPK_DEFAULT = 8;
 
 const PlannerQuerySchema: z.ZodType<PlannerQuery, z.ZodTypeDef, unknown> = z.object({
   source: z.enum(RETRIEVAL_SOURCE_VALUES),
-  text: z.string().default(''),
-  limit: z.number().int().min(1).max(RETRIEVAL_REQUEST_TOPK_MAX).default(RETRIEVAL_REQUEST_TOPK_DEFAULT),
+  text: z.string().nullable().optional(), // Optional for profile queries
+  limit: z.number().int().min(1).max(RETRIEVAL_REQUEST_TOPK_MAX).nullable().optional(),
 });
 
 /**
  * Schema for parsing raw Planner LLM output (per simplified spec).
  */
 export const PlannerLLMOutputSchema: z.ZodType<PlannerLLMOutput, z.ZodTypeDef, unknown> = z.object({
+  thoughts: z.array(z.string()).default([]),
   queries: z.array(PlannerQuerySchema).default([]),
-  cardsEnabled: z.boolean().default(true),
   topic: z.string().default(''),
+  useProfileContext: z.boolean().default(false),
 });
 
-const AnswerUiHintsSchema: z.ZodType<AnswerUiHints, z.ZodTypeDef, unknown> = z.object({
+const AnswerUiHintsSchema = z.object({
   projects: z.array(z.string()).default([]),
   experiences: z.array(z.string()).default([]),
+  education: z.array(z.string()).default([]),
+  links: z.array(z.enum(SOCIAL_PLATFORM_VALUES)).default([]),
 });
 
-export const AnswerPayloadSchema: z.ZodType<AnswerPayload, z.ZodTypeDef, unknown> = z.object({
-  message: z.string(),
+const CardSelectionReasonSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  reason: z.string(),
+});
+
+const CardSelectionCategorySchema = z.object({
+  included: z.array(CardSelectionReasonSchema),
+  excluded: z.array(CardSelectionReasonSchema),
+});
+
+const CardSelectionReasoningSchema = z.object({
+  projects: CardSelectionCategorySchema.nullable().optional(),
+  experiences: CardSelectionCategorySchema.nullable().optional(),
+  education: CardSelectionCategorySchema.nullable().optional(),
+  links: CardSelectionCategorySchema.nullable().optional(),
+});
+
+export const AnswerPayloadSchema = z.object({
   thoughts: z.array(z.string()).default([]),
+  cardReasoning: CardSelectionReasoningSchema.nullable().optional(),
   uiHints: AnswerUiHintsSchema.default({}),
+  message: z.string(),
 });
 
 export type RetrievalSummary = {
   source: RetrievalSource;
-  queryText: string;
+  queryText?: string | null; // Optional for profile queries
   requestedTopK: number;
   effectiveTopK: number;
   numResults: number;
@@ -384,6 +428,11 @@ export type AnswerReasoning = {
   model?: string;
   uiHints?: AnswerUiHints;
   thoughts?: string[];
+  cardReasoning?: CardSelectionReasoning | null;
+  effort?: ReasoningEffort;
+  durationMs?: number;
+  usage?: TokenUsage;
+  costUsd?: number;
 };
 
 export type RetrievedProjectDoc = {

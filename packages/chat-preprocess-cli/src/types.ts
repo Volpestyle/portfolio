@@ -66,6 +66,10 @@ export type ChatPreprocessConfig = {
   models?: PreprocessModelConfig;
   resume?: {
     filename?: string;
+    /**
+     * Optional regex (string or array) to treat certain skill entries as containers to be expanded into child skills.
+     */
+    skillContainerPatterns?: Array<string | RegExp> | string | RegExp;
   };
 };
 
@@ -107,6 +111,7 @@ export type ResolvedPreprocessConfig = {
   models: ResolvedModelConfig;
   resume: {
     filename: string;
+    skillContainerPatterns: RegExp[];
   };
 };
 

@@ -1,182 +1,286 @@
 #!/usr/bin/env tsx
 
-import { performance } from 'node:perf_hooks';
-import type OpenAI from 'openai';
-import type { ChatRequestMessage } from '@portfolio/chat-contract';
-import { chatApi } from '../src/server/chat/bootstrap';
-import { getOpenAIClient } from '../src/server/openai/client';
-import chatEvalSuites, { type ChatEvalTestCase, type ChatEvalSuite } from '../tests/golden';
+/**
+ * Chat Evals CLI
+ *
+ * Thin entry point that loads config, creates clients, and runs eval suites.
+ * All logic is in tests/golden/lib/
+ */
 
-type AssertionResult = {
-  testId: string;
-  testName: string;
-  passed: boolean;
-  errors: string[];
-  elapsedMs: number;
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { resolve, join } from 'node:path';
+import { parse as parseYaml } from 'yaml';
+import { getOpenAIClient } from '../src/server/openai/client';
+import { createFixtureChatServer, personaFile, profileFile } from '../tests/chat-evals/fixtures/bootstrap';
+import {
+  RETRIEVAL_REQUEST_TOPK_DEFAULT,
+  RETRIEVAL_REQUEST_TOPK_MAX,
+  type ProfileSummary,
+} from '@portfolio/chat-contract';
+import {
+  chatEvalSuites,
+  createEvalClient,
+  runAllSuites,
+  printSummary,
+  buildOutputReport,
+  type EvalConfig,
+} from '../tests/chat-evals';
+
+const DEFAULT_EVAL_CONFIG: EvalConfig = {
+  models: {
+    plannerModel: 'gpt-4o-mini',
+    answerModel: 'gpt-4o-mini',
+    embeddingModel: 'text-embedding-3-small',
+    judgeModel: 'gpt-4o',
+    similarityModel: 'text-embedding-3-small',
+  },
+  timeout: { softTimeoutMs: 60000 },
+  reasoning: { planner: 'minimal', answer: 'low' },
+  thresholds: { minSemanticSimilarity: 0.75, minJudgeScore: 0.7 },
 };
 
-function buildMessages(test: ChatEvalTestCase): ChatRequestMessage[] {
-  const history = test.input.conversationHistory ?? [];
-  return [...history, { role: 'user', content: test.input.userMessage }];
-}
+const assertRange = (value: number, min: number, max: number, name: string) => {
+  if (Number.isNaN(value) || value < min || value > max) {
+    throw new Error(`${name} must be between ${min} and ${max}`);
+  }
+};
 
-function assertStringContains(text: string, substrings?: string[]): string[] {
-  if (!substrings?.length) return [];
-  const lower = text.toLowerCase();
-  return substrings
-    .filter((snippet) => !lower.includes(snippet.toLowerCase()))
-    .map((snippet) => `Missing substring in answer: "${snippet}"`);
-}
+const normalizeTopK = (value: unknown, name: string): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${name} must be a number between 1 and ${RETRIEVAL_REQUEST_TOPK_MAX}`);
+  }
+  const intVal = Math.floor(value);
+  assertRange(intVal, 1, RETRIEVAL_REQUEST_TOPK_MAX, name);
+  return intVal;
+};
 
-function assertStringNotContains(text: string, substrings?: string[]): string[] {
-  if (!substrings?.length) return [];
-  const lower = text.toLowerCase();
-  return substrings
-    .filter((snippet) => lower.includes(snippet.toLowerCase()))
-    .map((snippet) => `Answer unexpectedly contains "${snippet}"`);
-}
+const normalizeWeight = (value: unknown, name: string): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${name} must be a non-negative number`);
+  }
+  assertRange(value, 0, 5, name);
+  return value;
+};
 
-function assertIdInclusion(ids: string[], mustInclude?: string[], mustNotInclude?: string[]): string[] {
-  const errors: string[] = [];
-  if (mustInclude?.length) {
-    for (const required of mustInclude) {
-      if (!ids.includes(required)) {
-        errors.push(`Missing required id: ${required}`);
+const normalizeMinRelevanceScore = (value: unknown): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error('retrieval.minRelevanceScore must be a number between 0 and 1');
+  }
+  assertRange(value, 0, 1, 'retrieval.minRelevanceScore');
+  return value;
+};
+
+const normalizeTokenLimit = (value: unknown, name: string): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  const intVal = Math.floor(value);
+  if (intVal <= 0) {
+    throw new Error(`${name} must be greater than 0`);
+  }
+  return intVal;
+};
+
+const normalizeTemperature = (value: unknown): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error('models.answerTemperature must be a number between 0 and 2');
+  }
+  assertRange(value, 0, 2, 'models.answerTemperature');
+  return value;
+};
+
+const normalizeThreshold = (value: unknown, name: string, fallback: number): number => {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${name} must be a number between 0 and 1`);
+  }
+  assertRange(value, 0, 1, name);
+  return value;
+};
+
+// --- Config Loading ---
+
+function loadEvalConfig(): EvalConfig {
+  const configPath = resolve(process.cwd(), 'chat-eval.config.yml');
+  if (!existsSync(configPath)) {
+    console.warn('chat-eval.config.yml not found, using defaults');
+    return DEFAULT_EVAL_CONFIG;
+  }
+
+  const raw = readFileSync(configPath, 'utf-8');
+  const parsed = parseYaml(raw) as Partial<EvalConfig>;
+  const models: Partial<EvalConfig['models']> = parsed.models ?? {};
+
+  const answerModel = models.answerModel?.trim();
+  if (!answerModel) {
+    throw new Error('chat-eval.config.yml is missing models.answerModel');
+  }
+
+  const plannerModel = models.plannerModel?.trim() || answerModel;
+  const embeddingModel = models.embeddingModel?.trim() || DEFAULT_EVAL_CONFIG.models.embeddingModel;
+  const judgeModel = models.judgeModel?.trim() || DEFAULT_EVAL_CONFIG.models.judgeModel;
+  const similarityModel =
+    models.similarityModel?.trim() || DEFAULT_EVAL_CONFIG.models.similarityModel;
+
+  const retrievalWeights = parsed.retrieval?.weights;
+  const weights = retrievalWeights
+    ? {
+        textWeight: normalizeWeight(retrievalWeights.textWeight, 'retrieval.weights.textWeight'),
+        semanticWeight: normalizeWeight(
+          retrievalWeights.semanticWeight,
+          'retrieval.weights.semanticWeight'
+        ),
+        recencyLambda: normalizeWeight(
+          retrievalWeights.recencyLambda,
+          'retrieval.weights.recencyLambda'
+        ),
       }
-    }
-  }
-  if (mustNotInclude?.length) {
-    for (const forbidden of mustNotInclude) {
-      if (ids.includes(forbidden)) {
-        errors.push(`Contains forbidden id: ${forbidden}`);
+    : undefined;
+
+  const retrieval = parsed.retrieval
+    ? {
+        defaultTopK: normalizeTopK(parsed.retrieval.defaultTopK, 'retrieval.defaultTopK'),
+        maxTopK: normalizeTopK(parsed.retrieval.maxTopK, 'retrieval.maxTopK'),
+        minRelevanceScore: normalizeMinRelevanceScore(parsed.retrieval.minRelevanceScore),
+        weights: weights &&
+          (weights.textWeight !== undefined ||
+            weights.semanticWeight !== undefined ||
+            weights.recencyLambda !== undefined)
+          ? weights
+          : undefined,
       }
-    }
-  }
-  return errors;
-}
+    : undefined;
 
-async function runChatEvalCase(test: ChatEvalTestCase, client: OpenAI): Promise<AssertionResult> {
-  const messages = buildMessages(test);
-  const start = performance.now();
-  const response = await chatApi.run(client, messages, { softTimeoutMs: 60000, reasoningEnabled: true });
-  const elapsedMs = Math.round(performance.now() - start);
-
-  const errors: string[] = [];
-  const plan = response.reasoningTrace?.plan;
-  const answer = response.message ?? '';
-  const ui = response.ui ?? { showProjects: [], showExperiences: [] };
-
-  if (!plan) errors.push('Missing plan in reasoningTrace');
-
-  if (plan) {
-    const queryCount = plan.queries?.length ?? 0;
-    if (typeof test.expected.planQueriesMin === 'number' && queryCount < test.expected.planQueriesMin) {
-      errors.push(`plan queries count ${queryCount} is below min ${test.expected.planQueriesMin}`);
-    }
-    if (typeof test.expected.planQueriesMax === 'number' && queryCount > test.expected.planQueriesMax) {
-      errors.push(`plan queries count ${queryCount} exceeds max ${test.expected.planQueriesMax}`);
-    }
-    if (typeof test.expected.cardsEnabled === 'boolean' && Boolean(plan.cardsEnabled) !== test.expected.cardsEnabled) {
-      errors.push(`cardsEnabled expected ${test.expected.cardsEnabled} but got ${Boolean(plan.cardsEnabled)}`);
-    }
+  if (retrieval?.maxTopK && retrieval.defaultTopK && retrieval.defaultTopK > retrieval.maxTopK) {
+    throw new Error('retrieval.defaultTopK cannot exceed retrieval.maxTopK');
   }
 
-  if (
-    typeof test.expected.uiHintsProjectsMinCount === 'number' &&
-    ui.showProjects.length < test.expected.uiHintsProjectsMinCount
-  ) {
-    errors.push(
-      `ui.showProjects count ${ui.showProjects.length} is below min ${test.expected.uiHintsProjectsMinCount}`
-    );
-  }
-  if (
-    typeof test.expected.uiHintsProjectsMaxCount === 'number' &&
-    ui.showProjects.length > test.expected.uiHintsProjectsMaxCount
-  ) {
-    errors.push(
-      `ui.showProjects count ${ui.showProjects.length} exceeds max ${test.expected.uiHintsProjectsMaxCount}`
-    );
-  }
-  if (
-    typeof test.expected.uiHintsExperiencesMinCount === 'number' &&
-    ui.showExperiences.length < test.expected.uiHintsExperiencesMinCount
-  ) {
-    errors.push(
-      `ui.showExperiences count ${ui.showExperiences.length} is below min ${test.expected.uiHintsExperiencesMinCount}`
-    );
-  }
-  if (
-    typeof test.expected.uiHintsExperiencesMaxCount === 'number' &&
-    ui.showExperiences.length > test.expected.uiHintsExperiencesMaxCount
-  ) {
-    errors.push(
-      `ui.showExperiences count ${ui.showExperiences.length} exceeds max ${test.expected.uiHintsExperiencesMaxCount}`
-    );
-  }
+  const normalizedRetrieval = retrieval
+    ? {
+        ...retrieval,
+        defaultTopK:
+          retrieval.defaultTopK ??
+          (retrieval.maxTopK !== undefined
+            ? Math.min(RETRIEVAL_REQUEST_TOPK_DEFAULT, retrieval.maxTopK)
+            : undefined),
+      }
+    : undefined;
 
-  errors.push(
-    ...assertIdInclusion(ui.showProjects, test.expected.mustIncludeProjectIds, test.expected.mustNotIncludeProjectIds),
-    ...assertIdInclusion(ui.showExperiences, test.expected.mustIncludeExperienceIds, undefined)
-  );
-
-  errors.push(...assertStringContains(answer, test.expected.answerContains));
-  errors.push(...assertStringNotContains(answer, test.expected.answerNotContains));
+  const tokens = parsed.tokens
+    ? {
+        planner: normalizeTokenLimit(parsed.tokens.planner, 'tokens.planner'),
+        answer: normalizeTokenLimit(parsed.tokens.answer, 'tokens.answer'),
+      }
+    : undefined;
 
   return {
-    testId: test.id,
-    testName: test.name,
-    passed: errors.length === 0,
-    errors,
-    elapsedMs,
+    models: {
+      plannerModel,
+      answerModel,
+      answerModelNoRetrieval: models.answerModelNoRetrieval?.trim() || undefined,
+      embeddingModel,
+      judgeModel,
+      similarityModel,
+      answerTemperature: normalizeTemperature(models.answerTemperature),
+    },
+    tokens,
+    retrieval: normalizedRetrieval,
+    timeout: {
+      softTimeoutMs: normalizeTokenLimit(parsed.timeout?.softTimeoutMs, 'timeout.softTimeoutMs') ??
+        DEFAULT_EVAL_CONFIG.timeout.softTimeoutMs,
+    },
+    reasoning: {
+      planner: parsed.reasoning?.planner ?? DEFAULT_EVAL_CONFIG.reasoning.planner,
+      answer: parsed.reasoning?.answer ?? DEFAULT_EVAL_CONFIG.reasoning.answer,
+      answerNoRetrieval: parsed.reasoning?.answerNoRetrieval,
+    },
+    thresholds: {
+      minSemanticSimilarity: normalizeThreshold(
+        parsed.thresholds?.minSemanticSimilarity,
+        'thresholds.minSemanticSimilarity',
+        DEFAULT_EVAL_CONFIG.thresholds.minSemanticSimilarity
+      ),
+      minJudgeScore: normalizeThreshold(
+        parsed.thresholds?.minJudgeScore,
+        'thresholds.minJudgeScore',
+        DEFAULT_EVAL_CONFIG.thresholds.minJudgeScore
+      ),
+    },
   };
 }
 
-async function runChatEvalSuite(suite: ChatEvalSuite, client: OpenAI): Promise<AssertionResult[]> {
-  const results: AssertionResult[] = [];
-  for (const test of suite.tests) {
-    const result = await runChatEvalCase(test, client);
-    results.push(result);
-    const status = result.passed ? 'PASS' : 'FAIL';
-    console.log(`\n[${status}] ${suite.name} :: ${test.id} — ${test.name} (${result.elapsedMs} ms)`);
-    if (!result.passed) {
-      for (const err of result.errors) {
-        console.log(`  - ${err}`);
-      }
-    }
-  }
-  return results;
-}
+// --- Main ---
 
-async function runAllChatEvals() {
-  const client = await getOpenAIClient();
-  const allResults: AssertionResult[] = [];
-  for (const suite of chatEvalSuites) {
-    console.log('\n================================================');
-    console.log(`Suite: ${suite.name}`);
-    console.log(suite.description);
-    const suiteResults = await runChatEvalSuite(suite, client);
-    allResults.push(...suiteResults);
-  }
+async function main() {
+  const config = loadEvalConfig();
 
-  const summary = allResults.map((r) => ({
-    id: r.testId,
-    name: r.testName,
-    passed: r.passed,
-    errors: r.errors.length,
-    ms: r.elapsedMs,
-  }));
+  console.log('Chat Evals - Semantic Similarity + LLM-as-a-Judge\n');
+  console.log('Pipeline models:', config.models.plannerModel, '/', config.models.answerModel);
+  console.log('Judge model:', config.models.judgeModel);
+  console.log(
+    'Thresholds: similarity >=',
+    config.thresholds.minSemanticSimilarity,
+    ', judge >=',
+    config.thresholds.minJudgeScore
+  );
 
-  console.log('\nSummary');
-  console.table(summary);
+  const openaiClient = await getOpenAIClient();
 
-  const failed = allResults.filter((r) => !r.passed);
+  // Create chat API with eval config models + persona/profile for context
+  // Uses frozen fixture data for stable, reproducible evals
+  const { chatApi } = createFixtureChatServer({
+    runtimeOptions: {
+      modelConfig: {
+        plannerModel: config.models.plannerModel,
+        answerModel: config.models.answerModel,
+        answerModelNoRetrieval: config.models.answerModelNoRetrieval,
+        embeddingModel: config.models.embeddingModel,
+        answerTemperature: config.models.answerTemperature,
+        reasoning: config.reasoning,
+      },
+      tokenLimits: config.tokens,
+      persona: personaFile,
+      profile: profileFile as ProfileSummary,
+    },
+    retrievalOverrides: config.retrieval,
+  });
+
+  // Create eval client (decoupled from test logic)
+  const evalClient = createEvalClient({
+    openaiClient,
+    chatApi,
+    config,
+  });
+
+  // Run all suites
+  const results = await runAllSuites(chatEvalSuites, evalClient, config);
+
+  // Print summary
+  printSummary(results);
+
+  // Build and save output report
+  const report = buildOutputReport(results, config);
+  const outputDir = resolve(process.cwd(), 'tests/chat-evals/output');
+  mkdirSync(outputDir, { recursive: true });
+
+  // Generate timestamped filename
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const outputPath = join(outputDir, `eval-${timestamp}.json`);
+  writeFileSync(outputPath, JSON.stringify(report, null, 2));
+  console.log(`\nOutput saved to: ${outputPath}`);
+
+  const failed = results.filter((r) => !r.passed);
   if (failed.length > 0) {
-    console.error(`\n${failed.length} chat eval(s) failed.`);
     process.exit(1);
   }
 }
 
-runAllChatEvals().catch((error) => {
+main().catch((error) => {
   console.error('chat-evals failed', error);
   process.exit(1);
 });

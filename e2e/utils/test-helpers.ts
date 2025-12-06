@@ -27,7 +27,6 @@ export async function mockChatStream(page: Page) {
             { source: 'projects', limit: 5, text: 'featured project highlights' },
             { source: 'resume', limit: 3, text: 'supporting experience context' },
           ],
-          cardsEnabled: true,
         },
       },
       itemId: anchorId,
@@ -37,7 +36,7 @@ export async function mockChatStream(page: Page) {
       type: 'stage',
       stage: 'planner',
       status: 'complete',
-      meta: { topic: 'featured project', cardsEnabled: true },
+      meta: { topic: 'featured project' },
       durationMs: 180,
       itemId: anchorId,
       anchorId,
@@ -87,7 +86,7 @@ export async function mockChatStream(page: Page) {
       type: 'ui',
       itemId: anchorId,
       anchorId,
-      ui: { showProjects: [project.slug], showExperiences: [] },
+      ui: { showProjects: [project.slug], showExperiences: [], showEducation: [], showLinks: [] },
     },
     {
       type: 'attachment',
@@ -101,7 +100,7 @@ export async function mockChatStream(page: Page) {
       trace: {
         answer: {
           model: 'gpt-5-nano-2025-08-07',
-          uiHints: { projects: [project.slug], experiences: [] },
+          uiHints: { projects: [project.slug], experiences: [], links: [] },
           thoughts: ['Introduce the featured project', 'Invite the user to open the inline docs'],
           message: "Here's a featured project from my portfolio.",
         },

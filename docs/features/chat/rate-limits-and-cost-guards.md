@@ -11,7 +11,7 @@ This stack ships with two defensive controls for the chat service:
 - Backend: Upstash Redis via `@upstash/ratelimit` sliding windows.
 - Behavior:
   - On quota breach: HTTP 429 with `RateLimit-*` headers.
-  - On limiter backend unavailability (missing secrets or Redis error): **fail closed** with HTTP 503 to avoid unthrottled spikes.
+  - On limiter backend unavailability (missing secrets or Redis error): production **fails closed** with HTTP 503; in dev, if secrets are missing the limiter bypasses instead of blocking.
 - Config:
   - Secrets: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (Secrets Manager, repo scope).
   - Local toggle: `ENABLE_DEV_RATE_LIMIT` defaults to **true** when creds are present; set it to `false` to bypass in dev. If secrets are missing in dev, rate limiting is bypassed automatically.
@@ -28,8 +28,9 @@ This stack ships with two defensive controls for the chat service:
   - Threshold: **$10** over the trailing 30 days (per infra stack).
   - Notifications: SNS email from `OPENAI_COST_ALERT_EMAIL`.
   - Missing-data guard: secondary alarm fires if no data points arrive for 3 consecutive days so we notice when publishing breaks.
-- Runtime budget guard (separate from the CloudWatch alarm) defaults to `$10/month` (`CHAT_MONTHLY_BUDGET_USD`) with warn/critical/exceeded at `$8 / $9.50 / $10`, tracks Planner/Retrieval/Answer runtime spend via Dynamo, and can fan out to SNS via `COST_ALERT_TOPIC_ARN` or `CHAT_COST_ALERT_TOPIC_ARN`. `/api/chat` blocks turns when already over budget; if a turn crosses the limit mid-stream, it finishes streaming and then emits SSE `error` with `code: "budget_exceeded"`.
-- Touchpoints: `packages/chat-next-api/src/costMetrics.ts` (publisher invoked from `createChatServerLogger` when `chat.pipeline.tokens` fire), `packages/chat-next-api/src/server.ts` (logger hook), `infra/cdk/lib/portfolio-stack.ts#createOpenAiCostAlarm` (alarm wiring + missing-data alert).
+- Runtime budget guard (separate from the CloudWatch alarm) is **opt-in**: enabled only when `chat.config.yml` sets `cost.budgetUsd` to a positive value. Warn/critical/exceeded thresholds: 80% / 95% / 100% of that budget. State lives in the `COST_TABLE_NAME` DynamoDB table (provisioned by CDK); optional SNS via `COST_ALERT_TOPIC_ARN` / `CHAT_COST_ALERT_TOPIC_ARN`.
+- Enforcement: `/api/chat` blocks turns when already over budget; if a turn pushes the budget over the limit at the end of a run, the stream emits an SSE `error` with `code: "budget_exceeded"` before closing.
+- Touchpoints: `packages/chat-next-api/src/costMetrics.ts` (publishes OpenAI cost metrics), `packages/chat-next-api/src/runtimeCost.ts` (runtime budget guard), `infra/cdk/lib/portfolio-stack.ts#createOpenAiCostAlarm` (alarm wiring + missing-data alert).
 
 ## Ops quick checks
 

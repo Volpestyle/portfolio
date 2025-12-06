@@ -93,6 +93,9 @@ test.describe('Engagement surfaces', () => {
     }
 
     // Mocked stream: verify surfaced project detail from UI hints.
+    const projectToggle = page.getByRole('button', { name: /projects/i });
+    await expect(projectToggle).toBeVisible();
+    await projectToggle.click();
     const projectHeading = page.getByRole('heading', { name: /sample-ai-app/i }).first();
     await expect(projectHeading).toBeVisible();
     const expandButton = page.getByRole('button', { name: /view details/i }).first();

@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 type InlineUiPortalContextValue = {
@@ -70,40 +71,36 @@ export function useInlineUiPortal() {
 
 export function InlineUiPortalAnchor({ anchorId, className }: { anchorId?: string | null; className?: string }) {
   const { registerAnchor, unregisterAnchor } = useInlineUiPortal();
-  const nodeRef = useRef<HTMLDivElement | null>(null);
-  const idRef = useRef<string | null>(null);
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
 
-  const attach = useCallback(() => {
-    const node = nodeRef.current;
+  useLayoutEffect(() => {
     if (!node || !anchorId) {
       return;
     }
     registerAnchor(anchorId, node);
-    idRef.current = anchorId;
-  }, [anchorId, registerAnchor]);
+    return () => {
+      unregisterAnchor(anchorId, node);
+    };
+  }, [anchorId, node, registerAnchor, unregisterAnchor]);
 
-  const detach = useCallback(() => {
-    const node = nodeRef.current;
-    if (!node || !idRef.current) {
-      return;
-    }
-    unregisterAnchor(idRef.current, node);
-    idRef.current = null;
-  }, [unregisterAnchor]);
+  return <div ref={setNode} className={cn('w-full', className)} data-inline-ui-anchor />;
+}
 
-  const refCallback = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (nodeRef.current) {
-        detach();
-      }
-      nodeRef.current = node;
-      if (!node) {
-        return;
-      }
-      attach();
-    },
-    [attach, detach]
-  );
+export function InlineUiPortal({
+  anchorId,
+  fallbackAnchorId,
+  children,
+}: {
+  anchorId?: string | null;
+  fallbackAnchorId?: string | null;
+  children: ReactNode;
+}) {
+  const { getAnchor } = useInlineUiPortal();
+  const target = getAnchor(anchorId) ?? getAnchor(fallbackAnchorId);
 
-  return <div ref={refCallback} className={cn('w-full', className)} data-inline-ui-anchor />;
+  if (!target) {
+    return null;
+  }
+
+  return createPortal(children, target);
 }

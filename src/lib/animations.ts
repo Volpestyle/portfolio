@@ -36,3 +36,47 @@ export const cardTransitions = {
     ease: [0.4, 0, 0.2, 1] as const,
   },
 } as const;
+
+/**
+ * Staggered entry animations for lists of items
+ */
+export const staggerConfig = {
+  /** Container variants for staggered children */
+  container: {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.08,
+        delayChildren: 0.05,
+      },
+    },
+  },
+  /** Individual item entry animation */
+  item: {
+    hidden: { opacity: 0, y: 12, scale: 0.97 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: {
+        duration: 0.35,
+        ease: [0.25, 0.46, 0.45, 0.94],
+      },
+    },
+  },
+  /** Section-level stagger for multiple sections */
+  section: {
+    hidden: { opacity: 0, y: 8 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.3,
+        ease: [0.25, 0.46, 0.45, 0.94],
+        staggerChildren: 0.1,
+        delayChildren: 0.1,
+      },
+    },
+  },
+} as const;

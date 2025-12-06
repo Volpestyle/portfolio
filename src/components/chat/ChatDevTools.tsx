@@ -111,7 +111,7 @@ export function ChatDevTools() {
         type="button"
         onClick={handleExport}
         disabled={!hasMessages || isSaving}
-        className="pointer-events-auto rounded-full border border-white/30 bg-black/70 px-4 py-2 font-semibold uppercase tracking-wide text-white/70 shadow-lg transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+        className="pointer-events-auto hidden rounded-full border border-white/30 bg-black/70 px-4 py-2 font-semibold uppercase tracking-wide text-white/70 shadow-lg transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40 sm:block"
         title={
           hasMessages ? 'Write the current chat transcript into debug/chat-exports' : 'Start chatting to enable exports'
         }

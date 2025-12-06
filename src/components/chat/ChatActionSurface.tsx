@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
-import type { ProjectSummary, ResumeEntry } from '@portfolio/chat-contract';
+import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
+import type { ProfileSocialLink, ProjectSummary, ResumeEntry } from '@portfolio/chat-contract';
 import type { ChatSurfaceState } from '@portfolio/chat-next-ui';
 import { useChat } from '@/hooks/useChat';
 import { useProjectListCache } from '@/hooks/useProjectListCache';
@@ -15,12 +15,15 @@ import { Spinner } from '@/components/ui/spinner';
 import { useProjectDetail } from '@/hooks/useProjectDetail';
 import { useProjectDocument } from '@/hooks/useProjectDocument';
 import { ExperienceList } from '@/components/chat/attachments/ExperienceList';
-import { cardTransitions } from '@/lib/animations';
+import { CollapsibleSection } from '@/components/chat/CollapsibleSection';
+import { FolderKanban, FileText, Sparkles } from 'lucide-react';
+import { cardTransitions, staggerConfig } from '@/lib/animations';
+import { getSocialIcon, resolveSocialLink } from '@/lib/profile/socialLinks';
 
 function useSurfaceProjects(surface: ChatSurfaceState) {
   const { projectCache } = useChat();
-  const { visibleProjectIds, focusedProjectId, highlightedSkills, lastActionAt } = surface;
-  const needsProjects = visibleProjectIds.length > 0 || Boolean(focusedProjectId);
+  const { visibleProjectIds, highlightedSkills } = surface;
+  const needsProjects = visibleProjectIds.length > 0;
   const { getCachedProjectList, ensureProjectList } = useProjectListCache();
   const [fallbackProjects, setFallbackProjects] = useState<ProjectSummary[] | null>(null);
 
@@ -66,106 +69,209 @@ function useSurfaceProjects(surface: ChatSurfaceState) {
     [projectCache, fallbackProjects]
   );
 
-  const focusedProject = useMemo(() => lookupProject(focusedProjectId), [lookupProject, focusedProjectId]);
-
-  const allVisibleProjects = useMemo(() => {
+  const visibleProjects = useMemo(() => {
     if (!visibleProjectIds.length) {
       return [] as ProjectSummary[];
     }
     return visibleProjectIds
       .map((id) => lookupProject(id))
-      .filter((project): project is ProjectSummary => Boolean(project));
+      .filter((project): project is ProjectSummary => Boolean(project))
+      .slice(0, 4);
   }, [lookupProject, visibleProjectIds]);
 
-  const filteredVisible = useMemo(() => {
-    if (!focusedProject) {
-      return allVisibleProjects.slice(0, 4);
-    }
-    const focusKey = normalizeProjectKey(focusedProject.slug ?? focusedProject.name);
-    return allVisibleProjects
-      .filter((project) => normalizeProjectKey(project.slug ?? project.name) !== focusKey)
-      .slice(0, 4);
-  }, [focusedProject, allVisibleProjects]);
-
-  const focusedAutoExpandToken =
-    focusedProject && focusedProjectId ? `${normalizeProjectKey(focusedProjectId)}::${lastActionAt ?? ''}` : null;
-
-  return { focusedProject, filteredVisible, highlightedSkills, focusedAutoExpandToken };
+  return { visibleProjects, highlightedSkills };
 }
 
 function useSurfaceExperiences(surface: ChatSurfaceState) {
   const { experienceCache } = useChat();
   const normalizedIds = (surface.visibleExperienceIds ?? []).map((id) => id?.trim().toLowerCase()).filter(Boolean);
 
-  return normalizedIds.map((id) => experienceCache[id]).filter((exp): exp is ResumeEntry => Boolean(exp));
+  return normalizedIds
+    .map((id) => experienceCache[id])
+    .filter((exp): exp is ResumeEntry => Boolean(exp && (exp.type === 'experience' || !exp.type)));
+}
+
+function useSurfaceEducation(surface: ChatSurfaceState) {
+  const { experienceCache } = useChat();
+  const normalizedIds = (surface.visibleEducationIds ?? []).map((id) => id?.trim().toLowerCase()).filter(Boolean);
+
+  return normalizedIds
+    .map((id) => experienceCache[id])
+    .filter((exp): exp is ResumeEntry => Boolean(exp && exp.type === 'education'));
+}
+
+function useSurfaceLinks(surface: ChatSurfaceState) {
+  const normalizedIds = (surface.visibleLinkIds ?? []).map((id) => id?.trim().toLowerCase()).filter(Boolean);
+  const seen = new Set<string>();
+
+  return normalizedIds
+    .map((id) => resolveSocialLink(id))
+    .filter((link): link is ProfileSocialLink => {
+      if (!link) return false;
+      const key = link.platform;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
 }
 
 export function ChatActionSurface({ surface }: { surface: ChatSurfaceState }) {
-  const { focusedProject, filteredVisible, highlightedSkills, focusedAutoExpandToken } = useSurfaceProjects(surface);
+  const { visibleProjects, highlightedSkills } = useSurfaceProjects(surface);
   const visibleExperiences = useSurfaceExperiences(surface);
+  const visibleEducation = useSurfaceEducation(surface);
+  const visibleLinks = useSurfaceLinks(surface);
 
-  const shouldRender =
-    Boolean(focusedProject) ||
-    filteredVisible.length > 0 ||
+  const hasCardContent =
+    visibleProjects.length > 0 ||
     highlightedSkills.length > 0 ||
-    visibleExperiences.length > 0;
+    visibleExperiences.length > 0 ||
+    visibleEducation.length > 0;
+
+  const shouldRender = hasCardContent || visibleLinks.length > 0;
   if (!shouldRender) {
     return null;
   }
 
   return (
-    <div className="mt-3 rounded-xl border-t border-white/10 bg-white/5 px-4 py-2 text-white backdrop-blur-sm">
-      <div className="space-y-4">
-        {focusedProject ? (
-          <section>
-            <p className="text-[11px] uppercase tracking-wide text-white/60">Focused project</p>
-            <div className="mt-2">
-              <SurfaceProjectCard project={focusedProject} autoExpandToken={focusedAutoExpandToken} />
-            </div>
-          </section>
-        ) : null}
+    <>
+      {hasCardContent ? (
+        <motion.div
+          className="-mx-4 mt-3 rounded-xl border-t border-white/10 bg-white/5 px-4 py-2 text-white backdrop-blur-sm sm:mx-0"
+          initial="hidden"
+          animate="visible"
+          variants={staggerConfig.container}
+        >
+          <motion.div className="space-y-4" variants={staggerConfig.section}>
+            {visibleProjects.length ? (
+              <CollapsibleSection title="Projects" icon={<FolderKanban className="h-3 w-3" />} count={visibleProjects.length}>
+                <div className="space-y-3">
+                  <AnimatePresence initial={false}>
+                    {visibleProjects.map((project) => (
+                      <motion.div
+                        key={`surface-${project.slug ?? project.name}`}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+                      >
+                        <SurfaceProjectCard project={project} />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </CollapsibleSection>
+            ) : null}
 
-        {filteredVisible.length ? (
-          <section>
-            <p className="text-[11px] uppercase tracking-wide text-white/60">Projects </p>
-            <div className="mt-2 space-y-3">
-              {filteredVisible.map((project) => (
-                <SurfaceProjectCard key={`surface-${project.slug ?? project.name}`} project={project} />
-              ))}
-            </div>
-          </section>
-        ) : null}
+            {visibleExperiences.length || visibleEducation.length ? (
+              <CollapsibleSection title="Resume" icon={<FileText className="h-3 w-3" />} count={visibleExperiences.length + visibleEducation.length}>
+                <ExperienceList experiences={visibleExperiences} education={visibleEducation} />
+              </CollapsibleSection>
+            ) : null}
 
-        {visibleExperiences.length ? (
-          <section>
-            <p className="text-[11px] uppercase tracking-wide text-white/60">Resume</p>
-            <div className="mt-2">
-              <ExperienceList experiences={visibleExperiences} />
-            </div>
-          </section>
-        ) : null}
+            {highlightedSkills.length ? (
+              <CollapsibleSection title="Skill highlights" icon={<Sparkles className="h-3 w-3" />} count={highlightedSkills.length}>
+                <div className="flex flex-wrap gap-2">
+                  <AnimatePresence initial={false}>
+                    {highlightedSkills.map((skill) => (
+                      <motion.span
+                        key={skill}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        transition={{ duration: 0.25 }}
+                        className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs text-white/80"
+                      >
+                        {skill}
+                      </motion.span>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </CollapsibleSection>
+            ) : null}
+          </motion.div>
+        </motion.div>
+      ) : null}
 
-        {highlightedSkills.length ? (
-          <section>
-            <p className="text-[11px] uppercase tracking-wide text-white/60">Skill highlights</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {highlightedSkills.map((skill) => (
-                <span
-                  key={skill}
-                  className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs text-white/80"
-                >
-                  {skill}
-                </span>
-              ))}
-            </div>
-          </section>
-        ) : null}
-      </div>
-    </div>
+      {visibleLinks.length ? (
+        <div className="mt-3 flex flex-wrap gap-3">
+          {visibleLinks.map((link) => (
+            <motion.div
+              key={`surface-link-${link.platform}`}
+              initial={{ opacity: 0, y: 8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              <SurfaceLinkButton link={link} />
+            </motion.div>
+          ))}
+        </div>
+      ) : null}
+    </>
   );
 }
 
 type ActiveDocState = { path: string; label?: string } | null;
+
+function SurfaceLinkButton({ link }: { link: ProfileSocialLink }) {
+  const icon = getSocialIcon(link.platform);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [textWidth, setTextWidth] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+
+  useLayoutEffect(() => {
+    if (textRef.current) {
+      setTextWidth(textRef.current.scrollWidth);
+    }
+  }, [link.label]);
+
+  const collapsedWidth = 44;
+  const expandedWidth = textWidth + 24; // px-3 = 12px each side
+
+  return (
+    <motion.a
+      href={link.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="relative inline-flex h-10 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-black/70 px-3 text-white shadow-sm transition-colors duration-200 hover:bg-white hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      initial={false}
+      style={{ width: collapsedWidth }}
+      animate={{ width: isHovered ? expandedWidth : collapsedWidth }}
+      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+    >
+      <motion.div
+        className="absolute"
+        initial={false}
+        animate={{ opacity: isHovered ? 0 : 1 }}
+        transition={{ duration: 0.15 }}
+      >
+        <SurfaceLinkIcon icon={icon} />
+      </motion.div>
+      <motion.span
+        ref={textRef}
+        className="whitespace-nowrap text-sm font-medium"
+        initial={false}
+        animate={{ opacity: isHovered ? 1 : 0 }}
+        transition={{ duration: 0.15 }}
+      >
+        {link.label}
+      </motion.span>
+    </motion.a>
+  );
+}
+
+function SurfaceLinkIcon({ icon }: { icon: { path: string } }) {
+  return (
+    <span className="flex h-5 w-5 items-center justify-center">
+      <svg aria-hidden="true" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 fill-current">
+        <path d={icon.path} />
+      </svg>
+    </span>
+  );
+}
 
 type ViewState = 'card' | 'detail' | 'document';
 
@@ -270,6 +376,7 @@ function SurfaceProjectCard({
   }, [activeDoc, collapseToCard, backToDetail, document?.path, document?.title, project.name]);
 
   const repoForCard = detail?.repo ?? repoInfo;
+  const prefersReducedMotion = useReducedMotion();
 
   const handleExpand = useCallback(() => {
     setIsExpanded(true);
@@ -279,8 +386,10 @@ function SurfaceProjectCard({
   const bodyLayoutId = `${layoutId}-body`;
 
   // Content variants - subtle opacity fade only
+  const initialOpacity = prefersReducedMotion ? 1 : 0.05;
   const contentVariants = {
-    initial: { opacity: 0 },
+    // Keep a soft fade on entry without fully hiding content even if animations are skipped
+    initial: { opacity: initialOpacity },
     animate: { opacity: 1 },
     exit: { opacity: 0 },
   };
