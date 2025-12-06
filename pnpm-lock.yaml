@@ -292,6 +292,9 @@ importers:
       '@portfolio/chat-contract':
         specifier: workspace:*
         version: link:../chat-contract
+      '@portfolio/chat-orchestrator':
+        specifier: workspace:*
+        version: link:../chat-orchestrator
       eventsource-parser:
         specifier: ^1.1.2
         version: 1.1.2
