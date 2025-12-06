@@ -1900,7 +1900,6 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
 
       const plannerKey = buildPlannerCacheKey(conversationSnippet);
       emitStageEvent('planner', 'start');
-      emitReasoning({ stage: 'planner', notes: 'Planning retrieval...' });
 
       // Track streamed planner fields for progressive reasoning panel updates
       let lastStreamedPlannerThoughts: string[] | undefined;
@@ -2044,7 +2043,6 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
 
       if (hasQueries) {
         emitStageEvent('retrieval', 'start');
-        emitReasoning({ stage: 'retrieval', notes: 'Running portfolio searches...' });
         try {
           const tRetrieval = performance.now();
           const executed = await executeRetrievalPlan(retrieval, plan, {
@@ -2161,7 +2159,6 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       };
 
       emitStageEvent('answer', 'start');
-      emitReasoning({ stage: 'answer', notes: 'Drafting answer...' });
 
       const answerModel = hasQueries
         ? modelConfig.answerModel
@@ -2230,7 +2227,8 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       }
 
       if (!hasQueries) {
-        answer.thoughts = undefined;
+        answer.uiHints = undefined;
+        answer.cardReasoning = undefined;
       }
 
       const ui = emitUiFromHints(answer.uiHints) ?? buildUi(answer.uiHints, retrieved, profileContextForAnswer);
