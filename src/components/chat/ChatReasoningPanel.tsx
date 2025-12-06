@@ -17,11 +17,13 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
   const [isExpanded, setIsExpanded] = useState(false);
   const plan = trace.plan;
   const retrievals = trace.retrieval ?? null;
+  const planQueries = plan?.queries?.filter((query) => query.source !== 'profile') ?? [];
   const retrievalDocs = trace.retrievalDocs ?? null;
   const answer = trace.answer ?? null;
   const traceError = trace.error ?? null;
   const streaming = trace.streaming ?? {};
   const plannerStreamingText = streaming.planner?.text || streaming.planner?.notes;
+  const planThoughts = plan?.thoughts?.filter(Boolean) ?? [];
   const retrievalStreamingText = streaming.retrieval?.text || streaming.retrieval?.notes;
   const answerStreamingText = streaming.answer?.text || streaming.answer?.notes;
 
@@ -38,7 +40,7 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
     return 'How I answered';
   }, [durationMs, isStreaming, traceError]);
 
-  const hasQueries = (plan?.queries?.length ?? 0) > 0;
+  const hasQueries = planQueries.length > 0;
 
   return (
     <div className={cn('w-full rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm', className)}>
@@ -131,18 +133,34 @@ export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, cla
                     {plan.topic && <InfoRow label="Topic" value={plan.topic} />}
                     {hasQueries ? (
                       <div className="space-y-1">
-                        {plan.queries.map((query, idx) => (
+                        {planQueries.map((query, idx) => (
                           <div key={`${query.source}-${idx}`} className="rounded border border-white/5 bg-white/5 p-2">
-                        <div className="flex items-center justify-between text-[11px] text-white/60">
-                          <span className="font-semibold text-blue-200">{capitalize(query.source)}</span>
-                          <span>TopK: {query.limit ?? '—'}</span>
-                        </div>
-                        <p className="mt-1 text-xs text-white/70">{query.text}</p>
+                            <div className="flex items-center justify-between text-[11px] text-white/60">
+                              <span className="font-semibold text-blue-200">{capitalize(query.source)}</span>
+                              {query.text && <span>TopK: {query.limit ?? '—'}</span>}
+                            </div>
+                            {query.text ? (
+                              <p className="mt-1 text-xs text-white/70">{query.text}</p>
+                            ) : (
+                              <p className="mt-1 text-xs text-white/50 italic">No query text provided</p>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-white/60">Planner chose to skip retrieval.</p>
+                    ) : (
+                      <p className="text-xs text-white/60">Planner chose to skip retrieval.</p>
+                    )}
+                    {planThoughts.length > 0 && (
+                      <div className="space-y-1">
+                        {planThoughts.map((thought, idx) => (
+                          <div key={idx} className="flex gap-2">
+                            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-500/20 text-[10px] font-medium text-blue-300">
+                              {idx + 1}
+                            </span>
+                            <span className="flex-1 text-white/80">{thought}</span>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 ) : plannerStreamingText ? (

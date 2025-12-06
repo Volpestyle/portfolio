@@ -21,6 +21,7 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
   const traceError = trace.error ?? null;
   const debug = trace.debug ?? null;
   const retrievalDocs = trace.retrievalDocs ?? null;
+  const plannerThoughts = plan?.thoughts?.filter(Boolean) ?? [];
   const hasData = Boolean(plan || retrievals.length || answer || traceError || debug);
   const isRetrievalStreaming = Boolean(isStreaming && plan && trace.retrieval === undefined);
   const isAnswerStreaming = Boolean(isStreaming && trace.retrieval !== undefined && !answer);
@@ -73,6 +74,18 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                       </div>
                     ) : (
                       <p className="text-xs text-purple-300/50">Skipped retrieval</p>
+                    )}
+                    {plannerThoughts.length > 0 && (
+                      <div className="space-y-1">
+                        {plannerThoughts.map((thought, idx) => (
+                          <div key={idx} className="flex gap-2 text-xs">
+                            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-purple-500/20 text-[10px] font-medium text-purple-300">
+                              {idx + 1}
+                            </span>
+                            <span className="text-purple-100/70">{thought}</span>
+                          </div>
+                        ))}
+                      </div>
                     )}
                     <Collapsible label="Planner JSON">{JSON.stringify(plan, null, 2)}</Collapsible>
                     {debug?.plannerPrompt && (
