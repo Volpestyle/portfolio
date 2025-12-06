@@ -71,7 +71,7 @@ export function ChatComposer({ isBusy, hasMessages, onSend }: ChatComposerProps)
           value={value}
           onChange={(event) => setValue(event.target.value)}
           placeholder="ask me anything..."
-          className="max-h-[200px] min-h-[40px] flex-1 overflow-y-auto rounded-lg border-gray-700 bg-black/50 text-white backdrop-blur-sm transition-all duration-200 placeholder:text-gray-500 hover:border-gray-600 focus:outline-none disabled:opacity-50"
+          className="max-h-[200px] min-h-[40px] flex-1 overflow-y-auto rounded-lg border-gray-700 bg-black/50 text-white text-base backdrop-blur-sm transition-all duration-200 placeholder:text-gray-500 hover:border-gray-600 focus:outline-none disabled:opacity-50"
           disabled={isBusy}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
