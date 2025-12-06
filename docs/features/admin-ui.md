@@ -1,135 +1,62 @@
-# Admin UI Documentation
+# Admin UI
 
-## Overview
+Admin is live at `/admin` and already wired to the blog APIs in this repo. It uses Auth.js (Google/GitHub) with an `ADMIN_EMAILS` allowlist and is blocked by middleware plus server-side checks.
 
-The admin UI provides a comprehensive blog content management system accessible at `/admin`. It follows the design specifications from `blog.md` and implements a clean, keyboard-friendly interface for managing blog posts.
+## Feature highlights
 
-## Features
+- **Posts list** (`/admin`):
+  - Search by title or slug and filter by status (`draft`, `scheduled`, `published`, `archived`).
+  - Table shows title, slug, tags, status (with scheduled datetime), updated/published dates, and action buttons.
+  - Quick actions: edit, view live (for published), schedule, publish, unschedule, archive, delete.
+- **Post editor** (`/admin/new`, `/admin/[slug]`):
+  - Metadata form with auto-generated slug (locked after creation), required title/summary, optional tags and hero image key.
+  - Markdown editor with toolbar, preview toggle, and media insertion.
+  - Media uploader validates JPG/PNG/GIF/WebP ≤ 5 MB, fetches a presigned PUT URL, uploads to S3, and lets you insert the key into markdown.
+  - Actions: save draft, publish now, schedule/unschedule, preview draft (enables Next.js draft mode), view live.
+  - Post info card shows created/published dates and the optimistic concurrency `version`.
+  - Keyboard shortcuts implemented: `⌘/Ctrl + S` saves draft, `⌘/Ctrl + P` previews.
 
-### Posts List (`/admin`)
+## API surface (already implemented)
 
-- **Search**: Filter posts by title or slug
-- **Status Filter**: Filter by draft, scheduled, published, or archived status
-- **Table View**: Displays title, status, updated date, published date, and actions
-- **Quick Actions**: Edit, View, Publish, Archive, and Delete buttons for each post
+All endpoints require an admin session (or the test bypass header/secret when fixtures are enabled) and expect the current `version` on mutating calls:
 
-### Post Editor (`/admin/[slug]` and `/admin/new`)
+- `GET /api/admin/posts` — list posts (`?status`, `?search` supported).
+- `POST /api/admin/posts` — create a post + first draft.
+- `GET /api/admin/posts/[slug]` — fetch metadata + latest revision (drafts allowed).
+- `PUT /api/admin/posts/[slug]` — save draft; keeps slug locked.
+- `POST /api/admin/posts/[slug]/publish` — publish now (optional `publishedAt`).
+- `POST /api/admin/posts/[slug]/schedule` — schedule publish at an ISO datetime.
+- `POST /api/admin/posts/[slug]/unschedule` — cancel schedule.
+- `POST /api/admin/posts/[slug]/archive` — archive and clear schedule.
+- `POST /api/admin/posts/[slug]/delete` — delete the post and all revisions.
+- `POST /api/admin/media/presigned-url` — presigned upload URL for media.
+- `GET /api/draft` / `DELETE /api/draft` — enable/disable draft mode for previews.
 
-- **Metadata Form**:
-  - Title (required)
-  - Slug (auto-generated from title, required)
-  - Summary (required)
-  - Tags (comma-separated)
-  - Hero Image Key
-- **Markdown Editor**:
-  - Syntax highlighting toolbar
-  - Preview mode
-  - Common markdown shortcuts (bold, italic, code, links, images, headings, lists)
-- **Media Uploader**:
-  - Drag-and-drop support
-  - File validation (JPEG, PNG, GIF, WebP, max 5MB)
-  - Presigned S3 upload
-  - Easy insertion into content
-- **Actions Sidebar**:
-  - Save Draft
-  - Preview Draft (opens in new tab)
-  - Publish Now
-  - View Live (for published posts)
-- **Post Info**: Version, created date, published date
+## Authentication and access
 
-### Keyboard Shortcuts
+- Auth.js providers are configured in `src/auth.ts`; `/admin` is protected in `src/middleware.ts`.
+- Server actions re-check the session and allowlist via `isAdminEmail`.
+- E2E fixtures can bypass with `E2E_ADMIN_BYPASS_SECRET` when fixture runtimes are enabled.
 
-- `⌘ + S` - Save Draft (planned)
-- `⌘ + P` - Preview (planned)
+## Operational notes
 
-## File Structure
+- Mutations are optimistic-concurrency guarded with `version` checks; stale updates fail.
+- Publish/schedule/unschedule/archival revalidate `/blog`, `/blog/<slug>`, and `/sitemap.xml`, plus CloudFront when configured.
+- Draft previews use Next.js draft mode; only admins can enable it.
+
+## File structure (UI)
 
 ```
 src/app/admin/
-├── page.tsx                           # Posts list page
-├── [slug]/page.tsx                    # Edit post page
-├── new/page.tsx                       # New post page
-├── layout.tsx                         # Admin layout with navigation
-├── not-found.tsx                      # 404 page
+├── page.tsx               # Posts list page
+├── [slug]/page.tsx        # Edit post page
+├── new/page.tsx           # New post page
+├── layout.tsx             # Admin layout
+├── not-found.tsx          # 404 for unknown slugs
 └── components/
-    ├── PostsFilters.tsx              # Search and status filters
-    ├── PostsTable.tsx                # Posts table with actions
-    ├── PostEditor.tsx                # Main post editor component
-    ├── MarkdownEditor.tsx            # Markdown editor with toolbar
-    └── MediaUploader.tsx             # Media upload component
+    ├── PostsFilters.tsx
+    ├── PostsTable.tsx
+    ├── PostEditor.tsx
+    ├── MarkdownEditor.tsx
+    └── MediaUploader.tsx
 ```
-
-## API Endpoints Required
-
-The UI expects the following API endpoints to be implemented:
-
-### Posts Management
-
-- `GET /api/admin/posts` - List posts (with optional ?status and ?search params)
-- `GET /api/admin/posts/[slug]` - Get single post with content
-- `POST /api/admin/posts` - Create new post
-- `PUT /api/admin/posts/[slug]` - Update post
-- `POST /api/admin/posts/[slug]/publish` - Publish post
-- `POST /api/admin/posts/[slug]/archive` - Archive post
-- `POST /api/admin/posts/[slug]/delete` - Delete post
-
-### Media Management
-
-- `POST /api/admin/media/presigned-url` - Get presigned S3 upload URL
-
-### Preview
-
-- `GET /api/draft` - Enable draft mode and redirect
-
-## Authentication
-
-The admin routes are protected by Auth.js middleware (configured in `middleware.ts`). Users must:
-
-1. Be authenticated via OAuth (Google/GitHub)
-2. Have their email in the `ADMIN_EMAILS` environment variable
-
-### Authentication Flow Diagram
-
-![Admin auth flow](../../generated-diagrams/admin-auth-flow.png)
-
-## Accessibility
-
-- High contrast UI using design system tokens
-- Visible focus states on all interactive elements
-- ARIA labels and roles for screen readers
-- ARIA-live regions for status messages
-- Keyboard navigation support
-
-## Styling
-
-Uses the existing Tailwind CSS design system with custom UI components:
-
-- Button variants (default, outline, ghost, destructive, secondary)
-- Card components for content sections
-- Input and Textarea with consistent styling
-- Status badges with color coding
-
-## Next Steps
-
-To make the admin UI fully functional, you'll need to:
-
-1. **Implement Backend APIs**: Create the API routes listed above in `src/app/api/admin/`
-2. **Set up DynamoDB and S3**: Configure the infrastructure as specified in `blog.md`
-3. **Configure Auth.js**: Set up OAuth providers and middleware (may already be done)
-4. **Add Keyboard Shortcuts**: Implement the keyboard event handlers
-5. **Enhance Preview**: Wire up the actual markdown renderer for the preview mode
-6. **Add Scheduling**: Implement the scheduling UI and EventBridge integration
-7. **Add Rich Editor**: Consider adding a rich text editor option alongside markdown
-
-## Environment Variables
-
-Required environment variables:
-
-- `ADMIN_EMAILS` - Comma-separated list of allowed admin emails
-- `NEXTAUTH_SECRET` - Auth.js secret
-- `NEXTAUTH_URL` - Auth.js callback URL
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - OAuth credentials
-- `POSTS_TABLE` - DynamoDB table name
-- `CONTENT_BUCKET` - S3 bucket for content
-- `MEDIA_BUCKET` - S3 bucket for media
-- `CLOUDFRONT_DISTRIBUTION_ID` - For cache invalidation

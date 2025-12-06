@@ -1,5 +1,7 @@
 # Stick Figure City
 
+Design blueprint only — this feature is not yet implemented in the codebase. Use it as a reference if we decide to build it later.
+
 Love this idea. You can totally make Stick‑Figure City feel alive while also showing off recognition + procedural animation. Below is an end‑to‑end blueprint that covers: (1) how to accept only stick figures, (2) how to turn each sketch into an animatable rig, (3) how to make them walk, idle, jump, and interact, and (4) how to filter out "too bland" submissions.
 
 ---

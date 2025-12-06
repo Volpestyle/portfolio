@@ -9,9 +9,10 @@
 - **AWS CDK `PortfolioStack`** orchestrates all infrastructure, ingesting the OpenNext build output to wire CloudFront behaviors, origins, and Lambda bundles.
 - **Amazon CloudFront** sits behind optional Route53 + ACM domains and powers all ingress. The default behavior runs the Next.js server Lambda@Edge; additional behaviors route static assets, image optimization, and other OpenNext origins.
 - **S3 Buckets** include the versioned assets bucket (static + incremental cache) plus dedicated `BlogContent` and `BlogMedia` buckets for editor uploads and rendered markdown content.
-- **DynamoDB** provides two tables: `BlogPosts` for CMS state (with a GSI on status/publishedAt) and `Revalidation` for Next.js tag cache metadata.
+- **DynamoDB** provides three tables: `BlogPosts` for CMS state (with a GSI on status/publishedAt), `Revalidation` for Next.js tag cache metadata, and `ChatRuntimeCost` for the chat runtime budget guard.
 - **SQS + Lambda worker** processes incremental revalidation jobs emitted by the edge runtime, fanning out cache invalidations without blocking requests.
 - **Blog publish Lambda & IAM scheduler role** let the admin UI publish/schedule posts while keeping AWS permissions scoped.
+- **Chat cost + OpenAI alarms**: runtime chat spend is tracked in DynamoDB with optional SNS alerts; OpenAI cost metrics can trigger a rolling 30-day CloudWatch alarm when enabled.
 - **Secrets Manager integration** injects env vars into regional Lambdas and securely passes a curated subset to the edge runtime via CloudFront headers.
 
 ## Request Flow (High Level)

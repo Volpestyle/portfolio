@@ -40,7 +40,7 @@ At a high level:
 - Observable – Every turn has a structured reasoning trace and token metrics.
 - Composable – Orchestrator and UI are decoupled via a clean SSE contract.
 - Reusable – Driven by OwnerConfig and data providers; domain-agnostic.
-- Cheap & fast – Uses nano-class runtime models (placeholder "nano model"); offline preprocessing uses a full-size model.
+- Cheap & fast – Prioritize the smallest, cheapest models that achieve acceptable quality. Be efficient with token usage (keep prompts concise, avoid redundant context). Offline preprocessing can use larger models for one-time enrichment.
 - Measurable – Preprocessing and runtime both emit token and cost metrics.
 
 Companion docs:
@@ -95,13 +95,13 @@ Per chat turn, the engine MUST:
 ### 1.3 Non‑Functional Requirements
 
 - **Latency**
-  - Planner uses a nano-class model; Answer model size is configurable (larger = better voice adherence).
+  - Use the smallest models that achieve acceptable quality for both Planner and Answer.
   - Answer streams tokens as soon as they're available.
   - Target: time-to-first-visible-activity < 500ms, full response < 3s for typical turns.
   - Note: Traditional TTFT is less critical here because the reasoning trace provides continuous visible feedback. Users see plan → retrieval summary → answer tokens as each stage completes.
 - **Cost**
-  - Runtime: Planner → nano; Answer → configurable (trade-off: larger model = better voice, higher cost).
-  - Preprocessing (offline): full-size model and text‑embedding‑3‑large for one‑time work.
+  - Runtime: Prioritize cheap, fast models. Larger models improve voice adherence but increase cost/latency—only scale up if quality requires it.
+  - Preprocessing (offline): Can use larger models for one-time enrichment work.
   - Track tokens & estimated USD cost for both preprocessing and runtime.
   - See `docs/features/chat/rate-limits-and-cost-guards.md` for cost alarms and rate limiting.
 - **Safety & Grounding**
@@ -176,7 +176,7 @@ _Figure 2.0: High-level runtime architecture showing the flow between client, se
   - CLI to build generated artifacts from:
     - data/chat/\* (resume PDF, profile markdown),
     - GitHub (projects), via a gist‑based repo config.
-  - Uses full-size model and text‑embedding‑3‑large for enrichment & embeddings.
+  - Can use larger models for enrichment since this is one-time offline work.
   - Emits metrics for token usage & cost per run.
 - **Observability & Devtools**
   - Logging of all pipeline stages and token usage.
@@ -189,7 +189,7 @@ _Figure 2.0: High-level runtime architecture showing the flow between client, se
 
 _Figure 2.2: Runtime data usage showing how generated artifacts are loaded and used at runtime._
 
-> **Note:** All model IDs in this spec (e.g., "nano model", "mini model", "full-size model") are placeholders. Actual model IDs are configured in `chat.config.yml`.
+> **Note:** Actual model IDs are configured in `chat.config.yml`. This spec does not mandate specific models—always prefer the smallest, cheapest models that achieve acceptable quality for your use case.
 
 Runtime wiring reads `chat.config.yml` (owner + model/tokens) alongside types exported from packages/chat-contract:
 
@@ -197,10 +197,10 @@ Runtime wiring reads `chat.config.yml` (owner + model/tokens) alongside types ex
 // Owner identity comes from the chat.config.yml `owner` block (ownerId, name, pronouns, domainLabel, portfolioKind).
 
 type ModelConfig = {
-  plannerModel: string; // nano-class model id
-  answerModel: string; // larger model = better voice/style adherence
+  plannerModel: string; // use smallest model that produces quality plans
+  answerModel: string; // use smallest model that maintains voice/style quality
   answerModelNoRetrieval?: string; // optional lighter model for no-retrieval turns (greetings/meta)
-  embeddingModel: string; // embedding model id
+  embeddingModel: string; // embedding model id (smaller dimensions = faster, cheaper)
   answerTemperature?: number; // optional (0-2; undefined uses model default)
   reasoning?: {
     planner?: ReasoningEffort; // minimal | low | medium | high
@@ -224,11 +224,11 @@ type DataProviders = {
 // (models map directly to ModelConfig; reasoning is optional and only used on reasoning-capable models)
 /*
 models:
-  plannerModel: gpt-5-nano-2025-08-07
-  answerModel: gpt-5-mini-2025-08-07  # mini recommended for better voice/persona adherence
-  embeddingModel: text-embedding-3-large
+  plannerModel: <your-chosen-model>      # smallest model with acceptable plan quality
+  answerModel: <your-chosen-model>       # smallest model with acceptable voice adherence
+  embeddingModel: <your-chosen-model>    # balance dimensions vs retrieval quality
   reasoning:
-    planner: low
+    planner: low    # we've had good results with low reasoning
     answer: low
 */
 
@@ -337,8 +337,8 @@ For each repo in the gist where `include !== false` and `hideFromChat !== true`:
 2. **Read README**
    - Find root README (e.g., README.md, README.mdx).
    - Treat README as the canonical source of project information for chat.
-3. **Summarize & enrich (full-size LLM)**
-   - Use a full-size model with a schema‑driven prompt to produce a ProjectDoc, given the README content.
+3. **Summarize & enrich (LLM)**
+   - Use a capable model with a schema‑driven prompt to produce a ProjectDoc, given the README content. (Preprocessing is offline/one-time, so larger models are acceptable here.)
    - Instructions:
      - Derive name, oneLiner, description, impactSummary, sizeOrScope, techStack, languages, tags, context, bullets, and URLs only from the README.
      - `tags` should be short free‑form phrases capturing domains (e.g., “AI”, “backend”), techniques (e.g., “LLM”, “computer vision”), and architectures/approaches (e.g., “microservices”, “serverless”).
@@ -352,7 +352,7 @@ For each repo in the gist where `include !== false` and `hideFromChat !== true`:
      - `techStack.join(', ')`
      - `languages.join(', ')`
      - `tags.join(', ')`
-   - Compute vector using text-embedding-3-large.
+   - Compute vector using the configured embedding model.
    - Add `{ id: projectId, vector }` to `EmbeddingIndex.projects`.
 5. **Outputs**
    - Write:
@@ -441,9 +441,9 @@ type ResumeDoc = ExperienceRecord | EducationRecord | AwardRecord | SkillRecord;
      - “Skills”.
      - “Awards” / “Honors”.
    - Group lines under headings.
-3. **LLM structuring (full-size LLM)**
+3. **LLM structuring**
 
-- Use a full-size model with a schema‑driven prompt to map the extracted resume text into ExperienceRecord[], EducationRecord[], AwardRecord[], SkillRecord[].
+- Use a capable model with a schema‑driven prompt to map the extracted resume text into ExperienceRecord[], EducationRecord[], AwardRecord[], SkillRecord[]. (Preprocessing is offline/one-time, so larger models are acceptable here.)
 - Instructions:
   - Preserve exact company/school/job titles.
   - Normalize `startDate`/`endDate` into YYYY-MM or similar.
@@ -459,7 +459,7 @@ type ResumeDoc = ExperienceRecord | EducationRecord | AwardRecord | SkillRecord;
 5. **Embeddings**
    - For each ExperienceRecord and SkillRecord:
      - Build embedding input: `summary + '\n' + bullets.join(' ') + '\n' + skills.join(', ')`.
-     - Compute vector via text-embedding-3-large.
+     - Compute vector using the configured embedding model.
      - Add `{ id, vector }` to `EmbeddingIndex.resume`.
 6. **Outputs**
    - Write:
@@ -509,15 +509,15 @@ type PersonaSummary = {
 };
 ```
 
-- **Profile is required.** It is ingested from a Markdown file in `data/chat/profile.md` using a full-size model to structure into a single ProfileDoc (with `id` typically set to `"profile"`). If `profile.md` is missing or empty, preprocessing fails with `PREPROCESS_PROFILE_REQUIRED`.
+- **Profile is required.** It is ingested from a Markdown file in `data/chat/profile.md` using a capable model to structure into a single ProfileDoc (with `id` typically set to `"profile"`). If `profile.md` is missing or empty, preprocessing fails with `PREPROCESS_PROFILE_REQUIRED`.
 - Persona is derived deterministically from `profile.json` fields (systemPersona, shortAbout derived from about paragraphs, styleGuidelines, voiceExamples) and stored as a PersonaSummary. The persona snapshot intentionally omits the full about paragraphs to keep the Answer system prompt lean; retrieval uses the profile doc for richer bio text.
 
 #### 3.3.1 Profile ingestion
 
 1. **Markdown → text**
    - Read `data/chat/profile.md` as UTF‑8 text.
-2. **LLM structuring (full-size LLM)**
-   - Use a full-size model with a schema‑driven prompt to map the markdown into a single ProfileDoc.
+2. **LLM structuring**
+   - Use a capable model with a schema‑driven prompt to map the markdown into a single ProfileDoc.
    - Instructions:
      - Set `id` to a stable value, typically `"profile"`.
      - Preserve exact name, headline, and social URLs.
@@ -589,10 +589,10 @@ type EmbeddingIndex = {
 
 Semantic enrichment is purely free‑form:
 
-- For each project, the full-size model:
+- For each project, the preprocessing model:
   - Normalizes tools/frameworks into techStack / languages.
   - Generates tags as short free‑form keywords/phrases describing domains, techniques, and architectures.
-- For each experience, the full-size model:
+- For each experience, the preprocessing model:
   - Populates skills with tools/frameworks/domains.
 - There is no fixed tag vocabulary; the model can use any phrasing justified by the README or resume text. Modern embeddings plus this enrichment allow broad queries like “what AI projects have you done?” to hit projects with varied wording.
 
@@ -773,11 +773,12 @@ All LLM interactions use the OpenAI Responses API with:
 
 ### 5.0 Model Strategy
 
-All runtime model IDs are read from `chat.config.yml`.
+All runtime model IDs are read from `chat.config.yml`. **Guiding principle: always use the smallest, cheapest model that achieves acceptable quality.** Be efficient with token usage—keep prompts concise and avoid redundant context.
 
-- **Offline (preprocess):** Full-size model for enrichment & persona + text-embedding-3-large for embeddings.
-- **Online Planner:** Nano-class model for cost/latency.
-- **Online Answer:** The larger the model, the better it adheres to persona voice/style. Trade-off is cost/latency.
+- **Offline (preprocess):** Can use larger models since this is one-time work. Quality here pays dividends at runtime.
+- **Online Planner:** Use the smallest model that produces good query plans. We've had excellent results with mini-class models and low reasoning effort.
+- **Online Answer:** Use the smallest model that maintains persona voice/style adherence. Start small and only scale up if quality degrades.
+- **Embeddings:** Smaller dimension models (e.g., `-small` variants) are faster and cheaper. Only use larger embedding models if retrieval quality suffers.
 
 #### 5.0.1 Token Budgets & Sliding Window
 
@@ -1326,6 +1327,24 @@ export interface PlannerLLMOutput {
 // Answer stage → AnswerPayload
 // ================================
 
+export interface CardSelectionReason {
+  id: string;
+  name: string;
+  reason: string;
+}
+
+export interface CardSelectionCategory {
+  included: CardSelectionReason[];
+  excluded: CardSelectionReason[];
+}
+
+export interface CardSelectionReasoning {
+  projects?: CardSelectionCategory | null;
+  experiences?: CardSelectionCategory | null;
+  education?: CardSelectionCategory | null;
+  links?: CardSelectionCategory | null;
+}
+
 export interface AnswerPayload {
   /**
    * User-facing message in first person ("I...").
@@ -1338,6 +1357,13 @@ export interface AnswerPayload {
    * Not shown to end users.
    */
   thoughts?: string[];
+
+  /**
+   * Structured reasoning for card inclusion/exclusion decisions.
+   * Each category contains arrays of included and excluded items with reasons.
+   * Used for debugging and eval transparency; not shown to end users.
+   */
+  cardReasoning?: CardSelectionReasoning | null;
 
   /**
    * Optional uiHints to drive cards.

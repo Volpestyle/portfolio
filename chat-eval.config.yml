@@ -2,7 +2,7 @@
 # Configure models and settings for running chat evals
 
 models:
-  # Pipeline models (what's being tested) - should match chat.config.yml
+  # Pipeline models
   plannerModel: gpt-5-nano-2025-08-07
   answerModel: gpt-5-nano-2025-08-07
   # answerModelNoRetrieval: gpt-5-mini-2025-08-07
