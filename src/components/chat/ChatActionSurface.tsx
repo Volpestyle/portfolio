@@ -232,46 +232,49 @@ type ActiveDocState = { path: string; label?: string } | null;
 
 function SurfaceLinkButton({ link }: { link: ProfileSocialLink }) {
   const icon = getSocialIcon(link.platform);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [textWidth, setTextWidth] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
 
+  useLayoutEffect(() => {
+    if (textRef.current) {
+      setTextWidth(textRef.current.scrollWidth);
+    }
+  }, [link.label]);
+
+  const collapsedWidth = 44;
+  const expandedWidth = textWidth + 24; // px-3 = 12px each side
+
   return (
-    <motion.div
-      className="h-10"
-      style={{ width: '2.75rem' }}
-      animate={{
-        width: isHovered ? '8rem' : '2.75rem',
-      }}
+    <motion.a
+      href={link.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="relative inline-flex h-10 items-center justify-center overflow-hidden rounded-full text-white transition-colors duration-200 hover:bg-white hover:text-black"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      initial={false}
+      animate={{ width: isHovered ? expandedWidth : collapsedWidth }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
     >
-      <a
-        href={link.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="group relative inline-flex h-10 w-full items-center justify-center overflow-hidden rounded-full text-white transition-colors duration-200 hover:bg-white hover:text-black"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+      <motion.div
+        className="absolute"
+        initial={false}
+        animate={{ opacity: isHovered ? 0 : 1 }}
+        transition={{ duration: 0.15 }}
       >
-        <motion.div
-          animate={{
-            x: isHovered ? 32 : 0,
-            opacity: isHovered ? 0 : 1,
-          }}
-          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-          className="absolute"
-        >
-          <SurfaceLinkIcon icon={icon} />
-        </motion.div>
-        <motion.span
-          animate={{
-            opacity: isHovered ? 1 : 0,
-          }}
-          transition={{ duration: 0.15 }}
-          className="whitespace-nowrap text-sm font-medium"
-        >
-          {link.label}
-        </motion.span>
-      </a>
-    </motion.div>
+        <SurfaceLinkIcon icon={icon} />
+      </motion.div>
+      <motion.span
+        ref={textRef}
+        className="whitespace-nowrap text-sm font-medium"
+        initial={false}
+        animate={{ opacity: isHovered ? 1 : 0 }}
+        transition={{ duration: 0.15 }}
+      >
+        {link.label}
+      </motion.span>
+    </motion.a>
   );
 }
 
