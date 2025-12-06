@@ -129,9 +129,9 @@ Per-IP Upstash Redis limiter: 5/min, 40/hr, 120/day. Fail-closed if Redis or IP 
 
 ### 1.5 Cost Monitoring & Alarms
 
-Runtime budget defaults to $10/month (override via `CHAT_MONTHLY_BUDGET_USD`) with warn/critical/exceeded thresholds at $8/$9.50/$10. Dynamo tracks spend per calendar month; CloudWatch/SNS alarm uses a rolling 30-day sum of daily cost metrics. Runtime only (Planner/Answer + embeddings). See `docs/features/chat/implementation-notes.md#12-cost-monitoring--alarms` for Dynamo/CloudWatch/SNS wiring.
+Runtime cost guardrails are config-driven. Set `cost.budgetUsd` in `chat.config.yml` to enable a monthly budget; turns are counted against that budget and enforced via DynamoDB with warn/critical/exceeded thresholds at 80%/95%/100%. CloudWatch metrics and optional SNS alerts use the same Dynamo state. If `cost.budgetUsd` is omitted or non-positive, no budget enforcement runs. Runtime only (Planner/Answer + embeddings). See `docs/features/chat/implementation-notes.md#12-cost-monitoring--alarms` for Dynamo/CloudWatch/SNS wiring.
 
-> **Implementation note:** Budget enforcement happens in the Next.js `/api/chat` route. The orchestrator emits per-stage `StageUsage` with `costUsd`; the route aggregates and blocks turns that would exceed the Dynamo-tracked monthly budget.
+> **Implementation note:** Budget enforcement happens in the Next.js `/api/chat` route. The orchestrator emits per-stage `StageUsage` with `costUsd`; the route aggregates and blocks turns that would exceed the Dynamo-tracked monthly budget when configured.
 
 ---
 
@@ -191,16 +191,10 @@ _Figure 2.2: Runtime data usage showing how generated artifacts are loaded and u
 
 > **Note:** All model IDs in this spec (e.g., "nano model", "mini model", "full-size model") are placeholders. Actual model IDs are configured in `chat.config.yml`.
 
-Runtime wiring uses typed configs exported from packages/chat-contract:
+Runtime wiring reads `chat.config.yml` (owner + model/tokens) alongside types exported from packages/chat-contract:
 
 ```ts
-type OwnerConfig = {
-  ownerId: string;
-  ownerName: string;
-  ownerPronouns?: string; // e.g. "she/her", "he/him", "they/them"
-  domainLabel: string; // e.g. "software engineer", "illustrator", "research group"
-  portfolioKind?: 'individual' | 'team' | 'organization';
-};
+// Owner identity comes from the chat.config.yml `owner` block (ownerId, name, pronouns, domainLabel, portfolioKind).
 
 type ModelConfig = {
   plannerModel: string; // nano-class model id
@@ -961,13 +955,14 @@ Canonical event types (only these names are emitted):
 | `ui`         | UiPayload updates derived from Answer.uiHints                  |
 | `token`      | Streamed answer tokens                                         |
 | `item`       | Reserved for non-token answer payloads (markdown blocks, etc.) |
-| `attachment` | Host-defined downloadable payloads                             |
+| `attachment` | Auto-generated doc payloads for uiHints IDs (projects/resume)  |
 | `ui_actions` | Host-defined UI actions (e.g., highlight card)                 |
 | `done`       | Stream completion + duration metadata                          |
 | `error`      | Structured error once streaming has begun                      |
 
 Each event is sent as an SSE `event:` name and JSON-encoded `data:` payload.
 
+Attachments are emitted after the Answer stage for every ID included in the UiPayload. The backend bundles a trimmed project or resume entry (e.g., project metadata plus an optional README snippet; resume entry data) so the frontend can hydrate caches without an extra fetch. Ignoring them is safe if the UI already has the data.
 **Progressive Pipeline Streaming**
 
 The pipeline streams updates as each stage starts and completes to reduce perceived latency.
@@ -1032,7 +1027,9 @@ Logical payload shapes (actual wire format is JSON-encoded in `data:`):
 - `reasoning`: `{ anchorId, stage, trace?: PartialReasoningTrace, delta?: string, notes?: string, progress?: number }`.
 - `token`: `{ anchorId, token }`.
 - `ui`: `{ anchorId, ui: UiPayload }`.
-- `item`, `attachment`, `ui_actions`: host-defined payloads keyed by `anchorId`.
+- `item`: host-defined payloads keyed by `anchorId`.
+- `attachment`: `{ anchorId, itemId, attachment }` where `attachment` is an auto-generated project or resume snapshot corresponding to UiPayload IDs.
+- `ui_actions`: host-defined UI actions keyed by `anchorId`.
 - `done`: `{ anchorId, totalDurationMs, truncationApplied? }`.
 
 **Frontend Stage Handling**
