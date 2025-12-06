@@ -45,7 +45,7 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
   const lastAssistantCompleted = lastAssistantMessageId ? Boolean(completionTimes[lastAssistantMessageId]) : false;
   const lastAssistantAnimated = lastAssistantMessage?.animated !== false;
   const streamingAssistantMessageId =
-    lastAssistantMessageId && (isBusy || lastAssistantAnimated || !lastAssistantCompleted)
+    lastAssistantMessageId && (!lastAssistantCompleted || lastAssistantAnimated)
       ? lastAssistantMessageId
       : undefined;
 
@@ -90,11 +90,9 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
 
           // Check if next message is the streaming assistant message
           const nextIsStreaming = nextMessage?.role === 'assistant' && nextMessage.id === streamingAssistantMessageId;
-          const streamingTrace = streamingAssistantMessageId ? reasoningTraces[streamingAssistantMessageId] ?? null : null;
-          const streamingHasUserReasoning = hasRenderableTrace(streamingTrace);
           const shouldRenderStreamingReasoning =
-            nextIsStreaming && ((reasoningEnabled && streamingHasUserReasoning) || isDev);
-          const shouldShowStreamingSpinner = nextIsStreaming && (!reasoningEnabled || !streamingHasUserReasoning);
+            nextIsStreaming && ((reasoningEnabled && hasRenderableCurrentTrace) || isDev);
+          const shouldShowStreamingSpinner = nextIsStreaming && (!reasoningEnabled || !hasRenderableCurrentTrace);
 
           return (
             <div key={message.id} className="flex flex-col gap-2">
@@ -120,7 +118,7 @@ export function ChatThread({ messages, isBusy }: ChatThreadProps) {
                     <>
                       {shouldRenderStreamingReasoning ? (
                         <ChatReasoningDisplay
-                          trace={streamingTrace}
+                          trace={currentTrace}
                           show={reasoningEnabled}
                           isStreaming={true}
                         />

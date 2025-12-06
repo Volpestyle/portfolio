@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
 import type { ProfileSocialLink, ProjectSummary, ResumeEntry } from '@portfolio/chat-contract';
 import type { ChatSurfaceState } from '@portfolio/chat-next-ui';
 import { useChat } from '@/hooks/useChat';
@@ -391,6 +391,7 @@ function SurfaceProjectCard({
   }, [activeDoc, collapseToCard, backToDetail, document?.path, document?.title, project.name]);
 
   const repoForCard = detail?.repo ?? repoInfo;
+  const prefersReducedMotion = useReducedMotion();
 
   const handleExpand = useCallback(() => {
     setIsExpanded(true);
@@ -400,8 +401,10 @@ function SurfaceProjectCard({
   const bodyLayoutId = `${layoutId}-body`;
 
   // Content variants - subtle opacity fade only
+  const initialOpacity = prefersReducedMotion ? 1 : 0.05;
   const contentVariants = {
-    initial: { opacity: 0 },
+    // Keep a soft fade on entry without fully hiding content even if animations are skipped
+    initial: { opacity: initialOpacity },
     animate: { opacity: 1 },
     exit: { opacity: 0 },
   };
