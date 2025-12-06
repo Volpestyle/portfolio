@@ -22,7 +22,6 @@ interface ChatReasoningPanelProps {
 export function ChatReasoningPanel({ trace, isStreaming = false, durationMs, className }: ChatReasoningPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const plan = trace.plan;
-  const retrievals = trace.retrieval ?? null;
   const planQueries = plan?.queries?.filter((query) => query.source !== 'profile') ?? [];
   const retrievalDocs = trace.retrievalDocs ?? null;
   const answer = trace.answer ?? null;

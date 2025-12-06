@@ -2,7 +2,7 @@
 // Re-exports types and assembles all suites
 
 import type { ChatEvalSuite } from './framework/types';
-import { locationChitchat } from './conversations';
+import { locationChitchat, reactExperience } from './conversations';
 
 // Re-export types and framework for external use
 export * from './framework';
@@ -12,7 +12,7 @@ export * from './conversations';
 export const conversationSuite: ChatEvalSuite = {
   name: 'Multi-Turn Conversations',
   description: 'Full conversation flows evaluated with semantic similarity and LLM-as-a-judge',
-  tests: [locationChitchat],
+  tests: [locationChitchat, reactExperience],
 };
 
 // All suites to run
