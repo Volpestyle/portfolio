@@ -1,1 +1,1 @@
-export { chatApi, chatOwnerId, chatRuntimeOptions, chatLogger, chatModerationOptions } from './bootstrap';
+export { chatApi, chatRuntimeOptions, chatLogger, chatModerationOptions, chatProviders } from './bootstrap';
