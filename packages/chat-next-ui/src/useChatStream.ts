@@ -264,7 +264,7 @@ export function useChatStream({
   );
 }
 
-function coerceUiPayload(input: unknown): { showProjects?: string[]; showExperiences?: string[] } | undefined {
+function coerceUiPayload(input: unknown): { showProjects?: string[]; showExperiences?: string[]; showEducation?: string[]; showLinks?: string[] } | undefined {
   if (!input || typeof input !== 'object') {
     return undefined;
   }
@@ -278,14 +278,18 @@ function coerceUiPayload(input: unknown): { showProjects?: string[]; showExperie
 
   const showProjects = normalizeIds(record.showProjects);
   const showExperiences = normalizeIds(record.showExperiences);
+  const showEducation = normalizeIds(record.showEducation);
+  const showLinks = normalizeIds(record.showLinks);
 
-  if (showProjects === undefined && showExperiences === undefined) {
+  if (showProjects === undefined && showExperiences === undefined && showEducation === undefined && showLinks === undefined) {
     return undefined;
   }
 
   return {
     showProjects,
     showExperiences,
+    showEducation,
+    showLinks,
   };
 }
 

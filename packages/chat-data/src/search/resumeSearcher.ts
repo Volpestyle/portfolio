@@ -1,4 +1,4 @@
-import type { ResumeEntry, ExperienceRecord, ResumeFacet } from '@portfolio/chat-contract';
+import type { ResumeEntry, ExperienceRecord } from '@portfolio/chat-contract';
 import { normalizeValue, includesText } from './utils';
 import {
   createSearcher,
@@ -17,7 +17,6 @@ export type ResumeSearchQuery = {
   skill?: string;
   text?: string;
   limit?: number;
-  facets?: ResumeFacet[];
 };
 
 type NormalizedResumeFilters = {
@@ -25,7 +24,6 @@ type NormalizedResumeFilters = {
   title?: string;
   skill?: string;
   text: string;
-  facets?: ResumeFacet[];
 };
 
 type ResumeSearchLogFilters = {
@@ -33,7 +31,6 @@ type ResumeSearchLogFilters = {
   title?: string;
   skill?: string;
   text: string;
-  facets?: ResumeFacet[];
 };
 
 export type ResumeSearchLogPayload = ResumeSearchLogFilters & {
@@ -68,17 +65,11 @@ export type ResumeSearcherOptions = {
   weights?: SearchWeights;
 };
 
-const normalizeFacets = (facets?: ResumeFacet[]) =>
-  Array.isArray(facets) && facets.length
-    ? Array.from(new Set(facets.filter((facet): facet is ResumeFacet => Boolean(facet))))
-    : undefined;
-
 const normalizeFilters = (input?: ResumeSearchQuery): NormalizedResumeFilters => ({
   company: normalizeValue(input?.company) || undefined,
   title: normalizeValue(input?.title) || undefined,
   skill: normalizeValue(input?.skill) || undefined,
   text: normalizeValue(input?.text),
-  facets: normalizeFacets(input?.facets),
 });
 
 const describeFilters = (filters: NormalizedResumeFilters): ResumeSearchLogFilters => ({
@@ -86,7 +77,6 @@ const describeFilters = (filters: NormalizedResumeFilters): ResumeSearchLogFilte
   title: filters.title,
   skill: filters.skill,
   text: filters.text,
-  facets: filters.facets,
 });
 
 const parseResumeDate = (value?: string | null): number | null => {
@@ -186,33 +176,40 @@ const computeStructuredScore = (record: ResumeEntry, filters: NormalizedResumeFi
   return score;
 };
 
-const resolveFacet = (record: ResumeEntry): ResumeFacet => {
-  if (record.type === 'education') return 'education';
-  if (record.type === 'award') return 'award';
-  if (record.type === 'skill') return 'skill';
-  return 'experience';
+const resolveTypeBias = (record: ResumeEntry): number => {
+  const type = record.type ?? 'experience';
+  if (type === 'experience') return 0.2;
+  if (type === 'education') return 0.12;
+  if (type === 'award') return 0.05;
+  return 0;
 };
 
-const applyFacetBias = (records: ResumeEntry[], facets?: ResumeFacet[], limit?: number): ResumeEntry[] => {
-  if (!facets?.length) return records.slice(0, limit ?? records.length);
-  const facetSet = new Set(facets);
-  return records
-    .map((record) => ({
-      record,
-      facetBoost: facetSet.has(resolveFacet(record)) ? 1 : 0,
-      score: (record as { _score?: number })._score ?? 0,
-    }))
+const applyTypeBias = (records: ResumeEntry[], limit?: number): ResumeEntry[] => {
+  if (!records.length) {
+    return records;
+  }
+  const scored = records.map((record) => {
+    const baseScore = (record as { _score?: number })._score ?? 0;
+    const biasedScore = baseScore + resolveTypeBias(record);
+    return { record, biasedScore };
+  });
+
+  const maxScore = scored.reduce((max, entry) => Math.max(max, entry.biasedScore), 0);
+
+  return scored
     .sort((a, b) => {
-      if (b.facetBoost !== a.facetBoost) {
-        return b.facetBoost - a.facetBoost;
+      if (b.biasedScore !== a.biasedScore) {
+        return b.biasedScore - a.biasedScore;
       }
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-      return 0;
+      const aId = (a.record as { id?: string }).id ?? '';
+      const bId = (b.record as { id?: string }).id ?? '';
+      return aId.localeCompare(bId);
     })
-    .slice(0, limit ?? records.length)
-    .map(({ record }) => record);
+    .slice(0, limit ?? scored.length)
+    .map(({ record, biasedScore }) => ({
+      ...record,
+      _score: maxScore > 0 ? biasedScore / maxScore : (record as { _score?: number })._score ?? 0,
+    }));
 };
 
 const buildCombinedTextQuery = (filters: NormalizedResumeFilters): string => filters.text;
@@ -330,13 +327,12 @@ export function createResumeSearcher(records: ResumeEntry[], options?: ResumeSea
       weights: options?.weights,
       logger: logger
         ? (payload: SearchLogPayload<NormalizedResumeFilters>) => {
-            const described = describeFilters(payload.filters);
-            logger({
-              company: described.company,
-              title: described.title,
-              skill: described.skill,
-              text: described.text,
-              facets: described.facets,
+              const described = describeFilters(payload.filters);
+              logger({
+                company: described.company,
+                title: described.title,
+                skill: described.skill,
+                text: described.text,
               limit: payload.limit,
               structuredCandidates: payload.structuredCandidates,
               matchedCount: payload.matchedCount,
@@ -360,10 +356,8 @@ export function createResumeSearcher(records: ResumeEntry[], options?: ResumeSea
   return {
     async searchResume(input?: ResumeSearchQuery): Promise<ResumeEntry[]> {
       const requestedLimit = input?.limit ?? defaultLimit;
-      const facetAwareLimit =
-        input?.facets?.length && requestedLimit < maxLimit ? Math.min(requestedLimit + 4, maxLimit) : requestedLimit;
-      const results = await search({ ...input, limit: facetAwareLimit });
-      return applyFacetBias(results, input?.facets, requestedLimit);
+      const results = await search({ ...input, limit: requestedLimit });
+      return applyTypeBias(results, requestedLimit);
     },
   };
 }

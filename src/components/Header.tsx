@@ -36,7 +36,7 @@ export function Header() {
   };
 
   return (
-    <motion.header layout="position" className="relative z-20 border-b border-white bg-black/50 py-2 backdrop-blur-sm">
+    <motion.header layout="position" className="relative z-20 border border-white/50 bg-black/70 py-2 backdrop-blur-sm">
       <div className="flex items-center justify-between px-4 py-3 sm:px-6">
         <div className="flex items-center gap-4">
           <Link href="/" aria-label="Home">

@@ -1,14 +1,5 @@
 import { z } from 'zod';
-import type {
-  ExperienceRecord,
-  EducationRecord,
-  AwardRecord,
-  SkillRecord,
-  ResumeEntry,
-  ProfileSummary,
-  ProjectContext,
-  SocialPlatform,
-} from '@portfolio/chat-contract';
+import { SOCIAL_PLATFORM_VALUES, type ExperienceRecord, type EducationRecord, type AwardRecord, type SkillRecord, type ProfileSummary, type ProjectContext, type SocialPlatform } from '@portfolio/chat-contract';
 
 const projectTimeframeSchema = z
   .object({
@@ -58,7 +49,7 @@ export const projectDatasetSchema = z.object({
 export type ProjectRecord = z.infer<typeof projectRecordSchema>;
 export type ProjectDataset = z.infer<typeof projectDatasetSchema>;
 
-const socialPlatformSchema = z.enum(['x', 'github', 'youtube', 'linkedin', 'spotify']);
+const socialPlatformSchema = z.enum(SOCIAL_PLATFORM_VALUES);
 
 const embeddingIndexMetaSchema = z.object({
   schemaVersion: z.number(),
@@ -138,18 +129,6 @@ export const skillRecordSchema: z.ZodType<SkillRecord> = z.object({
   skills: z.array(z.string()).optional(),
 });
 
-export const resumeEntrySchema: z.ZodType<ResumeEntry> = z.union([
-  experienceRecordSchema,
-  educationRecordSchema,
-  awardRecordSchema,
-  skillRecordSchema,
-]);
-
-export const experienceDatasetSchema = z.object({
-  snapshotDate: z.string().optional(),
-  experiences: z.array(experienceRecordSchema),
-});
-
 export const resumeDatasetSchema = z.object({
   snapshotDate: z.string().optional(),
   experiences: z.array(experienceRecordSchema),
@@ -158,14 +137,14 @@ export const resumeDatasetSchema = z.object({
   skills: z.array(skillRecordSchema).optional(),
 });
 
-export type ExperienceDataset = z.infer<typeof experienceDatasetSchema>;
 export type ResumeDataset = z.infer<typeof resumeDatasetSchema>;
 
 export const profileSummarySchema: z.ZodType<ProfileSummary> = z.object({
   updatedAt: z.string().optional(),
   fullName: z.string(),
   headline: z.string(),
-  location: z.string().optional(),
+  domainLabel: z.string().optional(),
+  currentLocation: z.string().optional(),
   currentRole: z.string().optional(),
   about: z.union([z.array(z.string()), z.string()]),
   topSkills: z.array(z.string()),

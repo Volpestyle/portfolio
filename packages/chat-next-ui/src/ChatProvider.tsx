@@ -6,12 +6,13 @@ import type {
   ChatMessage,
   ChatRequestMessage,
   PartialReasoningTrace,
-  ReasoningTraceError,
   ProjectDetail,
   ProjectSummary,
   ResumeEntry,
 } from '@portfolio/chat-contract';
 import { DEFAULT_CHAT_HISTORY_LIMIT } from '@portfolio/chat-contract';
+import { mergeReasoningTraces } from '@portfolio/chat-orchestrator';
+import { normalizeProjectKey } from '@/lib/projects/normalize';
 import { useChatUiState } from './chatUiState';
 import type { ChatUiState } from './chatUiState';
 import { useChatStream, type ChatAttachment } from './useChatStream';
@@ -29,7 +30,6 @@ export type ChatProviderProps = {
   fetcher?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   requestFormatter?: (messages: ChatMessage[]) => ChatRequestMessage[];
   onError?: (error: Error) => void;
-  ownerId?: string;
   /**
    * User-facing opt-in for reasoning traces.
    * Defaults to true to stream reasoning by default.
@@ -37,9 +37,8 @@ export type ChatProviderProps = {
   reasoningOptIn?: boolean;
 };
 
-const buildConversationStorageKey = (ownerId: string) => `chat:${ownerId}:conversationId`;
-const buildCompletionStorageKey = (ownerId: string, conversationId: string) =>
-  `chat:${ownerId}:completionTimes:${conversationId}`;
+const STORAGE_KEY_CONVERSATION = 'chat:conversationId';
+const buildCompletionStorageKey = (conversationId: string) => `chat:completionTimes:${conversationId}`;
 
 interface ChatContextValue {
   messages: ChatMessage[];
@@ -66,12 +65,8 @@ export function ChatProvider({
   fetcher,
   requestFormatter,
   onError,
-  ownerId,
   reasoningOptIn = true,
 }: ChatProviderProps) {
-  const [resolvedOwnerId, setResolvedOwnerId] = useState<string>(
-    () => ownerId ?? process.env.NEXT_PUBLIC_CHAT_OWNER_ID ?? 'portfolio-owner'
-  );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isBusy, setBusy] = useState(false);
   const [chatStarted, setChatStarted] = useState(false);
@@ -96,15 +91,14 @@ export function ChatProvider({
     if (typeof window === 'undefined') {
       return;
     }
-    const conversationKey = buildConversationStorageKey(resolvedOwnerId);
-    const storedConversationId = window.sessionStorage.getItem(conversationKey);
+    const storedConversationId = window.sessionStorage.getItem(STORAGE_KEY_CONVERSATION);
     const conversationId = storedConversationId?.trim() || conversationIdRef.current;
     if (!storedConversationId) {
-      window.sessionStorage.setItem(conversationKey, conversationId);
+      window.sessionStorage.setItem(STORAGE_KEY_CONVERSATION, conversationId);
     }
     conversationIdRef.current = conversationId;
 
-    const completionKey = buildCompletionStorageKey(resolvedOwnerId, conversationId);
+    const completionKey = buildCompletionStorageKey(conversationId);
     const storedCompletions = window.sessionStorage.getItem(completionKey);
     if (storedCompletions) {
       try {
@@ -116,22 +110,21 @@ export function ChatProvider({
         // ignore invalid storage
       }
     }
-  }, [resolvedOwnerId]);
+  }, []);
 
   // Persist completion timestamps
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
-    const conversationKey = buildConversationStorageKey(resolvedOwnerId);
-    const conversationId = window.sessionStorage.getItem(conversationKey) || conversationIdRef.current;
-    const completionKey = buildCompletionStorageKey(resolvedOwnerId, conversationId);
+    const conversationId = window.sessionStorage.getItem(STORAGE_KEY_CONVERSATION) || conversationIdRef.current;
+    const completionKey = buildCompletionStorageKey(conversationId);
     try {
       window.sessionStorage.setItem(completionKey, JSON.stringify(completionTimes));
     } catch {
       // ignore storage write errors
     }
-  }, [completionTimes, resolvedOwnerId]);
+  }, [completionTimes]);
 
   const resolveFetcher = useCallback(() => {
     if (fetcher) {
@@ -380,10 +373,6 @@ export function ChatProvider({
     applyAttachment: ingestAttachment,
     recordCompletionTime: markStreamCompletion,
   });
-  useEffect(() => {
-    const resolved = ownerId ?? process.env.NEXT_PUBLIC_CHAT_OWNER_ID ?? 'portfolio-owner';
-    setResolvedOwnerId(resolved);
-  }, [ownerId]);
   const shouldRequestReasoning = useMemo(() => Boolean(reasoningOptIn), [reasoningOptIn]);
   const reasoningEnabled = shouldRequestReasoning;
 
@@ -438,7 +427,6 @@ export function ChatProvider({
           body: JSON.stringify({
             messages: requestMessages,
             responseAnchorId: assistantMessageId,
-            ownerId: resolvedOwnerId,
             reasoningEnabled: shouldRequestReasoning,
             conversationId: conversationIdRef.current,
           }),
@@ -485,7 +473,6 @@ export function ChatProvider({
       pushMessage,
       resolveFetcher,
       streamAssistantResponse,
-      resolvedOwnerId,
       shouldRequestReasoning,
     ]
   );
@@ -605,10 +592,6 @@ function coerceResumeAttachment(attachment: ChatAttachment): ResumeEntry | null 
   return record as ResumeEntry;
 }
 
-function normalizeProjectKey(value?: string | null) {
-  return value?.trim().toLowerCase() ?? '';
-}
-
 function normalizeExperienceKey(value?: string | null) {
   return value?.trim().toLowerCase() ?? '';
 }
@@ -618,140 +601,4 @@ function createMessageId() {
     return crypto.randomUUID();
   }
   return `chat-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function mergeReasoningTraces(
-  existing: PartialReasoningTrace | undefined,
-  incoming: PartialReasoningTrace
-): PartialReasoningTrace {
-  const merged: PartialReasoningTrace = {
-    plan: incoming.plan ?? existing?.plan ?? null,
-    retrieval: incoming.retrieval ?? existing?.retrieval ?? null,
-    retrievalDocs: incoming.retrievalDocs ?? existing?.retrievalDocs ?? null,
-    answer: incoming.answer ?? existing?.answer ?? null,
-    error: mergeReasoningErrors(existing?.error, incoming.error, {
-      plan: incoming.plan ?? existing?.plan ?? null,
-      retrieval: incoming.retrieval ?? existing?.retrieval ?? null,
-      answer: incoming.answer ?? existing?.answer ?? null,
-    }),
-    debug: mergeReasoningDebug(existing?.debug, incoming.debug),
-    streaming: mergeStreaming(existing?.streaming, incoming.streaming),
-  };
-  if (existing && reasoningTracesEqual(existing, merged)) {
-    return existing;
-  }
-  return merged;
-}
-
-function reasoningTracesEqual(a: PartialReasoningTrace, b: PartialReasoningTrace): boolean {
-  return (
-    a.plan === b.plan &&
-    a.retrieval === b.retrieval &&
-    a.retrievalDocs === b.retrievalDocs &&
-    a.answer === b.answer &&
-    a.error === b.error &&
-    debugEqual(a.debug, b.debug) &&
-    streamingEqual(a.streaming, b.streaming)
-  );
-}
-
-function mergeReasoningDebug(
-  existing: PartialReasoningTrace['debug'],
-  incoming: PartialReasoningTrace['debug']
-): PartialReasoningTrace['debug'] {
-  if (!existing && !incoming) return undefined;
-  if (!incoming) return existing;
-  const base = existing ?? {};
-  return {
-    ...base,
-    ...incoming,
-    plannerPrompt: incoming.plannerPrompt ?? base.plannerPrompt,
-    answerPrompt: incoming.answerPrompt ?? base.answerPrompt,
-    plannerRawResponse: incoming.plannerRawResponse ?? base.plannerRawResponse,
-    answerRawResponse: incoming.answerRawResponse ?? base.answerRawResponse,
-    retrievalDocs: incoming.retrievalDocs ?? base.retrievalDocs,
-  };
-}
-
-function debugEqual(a: PartialReasoningTrace['debug'], b: PartialReasoningTrace['debug']): boolean {
-  if (!a && !b) return true;
-  if (!a || !b) return false;
-  return (
-    a.plannerPrompt?.system === b.plannerPrompt?.system &&
-    a.plannerPrompt?.user === b.plannerPrompt?.user &&
-    a.answerPrompt?.system === b.answerPrompt?.system &&
-    a.answerPrompt?.user === b.answerPrompt?.user &&
-    a.plannerRawResponse === b.plannerRawResponse &&
-    a.answerRawResponse === b.answerRawResponse &&
-    JSON.stringify(a.retrievalDocs) === JSON.stringify(b.retrievalDocs)
-  );
-}
-
-function mergeStreaming(
-  existing: PartialReasoningTrace['streaming'],
-  incoming: PartialReasoningTrace['streaming']
-): PartialReasoningTrace['streaming'] {
-  if (!existing && !incoming) return undefined;
-  if (!incoming) return existing;
-  const merged: NonNullable<PartialReasoningTrace['streaming']> = { ...(existing ?? {}) };
-  for (const [stage, chunk] of Object.entries(incoming)) {
-    if (!chunk || typeof chunk !== 'object') continue;
-    const current = merged[stage as keyof NonNullable<PartialReasoningTrace['streaming']>] ?? {};
-    const combinedText = [current.text ?? '', (chunk as { text?: string }).text ?? ''].join('');
-    merged[stage as keyof NonNullable<PartialReasoningTrace['streaming']>] = {
-      text: combinedText.length ? combinedText : undefined,
-      notes: (chunk as { notes?: string }).notes ?? current.notes,
-      progress: (chunk as { progress?: number }).progress ?? current.progress,
-    };
-  }
-  return merged;
-}
-
-function streamingEqual(
-  a: PartialReasoningTrace['streaming'],
-  b: PartialReasoningTrace['streaming']
-): boolean {
-  if (!a && !b) return true;
-  if (!a || !b) return false;
-  const stages = new Set([...Object.keys(a), ...Object.keys(b)]);
-  for (const stage of stages) {
-    const left = (a as NonNullable<typeof a>)[stage as keyof NonNullable<typeof a>];
-    const right = (b as NonNullable<typeof b>)[stage as keyof NonNullable<typeof b>];
-    if (!left && !right) continue;
-    if (!left || !right) return false;
-    if (left.text !== right.text || left.notes !== right.notes || left.progress !== right.progress) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function mergeReasoningErrors(
-  existing: PartialReasoningTrace['error'],
-  incoming: PartialReasoningTrace['error'],
-  mergedStages: Pick<PartialReasoningTrace, 'plan' | 'retrieval' | 'answer'>
-): ReasoningTraceError | null {
-  const candidate = incoming ?? existing ?? null;
-  if (!candidate) {
-    return null;
-  }
-
-  const stage = candidate.stage && candidate.stage.length ? candidate.stage : inferErroredStage(mergedStages);
-  if (!incoming && existing && existing.stage === stage) {
-    return existing;
-  }
-
-  return {
-    ...candidate,
-    stage,
-  };
-}
-
-function inferErroredStage(
-  trace: Pick<PartialReasoningTrace, 'plan' | 'retrieval' | 'answer'>
-): ReasoningTraceError['stage'] {
-  if (trace.answer) return 'answer';
-  if (trace.retrieval) return 'retrieval';
-  if (trace.plan) return 'planner';
-  return 'planner';
 }

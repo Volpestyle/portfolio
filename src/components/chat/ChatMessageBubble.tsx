@@ -40,8 +40,8 @@ export function ChatMessageBubble({
   }, [markMessageRendered, message.id]);
 
   const wrapperClass = isUser
-    ? 'w-full max-w-[85%] rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm text-white shadow-xl'
-    : 'w-full max-w-[85%] space-y-3 text-sm text-white';
+    ? 'inline-block max-w-[85%] sm:max-w-[70%] rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm text-white text-left shadow-xl'
+    : 'w-full max-w-full sm:max-w-[85%] space-y-3 text-sm text-white';
 
   // Find the index of the last text part
   const lastTextPartIndex = message.parts
@@ -63,6 +63,7 @@ export function ChatMessageBubble({
   return (
     <div className={cn('flex w-full', isUser ? 'justify-end' : 'justify-start')}>
       <div className={wrapperClass} data-testid={testId}>
+        {!isUser ? <InlineUiPortalAnchor anchorId={message.id} /> : null}
         {message.parts.map((part, index) => {
           if (part.kind === 'text') {
             // Skip empty text parts
@@ -112,7 +113,6 @@ export function ChatMessageBubble({
 
           return null;
         })}
-        {!isUser ? <InlineUiPortalAnchor anchorId={message.id} /> : null}
       </div>
     </div>
   );

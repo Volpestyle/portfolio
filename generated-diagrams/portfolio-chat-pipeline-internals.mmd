@@ -10,7 +10,7 @@ flowchart TB
   %% === Pipeline Stages ===
   subgraph PLANNER["Planner (LLM)"]
     P_IN["Inputs:\nsystem prompt,\nconversation window,\nlatest user message"]
-    P_OUT["PlannerLLMOutput\n(queries[], cardsEnabled, topic?)"]
+    P_OUT["PlannerLLMOutput\n(queries[], topic?)"]
   end
 
   subgraph RETR["Retrieval Engine"]
@@ -26,7 +26,7 @@ flowchart TB
   end
 
   subgraph UI["UI Derivation"]
-    UI_DERIVE["deriveUi()\nvalidate uiHints IDs\nrespect cardsEnabled\nfilter/dedupe/truncate"]
+    UI_DERIVE["deriveUi()\nvalidate uiHints IDs\nfilter/dedupe/truncate"]
     UI_PAYLOAD["UiPayload\n(showProjects,\nshowExperiences)"]
   end
 

@@ -253,6 +253,51 @@ function normalizeSkill(raw: RawSkill): NormalizedSkill {
   };
 }
 
+const shouldExpandSkill = (skill: NormalizedSkill, containerPatterns: RegExp[]): boolean => {
+  if (!containerPatterns.length) return false;
+  if (!skill.skills?.length) return false;
+  const name = skill.name?.trim();
+  if (!name) return false;
+  return containerPatterns.some((pattern) => pattern.test(name));
+};
+
+function expandSkillEntries(skills: NormalizedSkill[], containerPatterns: RegExp[]): NormalizedSkill[] {
+  const seen = new Set<string>();
+  const result: NormalizedSkill[] = [];
+
+  const addSkill = (skill: NormalizedSkill) => {
+    const baseId = skill.id?.trim() || slugify(skill.name || randomUUID());
+    let candidate = baseId || slugify(randomUUID());
+    let suffix = 1;
+    while (seen.has(candidate)) {
+      candidate = `${baseId}-${suffix++}`;
+    }
+    seen.add(candidate);
+    result.push({ ...skill, id: candidate });
+  };
+
+  for (const skill of skills) {
+    if (shouldExpandSkill(skill, containerPatterns)) {
+      const childNames = normalizeDistinctStrings(skill.skills);
+      for (const childName of childNames) {
+        addSkill({
+          type: 'skill',
+          id: slugify(childName),
+          name: childName,
+          category: skill.category,
+          summary: skill.summary,
+          skills: [],
+        });
+      }
+      continue;
+    }
+
+    addSkill({ ...skill, skills: normalizeDistinctStrings(skill.skills) });
+  }
+
+  return result;
+}
+
 export async function runResumeTask(context: PreprocessContext): Promise<PreprocessTaskResult> {
   const sourcePath = context.paths.resumeJson;
   const outputPath = context.paths.experiencesOutput;
@@ -287,7 +332,9 @@ export async function runResumeTask(context: PreprocessContext): Promise<Preproc
 
   const education = Array.isArray(parsed.education) ? parsed.education.map(normalizeEducation) : [];
   const awards = Array.isArray(parsed.awards) ? parsed.awards.map(normalizeAward) : [];
-  const skills = Array.isArray(parsed.skills) ? parsed.skills.map(normalizeSkill) : [];
+  const skills = Array.isArray(parsed.skills)
+    ? expandSkillEntries(parsed.skills.map(normalizeSkill), context.config.resume.skillContainerPatterns)
+    : [];
 
   const snapshotDate = parsed.snapshotDate ?? 'unspecified';
   const payload = { snapshotDate, experiences: normalized, education, awards, skills };

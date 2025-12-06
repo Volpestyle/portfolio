@@ -4,6 +4,8 @@ export type ChatSurfaceState = {
   anchorId: string;
   visibleProjectIds: string[];
   visibleExperienceIds: string[];
+  visibleEducationIds: string[];
+  visibleLinkIds: string[];
   focusedProjectId: string | null;
   highlightedSkills: string[];
   lastActionAt: string | null;
@@ -18,6 +20,8 @@ export type ApplyUiActionOptions = {
   ui?: {
     showProjects?: string[];
     showExperiences?: string[];
+    showLinks?: string[];
+    showEducation?: string[];
   };
   timestamp?: string;
 };
@@ -58,8 +62,10 @@ export function reduceChatUiState(prev: ChatUiState, options?: ApplyUiActionOpti
 
   const baseSurface = existingIndex !== -1 ? prevSurfaces[existingIndex] : createEmptySurface(anchorId);
 
-  let nextVisible = baseSurface.visibleProjectIds;
-  let nextVisibleExperiences = baseSurface.visibleExperienceIds;
+  let nextVisible = baseSurface.visibleProjectIds ?? [];
+  let nextVisibleExperiences = baseSurface.visibleExperienceIds ?? [];
+  let nextVisibleEducation = baseSurface.visibleEducationIds ?? [];
+  let nextVisibleLinks = baseSurface.visibleLinkIds ?? [];
   const nextFocused: string | null = null;
   const nextSkills: string[] = [];
   let mutated = false;
@@ -81,10 +87,30 @@ export function reduceChatUiState(prev: ChatUiState, options?: ApplyUiActionOpti
       }
     }
 
+    if (Array.isArray(options.ui.showEducation)) {
+      const dedupedEducation = dedupeIdentifiers(options.ui.showEducation);
+      if (!arraysEqual(dedupedEducation, nextVisibleEducation)) {
+        nextVisibleEducation = dedupedEducation;
+        mutated = true;
+      }
+    }
+
+    if (Array.isArray(options.ui.showLinks)) {
+      const dedupedLinks = dedupeIdentifiers(options.ui.showLinks);
+      if (!arraysEqual(dedupedLinks, nextVisibleLinks)) {
+        nextVisibleLinks = dedupedLinks;
+        mutated = true;
+      }
+    }
+
   }
 
   const hasPayload =
-    (nextVisible?.length ?? 0) > 0 || (nextVisibleExperiences?.length ?? 0) > 0 || Boolean(nextFocused);
+    (nextVisible?.length ?? 0) > 0 ||
+    (nextVisibleExperiences?.length ?? 0) > 0 ||
+    (nextVisibleEducation?.length ?? 0) > 0 ||
+    (nextVisibleLinks?.length ?? 0) > 0 ||
+    Boolean(nextFocused);
 
   if (!hasPayload) {
     if (existingIndex === -1) {
@@ -105,6 +131,8 @@ export function reduceChatUiState(prev: ChatUiState, options?: ApplyUiActionOpti
     anchorId,
     visibleProjectIds: nextVisible,
     visibleExperienceIds: nextVisibleExperiences,
+    visibleEducationIds: nextVisibleEducation,
+    visibleLinkIds: nextVisibleLinks,
     focusedProjectId: nextFocused ?? null,
     highlightedSkills: nextSkills,
     lastActionAt: options?.timestamp ?? new Date().toISOString(),
@@ -124,6 +152,8 @@ function createEmptySurface(anchorId: string): ChatSurfaceState {
     anchorId,
     visibleProjectIds: [],
     visibleExperienceIds: [],
+    visibleEducationIds: [],
+    visibleLinkIds: [],
     focusedProjectId: null,
     highlightedSkills: [],
     lastActionAt: null,

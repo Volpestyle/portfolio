@@ -101,12 +101,12 @@ digraph PortfolioChatEngine {
     ];
 
     planner [
-      label="Planner\n- Query construction\n- cardsEnabled/topic\n- PlannerLLMOutput",
+      label="Planner\n- Query construction\n- topic label\n- PlannerLLMOutput",
       fillcolor="#e0f2fe"
     ];
 
     retrieval [
-      label="Retrieval Engine\n(packages/chat-data)\n- BM25 shortlist\n- Embedding re-ranking\n- Recency scoring\n- Cards toggle respected",
+      label="Retrieval Engine\n(packages/chat-data)\n- BM25 shortlist\n- Embedding re-ranking\n- Recency scoring",
       fillcolor="#e0f2fe"
     ];
 
@@ -183,7 +183,7 @@ digraph PortfolioChatEngine {
   embedding_indexes -> retrieval [style="dashed", label="embeddings"];
 
   orchestrator -> planner [label="system prompt\n+ userContent"];
-  planner -> retrieval [label="PlannerLLMOutput\n(queries, cardsEnabled, topic)"];
+  planner -> retrieval [label="PlannerLLMOutput\n(queries, topic)"];
   retrieval -> answer [label="retrieved docs\n(projects, resume, profile)"];
 
   answer -> ui_payload [label="AnswerPayload.uiHints\n(filtered to retrieved IDs)"];

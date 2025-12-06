@@ -117,11 +117,6 @@ export const MODEL_ALIASES: Record<string, string> = {
   'gpt-3.5-turbo-1106': 'gpt-3.5-turbo',
 };
 
-export const FALLBACK_NORMALIZED_PRICING: NormalizedModelPricing = {
-  prompt: 30,
-  completion: 60,
-};
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }

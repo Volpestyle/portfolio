@@ -8,9 +8,46 @@ type PersonaArtifact = {
   generatedAt: string;
 } & PersonaSummary;
 
+type SocialLinkInput = {
+  url?: string | null;
+  blurb?: string | null;
+};
+
 async function loadJson<T>(filePath: string): Promise<T> {
   const contents = await fs.readFile(filePath, 'utf-8');
   return JSON.parse(contents) as T;
+}
+
+function normalizePersonaLinks(
+  links?: Array<string | SocialLinkInput | (PersonaProfile['socialLinks'] extends Array<infer T> ? T : never)>
+): PersonaProfile['socialLinks'] | undefined {
+  if (!links?.length) {
+    return undefined;
+  }
+  const dedup = new Map<string, { url: string; blurb?: string }>();
+  for (const link of links) {
+    const url =
+      typeof link === 'string'
+        ? link
+        : (link as SocialLinkInput)?.url ?? (link as { url?: string })?.url;
+    const blurb =
+      typeof link === 'string'
+        ? undefined
+        : (link as SocialLinkInput)?.blurb ?? (link as { blurb?: string })?.blurb;
+    const trimmedUrl = url?.trim();
+    if (!trimmedUrl) continue;
+    const trimmedBlurb = blurb?.trim();
+    const existing = dedup.get(trimmedUrl);
+    if (existing) {
+      if (!existing.blurb && trimmedBlurb) {
+        existing.blurb = trimmedBlurb;
+      }
+      continue;
+    }
+    dedup.set(trimmedUrl, trimmedBlurb ? { url: trimmedUrl, blurb: trimmedBlurb } : { url: trimmedUrl });
+  }
+  if (!dedup.size) return undefined;
+  return Array.from(dedup.values());
 }
 
 function mergePersonaProfile(value?: PersonaProfile, fallback?: PersonaProfile): PersonaProfile | undefined {
@@ -19,15 +56,15 @@ function mergePersonaProfile(value?: PersonaProfile, fallback?: PersonaProfile):
     ...(fallback ?? {}),
     ...(value ?? {}),
   };
-  if (merged.about) {
-    merged.about = normalizeDistinctStrings(merged.about);
-  }
+  // Persona snapshot intentionally omits long-form about paragraphs.
+  delete (merged as { about?: unknown }).about;
   if (merged.topSkills) {
     merged.topSkills = normalizeDistinctStrings(merged.topSkills);
   }
-  if (merged.socialLinks) {
-    merged.socialLinks = normalizeDistinctStrings(merged.socialLinks);
-  }
+  merged.socialLinks = normalizePersonaLinks([
+    ...(fallback?.socialLinks ?? []),
+    ...(value?.socialLinks ?? []),
+  ]);
   if (merged.featuredExperienceIds) {
     merged.featuredExperienceIds = normalizeDistinctStrings(merged.featuredExperienceIds);
   }
@@ -57,7 +94,7 @@ function extractAboutParagraphs(about: ProfileSummary['about']): string[] {
 
 function buildPersonaFromProfile(profile: ProfileSummary): PersonaSummary {
   const headline = profile.headline ? `, ${profile.headline}` : '';
-  const location = profile.location ? ` in ${profile.location}` : '';
+  const location = profile.currentLocation ? ` in ${profile.currentLocation}` : '';
   const role = profile.currentRole ? ` (${profile.currentRole})` : '';
   const topSkills = normalizeDistinctStrings(profile.topSkills);
   const skillClause = topSkills.length ? ` Common tools: ${topSkills.join(', ')}.` : '';
@@ -74,30 +111,21 @@ function buildPersonaFromProfile(profile: ProfileSummary): PersonaSummary {
   const styleGuidelines = normalizeDistinctStrings(profile.styleGuidelines);
 
   const voiceExamples = normalizeDistinctStrings(profile.voiceExamples);
-  const fallbackVoiceExamples = [
-    "Hey, I'm James—a Chicago-based full-stack engineer shipping web and mobile apps.",
-    'Most days I’m in React, Next.js, and TypeScript, wiring features end to end.',
-    'I like shipping quickly, getting feedback, and tightening the UX with each release.',
-    "Ask me about the AWS IAM Console or the Lowe's returns app we shipped at scale.",
-  ];
 
   return {
     systemPersona,
     shortAbout,
     styleGuidelines,
-    voiceExamples: voiceExamples.length ? voiceExamples : fallbackVoiceExamples,
+    voiceExamples,
     profile: {
       updatedAt: profile.updatedAt,
       fullName: profile.fullName,
       headline: profile.headline,
-      location: profile.location,
+      currentLocation: profile.currentLocation,
       currentRole: profile.currentRole,
-      about: aboutParagraphs,
       topSkills,
-      socialLinks: normalizeDistinctStrings(
-        (profile.socialLinks ?? [])
-          .map((link) => link?.url?.trim())
-          .filter((url): url is string => Boolean(url))
+      socialLinks: normalizePersonaLinks(
+        (profile.socialLinks ?? []).map((link) => ({ url: link?.url, blurb: link?.blurb }))
       ),
       featuredExperienceIds: normalizeDistinctStrings(
         (profile.featuredExperiences ?? []).map((exp) => exp?.id?.trim()).filter((id): id is string => Boolean(id))

@@ -19,7 +19,6 @@ export type RunOptions = {
   abortSignal?: AbortSignal;
   softTimeoutMs?: number;
   onReasoningUpdate?: (update: ReasoningUpdate) => void;
-  ownerId?: string;
   reasoningEnabled?: boolean;
   onStageEvent?: (stage: PipelineStage, status: StageStatus, meta?: StageMeta, durationMs?: number) => void;
   onUiEvent?: (ui: UiPayload) => void;
@@ -81,6 +80,7 @@ export {
   getRuntimeCostClients,
   shouldThrottleForBudget,
   recordRuntimeCost,
+  setRuntimeCostBudget,
   type RuntimeCostClients,
   type RuntimeCostState,
   type CostLevel,

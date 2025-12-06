@@ -18,6 +18,15 @@ import { DEFAULT_ENV_FILES } from './env';
 const DEFAULT_TEXT_MODEL = 'gpt-5-nano-2025-08-07';
 const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-large';
 const DEFAULT_RESUME_FILENAME = 'resume.pdf';
+const DEFAULT_SKILL_CONTAINER_PATTERNS: RegExp[] = [
+  /^(languages(\s*&\s*frameworks)?|frameworks)$/i,
+  /^(platforms?|cloud\s*platforms?)$/i,
+  /^(tools?|tooling)$/i,
+  /^(tech(nologies)?|tech\s*stack|technology\s*stack)$/i,
+  /^(databases?|data\s*apis|databases\s*&\s*data\s*apis)$/i,
+  /^(skills|technical\s*skills|skills\s*summary)$/i,
+  /^(core\s*competencies|competencies|areas\s*of\s*expertise|expertise)$/i,
+];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -61,6 +70,48 @@ function normalizeMatchers(values?: string[]): RepoMatcher[] {
   }
   return result;
 }
+
+const toRegex = (value: unknown): RegExp | null => {
+  if (value instanceof RegExp) {
+    return value;
+  }
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const regexLike = /^\/(.+)\/([a-z]*)$/i.exec(trimmed);
+  if (regexLike) {
+    const [, source, flagsRaw] = regexLike;
+    const flags = flagsRaw?.includes('i') ? flagsRaw : `${flagsRaw ?? ''}i`;
+    try {
+      return new RegExp(source, flags);
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    return new RegExp(trimmed, 'i');
+  } catch {
+    return null;
+  }
+};
+
+const normalizeRegexList = (value?: Array<string | RegExp> | string | RegExp): RegExp[] => {
+  const list = Array.isArray(value) ? value : value ? [value] : [];
+  const patterns: RegExp[] = [];
+  for (const item of list) {
+    const regex = toRegex(item);
+    if (regex) {
+      patterns.push(regex);
+    }
+  }
+  return patterns;
+};
 
 export function mergeConfigs(configs: Array<ChatPreprocessConfig | undefined>): ChatPreprocessConfig {
   const merged: ChatPreprocessConfig = {};
@@ -118,6 +169,10 @@ export function resolvePreprocessConfig(config?: ChatPreprocessConfig): Resolved
   const dataDir = path.resolve(rootDir, config?.paths?.dataDir ?? 'data/chat');
   const generatedDir = path.resolve(rootDir, config?.paths?.generatedDir ?? 'generated');
   const resumeFilename = config?.resume?.filename?.trim() || DEFAULT_RESUME_FILENAME;
+  const skillContainerPatterns =
+    normalizeRegexList(config?.resume?.skillContainerPatterns) ?? [];
+  const resolvedSkillContainers =
+    skillContainerPatterns.length > 0 ? skillContainerPatterns : DEFAULT_SKILL_CONTAINER_PATTERNS;
 
   function resolveOverride(key: keyof PreprocessPathOverrides, defaultPath: string): string {
     const override = config?.paths?.[key];
@@ -162,7 +217,7 @@ export function resolvePreprocessConfig(config?: ChatPreprocessConfig): Resolved
     repos: repoSelection,
     artifacts: { writerConfigs },
     models: resolveModelConfig(config?.models),
-    resume: { filename: resumeFilename },
+    resume: { filename: resumeFilename, skillContainerPatterns: resolvedSkillContainers },
   };
 }
 

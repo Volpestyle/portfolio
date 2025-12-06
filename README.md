@@ -100,7 +100,7 @@ The chat experience runs on a multi-stage orchestrator pipeline:
 - **Planner → Retrieval → Answer** pipeline in `packages/chat-orchestrator`; UI cards come from `AnswerPayload.uiHints`, never directly from retrieval.
 - **Retrieval** is in-process BM25 + embeddings over the precomputed snapshots in `generated/` (projects, resume, profile) loaded via `src/server/chat/dataProviders.ts`; no external vector DB.
 - **Streaming** via `/api/chat` route emits SSE events (`stage`, `reasoning`, `ui`, `token`, `item`, `attachment`, `ui_actions`, `done`, `error`) using `@portfolio/chat-next-api`; the front-end consumes them through `ChatProvider` from `@portfolio/chat-next-ui`.
-- **Answer payload** is structured JSON: the Answer stage streams `AnswerPayload.message` tokens and also returns optional `thoughts` for dev-only reasoning.
+- **Answer payload** is structured JSON: the Answer stage streams `AnswerPayload.message` tokens and also returns optional `thoughts` for reasoning.
 - **Configuration** supports model overrides, token limits, semantic ranking weights, and debug levels (see [config-notes.md](docs/features/chat/config-notes.md)).
 - **Observability** includes structured logging with correlation IDs, CloudWatch integration, cost metrics, and local debug export (see [chat-logging.md](docs/features/chat/chat-logging.md)).
 - **Safety** enforces rate limits (5/min, 40/hr, 120/day) that fail-closed and a $10/month runtime cost alarm with warning/critical/exceeded thresholds for planner/answer + embedding calls (see [rate-limits-and-cost-guards.md](docs/features/chat/rate-limits-and-cost-guards.md)).

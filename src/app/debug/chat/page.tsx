@@ -1,3 +1,4 @@
+import { DEFAULT_COST_DECIMAL_PLACES } from '@portfolio/chat-contract';
 import { CHAT_DEBUG_LEVEL, getChatDebugLogs, type ChatDebugLogEntry } from '@portfolio/chat-next-api';
 import { summarizeTokenUsage } from '@/lib/chat-debug';
 
@@ -97,8 +98,8 @@ export default function ChatDebugPage() {
                 {tokenSummary.totals.costUsd.toLocaleString(undefined, {
                   style: 'currency',
                   currency: 'USD',
-                  minimumFractionDigits: 4,
-                  maximumFractionDigits: 4,
+                  minimumFractionDigits: DEFAULT_COST_DECIMAL_PLACES,
+                  maximumFractionDigits: DEFAULT_COST_DECIMAL_PLACES,
                 })}
               </p>
             ) : null}
@@ -107,7 +108,7 @@ export default function ChatDebugPage() {
               {Object.entries(tokenSummary.byStage).map(([stage, totals]) => (
                 <p key={stage} className="font-mono text-xs text-white/80">
                   {stage}: prompt={totals.prompt} completion={totals.completion} total={totals.total}
-                  {tokenSummary.hasCost ? ` cost=$${totals.costUsd.toFixed(4)}` : ''}
+                  {tokenSummary.hasCost ? ` cost=$${totals.costUsd.toFixed(DEFAULT_COST_DECIMAL_PLACES)}` : ''}
                 </p>
               ))}
             </div>

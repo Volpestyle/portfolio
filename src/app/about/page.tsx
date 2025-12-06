@@ -3,35 +3,9 @@ import { AboutClient } from './AboutClient';
 import { SocialLinks } from './SocialLinks';
 import type { Metadata } from 'next';
 import profile from '../../../generated/profile.json';
-import { PROFILE_BIO_PARAGRAPHS, PROFILE_SOCIAL_LINKS } from '@/constants/profile';
-import type { ProfileSocialLink, SocialPlatform } from '@portfolio/chat-contract';
+import { PROFILE_BIO_PARAGRAPHS } from '@/constants/profile';
 import { resolveResumeFilename } from '@/server/chat/config';
-
-const SOCIAL_PLATFORMS: SocialPlatform[] = ['x', 'github', 'youtube', 'linkedin', 'spotify'];
-
-function normalizeSocialLinks(links: unknown): ProfileSocialLink[] {
-  if (!Array.isArray(links)) return [];
-  const normalized: ProfileSocialLink[] = [];
-  for (const link of links) {
-    const candidate = link as {
-      platform?: unknown;
-      label?: unknown;
-      url?: unknown;
-      blurb?: unknown;
-    };
-    const { platform, label, url, blurb } = candidate;
-    if (
-      typeof platform === 'string' &&
-      SOCIAL_PLATFORMS.includes(platform as SocialPlatform) &&
-      typeof label === 'string' &&
-      typeof url === 'string' &&
-      (typeof blurb === 'string' || typeof blurb === 'undefined')
-    ) {
-      normalized.push({ platform: platform as SocialPlatform, label, url, blurb });
-    }
-  }
-  return normalized;
-}
+import { getProfileSocialLinks } from '@/lib/profile/socialLinks';
 
 export const metadata: Metadata = {
   title: "About - JCV's Portfolio",
@@ -47,8 +21,7 @@ export const metadata: Metadata = {
 export default function About() {
   const resumeFilename = resolveResumeFilename();
   const aboutParagraphs = profile.about?.length ? profile.about : PROFILE_BIO_PARAGRAPHS;
-  const fromProfile = normalizeSocialLinks(profile.socialLinks);
-  const socialLinks: readonly ProfileSocialLink[] = fromProfile.length > 0 ? fromProfile : PROFILE_SOCIAL_LINKS;
+  const socialLinks = getProfileSocialLinks();
   const normalizedAbout = Array.isArray(aboutParagraphs) ? aboutParagraphs : [aboutParagraphs].filter(Boolean);
 
   return (

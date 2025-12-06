@@ -1,6 +1,6 @@
 import type { ChatMessage, ChatMessagePart, ChatTextPart } from '@portfolio/chat-contract';
 import type { ChatDebugLogEntry } from '@portfolio/chat-next-api';
-import { estimateCostUsd, parseUsage } from '@portfolio/chat-contract';
+import { DEFAULT_COST_DECIMAL_PLACES, estimateCostUsd, parseUsage } from '@portfolio/chat-contract';
 
 function isTextPart(part: ChatMessagePart): part is ChatTextPart {
   return part.kind === 'text';
@@ -158,12 +158,12 @@ export function formatChatMessagesAsMarkdown(messages: ChatMessage[], debugLogs?
     }
     if (usageSummary.hasCost) {
       lines.push('', '## Cost Summary', '');
-      lines.push(`- Estimated cost (USD): $${usageSummary.totals.costUsd.toFixed(4)}`);
+      lines.push(`- Estimated cost (USD): $${usageSummary.totals.costUsd.toFixed(DEFAULT_COST_DECIMAL_PLACES)}`);
       if (stageEntries.length) {
         lines.push('- By stage:');
         stageEntries.forEach(([stage, totals]) => {
           const stageCost = totals.costUsd ?? 0;
-          lines.push(`  - ${stage}: ~$${stageCost.toFixed(4)}`);
+          lines.push(`  - ${stage}: ~$${stageCost.toFixed(DEFAULT_COST_DECIMAL_PLACES)}`);
         });
       }
     }

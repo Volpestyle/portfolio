@@ -8,7 +8,7 @@ Companion to `docs/features/chat/chat-spec.md`. This file keeps eval coverage, c
 
 - Grounding + honesty for skills, projects, experience, and bio questions.
 - UI/text alignment: cards reflect Answer.uiHints and retrieved docs.
-- Cards toggle correctness (when cardsEnabled should be on/off).
+- Card presence/absence correctness (uiHints included only when relevant).
 - Zero/low‑evidence honesty and transparent fallbacks.
 - Persona voice consistency and “I” perspective.
 - Meta/chit‑chat sanity (no generic assistant drift).
@@ -24,7 +24,6 @@ type ChatEvalTestCase = {
   category: 'skill' | 'projects' | 'experience' | 'bio' | 'meta' | 'edge_case';
   input: { userMessage: string; conversationHistory?: ChatMessage[] };
   expected?: {
-    cardsEnabled?: boolean;
     plannerQueries?: Array<{ source?: PlannerQuerySource; textIncludes?: string[]; limitAtMost?: number }>;
     answerContains?: string[];
     answerNotContains?: string[];
@@ -58,7 +57,6 @@ const factCheckSuite: ChatEvalSuite = {
       category: 'skill',
       input: { userMessage: 'Have you used React?' },
       expected: {
-        cardsEnabled: true,
         uiHintsProjectsMinCount: 1,
       },
     },
@@ -85,7 +83,6 @@ const enumerationSuite: ChatEvalSuite = {
       category: 'projects',
       input: { userMessage: 'Which projects have you used Go on?' },
       expected: {
-        cardsEnabled: true,
         uiHintsProjectsMinCount: 1,
       },
     },
@@ -95,7 +92,6 @@ const enumerationSuite: ChatEvalSuite = {
       category: 'meta',
       input: { userMessage: 'Hi there!' },
       expected: {
-        cardsEnabled: false,
         uiHintsProjectsMaxCount: 0,
         uiHintsExperiencesMaxCount: 0,
       },
@@ -125,7 +121,7 @@ async function runChatEvalSuite(chatApi: ChatApi, openai: OpenAI, ownerId: strin
       });
 
       // Assert planner output, retrieval summaries, answer text, and uiPayload alignment
-      // (cardsEnabled, uiHints, and required IDs when specified).
+      // (uiHints and required IDs when specified).
       results.push(assertChatEval(test, { plan, retrieval, answer, uiPayload }));
     } catch (err) {
       results.push({
@@ -142,7 +138,7 @@ async function runChatEvalSuite(chatApi: ChatApi, openai: OpenAI, ownerId: strin
 }
 ```
 
-Keep assertions focused on the contract: planner queries, grounded answer text, cardsEnabled, and uiHints/card expectations.
+Keep assertions focused on the contract: planner queries, grounded answer text, and uiHints/card expectations.
 
 ---
 
@@ -151,3 +147,22 @@ Keep assertions focused on the contract: planner queries, grounded answer text, 
 - Full suites in `tests/golden/index.ts` (fact-check, enumeration, narrative, meta, edge cases).
 - Runner wiring sits next to the chat API integration helpers.
 - Metrics/grade scripts can emit JSON for dashboards; the shapes above are the expected contract.
+
+---
+
+## 5. Running evals locally (with logging)
+
+Prereqs:
+
+- `OPENAI_API_KEY` set, and `generated/` artifacts up to date (run `pnpm chat:preprocess` if needed).
+- `CHAT_DEBUG_LOG` optional: `1` (default dev), `2` (includes raw queries), or `3` (same with aggressive redaction).
+
+Commands:
+
+- Run the suites: `pnpm chat:evals`
+- Capture logs: `CHAT_DEBUG_LOG=2 pnpm chat:evals > chat-evals.log`
+
+Notes:
+
+- The runner uses `src/server/chat/bootstrap.ts`, so the same pipeline/logger is exercised as the app. Log output includes planner/retrieval/answer events and token spend (`chat.pipeline.tokens`). In dev, you can also open `/debug/chat` after a run to inspect the in-memory buffer.
+- Cost totals in the CLI summary/report include both pipeline calls and the eval overhead (semantic-similarity embeddings + judge model).

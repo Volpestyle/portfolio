@@ -1,4 +1,7 @@
-import 'server-only';
+// Only import server-only in Next.js environment (not when running with tsx/node directly)
+if (typeof process !== 'undefined' && process.env.NEXT_RUNTIME) {
+  import('server-only').catch(() => {});
+}
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 

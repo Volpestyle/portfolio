@@ -21,7 +21,6 @@ import type {
   ExperienceScope,
   ProfileSummary,
   ProjectSearchResult,
-  ResumeFacet,
   ScoreMetadata,
   SkillRecord,
 } from '@portfolio/chat-contract';
@@ -45,7 +44,7 @@ export type RetrievalResult = {
 
 export type RetrievalDrivers = {
   searchProjectsByText(queryText: string, topK?: number, options?: { scope?: ExperienceScope }): Promise<ProjectDoc[]>;
-  searchExperiencesByText(queryText: string, topK?: number, options?: { facets?: ResumeFacet[] }): Promise<ResumeDoc[]>;
+  searchExperiencesByText(queryText: string, topK?: number): Promise<ResumeDoc[]>;
   getProfileDoc(): Promise<ProfileDoc | undefined>;
 };
 
@@ -164,17 +163,12 @@ export function createRetrieval(options: RetrievalOptions): RetrievalDrivers {
       });
     },
 
-    async searchExperiencesByText(
-      queryText: string,
-      topK?: number,
-      options?: { facets?: ResumeFacet[] }
-    ): Promise<ResumeDoc[]> {
+    async searchExperiencesByText(queryText: string, topK?: number): Promise<ResumeDoc[]> {
       const limit = clamp(topK, maxTopK, defaultTopK);
       const searcher = await getResumeSearcher();
       const results = await searcher.searchResume({
         text: queryText,
         limit,
-        facets: options?.facets,
       });
       return results.map((result) => ({ ...result }));
     },

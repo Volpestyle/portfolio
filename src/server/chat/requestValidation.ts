@@ -3,7 +3,6 @@ import type { ChatRequestMessage } from '@portfolio/chat-contract';
 export type ChatPostBody = {
   messages?: ChatRequestMessage[];
   responseAnchorId?: string;
-  ownerId?: string;
   reasoningEnabled?: boolean;
   conversationId?: string;
 };
@@ -14,7 +13,6 @@ type ValidationSuccess = {
   value: {
     messages: ChatRequestMessage[];
     responseAnchorId: string;
-    ownerId: string;
     reasoningEnabled?: boolean;
     conversationId: string;
   };
@@ -25,10 +23,7 @@ export function resolveReasoningEnabled(options: { requested?: boolean; environm
   return Boolean(options.requested);
 }
 
-export function validateChatPostBody(
-  body: ChatPostBody | null | undefined,
-  expectedOwnerId: string
-): ValidationError | ValidationSuccess {
+export function validateChatPostBody(body: ChatPostBody | null | undefined): ValidationError | ValidationSuccess {
   const messages = Array.isArray(body?.messages) ? body!.messages : [];
   if (!messages.length) {
     return { ok: false, error: 'No messages provided.', status: 400 };
@@ -50,18 +45,11 @@ export function validateChatPostBody(
     return { ok: false, error: 'Missing responseAnchorId.', status: 400 };
   }
 
-  const ownerIdInput =
-    typeof body?.ownerId === 'string' && body.ownerId.trim().length > 0 ? body.ownerId.trim() : expectedOwnerId;
-  if (ownerIdInput !== expectedOwnerId) {
-    return { ok: false, error: 'Unknown ownerId.', status: 404 };
-  }
-
   return {
     ok: true,
     value: {
       messages,
       responseAnchorId,
-      ownerId: ownerIdInput,
       reasoningEnabled: typeof body?.reasoningEnabled === 'boolean' ? body.reasoningEnabled : undefined,
       conversationId,
     },

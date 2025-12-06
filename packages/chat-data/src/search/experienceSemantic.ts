@@ -1,4 +1,4 @@
-import type { ResumeEntry, ExperienceRecord } from '@portfolio/chat-contract';
+import type { ResumeEntry } from '@portfolio/chat-contract';
 import type { EmbeddingProvider, ExperienceRepository } from '../providers/types';
 import { cosineSimilarity } from './semantic';
 
@@ -40,19 +40,15 @@ export function createExperienceEmbeddingSemanticRanker(
 
       const scores = new Map<string, number>();
       for (const record of records) {
-        if (record.type && record.type !== 'experience') {
-          continue;
-        }
-        const experienceRecord = record as ExperienceRecord;
         const recordEmbedding = experienceRepository.getEmbedding
-          ? await experienceRepository.getEmbedding(experienceRecord)
+          ? await experienceRepository.getEmbedding(record)
           : undefined;
         if (!recordEmbedding?.length) {
           continue;
         }
         const similarity = cosineSimilarity(queryEmbedding, recordEmbedding);
         if (similarity > 0) {
-          scores.set(experienceRecord.id, similarity * scoreScale);
+          scores.set(record.id, similarity * scoreScale);
         }
       }
 

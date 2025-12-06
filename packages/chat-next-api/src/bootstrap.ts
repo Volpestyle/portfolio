@@ -1,5 +1,5 @@
 import type OpenAI from 'openai';
-import type { OwnerConfig, PersonaSummary, ProfileSummary } from '@portfolio/chat-contract';
+import type { PersonaSummary, ProfileSummary } from '@portfolio/chat-contract';
 import {
   createFilesystemProjectRepository,
   createFilesystemExperienceRepository,
@@ -13,7 +13,6 @@ import {
 import { createChatApi, type ChatApi, type ChatApiConfig } from './index';
 import { createSemanticRanker } from './semanticRanking';
 import { createExperienceSemanticRanker } from './experienceSemanticRanking';
-import type { IdentityContext } from '@portfolio/chat-orchestrator';
 
 export type FilesystemChatProviderOptions = {
   projectsFile: unknown;
@@ -31,8 +30,6 @@ export type ChatBootstrapOptions = FilesystemChatProviderOptions & {
     'defaultTopK' | 'maxTopK' | 'minRelevanceScore' | 'logger' | 'weights'
   >;
   personaFile?: unknown;
-  owner?: OwnerConfig;
-  ownerId?: string;
 };
 
 export type BootstrapResult = {
@@ -74,9 +71,7 @@ export function createPortfolioChatServer(options: ChatBootstrapOptions): Bootst
   const runtimeOptions = mergeRuntimeOptions(
     options.runtimeOptions,
     personaSummary,
-    profileSummary,
-    options.owner,
-    options.owner?.ownerId ?? options.ownerId
+    profileSummary
   );
 
   const embeddingModel = runtimeOptions?.modelConfig?.embeddingModel;
@@ -138,42 +133,14 @@ function safeProfileSummary(raw: unknown): ProfileSummary | undefined {
   }
 }
 
-function buildIdentityContext(profile?: ProfileSummary, persona?: PersonaSummary): IdentityContext | undefined {
-  const personaProfile = persona?.profile;
-  const sourceProfile =
-    profile ??
-    (personaProfile
-      ? {
-          fullName: personaProfile.fullName,
-          headline: personaProfile.headline,
-          location: personaProfile.location,
-          shortAbout: personaProfile.about?.[0],
-        }
-      : undefined);
-
-  if (!sourceProfile && !persona) {
-    return undefined;
-  }
-
-  return {
-    fullName: sourceProfile?.fullName,
-    headline: sourceProfile?.headline,
-    location: sourceProfile?.location,
-    shortAbout: persona?.shortAbout ?? sourceProfile?.shortAbout,
-  };
-}
-
 function mergeRuntimeOptions(
   runtimeOptions: ChatApiConfig['runtimeOptions'] | undefined,
   personaSummary: PersonaSummary | undefined,
-  profileSummary: ProfileSummary | undefined,
-  ownerFallback?: OwnerConfig,
-  ownerIdFallback?: string
+  profileSummary: ProfileSummary | undefined
 ): ChatApiConfig['runtimeOptions'] | undefined {
   const persona = runtimeOptions?.persona ?? personaSummary;
-  const identityContext = runtimeOptions?.identityContext ?? buildIdentityContext(profileSummary, persona);
 
-  if (!runtimeOptions && !persona && !identityContext && !ownerFallback && !ownerIdFallback) {
+  if (!runtimeOptions && !persona) {
     return undefined;
   }
 
@@ -185,16 +152,8 @@ function mergeRuntimeOptions(
     merged.persona = persona;
   }
 
-  if (identityContext && !merged.identityContext) {
-    merged.identityContext = identityContext;
-  }
-
-  if (ownerFallback && !merged.owner) {
-    merged.owner = ownerFallback;
-  }
-
-  if (ownerIdFallback && !merged.ownerId) {
-    merged.ownerId = ownerIdFallback;
+  if (profileSummary && !merged.profile) {
+    merged.profile = profileSummary;
   }
 
   return merged;

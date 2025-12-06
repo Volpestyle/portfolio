@@ -1,4 +1,4 @@
-export type { RetrievalSource, RetrievalPlan, UiPayload, AnswerPayload, AnswerUiHints, ExperienceScope, ResumeFacet } from '@portfolio/chat-contract';
+export type { RetrievalSource, RetrievalPlan, UiPayload, AnswerPayload, AnswerUiHints, ExperienceScope } from '@portfolio/chat-contract';
 export {
   AnswerPayloadSchema,
   PlannerLLMOutputSchema,

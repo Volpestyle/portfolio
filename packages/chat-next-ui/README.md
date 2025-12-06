@@ -55,7 +55,7 @@ The provider automatically:
 
 - Tracks the full message history (with a configurable window for outbound requests).
 - Streams the full SSE contract (`stage`, `reasoning`, `ui`, `token`, `item`, `attachment`, `ui_actions`, `done`, `error`) and applies updates as events arrive.
-- Updates `uiState.surfaces` based on UiPayload (`showProjects`, `showExperiences`) so components can render inline cards/actionable items next to specific assistant messages.
+- Updates `uiState.surfaces` based on UiPayload (`showProjects`, `showExperiences`, `showLinks`) so components can render inline cards/actionable items next to specific assistant messages.
 - Maintains normalized project/resume caches hydrated from `/api/projects` and `/api/resume`.
 
 ## `ChatProvider` props
@@ -63,7 +63,7 @@ The provider automatically:
 | Prop               | Type                                                | Default                                                        | Description                                                                                                    |
 | ------------------ | --------------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `endpoint`         | `string`                                            | `/api/chat`                                                    | URL the provider `POST`s to when sending a new message.                                                        |
-| `ownerId`          | `string`                                            | `process.env.NEXT_PUBLIC_CHAT_OWNER_ID \|\| 'portfolio-owner'` | Multi-tenant key forwarded to `/api/chat`; must match the server’s configured owner.                           |
+| `ownerId`          | `string`                                            | `process.env.NEXT_PUBLIC_CHAT_OWNER_ID`                        | Multi-tenant key forwarded to `/api/chat`; must match the server’s configured owner. Throws if missing.        |
 | `historyLimit`     | `number`                                            | `12`                                                           | Max number of prior messages included in each request payload. Non-positive/invalid values fall back to `12`.  |
 | `fetcher`          | `(input, init) => Promise<Response>`                | `globalThis.fetch`                                             | Optional injection point for custom fetch implementations (tests, polyfills).                                  |
 | `requestFormatter` | `(messages: ChatMessage[]) => ChatRequestMessage[]` | Default `flatten` helper                                       | Override the request content transformation before calling the API.                                            |
@@ -99,7 +99,8 @@ type UseChat = {
 - `anchorId`: Item/message id used to place inline UI via portals.
 - `visibleProjectIds`: Ordered, deduplicated identifiers from UiPayload.showProjects.
 - `visibleExperienceIds`: Ordered, deduplicated identifiers from UiPayload.showExperiences.
-- `reasoningTraces`: Partial reasoning traces keyed by item id.
+- `visibleEducationIds`: Ordered, deduplicated identifiers from UiPayload.showEducation.
+- `visibleLinkIds`: Ordered, deduplicated identifiers from UiPayload.showLinks.
 - `focusedProjectId`: Reserved for future use (currently null).
 - `highlightedSkills`: Reserved for future use.
 - `lastActionAt`: ISO timestamp recording when the latest UI instruction was applied.
@@ -112,7 +113,7 @@ The provider expects the chat endpoint to stream newline-separated server-sent e
 
 - `stage` – pipeline progress (`planner_start`, etc.).
 - `reasoning` – partial `ReasoningTrace` updates.
-- `ui` – UiPayload `{ showProjects, showExperiences }` for the referenced assistant turn.
+- `ui` – UiPayload `{ showProjects, showExperiences, showEducation, showLinks }` for the referenced assistant turn.
 - `token` – answer token chunks (the Answer stage streams `AnswerPayload.message`).
 - `item` – non-token answer parts, ordered by `itemId`.
 - `attachment` – host-defined payloads (projects/resume entries).

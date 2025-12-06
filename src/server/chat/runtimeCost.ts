@@ -26,7 +26,6 @@ type RuntimeCostClients = {
   sns?: SNSClient;
   tableName: string;
   alertTopicArn?: string;
-  ownerId: string;
   env: string;
 };
 
@@ -116,7 +115,6 @@ async function publishCostMetrics(
           Unit: StandardUnit.None,
           StorageResolution: 60,
           Dimensions: [
-            { Name: 'OwnerId', Value: clients.ownerId },
             { Name: 'Env', Value: clients.env },
             { Name: 'YearMonth', Value: yearMonth },
           ],
@@ -127,7 +125,6 @@ async function publishCostMetrics(
           Unit: StandardUnit.None,
           StorageResolution: 60,
           Dimensions: [
-            { Name: 'OwnerId', Value: clients.ownerId },
             { Name: 'Env', Value: clients.env },
             { Name: 'YearMonth', Value: yearMonth },
           ],
@@ -137,11 +134,11 @@ async function publishCostMetrics(
   );
 }
 
-function getOwnerEnvKey(ownerId: string, env: string): string {
-  return `${ownerId}|${env}`;
+function getEnvKey(env: string): string {
+  return env;
 }
 
-export async function getRuntimeCostClients(ownerId: string): Promise<RuntimeCostClients | null> {
+export async function getRuntimeCostClients(): Promise<RuntimeCostClients | null> {
   const tableName = process.env.COST_TABLE_NAME ?? process.env.CHAT_COST_TABLE_NAME;
   if (!tableName) {
     return null;
@@ -150,7 +147,7 @@ export async function getRuntimeCostClients(ownerId: string): Promise<RuntimeCos
   const alertTopicArn = process.env.COST_ALERT_TOPIC_ARN ?? process.env.CHAT_COST_ALERT_TOPIC_ARN;
 
   const env = resolveEnv();
-  const cacheKey = [ownerId, tableName, alertTopicArn, env].join('|');
+  const cacheKey = [tableName, alertTopicArn, env].join('|');
   if (cachedClients?.key === cacheKey) {
     return cachedClients.clients;
   }
@@ -163,7 +160,6 @@ export async function getRuntimeCostClients(ownerId: string): Promise<RuntimeCos
       sns: alertTopicArn ? new SNSClient({}) : undefined,
       tableName,
       alertTopicArn,
-      ownerId,
       env,
     },
   };
@@ -174,7 +170,7 @@ export async function getRuntimeCostState(clients: RuntimeCostClients): Promise<
   const now = new Date();
   const yearMonth = buildMonthKey(now);
   const key = {
-    owner_env: { S: getOwnerEnvKey(clients.ownerId, clients.env) },
+    owner_env: { S: getEnvKey(clients.env) },
     year_month: { S: yearMonth },
   } as const;
 
@@ -201,7 +197,7 @@ export async function recordRuntimeCost(
   const now = new Date();
   const yearMonth = buildMonthKey(now);
   const key = {
-    owner_env: { S: getOwnerEnvKey(clients.ownerId, clients.env) },
+    owner_env: { S: getEnvKey(clients.env) },
     year_month: { S: yearMonth },
   } as const;
 
@@ -240,7 +236,6 @@ export async function recordRuntimeCost(
             TopicArn: clients.alertTopicArn,
             Subject: `Chat runtime cost ${state.level}`,
             Message: JSON.stringify({
-              ownerId: clients.ownerId,
               env: clients.env,
               level: state.level,
               spendUsd: state.spendUsd,

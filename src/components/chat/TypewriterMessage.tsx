@@ -260,7 +260,11 @@ export function TypewriterMessage({
   }, [logEvent, text]);
 
   useEffect(() => {
-    if (display === text && text.length && completedFor !== text && queueRef.current.length === 0) {
+    const isComplete = display === text && completedFor !== text && queueRef.current.length === 0;
+    const hasContent = text.length > 0;
+    const isEmptyAndNotStreaming = !hasContent && !isStreaming;
+
+    if (isComplete && (hasContent || isEmptyAndNotStreaming)) {
       setCompletedFor(text);
       if (isTypewriterDebugEnabled()) {
         logEvent('typewriter_complete', {
@@ -272,7 +276,7 @@ export function TypewriterMessage({
       }
       onDone?.();
     }
-  }, [completedFor, display, logEvent, onDone, text]);
+  }, [completedFor, display, isStreaming, logEvent, onDone, text]);
 
   // Continue draining the queue after streaming ends
   useEffect(() => {

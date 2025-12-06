@@ -28,7 +28,6 @@ export function buildChatFixtureResponse({
         { source: 'projects', limit: 5, text: 'featured project highlights' },
         { source: 'resume', limit: 4, text: 'supporting resume context' },
       ],
-      cardsEnabled: true,
     },
     retrieval: [
       {
@@ -42,7 +41,7 @@ export function buildChatFixtureResponse({
     ],
     answer: {
       model: answerModel,
-      uiHints: { projects: [projectId], experiences: [] },
+      uiHints: { projects: [projectId], experiences: [], links: [] },
       thoughts: ['Introduce the project and why it stands out', 'Invite the user to explore the card for more context'],
       message: "Here's a featured project from my portfolio.",
     },
@@ -64,7 +63,7 @@ export function buildChatFixtureResponse({
       anchorId,
       stage: 'planner',
       status: 'complete',
-      meta: { topic: reasoningTrace.plan.topic, cardsEnabled: true },
+      meta: { topic: reasoningTrace.plan.topic },
       durationMs: 220,
     },
     { type: 'stage', itemId: anchorId, anchorId, stage: 'retrieval', status: 'start' },
@@ -86,7 +85,7 @@ export function buildChatFixtureResponse({
     {
       type: 'ui',
       itemId: anchorId,
-      ui: { showProjects: [projectId], showExperiences: [] },
+      ui: { showProjects: [projectId], showExperiences: [], showEducation: [], showLinks: [] },
     },
     {
       type: 'reasoning',
