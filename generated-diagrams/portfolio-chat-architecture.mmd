@@ -13,7 +13,7 @@ flowchart LR
     API[/"POST /api/chat\n(SSE)"/]
     MIDDLEWARE[["Rate-limit & Budget\nMiddleware"]]
     MOD_IN["Input Moderation\n(OpenAI Moderations)"]
-    ORCH["Chat Orchestrator\n(Planner -> Retrieval -> Evidence -> Answer)\n+ UiPayload + ReasoningTrace"]
+    ORCH["Chat Orchestrator\n(Planner -> Retrieval -> Answer)\n+ UiPayload + ReasoningTrace"]
   end
 
   %% === Data Layer & Retrieval ===
@@ -53,7 +53,7 @@ flowchart LR
   RETRIEVAL -->|embed queries| EMB
   PERSONA --> ORCH
 
-  ORCH -->|Planner/Evidence/Answer calls| LLM
+  ORCH -->|Planner/Answer calls| LLM
   MOD_IN -->|screen input| MOD_API
   API -->|output moderation| MOD_API
 
