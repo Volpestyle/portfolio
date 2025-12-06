@@ -46,7 +46,7 @@ At a high level:
 Companion docs:
 
 - Runtime cookbook and guardrails: `docs/features/chat/implementation-notes.md`.
-- Chat evals: `docs/features/chat/evals.md`.
+- Chat evals: `tests/chat-evals/README.md`.
 
 ---
 
@@ -1138,11 +1138,11 @@ Per chat turn, log:
 
 ### 8.4 Evals & Graders (cards-aware)
 
-Coverage focuses on grounding, UI/text alignment, card alignment (uiHints vs text), zero-result honesty, and persona adherence. See `docs/features/chat/evals.md` for the active suites and runner sketch.
+Coverage focuses on grounding, UI/text alignment, card alignment (uiHints vs text), zero-result honesty, and persona adherence. See `tests/chat-evals/README.md` for the active suites and runner sketch.
 
 ### 8.5 Chat Eval Sets
 
-Chat evals validate end-to-end behavior. Schema (source of truth lives in `docs/features/chat/evals.md`):
+Chat evals validate end-to-end behavior. Schema (source of truth lives in `tests/chat-evals/README.md`):
 
 ```ts
 type ChatEvalTestCase = {
@@ -1201,7 +1201,7 @@ const factCheckSuite: ChatEvalSuite = {
 };
 ```
 
-Full chat eval suites and runner sketch: `docs/features/chat/evals.md`; suites live in `tests/golden/index.ts`.
+Full chat eval suites and runner sketch: `tests/chat-evals/README.md`; suites live in `tests/chat-evals/index.ts`.
 
 ---
 
