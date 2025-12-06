@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { TokenUsage } from './cost';
 export * from './cost';
 
 export const SOCIAL_PLATFORM_VALUES = ['x', 'github', 'youtube', 'linkedin', 'spotify'] as const;
@@ -205,14 +206,6 @@ export type PersonaSummary = {
   generatedAt?: string;
 };
 
-export type OwnerConfig = {
-  ownerId: string;
-  ownerName: string;
-  ownerPronouns?: string;
-  domainLabel: string;
-  portfolioKind?: 'individual' | 'team' | 'organization';
-};
-
 export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high';
 
 export type StageReasoningConfig = {
@@ -243,8 +236,6 @@ export type DataProviders = {
 };
 
 export type ChatRole = 'user' | 'assistant';
-
-export type BannerMode = 'idle' | 'thinking' | 'hover' | 'chat';
 
 export type BannerState =
   | { mode: 'idle' }
@@ -292,6 +283,10 @@ export type PlannerLLMOutput = {
 
 export type RetrievalPlan = PlannerLLMOutput & {
   model?: string;
+  effort?: ReasoningEffort;
+  durationMs?: number;
+  usage?: TokenUsage;
+  costUsd?: number;
 };
 
 export type AnswerUiHints = {
@@ -334,14 +329,14 @@ export const PlannerLLMOutputSchema: z.ZodType<PlannerLLMOutput, z.ZodTypeDef, u
   thoughts: z.array(z.string()).default([]),
 });
 
-const AnswerUiHintsSchema: z.ZodType<AnswerUiHints, z.ZodTypeDef, unknown> = z.object({
+const AnswerUiHintsSchema = z.object({
   projects: z.array(z.string()).default([]),
   experiences: z.array(z.string()).default([]),
   education: z.array(z.string()).default([]),
   links: z.array(z.enum(SOCIAL_PLATFORM_VALUES)).default([]),
 });
 
-export const AnswerPayloadSchema: z.ZodType<AnswerPayload, z.ZodTypeDef, unknown> = z.object({
+export const AnswerPayloadSchema = z.object({
   message: z.string(),
   thoughts: z.array(z.string()).default([]),
   uiHints: AnswerUiHintsSchema.default({}),
@@ -395,6 +390,10 @@ export type AnswerReasoning = {
   model?: string;
   uiHints?: AnswerUiHints;
   thoughts?: string[];
+  effort?: ReasoningEffort;
+  durationMs?: number;
+  usage?: TokenUsage;
+  costUsd?: number;
 };
 
 export type RetrievedProjectDoc = {
