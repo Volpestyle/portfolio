@@ -2,7 +2,13 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { PartialReasoningTrace, RetrievedProjectDoc, RetrievedResumeDoc } from '@portfolio/chat-contract';
+import type {
+  PartialReasoningTrace,
+  RetrievedProjectDoc,
+  RetrievedResumeDoc,
+  CardSelectionReasoning,
+  CardSelectionReason,
+} from '@portfolio/chat-contract';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, BookOpen, Brain, ChevronDown, Code, Database } from 'lucide-react';
 
@@ -22,9 +28,27 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
   const debug = trace.debug ?? null;
   const retrievalDocs = trace.retrievalDocs ?? null;
   const plannerThoughts = plan?.thoughts?.filter(Boolean) ?? [];
+  const streaming = trace.streaming ?? {};
+  const plannerStreamingText = streaming.planner?.text || streaming.planner?.notes;
+  const retrievalStreamingText = streaming.retrieval?.text || streaming.retrieval?.notes;
+  const answerStreamingText = streaming.answer?.text || streaming.answer?.notes;
+
+  // Determine current pipeline stage for spinner visibility
+  // Only the current active stage should show a spinner
+  const hasRetrieval = trace.retrieval !== undefined;
+  const answerStarted = Boolean(answerStreamingText) || answer !== null;
+
+  // Derive effective streaming state from trace content, not just the prop
+  // Key insight: if the trace is incomplete (no answer, no error), we're still streaming
+  // even if the streaming text is temporarily empty (e.g., during schema parsing)
+  const hasStartedProcessing = Boolean(plan || plannerStreamingText || retrievalStreamingText || answerStreamingText);
+  const isIncomplete = !traceError && !answer;
+  const effectivelyStreaming = isStreaming || (hasStartedProcessing && isIncomplete);
+
   const hasData = Boolean(plan || retrievals.length || answer || traceError || debug);
-  const isRetrievalStreaming = Boolean(isStreaming && plan && trace.retrieval === undefined);
-  const isAnswerStreaming = Boolean(isStreaming && trace.retrieval !== undefined && !answer);
+  const isPlannerStreaming = effectivelyStreaming && !hasRetrieval;
+  const isRetrievalStreaming = effectivelyStreaming && hasRetrieval && !answerStarted;
+  const isAnswerStreaming = effectivelyStreaming && (Boolean(answerStreamingText) || (hasRetrieval && !answer));
 
   return (
     <div className={cn('w-full rounded-lg border border-purple-500/20 bg-purple-950/20', className)}>
@@ -36,7 +60,7 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
           <Code className="h-4 w-4 text-purple-400" />
           <span className="text-sm font-medium text-purple-100">Dev Trace</span>
           {!hasData && <span className="text-xs text-purple-300/50">Awaiting...</span>}
-          {isStreaming && <span className="h-2 w-2 animate-pulse rounded-full bg-purple-400" />}
+          {effectivelyStreaming && <span className="h-2 w-2 animate-pulse rounded-full bg-purple-400" />}
         </div>
         <ChevronDown className={cn('h-4 w-4 text-purple-300/60 transition-transform', isExpanded && 'rotate-180')} />
       </button>
@@ -53,7 +77,7 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
             <div className="space-y-4 border-t border-purple-500/10 px-4 py-3">
               {traceError && <ErrorBanner error={traceError} />}
 
-              <DevSection icon={<Brain className="h-4 w-4" />} title="Planner" isStreaming={isStreaming && !plan}>
+              <DevSection icon={<Brain className="h-4 w-4" />} title="Planner" isStreaming={isPlannerStreaming}>
                 {plan ? (
                   <div className="space-y-2">
                     <ModelMeta
@@ -63,26 +87,6 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                       durationMs={plan.durationMs}
                       costUsd={plan.costUsd}
                     />
-                    {plan.topic && (
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                        <span className="text-purple-300/60">Topic: <span className="text-purple-100">{plan.topic}</span></span>
-                      </div>
-                    )}
-                    {plan.queries.length > 0 ? (
-                      <div className="space-y-1.5">
-                        {plan.queries.map((q, idx) => (
-                          <div key={`${q.source}-${idx}`} className="rounded border border-purple-500/10 bg-purple-950/30 p-2">
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="font-medium text-purple-200">{capitalize(q.source)}</span>
-                              <span className="text-purple-300/50">topK: {q.limit ?? '—'}</span>
-                            </div>
-                            <p className="mt-1 text-xs text-purple-100/70">{q.text}</p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-purple-300/50">Skipped retrieval</p>
-                    )}
                     {plannerThoughts.length > 0 && (
                       <div className="space-y-1">
                         {plannerThoughts.map((thought, idx) => (
@@ -95,6 +99,24 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                         ))}
                       </div>
                     )}
+                    {plan.queries.length > 0 && (
+                      <div className="space-y-1.5">
+                        {plan.queries.map((q, idx) => (
+                          <div key={`${q.source}-${idx}`} className="rounded border border-purple-500/10 bg-purple-950/30 p-2">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-medium text-purple-200">{capitalize(q.source)}</span>
+                              <span className="text-purple-300/50">topK: {q.limit ?? '—'}</span>
+                            </div>
+                            <p className="mt-1 text-xs text-purple-100/70">{q.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {plan.topic && (
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                        <span className="text-purple-300/60">Topic: <span className="text-purple-100">{plan.topic}</span></span>
+                      </div>
+                    )}
                     <Collapsible label="Planner JSON">{JSON.stringify(plan, null, 2)}</Collapsible>
                     {debug?.plannerPrompt && (
                       <div className="space-y-1.5">
@@ -104,8 +126,10 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                     )}
                     {debug?.plannerRawResponse && <Collapsible label="Raw LLM response">{debug.plannerRawResponse}</Collapsible>}
                   </div>
+                ) : plannerStreamingText ? (
+                  <StreamingText text={plannerStreamingText} />
                 ) : (
-                  <p className="text-xs text-purple-300/40">Waiting...</p>
+                  <LoadingPlaceholder />
                 )}
               </DevSection>
 
@@ -139,8 +163,10 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                     )}
                     {retrievals.length > 0 && <Collapsible label="Retrieval JSON">{JSON.stringify(retrievals, null, 2)}</Collapsible>}
                   </div>
+                ) : retrievalStreamingText ? (
+                  <StreamingText text={retrievalStreamingText} />
                 ) : (
-                  <p className="text-xs text-purple-300/40">Waiting...</p>
+                  <LoadingPlaceholder />
                 )}
               </DevSection>
 
@@ -154,13 +180,6 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                       durationMs={answer.durationMs}
                       costUsd={answer.costUsd}
                     />
-                    {answer.uiHints && (
-                      <div className="flex gap-3 text-xs text-purple-300/60">
-                        <span>Projects: <span className="text-purple-100">{answer.uiHints.projects?.length ?? 0}</span></span>
-                        <span>Experiences: <span className="text-purple-100">{answer.uiHints.experiences?.length ?? 0}</span></span>
-                        <span>Links: <span className="text-purple-100">{answer.uiHints.links?.length ?? 0}</span></span>
-                      </div>
-                    )}
                     {answer.thoughts && answer.thoughts.length > 0 && (
                       <div className="space-y-1">
                         {answer.thoughts.map((thought, idx) => (
@@ -173,6 +192,14 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                         ))}
                       </div>
                     )}
+                    <CardReasoningDevSection cardReasoning={answer.cardReasoning ?? undefined} />
+                    {answer.uiHints && (
+                      <div className="flex gap-3 text-xs text-purple-300/60">
+                        <span>Projects: <span className="text-purple-100">{answer.uiHints.projects?.length ?? 0}</span></span>
+                        <span>Experiences: <span className="text-purple-100">{answer.uiHints.experiences?.length ?? 0}</span></span>
+                        <span>Links: <span className="text-purple-100">{answer.uiHints.links?.length ?? 0}</span></span>
+                      </div>
+                    )}
                     <Collapsible label="Answer JSON">{JSON.stringify(answer, null, 2)}</Collapsible>
                     {debug?.answerPrompt && (
                       <div className="space-y-1.5">
@@ -181,9 +208,34 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                       </div>
                     )}
                     {debug?.answerRawResponse && <Collapsible label="Raw LLM response">{debug.answerRawResponse}</Collapsible>}
+                    {answerStreamingText && effectivelyStreaming && (
+                      <motion.span
+                        className="inline-flex gap-0.5"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                      >
+                        <motion.span
+                          className="h-1.5 w-1.5 rounded-full bg-purple-400"
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
+                        />
+                        <motion.span
+                          className="h-1.5 w-1.5 rounded-full bg-purple-400"
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut', delay: 0.15 }}
+                        />
+                        <motion.span
+                          className="h-1.5 w-1.5 rounded-full bg-purple-400"
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
+                        />
+                      </motion.span>
+                    )}
                   </div>
+                ) : answerStreamingText ? (
+                  <StreamingText text={answerStreamingText} />
                 ) : (
-                  <p className="text-xs text-purple-300/40">Waiting...</p>
+                  <LoadingPlaceholder />
                 )}
               </DevSection>
             </div>
@@ -348,6 +400,59 @@ function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function LoadingPlaceholder() {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="h-3 w-3 animate-spin rounded-full border-2 border-purple-500/20 border-t-purple-400" />
+        <span className="text-xs text-purple-300/40">Waiting...</span>
+      </div>
+      <div className="space-y-1.5">
+        <motion.div
+          className="h-2.5 w-3/4 rounded bg-purple-500/10"
+          animate={{ opacity: [0.3, 0.6, 0.3] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <motion.div
+          className="h-2.5 w-1/2 rounded bg-purple-500/10"
+          animate={{ opacity: [0.3, 0.6, 0.3] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut', delay: 0.2 }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function StreamingText({ text }: { text: string }) {
+  if (!text) return null;
+  return (
+    <div className="space-y-1">
+      <p className="whitespace-pre-wrap text-xs leading-relaxed text-purple-100/70">{text}</p>
+      <motion.span
+        className="inline-flex gap-0.5"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <motion.span
+          className="h-1.5 w-1.5 rounded-full bg-purple-400"
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <motion.span
+          className="h-1.5 w-1.5 rounded-full bg-purple-400"
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut', delay: 0.15 }}
+        />
+        <motion.span
+          className="h-1.5 w-1.5 rounded-full bg-purple-400"
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
+        />
+      </motion.span>
+    </div>
+  );
+}
+
 function DocsDropdown<T>({
   label,
   docs,
@@ -425,6 +530,105 @@ function renderResumeDoc(doc: RetrievedResumeDoc, _idx: number) {
       {doc.institution && <p className="text-[11px] text-purple-100/60">{doc.institution}</p>}
       {doc.summary && <p className="mt-0.5 text-[11px] text-purple-100/50 line-clamp-2">{doc.summary}</p>}
       <p className="mt-1 text-[10px] text-purple-300/40">ID: {doc.id}</p>
+    </div>
+  );
+}
+
+function CardReasoningDevSection({ cardReasoning }: { cardReasoning?: CardSelectionReasoning }) {
+  if (!cardReasoning) return null;
+
+  const categories = [
+    { key: 'projects', label: 'Projects', data: cardReasoning.projects, hideExcluded: false },
+    { key: 'experiences', label: 'Experiences', data: cardReasoning.experiences, hideExcluded: false },
+    { key: 'education', label: 'Education', data: cardReasoning.education, hideExcluded: false },
+    { key: 'links', label: 'Links', data: cardReasoning.links, hideExcluded: true },
+  ].filter((c) => c.data && (c.data.included.length > 0 || c.data.excluded.length > 0));
+
+  if (categories.length === 0) return null;
+
+  return (
+    <div className="space-y-1.5">
+      <span className="text-[11px] font-medium text-purple-300/60">Card Selection</span>
+      {categories.map(({ key, label, data, hideExcluded }) => (
+        <CollapsibleCardReasoningDev
+          key={key}
+          label={label}
+          included={data?.included ?? []}
+          excluded={data?.excluded ?? []}
+          hideExcluded={hideExcluded}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CollapsibleCardReasoningDev({
+  label,
+  included,
+  excluded,
+  hideExcluded = false,
+}: {
+  label: string;
+  included: CardSelectionReason[];
+  excluded: CardSelectionReason[];
+  hideExcluded?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const showExcluded = !hideExcluded && excluded.length > 0;
+
+  return (
+    <div className="rounded border border-purple-500/10 bg-purple-950/30">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center justify-between px-2 py-1.5 text-left text-[11px] font-medium text-purple-100/70 hover:bg-purple-500/5"
+      >
+        <span>
+          {label} ({included.length} shown{!hideExcluded ? `, ${excluded.length} excluded` : ''})
+        </span>
+        <ChevronDown className={cn('h-3 w-3 text-purple-300/40 transition-transform', isOpen && 'rotate-180')} />
+      </button>
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-2 border-t border-purple-500/10 p-2">
+              {included.length > 0 && (
+                <div className="space-y-1">
+                  <span className="text-[10px] font-medium text-green-400">Included</span>
+                  {included.map((item) => (
+                    <div key={item.id} className="rounded bg-green-500/10 p-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-purple-100">{item.name}</span>
+                        <span className="text-[10px] text-purple-300/40">{item.id}</span>
+                      </div>
+                      <p className="text-[11px] text-purple-100/60">{item.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {showExcluded && (
+                <div className="space-y-1">
+                  <span className="text-[10px] font-medium text-red-400/80">Excluded</span>
+                  {excluded.map((item) => (
+                    <div key={item.id} className="rounded bg-red-500/10 p-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-purple-100/60">{item.name}</span>
+                        <span className="text-[10px] text-purple-300/40">{item.id}</span>
+                      </div>
+                      <p className="text-[11px] text-purple-100/50">{item.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
