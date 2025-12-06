@@ -4,7 +4,7 @@ models:
   # answerModelNoRetrieval: gpt-5-nano-2025-08-07
   embeddingModel: text-embedding-3-small
   reasoning:
-    planner: minimal
+    planner: low
     answer: low
     # answerNoRetrieval: minimal
 tokens:
@@ -15,12 +15,12 @@ retrieval:
   defaultTopK: 8
   maxTopK: 10
   # Minimum relevance (0-1) to keep a doc; 0.5 = keep docs scoring at least 50% of the top match.
-  minRelevanceScore: 0.5
+  minRelevanceScore: 0.3
   # Adjust how retrieval combines lexical, semantic, and recency signals (non-negative, capped at 5).
   weights:
     textWeight: 0.3
     semanticWeight: 0.5
-    recencyLambda: 0.2
+    recencyLambda: 0.05
 moderation:
   input:
     enabled: false
