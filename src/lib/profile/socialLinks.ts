@@ -1,7 +1,6 @@
 import { SOCIAL_PLATFORM_VALUES, type ProfileSocialLink, type SocialPlatform } from '@portfolio/chat-contract';
 import { siGithub, siLinkedin, siSpotify, siX, siYoutube } from 'simple-icons/icons';
 import profile from '../../../generated/profile.json';
-import { PROFILE_SOCIAL_LINKS } from '@/constants/profile';
 
 export type SocialIcon = { path: string; hex: string };
 
@@ -39,11 +38,11 @@ export function normalizeSocialLinks(links: unknown): ProfileSocialLink[] {
   return normalized;
 }
 
-const fromProfile = normalizeSocialLinks((profile as { socialLinks?: unknown }).socialLinks);
-const fallbackLinks = normalizeSocialLinks(PROFILE_SOCIAL_LINKS);
-const SOCIAL_LINKS: ProfileSocialLink[] = (fromProfile.length ? fromProfile : fallbackLinks).map((link) => ({
-  ...link,
-}));
+const SOCIAL_LINKS: ProfileSocialLink[] = normalizeSocialLinks((profile as { socialLinks?: unknown }).socialLinks).map(
+  (link) => ({
+    ...link,
+  })
+);
 const SOCIAL_LINK_MAP = new Map<string, ProfileSocialLink>(
   SOCIAL_LINKS.map((link) => [normalizeLinkId(link.platform), link])
 );
