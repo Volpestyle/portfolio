@@ -1,6 +1,7 @@
 import type {
   AnswerPayload,
   AnswerUiHints,
+  CardSelectionReasoning,
   ChatRequestMessage,
   ModelConfig,
   PartialReasoningTrace,
@@ -242,6 +243,98 @@ function extractFirstJsonBlock(raw: string): string | null {
   return null;
 }
 
+function tryParseJsonLoose(raw: string): unknown | undefined {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
+
+function repairJsonLikeSnapshot(raw: string): string | null {
+  const start = raw.indexOf('{');
+  const candidate = start === -1 ? raw : raw.slice(start);
+  let value = candidate.trim();
+  if (!value) return null;
+
+  // Strip trailing comma when it appears outside of a string
+  let inString = false;
+  let escape = false;
+  for (let i = value.length - 1; i >= 0; i -= 1) {
+    const ch = value[i]!;
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) {
+      continue;
+    }
+    if (ch === ',') {
+      value = value.slice(0, i) + value.slice(i + 1);
+      break;
+    }
+    if (ch !== ' ' && ch !== '\n' && ch !== '\r' && ch !== '\t') {
+      break;
+    }
+  }
+
+  // Balance braces/brackets and close a hanging string so the snapshot is parseable
+  const stack: string[] = [];
+  inString = false;
+  escape = false;
+  for (const ch of value) {
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '{' || ch === '[') {
+      stack.push(ch);
+    } else if (ch === '}' || ch === ']') {
+      const top = stack[stack.length - 1];
+      if ((ch === '}' && top === '{') || (ch === ']' && top === '[')) {
+        stack.pop();
+      }
+    }
+  }
+
+  if (inString) {
+    value += '"';
+  }
+  while (stack.length) {
+    const opener = stack.pop()!;
+    value += opener === '{' ? '}' : ']';
+  }
+  return value;
+}
+
+function parseStreamingJsonCandidate(snapshot: string): unknown | undefined {
+  const block = extractFirstJsonBlock(snapshot) ?? snapshot;
+  const parsed = tryParseJsonLoose(block);
+  if (typeof parsed !== 'undefined') {
+    return parsed;
+  }
+  const repaired = repairJsonLikeSnapshot(block);
+  if (!repaired) return undefined;
+  return tryParseJsonLoose(repaired);
+}
+
 const DEFAULT_PROFILE_IDENTITY = {
   fullName: 'Portfolio Owner',
   domainLabel: 'portfolio owner',
@@ -292,7 +385,7 @@ export function buildAnswerSystemPrompt(
     sections.push(
       [
         '## Voice Examples',
-        '**IMPORTANT - VOICE EXAMPLES** — Treat these as base programming. Match this voice/tone closely; it is OK to reuse these responses verbatim when appropriate.',
+        'Match this voice/tone as closely as possible.',
         ...persona.voiceExamples.map((example) => `- ${example}`),
       ].join('\n')
     );
@@ -955,15 +1048,8 @@ async function runStreamingJsonResponse<T>({
           const trimmed = streamedText.trim();
           if (!trimmed) return;
 
-          let parsedCandidate: unknown;
-          try {
-            const jsonCandidate = extractFirstJsonBlock(trimmed) ?? trimmed;
-            parsedCandidate = JSON.parse(jsonCandidate);
-          } catch {
-            parsedCandidate = undefined;
-          }
-
-          if (parsedCandidate) {
+          const parsedCandidate = parseStreamingJsonCandidate(trimmed);
+          if (typeof parsedCandidate !== 'undefined') {
             streamedParsed = parsedCandidate;
             const messageValue =
               typeof (parsedCandidate as { message?: unknown }).message === 'string'
@@ -1816,6 +1902,43 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       emitStageEvent('planner', 'start');
       emitReasoning({ stage: 'planner', notes: 'Planning retrieval...' });
 
+      // Track streamed planner fields for progressive reasoning panel updates
+      let lastStreamedPlannerThoughts: string[] | undefined;
+      let lastStreamedPlannerQueries: PlannerLLMOutput['queries'] | undefined;
+      let lastStreamedPlannerTopic: string | undefined;
+
+      const emitPlannerStreamingDelta = (candidate: unknown) => {
+        if (!candidate || typeof candidate !== 'object') return;
+
+        const typed = candidate as Partial<PlannerLLMOutput>;
+
+        const thoughts = Array.isArray(typed.thoughts) ? typed.thoughts : undefined;
+        const queries = Array.isArray(typed.queries) ? typed.queries : undefined;
+        const topic = typeof typed.topic === 'string' ? typed.topic : undefined;
+
+        const thoughtsChanged = thoughts && JSON.stringify(thoughts) !== JSON.stringify(lastStreamedPlannerThoughts);
+        const queriesChanged = queries && JSON.stringify(queries) !== JSON.stringify(lastStreamedPlannerQueries);
+        const topicChanged = topic !== undefined && topic !== lastStreamedPlannerTopic;
+
+        if (thoughtsChanged || queriesChanged || topicChanged) {
+          if (thoughtsChanged) lastStreamedPlannerThoughts = thoughts;
+          if (queriesChanged) lastStreamedPlannerQueries = queries;
+          if (topicChanged) lastStreamedPlannerTopic = topic;
+
+          emitReasoning({
+            stage: 'planner',
+            trace: buildPartialReasoningTrace({
+              plan: {
+                thoughts: lastStreamedPlannerThoughts,
+                queries: lastStreamedPlannerQueries ?? [],
+                topic: lastStreamedPlannerTopic,
+                useProfileContext: typed.useProfileContext,
+              },
+            }),
+          });
+        }
+      };
+
       let plan: RetrievalPlan;
       try {
         const tPlan = performance.now();
@@ -1863,6 +1986,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
                 plannerRawResponse = raw;
               }
             },
+            onParsedDelta: emitPlannerStreamingDelta,
           });
           rawPlan = normalizePlannerOutput(plannerOutput, plannerModel);
           if (!cachedPlan) {
@@ -1998,10 +2122,42 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         }
         return nextUi;
       };
-      const emitUiFromCandidate = (candidate: unknown) => {
+      let lastStreamedThoughts: string[] | undefined;
+      let lastStreamedCardReasoning: CardSelectionReasoning | null | undefined;
+
+      const emitAnswerStreamingDelta = (candidate: unknown) => {
+        if (!candidate || typeof candidate !== 'object') return;
+
+        const typed = candidate as Partial<AnswerPayload>;
+
+        // Stream thoughts to reasoning panel
+        const thoughts = Array.isArray(typed.thoughts) ? typed.thoughts : undefined;
+        const thoughtsChanged = thoughts && JSON.stringify(thoughts) !== JSON.stringify(lastStreamedThoughts);
+
+        // Stream cardReasoning to reasoning panel
+        const cardReasoning = typed.cardReasoning !== undefined ? typed.cardReasoning : undefined;
+        const cardReasoningChanged = cardReasoning !== undefined && JSON.stringify(cardReasoning) !== JSON.stringify(lastStreamedCardReasoning);
+
+        if (thoughtsChanged || cardReasoningChanged) {
+          if (thoughtsChanged) lastStreamedThoughts = thoughts;
+          if (cardReasoningChanged) lastStreamedCardReasoning = cardReasoning;
+
+          emitReasoning({
+            stage: 'answer',
+            trace: buildPartialReasoningTrace({
+              answer: {
+                thoughts: lastStreamedThoughts,
+                cardReasoning: lastStreamedCardReasoning,
+              },
+            }),
+          });
+        }
+
+        // Stream uiHints
         const hints = coerceUiHints(candidate);
-        if (!hints) return;
-        emitUiFromHints(hints);
+        if (hints) {
+          emitUiFromHints(hints);
+        }
       };
 
       emitStageEvent('answer', 'start');
@@ -2057,7 +2213,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
               answerRawResponse = raw;
             }
           },
-          onParsedDelta: emitUiFromCandidate,
+          onParsedDelta: emitAnswerStreamingDelta,
         });
         timings.answerMs = performance.now() - tAnswer;
       } catch (error) {
@@ -2078,7 +2234,9 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       }
 
       const ui = emitUiFromHints(answer.uiHints) ?? buildUi(answer.uiHints, retrieved, profileContextForAnswer);
-      if (!uiEmittedDuringStreaming) {
+      const shouldEmitFinalUi =
+        !latestUiPayload || !uiPayloadEquals(latestUiPayload, ui) || !uiEmittedDuringStreaming;
+      if (shouldEmitFinalUi) {
         latestUiPayload = ui;
         try {
           runOptions?.onUiEvent?.(ui);
@@ -2098,6 +2256,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         model: answerModel,
         uiHints: answer.uiHints,
         thoughts: answer.thoughts,
+        cardReasoning: answer.cardReasoning,
         effort: coerceReasoningEffort(answerReasoning?.effort ?? answerReasoningEffort),
         durationMs: timings.answerMs,
         usage: answerUsage?.usage,
