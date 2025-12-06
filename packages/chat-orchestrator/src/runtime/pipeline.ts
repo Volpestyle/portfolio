@@ -35,8 +35,6 @@ import type OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import type { ResponseFormatTextJSONSchemaConfig } from 'openai/resources/responses/responses';
 import type { Reasoning } from 'openai/resources/shared';
-import { performance } from 'node:perf_hooks';
-import { inspect } from 'node:util';
 import { getEncoding } from 'js-tiktoken';
 import { z } from 'zod';
 import { answerSystemPrompt, plannerSystemPrompt } from '../pipelinePrompts';
@@ -51,6 +49,7 @@ import {
   type ResumeDoc,
   type SkillDoc,
 } from './retrieval';
+import { buildPartialReasoningTrace, mergeReasoningTraces } from './reasoningMerge';
 
 // --- Types ---
 
@@ -96,7 +95,6 @@ type ProfileContext = {
 };
 
 export type ChatRuntimeOptions = {
-  ownerId?: string;
   modelConfig?: Partial<ModelConfig>;
   tokenLimits?: {
     planner?: number;
@@ -125,7 +123,6 @@ export type RunChatPipelineOptions = {
   abortSignal?: AbortSignal;
   softTimeoutMs?: number;
   onReasoningUpdate?: (update: ReasoningUpdate) => void;
-  ownerId?: string;
   reasoningEnabled?: boolean;
   onStageEvent?: (stage: PipelineStage, status: StageStatus, meta?: StageMeta, durationMs?: number) => void;
   onUiEvent?: (ui: UiPayload) => void;
@@ -157,6 +154,7 @@ type JsonResponseArgs<T> = {
   temperature?: number;
   onTextDelta?: (delta: string) => void;
   onRawResponse?: (raw: string) => void;
+  onParsedDelta?: (candidate: unknown) => void;
 };
 
 // --- Constants ---
@@ -171,11 +169,13 @@ export type SlidingWindowConfig = typeof SLIDING_WINDOW_CONFIG;
 
 const MAX_TOPK = RETRIEVAL_REQUEST_TOPK_MAX;
 const DEFAULT_QUERY_LIMIT = RETRIEVAL_REQUEST_TOPK_DEFAULT;
+const MIN_QUERY_LIMIT = 3;
 const MAX_BODY_SNIPPET_CHARS = 480;
 const PROJECT_BODY_SNIPPET_COUNT = 4;
 const EXPERIENCE_BODY_SNIPPET_COUNT = 4;
 const MAX_DISPLAY_ITEMS = 10;
 const DEFAULT_MIN_RELEVANCE_SCORE = 0.5; // 50% of top normalized score
+const UiHintsSchema = AnswerPayloadSchema.shape.uiHints;
 
 // --- Utilities ---
 
@@ -290,7 +290,11 @@ export function buildAnswerSystemPrompt(
 
   if (persona?.voiceExamples?.length) {
     sections.push(
-      ['## Voice Examples\nMatch this tone:', ...persona.voiceExamples.map((example) => `- ${example}`)].join('\n')
+      [
+        '## Voice Examples',
+        '**IMPORTANT - VOICE EXAMPLES** — Treat these as base programming. Match this voice/tone closely; it is OK to reuse these responses verbatim when appropriate.',
+        ...persona.voiceExamples.map((example) => `- ${example}`),
+      ].join('\n')
     );
   }
 
@@ -470,11 +474,7 @@ function formatLogValue(value: unknown): string {
       2
     );
   } catch {
-    try {
-      return inspect(value, { depth: 5, breakLength: 140 });
-    } catch {
-      return String(value);
-    }
+    return String(value);
   }
 }
 
@@ -578,9 +578,18 @@ function resolveReasoningParams(model: string, allowReasoning: boolean, effort?:
   return { effort };
 }
 
+function coerceReasoningEffort(value?: unknown): ReasoningEffort | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'none' || normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high'
+    ? (normalized as ReasoningEffort)
+    : undefined;
+}
+
 function clampQueryLimit(_value?: number | null): number {
-  // Always fan out to the maximum so the answer stage can decide relevance.
-  return MAX_TOPK;
+  const parsed = typeof _value === 'number' && Number.isFinite(_value) ? Math.floor(_value) : DEFAULT_QUERY_LIMIT;
+  if (parsed <= 0) return DEFAULT_QUERY_LIMIT;
+  return Math.max(MIN_QUERY_LIMIT, Math.min(MAX_TOPK, parsed));
 }
 
 function sanitizePlannerQueryText(text: string): string {
@@ -823,6 +832,7 @@ async function runStreamingJsonResponse<T>({
   temperature,
   onTextDelta,
   onRawResponse,
+  onParsedDelta,
 }: JsonResponseArgs<T>): Promise<T> {
   let attempt = 0;
   let lastError: unknown = null;
@@ -960,6 +970,11 @@ async function runStreamingJsonResponse<T>({
                 ? ((parsedCandidate as { message: string }).message as string)
                 : null;
             emitMessageDelta?.(messageValue);
+            try {
+              onParsedDelta?.(parsedCandidate);
+            } catch (err) {
+              logger?.('chat.pipeline.error', { stage: `${stageLabel}_parsed_delta`, model, error: formatLogValue(err) });
+            }
           } else {
             const partialMessage = extractMessageFromPartialJson(trimmed);
             if (partialMessage && partialMessage.length > lastEmittedMessage.length) {
@@ -1058,6 +1073,14 @@ async function runStreamingJsonResponse<T>({
         emitMessageDelta(finalMessage);
       }
 
+      try {
+        if (typeof candidate !== 'undefined') {
+          onParsedDelta?.(candidate);
+        }
+      } catch (err) {
+        logger?.('chat.pipeline.error', { stage: `${stageLabel}_parsed_delta_final`, model, error: formatLogValue(err) });
+      }
+
       if (candidate && typeof candidate === 'object' && typeof (candidate as { message?: unknown }).message === 'string') {
         const currentMessage = (candidate as { message: string }).message as string;
         (candidate as { message: string }).message = sanitizeMessageSnapshot(
@@ -1132,7 +1155,7 @@ function normalizePlannerOutput(plan: PlannerLLMOutput, model?: string): Retriev
           limit: clampQueryLimit(query?.limit),
         };
       })
-      .filter((query) => query.source === 'projects' || query.source === 'resume')
+      .filter((query) => query.source === 'projects' || query.source === 'resume' || query.source === 'profile')
     : [];
 
   const deduped: RetrievalPlan['queries'] = [];
@@ -1212,13 +1235,12 @@ function normalizeDocId(id: string): string {
 async function executeRetrievalPlan(
   retrieval: RetrievalDrivers,
   plan: RetrievalPlan,
-  options?: { logger?: ChatRuntimeOptions['logger']; cache?: RetrievalCache; ownerId?: string; embeddingModel?: string; minRelevanceScore?: number; onQueryResult?: (summary: RetrievalSummary) => void }
+  options?: { logger?: ChatRuntimeOptions['logger']; cache?: RetrievalCache; embeddingModel?: string; minRelevanceScore?: number; onQueryResult?: (summary: RetrievalSummary) => void }
 ): Promise<ExecutedRetrievalResult> {
   const cache = options?.cache;
-  const ownerKey = options?.ownerId ?? 'default';
 
   const fetchProjects = async (query: string, topK: number): Promise<ProjectDoc[]> => {
-    const cacheKey = `${ownerKey}:${query}:${topK}`;
+    const cacheKey = `${query}:${topK}`;
     if (cache?.projects.has(cacheKey)) {
       options?.logger?.('chat.pipeline.retrieval.cache', { source: 'projects', hit: true, key: cacheKey });
       return cache.projects.get(cacheKey) ?? [];
@@ -1229,7 +1251,7 @@ async function executeRetrievalPlan(
   };
 
   const fetchResume = async (query: string, topK: number): Promise<ResumeDoc[]> => {
-    const cacheKey = `${ownerKey}:${query}:${topK}`;
+    const cacheKey = `${query}:${topK}`;
     if (cache?.resume.has(cacheKey)) {
       options?.logger?.('chat.pipeline.retrieval.cache', { source: 'resume', hit: true, key: cacheKey });
       return cache.resume.get(cacheKey) ?? [];
@@ -1240,7 +1262,7 @@ async function executeRetrievalPlan(
   };
 
   const fetchProfile = async (): Promise<ProfileDoc | undefined> => {
-    const cacheKey = `${ownerKey}:profile`;
+    const cacheKey = 'profile';
     if (cache?.profile?.has(cacheKey)) {
       options?.logger?.('chat.pipeline.retrieval.cache', { source: 'profile', hit: true, key: cacheKey });
       return cache.profile?.get(cacheKey) ?? undefined;
@@ -1320,10 +1342,14 @@ async function executeRetrievalPlan(
     numResults:
       query.source === 'projects'
         ? cappedResult.projects.length
-        : cappedResult.experiences.length +
-        cappedResult.education.length +
-        cappedResult.awards.length +
-        cappedResult.skills.length,
+        : query.source === 'profile'
+          ? cappedResult.profile
+            ? 1
+            : 0
+          : cappedResult.experiences.length +
+            cappedResult.education.length +
+            cappedResult.awards.length +
+            cappedResult.skills.length,
     embeddingModel: options?.embeddingModel,
   }));
 
@@ -1458,6 +1484,26 @@ function buildUi(uiHints: AnswerUiHints | undefined, retrieved: RetrievalResult,
   return { showProjects, showExperiences, showEducation, showLinks };
 }
 
+function uiPayloadEquals(a: UiPayload | null | undefined, b: UiPayload | null | undefined): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  const eq = (x: string[], y: string[]) => x.length === y.length && x.every((val, idx) => val === y[idx]);
+  return (
+    eq(a.showProjects, b.showProjects) &&
+    eq(a.showExperiences, b.showExperiences) &&
+    eq(a.showEducation, b.showEducation) &&
+    eq(a.showLinks as unknown as string[], b.showLinks as unknown as string[])
+  );
+}
+
+function coerceUiHints(candidate: unknown): AnswerUiHints | undefined {
+  if (!candidate || typeof candidate !== 'object') return undefined;
+  if (!Object.prototype.hasOwnProperty.call(candidate, 'uiHints')) return undefined;
+  const parsed = UiHintsSchema.safeParse((candidate as { uiHints?: unknown }).uiHints);
+  if (!parsed.success) return undefined;
+  return parsed.data;
+}
+
 function resolveResumeEntry(resumeMaps: ResumeMaps, id: string): ResumeDoc | undefined {
   const normalized = normalizeDocId(id);
   return (
@@ -1550,69 +1596,6 @@ function buildRetrievalDocs(retrieved: RetrievalResult): RetrievalDocs {
 
 // --- Reasoning trace helpers ---
 
-function buildPartialReasoningTrace(seed?: Partial<PartialReasoningTrace>): PartialReasoningTrace {
-  return {
-    plan: seed?.plan ?? null,
-    retrieval: seed?.retrieval ?? null,
-    retrievalDocs: seed?.retrievalDocs ?? null,
-    answer: seed?.answer ?? null,
-    error: seed?.error ?? null,
-    debug: seed?.debug ?? null,
-    streaming: seed?.streaming,
-  };
-}
-
-function mergeReasoningTraces(current: PartialReasoningTrace, incoming: PartialReasoningTrace): PartialReasoningTrace {
-  return {
-    plan: incoming.plan ?? current.plan,
-    retrieval: incoming.retrieval ?? current.retrieval,
-    retrievalDocs: incoming.retrievalDocs ?? current.retrievalDocs,
-    answer: incoming.answer ?? current.answer,
-    error: incoming.error ?? current.error,
-    debug: mergeReasoningDebug(current.debug, incoming.debug),
-    streaming: mergeStreaming(current.streaming, incoming.streaming),
-  };
-}
-
-function mergeReasoningDebug(
-  current: PartialReasoningTrace['debug'],
-  incoming: PartialReasoningTrace['debug']
-): PartialReasoningTrace['debug'] {
-  if (!current && !incoming) return undefined;
-  if (!incoming) return current;
-  const base = current ?? {};
-  return {
-    ...base,
-    ...incoming,
-    plannerPrompt: incoming.plannerPrompt ?? base.plannerPrompt,
-    answerPrompt: incoming.answerPrompt ?? base.answerPrompt,
-    plannerRawResponse: incoming.plannerRawResponse ?? base.plannerRawResponse,
-    answerRawResponse: incoming.answerRawResponse ?? base.answerRawResponse,
-    retrievalDocs: incoming.retrievalDocs ?? base.retrievalDocs,
-  };
-}
-
-function mergeStreaming(
-  current: PartialReasoningTrace['streaming'],
-  incoming: PartialReasoningTrace['streaming']
-): PartialReasoningTrace['streaming'] {
-  if (!current && !incoming) return undefined;
-  if (!incoming) return current;
-  const merged: NonNullable<PartialReasoningTrace['streaming']> = { ...(current ?? {}) };
-  for (const [stage, chunk] of Object.entries(incoming)) {
-    if (!chunk || typeof chunk !== 'object') continue;
-    const key = stage as ReasoningStage;
-    const existing = merged[key] ?? {};
-    const combinedText = [existing.text ?? '', (chunk as { text?: string }).text ?? ''].join('');
-    merged[key] = {
-      text: combinedText.length ? combinedText : undefined,
-      notes: (chunk as { notes?: string }).notes ?? existing.notes,
-      progress: (chunk as { progress?: number }).progress ?? existing.progress,
-    };
-  }
-  return merged;
-}
-
 function buildErrorTrace(stage: ReasoningStage, error: Error): ReasoningUpdate {
   const message = error instanceof Error ? error.message : 'Unknown error';
   const traceError: ReasoningTraceError = {
@@ -1664,7 +1647,6 @@ function createAbortSignal(runOptions?: RunChatPipelineOptions): { signal: Abort
 
 export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRuntimeOptions) {
   const modelConfig = resolveModelConfig(options);
-  const ownerId = options?.ownerId ?? 'default';
   const plannerModel = modelConfig.plannerModel;
   const embeddingModel = modelConfig.embeddingModel;
   const stageReasoning = options?.modelConfig?.reasoning;
@@ -1680,7 +1662,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
     resume: new Map(),
     profile: new Map(),
   };
-  const buildPlannerCacheKey = (snippet: string, ownerKey: string) => JSON.stringify({ ownerId: ownerKey, snippet });
+  const buildPlannerCacheKey = (snippet: string) => JSON.stringify({ snippet });
 
   const createReasoningEmitter = (runOptions?: RunChatPipelineOptions) => {
     const allowReasoning = Boolean(runOptions?.reasoningEnabled && runOptions?.onReasoningUpdate);
@@ -1712,7 +1694,6 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       const tStart = performance.now();
       const devDebugEnabled = process.env.NODE_ENV !== 'production';
       const timings: Record<string, number> = {};
-      const effectiveOwnerId = runOptions?.ownerId ?? ownerId;
       const { signal: runSignal, cleanup: cleanupAborters, timedOut } = createAbortSignal(runOptions);
       const stageUsages: StageUsage[] = [];
       const missingCostWarned = new Set<string>();
@@ -1831,7 +1812,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         reasoningEmitter.emit(update);
       };
 
-      const plannerKey = buildPlannerCacheKey(conversationSnippet, effectiveOwnerId);
+      const plannerKey = buildPlannerCacheKey(conversationSnippet);
       emitStageEvent('planner', 'start');
       emitReasoning({ stage: 'planner', notes: 'Planning retrieval...' });
 
@@ -1890,6 +1871,14 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         }
         plan = normalizePlannerOutput(rawPlan, plannerModel);
         timings.planMs = performance.now() - tPlan;
+        const plannerUsage = stageUsages.find((entry) => entry.stage === 'planner');
+        plan = {
+          ...plan,
+          effort: coerceReasoningEffort(plannerReasoning?.effort ?? stageReasoning?.planner),
+          durationMs: timings.planMs,
+          usage: plannerUsage?.usage,
+          costUsd: plannerUsage?.costUsd,
+        };
         emitStageEvent('planner', 'complete', { topic: plan.topic ?? null }, timings.planMs);
       } catch (error) {
         cleanupAborters();
@@ -1937,7 +1926,6 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           const executed = await executeRetrievalPlan(retrieval, plan, {
             logger,
             cache: retrievalCache,
-            ownerId: effectiveOwnerId,
             embeddingModel,
             minRelevanceScore,
             onQueryResult: (summary) => emitReasoning({ stage: 'retrieval', notes: `${summary.source}: ${summary.numResults} results` }),
@@ -1991,6 +1979,30 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
 
       const allowProfileContext = Boolean(runtimeProfileContext && (plan.useProfileContext || !hasQueries));
       const profileContextForAnswer = allowProfileContext ? runtimeProfileContext : undefined;
+      let latestUiPayload: UiPayload | null = null;
+      let uiEmittedDuringStreaming = false;
+      const emitUiFromHints = (hints?: AnswerUiHints): UiPayload | undefined => {
+        if (!hints) return undefined;
+        const nextUi = buildUi(hints, retrieved, profileContextForAnswer);
+        if (uiPayloadEquals(latestUiPayload, nextUi)) {
+          return nextUi;
+        }
+        latestUiPayload = nextUi;
+        if (runOptions?.onUiEvent) {
+          try {
+            uiEmittedDuringStreaming = true;
+            runOptions.onUiEvent(nextUi);
+          } catch (error) {
+            logger?.('chat.pipeline.error', { stage: 'ui_emit', error: formatLogValue(error) });
+          }
+        }
+        return nextUi;
+      };
+      const emitUiFromCandidate = (candidate: unknown) => {
+        const hints = coerceUiHints(candidate);
+        if (!hints) return;
+        emitUiFromHints(hints);
+      };
 
       emitStageEvent('answer', 'start');
       emitReasoning({ stage: 'answer', notes: 'Drafting answer...' });
@@ -2021,6 +2033,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       const answerReasoning = resolveReasoningParams(answerModel, Boolean(runOptions?.reasoningEnabled), answerReasoningEffort);
       let answer: AnswerPayload;
       try {
+        const tAnswer = performance.now();
         answer = await runStreamingJsonResponse<AnswerPayload>({
           client,
           model: answerModel,
@@ -2044,7 +2057,9 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
               answerRawResponse = raw;
             }
           },
+          onParsedDelta: emitUiFromCandidate,
         });
+        timings.answerMs = performance.now() - tAnswer;
       } catch (error) {
         cleanupAborters();
         logger?.('chat.pipeline.error', { stage: 'answer', error: formatLogValue(error) });
@@ -2062,25 +2077,37 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         answer.thoughts = undefined;
       }
 
-      const ui = buildUi(answer.uiHints, retrieved, profileContextForAnswer);
-      try {
-        runOptions?.onUiEvent?.(ui);
-      } catch (error) {
-        logger?.('chat.pipeline.error', { stage: 'ui_emit', error: formatLogValue(error) });
+      const ui = emitUiFromHints(answer.uiHints) ?? buildUi(answer.uiHints, retrieved, profileContextForAnswer);
+      if (!uiEmittedDuringStreaming) {
+        latestUiPayload = ui;
+        try {
+          runOptions?.onUiEvent?.(ui);
+        } catch (error) {
+          logger?.('chat.pipeline.error', { stage: 'ui_emit', error: formatLogValue(error) });
+        }
+      } else if (!latestUiPayload) {
+        latestUiPayload = ui;
       }
 
       const projectMap = new Map(retrieved.projects.map((p) => [normalizeDocId(p.id), p]));
       const resumeMaps: ResumeMaps = splitResumeDocs([...retrieved.experiences, ...retrieved.education, ...retrieved.awards, ...retrieved.skills]);
       const attachments = buildAttachmentPayloads(ui, projectMap, resumeMaps);
 
+      const answerUsage = stageUsages.find((entry) => entry.stage === 'answer');
+      const answerTrace: PartialReasoningTrace['answer'] = {
+        model: answerModel,
+        uiHints: answer.uiHints,
+        thoughts: answer.thoughts,
+        effort: coerceReasoningEffort(answerReasoning?.effort ?? answerReasoningEffort),
+        durationMs: timings.answerMs,
+        usage: answerUsage?.usage,
+        costUsd: answerUsage?.costUsd,
+      };
+
       const reasoningTrace: ReasoningTrace = {
         plan,
         retrieval: retrievalSummaries,
-        answer: {
-          model: answerModel,
-          uiHints: answer.uiHints,
-          thoughts: answer.thoughts,
-        },
+        answer: answerTrace,
       };
 
       emitReasoning({

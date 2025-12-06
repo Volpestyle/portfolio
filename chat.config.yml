@@ -1,10 +1,3 @@
-owner:
-  ownerId: portfolio-owner
-  ownerName: James Volpe # replace with your name
-  domainLabel: software engineer # replace with your domain label (e.g. software engineer, designer, researcher, artist etc.)
-  portfolioKind: individual # one of: individual | team | organization
-  ownerPronouns: he/him
-
 models:
   plannerModel: gpt-5-mini-2025-08-07
   answerModel: gpt-5-mini-2025-08-07
@@ -37,3 +30,6 @@ moderation:
     # model: omni-moderation-latest
     # refusalMessage: I can only answer questions about my portfolio and professional background.
     # refusalBanner: That request was blocked by my safety filters.
+cost:
+  # Monthly runtime budget in USD; omit to disable budget checks entirely.
+  budgetUsd: 10

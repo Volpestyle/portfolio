@@ -8,14 +8,13 @@ import {
 import { shouldServeFixturesForRequest } from '@/lib/test-flags';
 import { buildRateLimitHeaders, enforceChatRateLimit } from '@/lib/rate-limit';
 import { getOpenAIClient } from '@/server/openai/client';
-import { chatApi, chatLogger, chatOwnerId, chatRuntimeOptions, chatModerationOptions } from '@/server/chat/pipeline';
+import { chatApi, chatLogger, chatRuntimeOptions, chatModerationOptions } from '@/server/chat/pipeline';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const chatHandler = createNextChatHandler({
   chatApi,
-  chatOwnerId,
   chatLogger,
   chatRuntimeOptions,
   getOpenAIClient,

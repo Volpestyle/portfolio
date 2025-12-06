@@ -1,4 +1,4 @@
-import { createChatServerLogger, createPortfolioChatServer } from '@portfolio/chat-next-api';
+import { createChatServerLogger, createPortfolioChatServer, setRuntimeCostBudget } from '@portfolio/chat-next-api';
 import { getOpenAIClient } from '@/server/openai/client';
 import experiencesFile from '../../../generated/resume.json';
 import resumeEmbeddings from '../../../generated/resume-embeddings.json';
@@ -11,19 +11,20 @@ import {
   resolveChatRuntimeOptions,
   resolveRetrievalOverrides,
   resolveModerationOptions,
+  resolveCostBudget,
   type ResolvedModerationOptions,
 } from './config';
 
 const chatConfig = loadChatConfig();
 export const chatRuntimeOptions = resolveChatRuntimeOptions(chatConfig);
 export const chatModerationOptions: ResolvedModerationOptions | undefined = resolveModerationOptions(chatConfig);
+const configuredBudgetUsd = resolveCostBudget(chatConfig);
+setRuntimeCostBudget(configuredBudgetUsd);
 
 export const chatLogger = createChatServerLogger();
-const resolvedOwnerId = chatRuntimeOptions?.ownerId ?? process.env.CHAT_OWNER_ID ?? 'portfolio-owner';
 const runtimeOptions = {
   ...(chatRuntimeOptions ?? {}),
   logger: chatLogger,
-  ownerId: resolvedOwnerId,
 };
 
 const bootstrapped = createPortfolioChatServer({
@@ -41,6 +42,5 @@ const bootstrapped = createPortfolioChatServer({
   runtimeOptions,
 });
 
-export const chatOwnerId = runtimeOptions.ownerId ?? 'portfolio-owner';
 export const chatApi = bootstrapped.chatApi;
 export const chatProviders = bootstrapped.providers;

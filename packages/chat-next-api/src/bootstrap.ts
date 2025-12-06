@@ -30,7 +30,6 @@ export type ChatBootstrapOptions = FilesystemChatProviderOptions & {
     'defaultTopK' | 'maxTopK' | 'minRelevanceScore' | 'logger' | 'weights'
   >;
   personaFile?: unknown;
-  ownerId?: string;
 };
 
 export type BootstrapResult = {
@@ -72,8 +71,7 @@ export function createPortfolioChatServer(options: ChatBootstrapOptions): Bootst
   const runtimeOptions = mergeRuntimeOptions(
     options.runtimeOptions,
     personaSummary,
-    profileSummary,
-    options.ownerId
+    profileSummary
   );
 
   const embeddingModel = runtimeOptions?.modelConfig?.embeddingModel;
@@ -138,12 +136,11 @@ function safeProfileSummary(raw: unknown): ProfileSummary | undefined {
 function mergeRuntimeOptions(
   runtimeOptions: ChatApiConfig['runtimeOptions'] | undefined,
   personaSummary: PersonaSummary | undefined,
-  profileSummary: ProfileSummary | undefined,
-  ownerIdFallback?: string
+  profileSummary: ProfileSummary | undefined
 ): ChatApiConfig['runtimeOptions'] | undefined {
   const persona = runtimeOptions?.persona ?? personaSummary;
 
-  if (!runtimeOptions && !persona && !ownerIdFallback) {
+  if (!runtimeOptions && !persona) {
     return undefined;
   }
 
@@ -157,10 +154,6 @@ function mergeRuntimeOptions(
 
   if (profileSummary && !merged.profile) {
     merged.profile = profileSummary;
-  }
-
-  if (ownerIdFallback && !merged.ownerId) {
-    merged.ownerId = ownerIdFallback;
   }
 
   return merged;
