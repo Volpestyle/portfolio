@@ -1,0 +1,58 @@
+'use client';
+
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronDown } from 'lucide-react';
+
+type CollapsibleSectionProps = {
+  title: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  defaultExpanded?: boolean;
+};
+
+export function CollapsibleSection({ title, icon, children, defaultExpanded = true }: CollapsibleSectionProps) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+    >
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="group flex w-full items-center justify-between text-left"
+      >
+        <span className="flex items-center gap-1.5">
+          {icon ? <span className="text-white/40 transition-colors group-hover:text-white/60">{icon}</span> : null}
+          <p className="font-mono text-xs uppercase tracking-wider text-white/50 transition-colors group-hover:text-white/70">{title}</p>
+        </span>
+        <motion.div
+          animate={{ rotate: isExpanded ? 0 : -90 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="text-white/40 transition-colors group-hover:text-white/60"
+        >
+          <ChevronDown className="h-3 w-3" />
+        </motion.div>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{
+              height: { type: 'spring', stiffness: 300, damping: 30 },
+              opacity: { duration: 0.2 },
+            }}
+            className="overflow-hidden"
+          >
+            <div className="mt-2">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.section>
+  );
+}

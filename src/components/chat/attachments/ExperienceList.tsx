@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Briefcase, GraduationCap, Award, Wrench } from 'lucide-react';
 import type { ResumeEntry } from '@portfolio/chat-contract';
 import { cn } from '@/lib/utils';
 import { ToolCallIndicator } from './ToolCallIndicator';
@@ -93,6 +93,7 @@ function ExperienceCard({ experience: exp, variant = 'default' }: ExperienceCard
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
       className={cn(
         'flex flex-col rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm transition-colors duration-300 hover:border-white/20 hover:bg-black/40',
@@ -211,15 +212,27 @@ export function ExperienceList({ experiences, education, awards, skills, variant
     return <ToolCallIndicator title="Searched resume" description="No matching entries for that query." />;
   }
 
+  const sectionIcons: Record<string, React.ReactNode> = {
+    Experience: <Briefcase className="h-3 w-3" />,
+    Education: <GraduationCap className="h-3 w-3" />,
+    Awards: <Award className="h-3 w-3" />,
+    Skills: <Wrench className="h-3 w-3" />,
+  };
+
   const renderSection = (title: string, entries: ResumeEntry[]) => {
     if (!entries.length) return null;
     return (
       <section>
-        <p className="text-[11px] uppercase tracking-wide text-white/60">{title}</p>
+        <span className="flex items-center gap-1.5">
+          {sectionIcons[title] ? <span className="text-white/40">{sectionIcons[title]}</span> : null}
+          <p className="font-mono text-xs uppercase tracking-wider text-white/50">{title}</p>
+        </span>
         <div className="mt-2 space-y-3">
-          {entries.map((exp) => {
-            return <ExperienceCard key={exp.id} experience={exp} variant={variant} />;
-          })}
+          <AnimatePresence initial={false}>
+            {entries.map((exp) => {
+              return <ExperienceCard key={exp.id} experience={exp} variant={variant} />;
+            })}
+          </AnimatePresence>
         </div>
       </section>
     );

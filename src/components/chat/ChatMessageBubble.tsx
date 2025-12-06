@@ -63,6 +63,7 @@ export function ChatMessageBubble({
   return (
     <div className={cn('flex w-full', isUser ? 'justify-end' : 'justify-start')}>
       <div className={wrapperClass} data-testid={testId}>
+        {!isUser ? <InlineUiPortalAnchor anchorId={message.id} /> : null}
         {message.parts.map((part, index) => {
           if (part.kind === 'text') {
             // Skip empty text parts
@@ -112,7 +113,6 @@ export function ChatMessageBubble({
 
           return null;
         })}
-        {!isUser ? <InlineUiPortalAnchor anchorId={message.id} /> : null}
       </div>
     </div>
   );

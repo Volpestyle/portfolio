@@ -15,13 +15,15 @@ import { Spinner } from '@/components/ui/spinner';
 import { useProjectDetail } from '@/hooks/useProjectDetail';
 import { useProjectDocument } from '@/hooks/useProjectDocument';
 import { ExperienceList } from '@/components/chat/attachments/ExperienceList';
+import { CollapsibleSection } from '@/components/chat/CollapsibleSection';
+import { FolderKanban, FileText, Sparkles } from 'lucide-react';
 import { cardTransitions, staggerConfig } from '@/lib/animations';
 import { getSocialIcon, resolveSocialLink } from '@/lib/profile/socialLinks';
 
 function useSurfaceProjects(surface: ChatSurfaceState) {
   const { projectCache } = useChat();
-  const { visibleProjectIds, focusedProjectId, highlightedSkills, lastActionAt } = surface;
-  const needsProjects = visibleProjectIds.length > 0 || Boolean(focusedProjectId);
+  const { visibleProjectIds, highlightedSkills } = surface;
+  const needsProjects = visibleProjectIds.length > 0;
   const { getCachedProjectList, ensureProjectList } = useProjectListCache();
   const [fallbackProjects, setFallbackProjects] = useState<ProjectSummary[] | null>(null);
 
@@ -67,31 +69,17 @@ function useSurfaceProjects(surface: ChatSurfaceState) {
     [projectCache, fallbackProjects]
   );
 
-  const focusedProject = useMemo(() => lookupProject(focusedProjectId), [lookupProject, focusedProjectId]);
-
-  const allVisibleProjects = useMemo(() => {
+  const visibleProjects = useMemo(() => {
     if (!visibleProjectIds.length) {
       return [] as ProjectSummary[];
     }
     return visibleProjectIds
       .map((id) => lookupProject(id))
-      .filter((project): project is ProjectSummary => Boolean(project));
+      .filter((project): project is ProjectSummary => Boolean(project))
+      .slice(0, 4);
   }, [lookupProject, visibleProjectIds]);
 
-  const filteredVisible = useMemo(() => {
-    if (!focusedProject) {
-      return allVisibleProjects.slice(0, 4);
-    }
-    const focusKey = normalizeProjectKey(focusedProject.slug ?? focusedProject.name);
-    return allVisibleProjects
-      .filter((project) => normalizeProjectKey(project.slug ?? project.name) !== focusKey)
-      .slice(0, 4);
-  }, [focusedProject, allVisibleProjects]);
-
-  const focusedAutoExpandToken =
-    focusedProject && focusedProjectId ? `${normalizeProjectKey(focusedProjectId)}::${lastActionAt ?? ''}` : null;
-
-  return { focusedProject, filteredVisible, highlightedSkills, focusedAutoExpandToken };
+  return { visibleProjects, highlightedSkills };
 }
 
 function useSurfaceExperiences(surface: ChatSurfaceState) {
@@ -130,14 +118,13 @@ function useSurfaceLinks(surface: ChatSurfaceState) {
 }
 
 export function ChatActionSurface({ surface }: { surface: ChatSurfaceState }) {
-  const { focusedProject, filteredVisible, highlightedSkills, focusedAutoExpandToken } = useSurfaceProjects(surface);
+  const { visibleProjects, highlightedSkills } = useSurfaceProjects(surface);
   const visibleExperiences = useSurfaceExperiences(surface);
   const visibleEducation = useSurfaceEducation(surface);
   const visibleLinks = useSurfaceLinks(surface);
 
   const hasCardContent =
-    Boolean(focusedProject) ||
-    filteredVisible.length > 0 ||
+    visibleProjects.length > 0 ||
     highlightedSkills.length > 0 ||
     visibleExperiences.length > 0 ||
     visibleEducation.length > 0;
@@ -157,54 +144,51 @@ export function ChatActionSurface({ surface }: { surface: ChatSurfaceState }) {
           variants={staggerConfig.container}
         >
           <motion.div className="space-y-4" variants={staggerConfig.section}>
-            {focusedProject ? (
-              <motion.section variants={staggerConfig.item}>
-                <p className="text-[11px] uppercase tracking-wide text-white/60">Focused project</p>
-                <motion.div className="mt-2" variants={staggerConfig.container} initial="hidden" animate="visible">
-                  <motion.div variants={staggerConfig.item}>
-                    <SurfaceProjectCard project={focusedProject} autoExpandToken={focusedAutoExpandToken} />
-                  </motion.div>
-                </motion.div>
-              </motion.section>
-            ) : null}
-
-            {filteredVisible.length ? (
-              <motion.section variants={staggerConfig.item}>
-                <p className="text-[11px] uppercase tracking-wide text-white/60">Projects </p>
-                <motion.div className="mt-2 space-y-3" variants={staggerConfig.container} initial="hidden" animate="visible">
-                  {filteredVisible.map((project) => (
-                    <motion.div key={`surface-${project.slug ?? project.name}`} variants={staggerConfig.item}>
-                      <SurfaceProjectCard project={project} />
-                    </motion.div>
-                  ))}
-                </motion.div>
-              </motion.section>
+            {visibleProjects.length ? (
+              <CollapsibleSection title="Projects" icon={<FolderKanban className="h-3 w-3" />}>
+                <div className="space-y-3">
+                  <AnimatePresence initial={false}>
+                    {visibleProjects.map((project) => (
+                      <motion.div
+                        key={`surface-${project.slug ?? project.name}`}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+                      >
+                        <SurfaceProjectCard project={project} />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </CollapsibleSection>
             ) : null}
 
             {visibleExperiences.length || visibleEducation.length ? (
-              <motion.section variants={staggerConfig.item}>
-                <p className="text-[11px] uppercase tracking-wide text-white/60">Resume</p>
-                <motion.div className="mt-2" variants={staggerConfig.item}>
-                  <ExperienceList experiences={visibleExperiences} education={visibleEducation} />
-                </motion.div>
-              </motion.section>
+              <CollapsibleSection title="Resume" icon={<FileText className="h-3 w-3" />}>
+                <ExperienceList experiences={visibleExperiences} education={visibleEducation} />
+              </CollapsibleSection>
             ) : null}
 
             {highlightedSkills.length ? (
-              <motion.section variants={staggerConfig.item}>
-                <p className="text-[11px] uppercase tracking-wide text-white/60">Skill highlights</p>
-                <motion.div className="mt-2 flex flex-wrap gap-2" variants={staggerConfig.container} initial="hidden" animate="visible">
-                  {highlightedSkills.map((skill) => (
-                    <motion.span
-                      key={skill}
-                      variants={staggerConfig.item}
-                      className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs text-white/80"
-                    >
-                      {skill}
-                    </motion.span>
-                  ))}
-                </motion.div>
-              </motion.section>
+              <CollapsibleSection title="Skill highlights" icon={<Sparkles className="h-3 w-3" />}>
+                <div className="flex flex-wrap gap-2">
+                  <AnimatePresence initial={false}>
+                    {highlightedSkills.map((skill) => (
+                      <motion.span
+                        key={skill}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        transition={{ duration: 0.25 }}
+                        className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs text-white/80"
+                      >
+                        {skill}
+                      </motion.span>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </CollapsibleSection>
             ) : null}
           </motion.div>
         </motion.div>
