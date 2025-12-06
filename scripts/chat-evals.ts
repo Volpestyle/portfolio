@@ -114,7 +114,7 @@ function loadEvalConfig(): EvalConfig {
 
   const raw = readFileSync(configPath, 'utf-8');
   const parsed = parseYaml(raw) as Partial<EvalConfig>;
-  const models = parsed.models ?? {};
+  const models: Partial<EvalConfig['models']> = parsed.models ?? {};
 
   const answerModel = models.answerModel?.trim();
   if (!answerModel) {

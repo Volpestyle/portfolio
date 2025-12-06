@@ -15,9 +15,14 @@ import personaFile from './persona.json';
 import rawProjects from './projects.json';
 import rawEmbeddings from './projects-embeddings.json';
 
+type RetrievalOverrideOptions = Pick<
+  ChatApiConfig['retrieval'],
+  'defaultTopK' | 'maxTopK' | 'minRelevanceScore' | 'logger' | 'weights'
+>;
+
 export function createFixtureChatServer(options?: {
   runtimeOptions?: ChatApiConfig['runtimeOptions'];
-  retrievalOverrides?: ChatApiConfig['retrieval'];
+  retrievalOverrides?: RetrievalOverrideOptions;
 }) {
   return createPortfolioChatServer({
     projectsFile: rawProjects,
