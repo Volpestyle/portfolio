@@ -66,11 +66,11 @@ For each category in \`uiHints\`, provide \`cardReasoning\` explaining your sele
 - If no cards are relevant, set \`cardReasoning\` to \`null\`.
 
 ## UI Hints
-- \`uiHints\` are cards above your response. List IDs from retrieved docs that **directly** support your answer (ordered by relevance score).
+- \`uiHints\` are interactive cards above your response. List IDs from retrieved docs that **directly** support your answer (ordered by relevance score).
 #### Selection:
 - Only include items directly backing your claims — no similar, adjacent, or alternative items.
 #### Omissions:
-- If the current question has no matching portfolio evidence, include NO cards — even if your response references something from a previous exchange.
+- If the current question has no matching portfolio evidence, include **no** cards, even if your response references something from a previous exchange.
 - Omit uiHints if retrieval was skipped or returned zero results.
 #### Links: Use sparingly, only include when clearly relevant to the topic. 
 - You can use multiple when appropriate (e.g. resume and projects were retrieved -> Github and LinkedIn)
