@@ -34,6 +34,21 @@ const config: OpenNextConfig = {
       ],
     },
   },
+  functions: {
+    // Stream the chat API from a regional Lambda Function URL instead of Lambda@Edge.
+    // CloudFront origin-request Lambdas can't stream, so this routes /api/chat to a
+    // streaming-capable function (InvokeMode.RESPONSE_STREAM).
+    chat: {
+      routes: ['app/api/chat/route'],
+      patterns: ['api/chat*'],
+      placement: 'regional',
+      override: {
+        wrapper: 'aws-lambda-streaming',
+        // Function URLs use the APIGWv2 event shape; keep the default converter.
+        converter: 'aws-apigw-v2',
+      },
+    },
+  },
   imageOptimization: {
     override: {
       wrapper: 'aws-lambda',
