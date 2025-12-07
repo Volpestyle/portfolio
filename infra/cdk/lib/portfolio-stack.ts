@@ -958,6 +958,7 @@ export class PortfolioStack extends Stack {
         'next-url',
         'x-prerender-revalidate',
         'x-revalidate-secret',
+        'x-chat-origin-secret',
         'x-portfolio-test-mode'
       ),
       cookieBehavior: cloudfront.CacheCookieBehavior.none(),
@@ -1465,6 +1466,12 @@ export class PortfolioStack extends Stack {
 
     for (const [key, value] of Object.entries(this.buildEdgeSecretHeaders())) {
       headers[key] = value;
+    }
+
+    const chatOriginSecret =
+      this.runtimeEnvironment['CHAT_ORIGIN_SECRET'] ?? this.runtimeEnvironment['REVALIDATE_SECRET'];
+    if (chatOriginSecret) {
+      headers['x-chat-origin-secret'] = chatOriginSecret;
     }
 
     return headers;
