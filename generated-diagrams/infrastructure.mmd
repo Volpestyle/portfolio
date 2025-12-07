@@ -1,0 +1,73 @@
+%%{init: {'theme': 'neutral', 'themeVariables': { 'primaryColor': '#e2e8f0', 'primaryTextColor': '#1e293b', 'primaryBorderColor': '#64748b', 'lineColor': '#64748b' }}}%%
+flowchart TB
+    subgraph Internet
+        User((User))
+    end
+
+    subgraph AWS["AWS Cloud (us-east-1)"]
+        subgraph CDN["Content Delivery"]
+            Route53[Route53 DNS]
+            ACM[ACM Certificate]
+            CF[CloudFront<br/>Distribution]
+        end
+
+        subgraph Compute["Compute"]
+            EdgeFn[Lambda@Edge<br/>1536MB / 30s]
+            ChatFn[Chat Lambda<br/>1024MB / Streaming]
+            ImageFn[Image Lambda<br/>1024MB]
+            RevalWorker[Revalidation Worker<br/>512MB]
+            BlogPublish[Blog Publisher<br/>256MB]
+        end
+
+        subgraph StorageLayer["Storage"]
+            AssetsBucket[(S3<br/>Assets + Cache)]
+            ContentBucket[(S3<br/>Blog Content)]
+            MediaBucket[(S3<br/>Blog Media)]
+        end
+
+        subgraph DataLayer["Data"]
+            PostsTable[(DynamoDB<br/>BlogPosts)]
+            CacheTable[(DynamoDB<br/>Revalidation)]
+            CostTable[(DynamoDB<br/>ChatCosts)]
+        end
+
+        subgraph Messaging["Messaging"]
+            RevalQueue[/SQS FIFO<br/>Revalidation/]
+            AlertTopic[/SNS Topic<br/>Cost Alerts/]
+        end
+
+        subgraph Secrets["Secrets"]
+            EnvSecret[Secrets Manager<br/>Environment]
+            RepoSecret[Secrets Manager<br/>Repository]
+        end
+
+        subgraph Scheduling["Scheduling"]
+            EventBridge[EventBridge<br/>Scheduler]
+        end
+    end
+
+    User --> Route53
+    Route53 --> CF
+    ACM -.-> CF
+
+    CF -->|"/*"| EdgeFn
+    CF -->|"/api/chat/*"| ChatFn
+    CF -->|"/_next/image"| ImageFn
+    CF -->|"/_next/static/*"| AssetsBucket
+
+    EdgeFn --> PostsTable
+    EdgeFn --> CacheTable
+    EdgeFn --> ContentBucket
+    EdgeFn --> EnvSecret
+
+    ChatFn --> CostTable
+    ChatFn --> AlertTopic
+    ChatFn --> EnvSecret
+
+    ImageFn --> AssetsBucket
+
+    RevalQueue --> RevalWorker
+    RevalWorker --> CacheTable
+
+    EventBridge --> BlogPublish
+    BlogPublish --> PostsTable

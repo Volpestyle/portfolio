@@ -1,0 +1,74 @@
+%%{init: {'theme': 'neutral', 'themeVariables': { 'primaryColor': '#e2e8f0', 'primaryTextColor': '#1e293b', 'primaryBorderColor': '#64748b', 'lineColor': '#64748b' }}}%%
+flowchart TB
+    subgraph Client["Browser"]
+        ChatUI[Chat UI Component]
+        UseChat[useChat Hook]
+        SSE[SSE Parser]
+    end
+
+    subgraph CloudFront["CloudFront"]
+        CF["/api/chat/*"]
+    end
+
+    subgraph ChatLambda["Chat Lambda (Regional)"]
+        Handler[Request Handler]
+
+        subgraph Pipeline["Chat Pipeline"]
+            Validate[Validate Request]
+            RateLimit[Rate Limit Check]
+            Budget[Budget Check]
+            Retrieve[Retrieve Documents]
+            Generate[Generate Response]
+        end
+
+        subgraph Orchestrator["@portfolio/chat-orchestrator"]
+            Planner[Query Planner]
+            Context[Context Builder]
+            Stream[Response Streamer]
+        end
+
+        subgraph DataLayer["@portfolio/chat-data"]
+            Lexical[Lexical Search<br/>MiniSearch]
+            Semantic[Semantic Search<br/>Embeddings]
+            Hybrid[Hybrid Scorer]
+        end
+    end
+
+    subgraph Storage["Storage"]
+        Embeddings[(Generated<br/>Embeddings)]
+        CostTable[(DynamoDB<br/>Costs)]
+    end
+
+    subgraph External["External"]
+        OpenAI[OpenAI API<br/>GPT + Ada]
+        Redis[Upstash Redis<br/>Rate Limiting]
+        CloudWatch[CloudWatch<br/>Metrics]
+    end
+
+    ChatUI --> UseChat
+    UseChat -->|POST| CF
+    CF --> Handler
+    Handler --> Validate
+    Validate --> RateLimit
+    RateLimit --> Redis
+    RateLimit --> Budget
+    Budget --> CostTable
+    Budget --> Retrieve
+
+    Retrieve --> Planner
+    Planner --> Lexical
+    Planner --> Semantic
+    Lexical --> Hybrid
+    Semantic --> Hybrid
+    Hybrid --> Embeddings
+
+    Retrieve --> Context
+    Context --> Generate
+    Generate --> Stream
+    Stream --> OpenAI
+
+    Stream -->|SSE| SSE
+    SSE --> ChatUI
+
+    Handler --> CloudWatch
+    Handler --> CostTable
