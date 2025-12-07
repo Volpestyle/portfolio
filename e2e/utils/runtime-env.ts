@@ -106,12 +106,18 @@ export function resolveTestRuntime(): TestRuntime {
 }
 
 export function buildProjectHeaders(project: 'ui' | 'api', runtime: TestRuntime): Record<string, string> {
+  const headers: Record<string, string> = {};
+
   if (runtime.mode === 'mock') {
-    return {
-      [TEST_MODE_HEADER]: project === 'ui' ? 'e2e' : 'integration',
-    };
+    headers[TEST_MODE_HEADER] = project === 'ui' ? 'e2e' : 'integration';
   }
-  return {};
+
+  const chatOriginSecret = process.env.CHAT_ORIGIN_SECRET ?? process.env.REVALIDATE_SECRET;
+  if (chatOriginSecret) {
+    headers['x-chat-origin-secret'] = chatOriginSecret;
+  }
+
+  return headers;
 }
 
 export function usingRealApis(runtime: TestRuntime): boolean {

@@ -172,6 +172,8 @@ jobs:
           # Keep Playwright in mock mode for deterministic data & so local dev environments aren't required
           BLOG_TEST_FIXTURES: 'true'
           PORTFOLIO_TEST_FIXTURES: 'true'
+          # Pass secret for chat API authentication during tests
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: pnpm test
 
       - name: Upload test results
@@ -258,7 +260,7 @@ jobs:
             exit 0
           fi
           payload='{"paths":["/projects","/blog","/_next/data/*","/api/github/portfolio-repos","/api/blog/posts"],"tags":["github-repos","posts"]}'
-          attempts=5
+          attempts=3
           delay=5
 
           for attempt in $(seq 1 $attempts); do
@@ -270,7 +272,7 @@ jobs:
               -H "x-revalidate-secret: ${REVALIDATE_SECRET}" \
               --data "${payload}" \
               --fail-with-body \
-              --max-time 20 \
+              --max-time 15 \
               --connect-timeout 5 || true)
             status_code=${status_code:-000}
 
@@ -344,6 +346,8 @@ jobs:
           E2E_API_REPO_OWNER: ${{ vars.API_INTEGRATION_REPO_OWNER }}
           E2E_API_REPO_NAME: ${{ vars.API_INTEGRATION_REPO_NAME }}
           E2E_API_DOC_PATH: ${{ vars.API_INTEGRATION_DOC_PATH }}
+          # Pass secret for chat API authentication during tests
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
         run: pnpm run test:real-api
 
       - name: Run real UI smoke tests

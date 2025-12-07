@@ -22,22 +22,31 @@ async function getRevalidateSecret(): Promise<string | null> {
 }
 
 export async function POST(req: Request) {
-  const expectedSecret = await getRevalidateSecret();
-  if (!expectedSecret) {
-    return new Response('Server misconfiguration (missing revalidation secret)', { status: 500 });
+  const startedAt = Date.now();
+
+  try {
+    const expectedSecret = await getRevalidateSecret();
+    if (!expectedSecret) {
+      console.error('[revalidate] Missing expected secret value');
+      return Response.json({ ok: false, error: 'Server misconfiguration (missing revalidation secret)' }, { status: 500 });
+    }
+
+    const provided = req.headers.get('x-revalidate-secret');
+    if (provided !== expectedSecret) {
+      return Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const payload = await req.json().catch(() => ({ paths: [], tags: [] }));
+    const paths = Array.isArray(payload.paths) ? payload.paths : [];
+    const tags = Array.isArray(payload.tags) ? payload.tags : [];
+
+    await revalidateContent({ paths, tags });
+    return Response.json({ ok: true, paths, tags, durationMs: Date.now() - startedAt });
+  } catch (error) {
+    console.error('[revalidate] failed', error);
+    const message = error instanceof Error ? error.message : 'Unexpected error';
+    return Response.json({ ok: false, error: message }, { status: 500 });
   }
-
-  const provided = req.headers.get('x-revalidate-secret');
-  if (provided !== expectedSecret) {
-    return new Response('Unauthorized', { status: 401 });
-  }
-
-  const payload = await req.json().catch(() => ({ paths: [], tags: [] }));
-  const paths = Array.isArray(payload.paths) ? payload.paths : [];
-  const tags = Array.isArray(payload.tags) ? payload.tags : [];
-
-  await revalidateContent({ paths, tags });
-  return Response.json({ ok: true });
 }
 
 export const runtime = 'nodejs';
