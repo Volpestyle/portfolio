@@ -68,11 +68,14 @@ async function getChatOriginSecret(): Promise<string | null> {
 }
 
 export async function POST(request: NextRequest) {
-  const expectedSecret = await getChatOriginSecret();
-  if (expectedSecret) {
-    const provided = request.headers.get('x-chat-origin-secret');
-    if (provided !== expectedSecret) {
-      return new Response('Forbidden', { status: 403 });
+  const isDev = process.env.NODE_ENV === 'development';
+  if (!isDev) {
+    const expectedSecret = await getChatOriginSecret();
+    if (expectedSecret) {
+      const provided = request.headers.get('x-chat-origin-secret');
+      if (provided !== expectedSecret) {
+        return new Response('Forbidden', { status: 403 });
+      }
     }
   }
 
