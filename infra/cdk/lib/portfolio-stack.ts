@@ -957,6 +957,7 @@ export class PortfolioStack extends Stack {
         'next-router-state-tree',
         'next-url',
         'x-prerender-revalidate',
+        'x-revalidate-secret',
         'x-portfolio-test-mode'
       ),
       cookieBehavior: cloudfront.CacheCookieBehavior.none(),
