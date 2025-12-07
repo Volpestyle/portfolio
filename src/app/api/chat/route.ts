@@ -56,7 +56,7 @@ async function getChatOriginSecret(): Promise<string | null> {
     return chatOriginSecret;
   }
   if (!chatOriginSecretPromise) {
-    chatOriginSecretPromise = resolveSecretValue('CHAT_ORIGIN_SECRET', { scope: 'repo' })
+    chatOriginSecretPromise = resolveSecretValue('CHAT_ORIGIN_SECRET', { scope: 'repo', fallbackEnvVar: 'REVALIDATE_SECRET' })
       .then((value) => value ?? null)
       .catch(() => null)
       .finally(() => {
