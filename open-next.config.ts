@@ -44,8 +44,17 @@ const config: OpenNextConfig = {
       placement: 'regional',
       override: {
         wrapper: 'aws-lambda-streaming',
-        // Function URLs use the APIGWv2 event shape; keep the default converter.
         converter: 'aws-apigw-v2',
+      },
+      install: {
+        packages: [
+          'react@19.0.0',
+          'react-dom@19.0.0',
+          '@aws-sdk/client-secrets-manager@3',
+          '@aws-sdk/client-cloudwatch@3',
+          '@aws-sdk/client-dynamodb@3',
+          '@aws-sdk/client-sns@3',
+        ],
       },
     },
   },
