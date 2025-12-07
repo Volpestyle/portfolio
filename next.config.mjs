@@ -2,7 +2,13 @@
 const nextConfig = {
   output: 'standalone',
   outputFileTracingIncludes: {
-    '/api/chat': ['./generated/**/*', './chat.config.*', './chat-preprocess.config.*'],
+    '/api/chat': [
+      './generated/**/*',
+      './chat.config.*',
+      './chat-preprocess.config.*',
+      './node_modules/react/**/*',
+      './node_modules/react-dom/**/*',
+    ],
   },
   experimental: {
     externalDir: true,
