@@ -913,6 +913,8 @@ export class PortfolioStack extends Stack {
         // so disable IAM auth just for that origin to avoid SigV4 errors.
         const functionAuthType =
           key === 'chat' ? lambda.FunctionUrlAuthType.NONE : lambda.FunctionUrlAuthType.AWS_IAM;
+        const oacSigning =
+          functionAuthType === lambda.FunctionUrlAuthType.NONE ? cloudfront.Signing.NEVER : undefined;
 
         const fnUrl = fn.addFunctionUrl({
           authType: functionAuthType,
@@ -923,7 +925,9 @@ export class PortfolioStack extends Stack {
 
         const customHeaders = this.buildOriginCustomHeaders();
         const originResource = origins.FunctionUrlOrigin.withOriginAccessControl(fnUrl, {
-          originAccessControl: new cloudfront.FunctionUrlOriginAccessControl(this, `${functionId}FunctionOAC`),
+          originAccessControl: new cloudfront.FunctionUrlOriginAccessControl(this, `${functionId}FunctionOAC`, {
+            signing: oacSigning,
+          }),
           customHeaders: Object.keys(customHeaders).length ? customHeaders : undefined,
         });
 
