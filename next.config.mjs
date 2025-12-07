@@ -1,11 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  outputFileTracingIncludes: {
+    '/api/chat': ['./generated/**/*', './chat.config.*', './chat-preprocess.config.*'],
+  },
   experimental: {
     externalDir: true,
-    outputFileTracingIncludes: {
-      '/api/chat': ['./generated/**/*', './chat.config.*', './chat-preprocess.config.*'],
-    },
   },
   transpilePackages: [
     '@portfolio/chat-contract',
