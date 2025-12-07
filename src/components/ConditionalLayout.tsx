@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import { Header } from '@/components/Header';
 import { AnimatedLayout } from '@/components/AnimatedLayout';
-import { LoadingOverlay } from '@/components/LoadingOverlay';
+import { PageTransition } from '@/components/PageTransition';
 
 interface ConditionalLayoutProps {
   children: ReactNode;
@@ -27,9 +27,9 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
       <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
         <AnimatedLayout>
           <Header />
-          <LoadingOverlay spinnerVariant="ring">
+          <PageTransition>
             <main className="px-4 py-8 sm:px-8">{children}</main>
-          </LoadingOverlay>
+          </PageTransition>
         </AnimatedLayout>
       </div>
     </>

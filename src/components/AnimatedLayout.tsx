@@ -10,7 +10,7 @@ export function AnimatedLayout({ children }: { children: ReactNode }) {
       <div className="fixed inset-0 z-0 backdrop-blur-sm md:hidden" />
       <motion.div
         layout
-        className="relative z-10 w-full max-w-4xl border-white/20 text-white backdrop-blur-sm md:border"
+        className="relative z-10 flex w-full max-w-4xl flex-col overflow-hidden border-white/20 text-white backdrop-blur-sm md:border"
         transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
       >
         {children}
