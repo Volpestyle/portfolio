@@ -10,6 +10,7 @@
     "lint": "pnpm exec tsc --noEmit && eslint .",
     "format": "prettier --write .",
     "generate:mermaid": "tsx scripts/generate-mermaid.ts",
+    "clean:docs": "find . -type f -name 'README.md' -not -path '*/node_modules/*' -delete && find . -type d -name 'docs' -not -path '*/node_modules/*' -exec rm -rf {} +",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed",
