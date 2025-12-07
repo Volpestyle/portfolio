@@ -909,8 +909,13 @@ export class PortfolioStack extends Stack {
           logGroup: fnLogGroup,
         });
 
+        // The chat endpoint must accept unsigned requests from CloudFront viewers,
+        // so disable IAM auth just for that origin to avoid SigV4 errors.
+        const functionAuthType =
+          key === 'chat' ? lambda.FunctionUrlAuthType.NONE : lambda.FunctionUrlAuthType.AWS_IAM;
+
         const fnUrl = fn.addFunctionUrl({
-          authType: lambda.FunctionUrlAuthType.AWS_IAM,
+          authType: functionAuthType,
           invokeMode: originConfig.streaming ? lambda.InvokeMode.RESPONSE_STREAM : lambda.InvokeMode.BUFFERED,
         });
 

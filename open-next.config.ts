@@ -1,5 +1,14 @@
 import type { OpenNextConfig } from '@opennextjs/aws/types/open-next';
 
+const baseRuntimePackages = [
+  '@next/env@15.5.6',
+  '@swc/helpers@0.5.15',
+  'postcss@8.4.31',
+  'styled-jsx@5.1.6',
+  'react@19.0.0',
+  'react-dom@19.0.0',
+];
+
 const config: OpenNextConfig = {
   default: {
     override: {
@@ -11,13 +20,8 @@ const config: OpenNextConfig = {
     placement: 'global',
     install: {
       packages: [
-        '@next/env@15.5.6',
-        '@swc/helpers@0.5.15',
-        'postcss@8.4.31',
-        'styled-jsx@5.1.6',
-        'react@19.0.0',
-        'react-dom@19.0.0',
-        // Add AWS SDK and Smithy dependencies for Lambda@Edge
+        ...baseRuntimePackages,
+        // AWS SDK and Smithy dependencies for Lambda@Edge
         '@aws-sdk/client-dynamodb@3',
         '@aws-sdk/lib-dynamodb@3',
         '@aws-sdk/client-s3@3',
@@ -48,8 +52,7 @@ const config: OpenNextConfig = {
       },
       install: {
         packages: [
-          'react@19.0.0',
-          'react-dom@19.0.0',
+          ...baseRuntimePackages,
           '@aws-sdk/client-secrets-manager@3',
           '@aws-sdk/client-cloudwatch@3',
           '@aws-sdk/client-dynamodb@3',
