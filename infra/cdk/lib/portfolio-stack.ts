@@ -1004,6 +1004,7 @@ export class PortfolioStack extends Stack {
 
       const isStatic = originKey === 's3';
       const isImageOptimizer = originKey === 'imageOptimizer';
+      const isDefaultOrigin = originKey === 'default';
       const cachePolicy = isImageOptimizer ? imageCachePolicy : isStatic ? staticCachePolicy : serverCachePolicy;
       const allowedMethods =
         isImageOptimizer || isStatic
@@ -1014,16 +1015,17 @@ export class PortfolioStack extends Stack {
         : !isStatic
           ? cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER
           : undefined;
-      const edgeLambdas =
-        !isStatic && !isImageOptimizer
-          ? [
-              {
-                eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
-                functionVersion: serverEdgeFunction.currentVersion,
-                includeBody: true,
-              },
-            ]
-          : undefined;
+      // Only attach edge function to the default origin. Custom function origins
+      // (like 'chat') handle requests themselves and don't need the edge function.
+      const edgeLambdas = isDefaultOrigin
+        ? [
+            {
+              eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
+              functionVersion: serverEdgeFunction.currentVersion,
+              includeBody: true,
+            },
+          ]
+        : undefined;
 
       const behaviorOptions: cloudfront.BehaviorOptions = {
         origin,
