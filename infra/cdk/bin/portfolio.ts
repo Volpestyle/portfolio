@@ -64,9 +64,35 @@ const collectLambdaEnv = (parsedFileEnv?: {
     return combined;
   }
 
+  // When no env file is present, avoid dumping the entire runner env (PATH, GITHUB_*, etc.)
+  // into the Lambda environment. Only keep keys we actually use at runtime.
+  const allowedPrefixes = [
+    'APP_',
+    'NEXT_',
+    'SECRETS_MANAGER_',
+    'OPENAI_',
+    'CHAT_',
+    'GH_',
+    'E2E_',
+    'ADMIN_',
+    'PORTFOLIO_',
+    'UPSTASH_',
+    'REVALIDATE_',
+    'BLOG_',
+  ];
+  const allowedKeys = new Set([
+    'NODE_ENV',
+    'CDK_DEPLOY_ROLE_ARN',
+    'PORTFOLIO_GIST_ID',
+    'ADMIN_EMAILS',
+    'REVALIDATE_SECRET',
+  ]);
+
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
-    if (typeof value === 'string' && value.length > 0) {
+    if (typeof value !== 'string' || value.length === 0) continue;
+    const isAllowedPrefix = allowedPrefixes.some((prefix) => key.startsWith(prefix));
+    if (isAllowedPrefix || allowedKeys.has(key)) {
       result[key] = value;
     }
   }
