@@ -6,6 +6,7 @@ import { motion, LayoutGroup } from 'framer-motion';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { AnimatedSendButton } from '@/components/ui/AnimatedSendButton';
+import { usePageTransition } from '@/components/PageTransition';
 
 interface ChatComposerProps {
   isBusy: boolean;
@@ -18,6 +19,7 @@ export function ChatComposer({ isBusy, hasMessages, onSend }: ChatComposerProps)
   const [textareaHeight, setTextareaHeight] = useState(40);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const isTransitioning = usePageTransition();
 
   // Check if we're on mobile (below sm breakpoint)
   useEffect(() => {
@@ -63,7 +65,12 @@ export function ChatComposer({ isBusy, hasMessages, onSend }: ChatComposerProps)
             : ''
       )}
       onSubmit={handleSubmit}
-      transition={{ type: 'tween', duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      initial={isFixedMode ? { opacity: 0, y: 10 } : false}
+      animate={{
+        opacity: isTransitioning && isFixedMode ? 0 : 1,
+        y: isTransitioning && isFixedMode ? 10 : 0,
+      }}
+      transition={{ type: 'tween', duration: 0.4, ease: [0.2, 0, 0.2, 1] }}
     >
       <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:flex-row sm:items-end">
         <Textarea

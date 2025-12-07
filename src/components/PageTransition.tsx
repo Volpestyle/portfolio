@@ -2,10 +2,24 @@
 
 import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
 import { usePathname } from 'next/navigation';
-import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { FrozenRouter } from './FrozenRouter';
 import { Spinner } from '@/components/ui/spinner';
+
+const PageTransitionContext = createContext(false);
+
+export function usePageTransition() {
+  return useContext(PageTransitionContext);
+}
 
 interface PageTransitionProps {
   children: ReactNode;
@@ -38,27 +52,29 @@ export function PageTransition({ children }: PageTransitionProps) {
   }, [isTransitioning]);
 
   return (
-    <div className="relative flex w-full flex-1 flex-col">
-      {/* Content layer - stays hidden during transition, frame resizes to fit */}
-      <AnimatePresence mode="popLayout">
-        <TransitionPane pathname={pathname} isTransitioning={isTransitioning}>
-          {children}
-        </TransitionPane>
-      </AnimatePresence>
+    <PageTransitionContext.Provider value={isTransitioning}>
+      <div className="relative flex w-full flex-1 flex-col">
+        {/* Content layer - stays hidden during transition, frame resizes to fit */}
+        <AnimatePresence mode="popLayout">
+          <TransitionPane pathname={pathname} isTransitioning={isTransitioning}>
+            {children}
+          </TransitionPane>
+        </AnimatePresence>
 
-      {/* Spinner overlay - portaled to body, completely outside framer-motion */}
-      {mounted &&
-        createPortal(
-          <div
-            className={`pointer-events-none fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${
-              isTransitioning ? 'opacity-100' : 'opacity-0'
-            }`}
-          >
-            <Spinner variant="ring" size="lg" />
-          </div>,
-          document.body
-        )}
-    </div>
+        {/* Spinner overlay - portaled to body, completely outside framer-motion */}
+        {mounted &&
+          createPortal(
+            <div
+              className={`pointer-events-none fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${
+                isTransitioning ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              <Spinner variant="ring" size="lg" />
+            </div>,
+            document.body
+          )}
+      </div>
+    </PageTransitionContext.Provider>
   );
 }
 
