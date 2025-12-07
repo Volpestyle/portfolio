@@ -62,7 +62,7 @@ export function createChatApi(config: ChatApiConfig): ChatApi {
 
 export { createChatSseStream, SSE_HEADERS } from './stream';
 export type { ChatbotResponse } from '@portfolio/chat-orchestrator';
-export { createPortfolioChatServer } from './bootstrap';
+export { createPortfolioChatServer, createFilesystemChatProviders } from './bootstrap';
 export {
   createChatServerLogger,
   logChatDebug,
