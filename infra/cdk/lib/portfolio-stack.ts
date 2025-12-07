@@ -1223,8 +1223,8 @@ export class PortfolioStack extends Stack {
     );
   }
 
-  private attachCostMetricPermissions(grantable: iam.IGrantable) {
-    grantable.grantPrincipal.addToPrincipalPolicy(
+  private attachCostMetricPermissions(fn: cloudfrontExperimental.EdgeFunction) {
+    fn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['cloudwatch:PutMetricData'],
         resources: ['*'],
