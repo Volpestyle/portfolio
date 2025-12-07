@@ -10,6 +10,11 @@ on:
         required: false
         default: production
         type: environment
+      skip_tests:
+        description: Skip E2E and smoke tests (quick patch mode)
+        required: false
+        default: false
+        type: boolean
 
 # OIDC for AWS + read access to repo
 permissions:
@@ -21,6 +26,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # --- Quick patch mode: add [skip] to commit message to skip tests ---
+  SKIP_TESTS: ${{ contains(github.event.head_commit.message, '[skip]') || inputs.skip_tests == true }}
+
   # --- Paths (adjust if your layout differs) ---
   # Root of your Next.js app that contains open-next.config.(ts|mjs|cjs)
   APP_ROOT: ${{ vars.NEXT_APP_PATH || '.' }}
@@ -155,6 +163,7 @@ jobs:
           test -f .open-next/open-next.output.json
 
       - name: Run E2E Tests
+        if: ${{ env.SKIP_TESTS != 'true' }}
         working-directory: ${{ env.APP_ROOT }}
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -260,7 +269,7 @@ jobs:
     name: Post-deploy smoke tests
     runs-on: ubuntu-latest
     needs: deploy
-    if: ${{ vars.API_INTEGRATION_BASE_URL != '' || vars.APP_DOMAIN_NAME != '' }}
+    if: ${{ (vars.API_INTEGRATION_BASE_URL != '' || vars.APP_DOMAIN_NAME != '') && !contains(github.event.head_commit.message, '[skip]') && inputs.skip_tests != true }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
