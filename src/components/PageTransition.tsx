@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
 import { usePathname } from 'next/navigation';
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FrozenRouter } from './FrozenRouter';
 import { Spinner } from '@/components/ui/spinner';
 
@@ -15,7 +15,7 @@ export function PageTransition({ children }: PageTransitionProps) {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const prevPathname = useRef(pathname);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (pathname !== prevPathname.current) {
       setIsTransitioning(true);
       prevPathname.current = pathname;
@@ -49,7 +49,7 @@ export function PageTransition({ children }: PageTransitionProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="pointer-events-none absolute inset-0 z-10 flex items-center"
+            className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center pt-[10svh] md:items-center md:pt-0"
           >
             <Spinner variant="ring" size="lg" />
           </motion.div>
@@ -75,8 +75,8 @@ function TransitionPane({
       key={pathname ?? 'root'}
       initial={{ opacity: 0, y: 10 }}
       animate={{
-        opacity: isTransitioning ? 0 : 1,
-        y: isTransitioning ? 10 : 0,
+        opacity: isTransitioning && isPresent ? 0 : 1,
+        y: isTransitioning && isPresent ? 10 : 0,
       }}
       exit={{ opacity: 0, y: -10 }}
       transition={{
