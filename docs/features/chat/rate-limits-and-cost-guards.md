@@ -32,7 +32,20 @@ This stack ships with two defensive controls for the chat service:
 - Enforcement: `/api/chat` blocks turns when already over budget; if a turn pushes the budget over the limit at the end of a run, the stream emits an SSE `error` with `code: "budget_exceeded"` before closing.
 - Touchpoints: `packages/chat-next-api/src/costMetrics.ts` (publishes OpenAI cost metrics), `packages/chat-next-api/src/runtimeCost.ts` (runtime budget guard), `infra/cdk/lib/portfolio-stack.ts#createOpenAiCostAlarm` (alarm wiring + missing-data alert).
 
+## Origin secret (CloudFront bypass protection)
+
+The chat endpoint requires an origin secret header to prevent direct API access that bypasses CloudFront.
+
+- Header: `x-chat-origin-secret`
+- Secret resolution: `CHAT_ORIGIN_SECRET` from Secrets Manager (repo scope), falling back to `REVALIDATE_SECRET` if not set.
+- Behavior:
+  - If the secret is configured and the header doesn't match: HTTP 403 Forbidden.
+  - If no secret is configured: the check is skipped (allows local dev without secrets).
+- CloudFront injection: The CDK stack adds the header to origin requests via CloudFront's origin request policy, so legitimate traffic through CloudFront is automatically authenticated.
+- Touchpoints: `src/app/api/chat/route.ts` (enforcement), `infra/cdk/lib/portfolio-stack.ts#buildEdgeOriginHeaders` (CloudFront injection).
+
 ## Ops quick checks
 
 - Rate limit health: confirm Upstash secrets are present and `/api/chat` returns 429s on burst; 503 if Redis is unreachable (expected fail-closed).
 - Cost visibility: verify `OPENAI_COST_METRICS_ENABLED` is set and the CloudWatch metric shows per-call costs; alarm should reflect a true 30-day sum (not a single-day spike).
+- Origin secret: verify direct requests to the Lambda Function URL without the header return 403; requests through CloudFront should succeed.
