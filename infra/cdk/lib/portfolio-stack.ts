@@ -1265,6 +1265,11 @@ export class PortfolioStack extends Stack {
     }
 
     for (const entry of this.protectedFunctionUrls) {
+      // Only add IAM-based CloudFront invoke permissions for AWS_IAM URLs.
+      if (entry.url.authType !== lambda.FunctionUrlAuthType.AWS_IAM) {
+        continue;
+      }
+
       entry.url.grantInvokeUrl(
         new iam.ServicePrincipal('cloudfront.amazonaws.com', {
           conditions: {
@@ -1277,22 +1282,6 @@ export class PortfolioStack extends Stack {
           },
         })
       );
-
-      // For authType NONE, tighten the auto-created Function URL permissions to CloudFront only.
-      if (entry.url.authType === lambda.FunctionUrlAuthType.NONE) {
-        const restrictPermission = (id: string) => {
-          const permission = entry.fn.node.tryFindChild(id) as lambda.CfnPermission | undefined;
-          if (!permission) {
-            return;
-          }
-          permission.addPropertyOverride('Principal', 'cloudfront.amazonaws.com');
-          permission.addPropertyDeletionOverride('SourceArn');
-          permission.addPropertyDeletionOverride('SourceAccount');
-        };
-
-        restrictPermission('invoke-function-url');
-        restrictPermission('invoke-function');
-      }
     }
   }
 
