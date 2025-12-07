@@ -1285,8 +1285,8 @@ export class PortfolioStack extends Stack {
             return;
           }
           permission.addPropertyOverride('Principal', 'cloudfront.amazonaws.com');
-          permission.addPropertyOverride('SourceArn', distribution.distributionArn);
-          permission.addPropertyOverride('SourceAccount', Stack.of(this).account);
+          permission.addPropertyDeletionOverride('SourceArn');
+          permission.addPropertyDeletionOverride('SourceAccount');
         };
 
         restrictPermission('invoke-function-url');
