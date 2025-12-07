@@ -1277,24 +1277,20 @@ export class PortfolioStack extends Stack {
         })
       );
 
-      // When authType is NONE we still want the origin locked to CloudFront.
+      // For authType NONE, tighten the auto-created Function URL permissions to CloudFront only.
       if (entry.url.authType === lambda.FunctionUrlAuthType.NONE) {
-        entry.fn.addToResourcePolicy(
-          new iam.PolicyStatement({
-            effect: iam.Effect.DENY,
-            principals: [new iam.AnyPrincipal()],
-            actions: ['lambda:InvokeFunctionUrl', 'lambda:InvokeFunction'],
-            resources: [entry.fn.functionArn],
-            conditions: {
-              StringNotEquals: {
-                'aws:SourceArn': distribution.distributionArn,
-              },
-              Bool: {
-                'lambda:InvokedViaFunctionUrl': true,
-              },
-            },
-          })
-        );
+        const restrictPermission = (id: string) => {
+          const permission = entry.fn.node.tryFindChild(id) as lambda.CfnPermission | undefined;
+          if (!permission) {
+            return;
+          }
+          permission.addPropertyOverride('Principal', 'cloudfront.amazonaws.com');
+          permission.addPropertyOverride('SourceArn', distribution.distributionArn);
+          permission.addPropertyOverride('SourceAccount', Stack.of(this).account);
+        };
+
+        restrictPermission('invoke-function-url');
+        restrictPermission('invoke-function');
       }
     }
   }
