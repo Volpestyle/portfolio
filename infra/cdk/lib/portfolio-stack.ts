@@ -108,7 +108,7 @@ export class PortfolioStack extends Stack {
   private readonly edgeSecretsRegionHeaderName = 'x-opn-secrets-region';
   private readonly edgeSecretsFallbackRegionHeaderName = 'x-opn-secrets-fallback-region';
   private edgeRuntimeHeaderValues?: Record<string, string>;
-  private readonly protectedFunctionUrls: lambda.IFunctionUrl[] = [];
+  private readonly protectedFunctionUrls: { url: lambda.IFunctionUrl; fn: lambda.Function }[] = [];
   private readonly postsTable: dynamodb.Table;
   private readonly blogContentBucket: s3.Bucket;
   private readonly blogMediaBucket: s3.Bucket;
@@ -869,7 +869,7 @@ export class PortfolioStack extends Stack {
       invokeMode: imageOrigin.streaming ? lambda.InvokeMode.RESPONSE_STREAM : lambda.InvokeMode.BUFFERED,
     });
 
-    this.protectedFunctionUrls.push(functionUrl);
+    this.protectedFunctionUrls.push({ url: functionUrl, fn });
 
     const origin = origins.FunctionUrlOrigin.withOriginAccessControl(functionUrl, {
       originAccessControl: new cloudfront.FunctionUrlOriginAccessControl(this, 'ImageOptimizerOAC'),
@@ -921,7 +921,7 @@ export class PortfolioStack extends Stack {
           invokeMode: originConfig.streaming ? lambda.InvokeMode.RESPONSE_STREAM : lambda.InvokeMode.BUFFERED,
         });
 
-        this.protectedFunctionUrls.push(fnUrl);
+        this.protectedFunctionUrls.push({ url: fnUrl, fn });
 
         const customHeaders = this.buildOriginCustomHeaders();
         const originResource = origins.FunctionUrlOrigin.withOriginAccessControl(fnUrl, {
@@ -1263,8 +1263,8 @@ export class PortfolioStack extends Stack {
       return;
     }
 
-    for (const fnUrl of this.protectedFunctionUrls) {
-      fnUrl.grantInvokeUrl(
+    for (const entry of this.protectedFunctionUrls) {
+      entry.url.grantInvokeUrl(
         new iam.ServicePrincipal('cloudfront.amazonaws.com', {
           conditions: {
             ArnLike: {
@@ -1276,6 +1276,26 @@ export class PortfolioStack extends Stack {
           },
         })
       );
+
+      // When authType is NONE we still want the origin locked to CloudFront.
+      if (entry.url.authType === lambda.FunctionUrlAuthType.NONE) {
+        entry.fn.addToResourcePolicy(
+          new iam.PolicyStatement({
+            effect: iam.Effect.DENY,
+            principals: [new iam.AnyPrincipal()],
+            actions: ['lambda:InvokeFunctionUrl', 'lambda:InvokeFunction'],
+            resources: [entry.fn.functionArn],
+            conditions: {
+              StringNotEquals: {
+                'aws:SourceArn': distribution.distributionArn,
+              },
+              Bool: {
+                'lambda:InvokedViaFunctionUrl': true,
+              },
+            },
+          })
+        );
+      }
     }
   }
 
