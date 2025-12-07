@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
 import { usePathname } from 'next/navigation';
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { FrozenRouter } from './FrozenRouter';
@@ -35,22 +35,9 @@ export function PageTransition({ children }: PageTransitionProps) {
     <div className="relative flex w-full flex-1 flex-col">
       {/* Content layer - stays hidden during transition, frame resizes to fit */}
       <AnimatePresence mode="popLayout">
-        <motion.div
-          key={pathname}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{
-            opacity: isTransitioning ? 0 : 1,
-            y: isTransitioning ? 10 : 0,
-          }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{
-            duration: 0.4,
-            ease: [0.2, 0, 0.2, 1],
-          }}
-          className="w-full"
-        >
-          <FrozenRouter>{children}</FrozenRouter>
-        </motion.div>
+        <TransitionPane pathname={pathname} isTransitioning={isTransitioning}>
+          {children}
+        </TransitionPane>
       </AnimatePresence>
 
       {/* Spinner overlay - absolutely positioned, no layout impact */}
@@ -69,5 +56,38 @@ export function PageTransition({ children }: PageTransitionProps) {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function TransitionPane({
+  children,
+  pathname,
+  isTransitioning,
+}: {
+  children: ReactNode;
+  pathname: string | null;
+  isTransitioning: boolean;
+}) {
+  const isPresent = useIsPresent();
+
+  return (
+    <motion.div
+      key={pathname ?? 'root'}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{
+        opacity: isTransitioning ? 0 : 1,
+        y: isTransitioning ? 10 : 0,
+      }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{
+        duration: 0.4,
+        ease: [0.2, 0, 0.2, 1],
+      }}
+      className="w-full"
+      aria-hidden={!isPresent}
+      style={!isPresent ? { pointerEvents: 'none' } : undefined}
+    >
+      <FrozenRouter>{children}</FrozenRouter>
+    </motion.div>
   );
 }
