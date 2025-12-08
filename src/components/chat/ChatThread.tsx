@@ -96,8 +96,7 @@ export function ChatThread({ messages, isBusy, hasMessages }: ChatThreadProps) {
           const nextMessageHasDevReasoning =
             nextMessage?.role === 'assistant' &&
             streamingAssistantMessageId !== nextMessage.id &&
-            showDevTools &&
-            Boolean(nextTrace);
+            showDevTools;
 
           // Check if next message is the streaming assistant message
           const nextIsStreaming = nextMessage?.role === 'assistant' && nextMessage.id === streamingAssistantMessageId;
