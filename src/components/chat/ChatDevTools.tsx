@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Download, Code, User, Settings } from 'lucide-react';
 import { useChat } from '@/hooks/useChat';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { formatChatMessagesAsMarkdown } from '@/lib/chat-debug';
+import { AnimatedExpandButton } from '@/components/ui/AnimatedExpandButton';
 import type { ChatDebugLogEntry } from '@portfolio/chat-next-api';
 
 const isDevEnvironment = process.env.NODE_ENV === 'development';
@@ -22,7 +24,6 @@ export function ChatDevTools() {
   const [devReasoningView, setDevReasoningView] = useState(false);
   const [devReasoningInitialized, setDevReasoningInitialized] = useState(false);
   const hasMessages = messages.length > 0;
-  const isProd = process.env.NODE_ENV === 'production';
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -131,34 +132,43 @@ export function ChatDevTools() {
   }
 
   return createPortal(
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[9999] flex max-w-sm flex-col gap-2 text-[11px]">
-      <button
-        type="button"
-        onClick={handleExport}
-        disabled={!hasMessages || isSaving}
-        className="pointer-events-auto hidden rounded-full border border-white/30 bg-black/70 px-4 py-2 font-semibold uppercase tracking-wide text-white/70 shadow-lg transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40 sm:block"
-        title={
-          hasMessages
-            ? isProd
-              ? 'Save this chat log to AWS (admin-only)'
-              : 'Write the current chat transcript into debug/chat-exports'
-            : 'Start chatting to enable exports'
-        }
-      >
-        {isSaving ? 'Saving…' : isProd ? 'Export Chat' : 'Export Chat to Repo'}
-      </button>
-      <button
-        type="button"
-        onClick={toggleDevReasoningView}
-        className="pointer-events-auto hidden rounded-full border border-white/20 bg-black/60 px-4 py-2 font-semibold uppercase tracking-wide text-white/60 shadow-lg transition hover:text-white sm:block"
-        title="Toggle between user-facing and developer reasoning panels"
-      >
-        {devReasoningView ? '← User Reasoning View' : '→ Dev Reasoning View'}
-      </button>
-      {lastExportInfo ? (
-        <div className="pointer-events-auto rounded bg-emerald-500/20 px-3 py-2 font-mono text-[10px] text-emerald-100">
+    <div className="pointer-events-none fixed bottom-4 right-4 z-[9999] flex flex-col items-end gap-2">
+      {/* Toolbar */}
+      <div className="pointer-events-auto hidden h-10 items-center gap-1 rounded-full border border-white/20 bg-black/70 p-1 backdrop-blur-sm sm:flex">
+        <AnimatedExpandButton
+          icon={<Download className="h-4 w-4" />}
+          text={isSaving ? 'saving...' : 'export'}
+          collapsedWidth="2rem"
+          expandedWidth="5.5rem"
+          disabled={!hasMessages || isSaving}
+          onClick={handleExport}
+          className="h-8 rounded-full text-xs"
+        />
+        <AnimatedExpandButton
+          icon={devReasoningView ? <User className="h-4 w-4" /> : <Code className="h-4 w-4" />}
+          text={devReasoningView ? 'user view' : 'dev view'}
+          collapsedWidth="2rem"
+          expandedWidth="6rem"
+          onClick={toggleDevReasoningView}
+          className="h-8 rounded-full text-xs"
+        />
+        {isAdmin && (
+          <AnimatedExpandButton
+            icon={<Settings className="h-4 w-4" />}
+            text="admin"
+            collapsedWidth="2rem"
+            expandedWidth="5rem"
+            href="/admin"
+            className="h-8 rounded-full text-xs"
+          />
+        )}
+      </div>
+
+      {/* Status messages */}
+      {lastExportInfo && (
+        <div className="pointer-events-auto rounded-lg bg-emerald-500/20 px-3 py-2 text-[10px] font-mono text-emerald-100 backdrop-blur-sm">
           <span>Saved to {lastExportInfo.label}</span>
-          {lastExportInfo.url ? (
+          {lastExportInfo.url && (
             <>
               {' '}
               <a
@@ -170,14 +180,14 @@ export function ChatDevTools() {
                 Download
               </a>
             </>
-          ) : null}
+          )}
         </div>
-      ) : null}
-      {errorMessage ? (
-        <div className="pointer-events-auto rounded bg-red-500/20 px-3 py-2 font-mono text-[10px] text-red-100">
+      )}
+      {errorMessage && (
+        <div className="pointer-events-auto rounded-lg bg-red-500/20 px-3 py-2 text-[10px] font-mono text-red-100 backdrop-blur-sm">
           {errorMessage}
         </div>
-      ) : null}
+      )}
     </div>,
     portalTarget
   );
