@@ -8,6 +8,7 @@ import { InlineUiPortal, InlineUiPortalAnchor, InlineUiPortalProvider } from '@/
 import { useChat } from '@/hooks/useChat';
 import { ChatReasoningDisplay } from '@/components/chat/ChatReasoningDisplay';
 import { cn } from '@/lib/utils';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 interface ChatThreadProps {
   messages: ChatMessage[];
@@ -31,6 +32,8 @@ function ThinkingSpinner() {
 export function ChatThread({ messages, isBusy, hasMessages }: ChatThreadProps) {
   const { uiState, reasoningTraces, reasoningEnabled, completionTimes } = useChat();
   const isDev = process.env.NODE_ENV === 'development';
+  const isAdmin = useIsAdmin();
+  const showDevTools = isDev || isAdmin;
   const surfaces = uiState.surfaces ?? [];
   const hasRenderableTrace = (trace: PartialReasoningTrace | null | undefined) => {
     if (!trace) return false;
@@ -91,12 +94,15 @@ export function ChatThread({ messages, isBusy, hasMessages }: ChatThreadProps) {
             streamingAssistantMessageId !== nextMessage.id &&
             hasRenderableTrace(nextTrace);
           const nextMessageHasDevReasoning =
-            nextMessage?.role === 'assistant' && streamingAssistantMessageId !== nextMessage.id && isDev && Boolean(nextTrace);
+            nextMessage?.role === 'assistant' &&
+            streamingAssistantMessageId !== nextMessage.id &&
+            showDevTools &&
+            Boolean(nextTrace);
 
           // Check if next message is the streaming assistant message
           const nextIsStreaming = nextMessage?.role === 'assistant' && nextMessage.id === streamingAssistantMessageId;
           const shouldRenderStreamingReasoning =
-            nextIsStreaming && ((reasoningEnabled && hasRenderableCurrentTrace) || isDev);
+            nextIsStreaming && ((reasoningEnabled && hasRenderableCurrentTrace) || showDevTools);
           const shouldShowStreamingSpinner = nextIsStreaming && (!reasoningEnabled || !hasRenderableCurrentTrace);
 
           return (
