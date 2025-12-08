@@ -18,5 +18,5 @@ export function DocumentContent({ content, pid, path, projectName }: DocumentCon
     { label: documentName },
   ];
 
-  return <MarkdownViewer content={content} pid={pid} breadcrumbs={breadcrumbs} />;
+  return <MarkdownViewer content={content} pid={pid} breadcrumbs={breadcrumbs} filename={path.join('/')} />;
 }

@@ -392,6 +392,58 @@ export const getDocumentContent = unstable_cache(fetchDocumentContent, ['documen
   tags: ['github-document'],
 });
 
+export interface DirectoryEntry {
+  name: string;
+  path: string;
+  type: 'file' | 'dir';
+}
+
+async function fetchDirectoryContents(
+  repo: string,
+  dirPath: string,
+  owner: string = GH_CONFIG.USERNAME
+): Promise<DirectoryEntry[]> {
+  const token = await resolveGitHubToken();
+  if (!token) throw new Error('GitHub token is not configured');
+  const octokit = await createOctokit(token);
+
+  const portfolioConfig = await getPortfolioConfig();
+  const repoConfig = portfolioConfig?.repositories?.find((r) => r.name === repo);
+
+  let repoToFetch = repo;
+  if (repoConfig?.isPrivate) {
+    repoToFetch = repoConfig.publicRepo || `${repo}-public`;
+  }
+
+  const response = await octokit.rest.repos.getContent({
+    owner,
+    repo: repoToFetch,
+    path: dirPath,
+  });
+
+  if (!Array.isArray(response.data)) {
+    throw new Error('Path is not a directory');
+  }
+
+  return response.data
+    .filter((item) => item.type === 'file' || item.type === 'dir')
+    .map((item) => ({
+      name: item.name,
+      path: item.path,
+      type: item.type as 'file' | 'dir',
+    }))
+    .sort((a, b) => {
+      // Directories first, then files
+      if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+}
+
+export const getDirectoryContents = unstable_cache(fetchDirectoryContents, ['directory-contents'], {
+  revalidate: 3600,
+  tags: ['github-directory'],
+});
+
 export async function getRepos(): Promise<RepoData[]> {
   const { starred, normal } = await getPortfolioRepos();
   return [...starred, ...normal];

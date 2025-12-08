@@ -11,6 +11,7 @@ import { normalizeProjectKey } from '@/lib/projects/normalize';
 import { useProjectRepo } from '@/hooks/useProjectRepo';
 import { ProjectInlineDetails } from '@/components/chat/attachments/ProjectInlineDetails';
 import { DocumentInlinePanel } from '@/components/chat/attachments/DocumentInlinePanel';
+import { DirectoryInlinePanel } from '@/components/chat/attachments/DirectoryInlinePanel';
 import { Spinner } from '@/components/ui/spinner';
 import { useProjectDetail } from '@/hooks/useProjectDetail';
 import { useProjectDocument } from '@/hooks/useProjectDocument';
@@ -288,10 +289,15 @@ function SurfaceProjectCard({
   const { data: detail, isLoading, isError } = useProjectDetail(projectId, { enabled: isExpanded });
   const { data: repoInfo } = useProjectRepo(projectId);
   const {
-    data: document,
+    data: docResponse,
     isLoading: isDocLoading,
     isError: docError,
   } = useProjectDocument(projectId, activeDoc?.path, { enabled: isExpanded && Boolean(activeDoc?.path) });
+
+  // Extract file or directory data from response
+  const fileDoc = docResponse?.type === 'file' ? docResponse.document : null;
+  const dirDoc = docResponse?.type === 'directory' ? docResponse.directory : null;
+
   const autoExpandRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [stableHeight, setStableHeight] = useState<number | null>(null);
@@ -367,13 +373,16 @@ function SurfaceProjectCard({
       return null;
     }
     const docLabel =
-      (document?.path && document.path === activeDoc.path && document.title) || activeDoc.label || activeDoc.path;
+      (fileDoc?.path && fileDoc.path === activeDoc.path && fileDoc.title) ||
+      (dirDoc?.path && dirDoc.path === activeDoc.path && activeDoc.path.split('/').pop()) ||
+      activeDoc.label ||
+      activeDoc.path;
     return [
       { label: 'Projects', onClick: collapseToCard },
       { label: project.name, onClick: backToDetail },
       { label: docLabel },
     ];
-  }, [activeDoc, collapseToCard, backToDetail, document?.path, document?.title, project.name]);
+  }, [activeDoc, collapseToCard, backToDetail, fileDoc?.path, fileDoc?.title, dirDoc?.path, project.name]);
 
   const repoForCard = detail?.repo ?? repoInfo;
   const prefersReducedMotion = useReducedMotion();
@@ -474,7 +483,7 @@ function SurfaceProjectCard({
                   >
                     <Spinner size="md" variant="ring" />
                   </motion.div>
-                ) : docError || !document ? (
+                ) : docError || !docResponse ? (
                   <motion.div key="doc-error" className="p-4" {...fadeMotionProps}>
                     <p className="text-sm text-white/70">Unable to load that document. Please try another link.</p>
                     <button
@@ -484,18 +493,27 @@ function SurfaceProjectCard({
                       Back to project
                     </button>
                   </motion.div>
-                ) : (
+                ) : fileDoc ? (
                   <motion.div key="doc-content" layoutId={bodyLayoutId} transition={cardTransitions.layout}>
                     <DocumentInlinePanel
-                      repo={document.repoName}
-                      title={document.title}
-                      path={document.path}
-                      content={document.content}
+                      repo={fileDoc.repoName}
+                      title={fileDoc.title}
+                      path={fileDoc.path}
+                      content={fileDoc.content}
                       breadcrumbsOverride={docBreadcrumbs ?? undefined}
                       onDocLinkClick={handleDocLinkClick}
                     />
                   </motion.div>
-                )}
+                ) : dirDoc ? (
+                  <motion.div key="dir-content" layoutId={bodyLayoutId} transition={cardTransitions.layout}>
+                    <DirectoryInlinePanel
+                      path={dirDoc.path}
+                      entries={dirDoc.entries}
+                      breadcrumbsOverride={docBreadcrumbs ?? undefined}
+                      onDocLinkClick={handleDocLinkClick}
+                    />
+                  </motion.div>
+                ) : null}
               </AnimatePresence>
             </motion.div>
           )}

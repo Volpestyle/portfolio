@@ -4,14 +4,30 @@ import { useQuery } from '@tanstack/react-query';
 import { projectDocumentQueryKey } from '@/lib/query-keys';
 import { normalizeProjectKey } from '@/lib/projects/normalize';
 
-type ProjectDocument = {
+export type ProjectDocument = {
   repoName: string;
   path: string;
   title: string;
   content: string;
 };
 
-async function fetchProjectDocument(projectId: string, docPath: string): Promise<ProjectDocument> {
+export type DirectoryEntry = {
+  name: string;
+  path: string;
+  type: 'file' | 'dir';
+};
+
+export type ProjectDirectory = {
+  repoName: string;
+  path: string;
+  entries: DirectoryEntry[];
+};
+
+export type DocumentResponse =
+  | { type: 'file'; document: ProjectDocument }
+  | { type: 'directory'; directory: ProjectDirectory };
+
+async function fetchProjectDocument(projectId: string, docPath: string): Promise<DocumentResponse> {
   const encodedDocPath = docPath
     .split('/')
     .map((segment) => encodeURIComponent(segment))
@@ -22,7 +38,7 @@ async function fetchProjectDocument(projectId: string, docPath: string): Promise
     throw new Error('Failed to fetch document');
   }
   const data = await response.json();
-  return data.document as ProjectDocument;
+  return data as DocumentResponse;
 }
 
 type UseProjectDocumentOptions = {

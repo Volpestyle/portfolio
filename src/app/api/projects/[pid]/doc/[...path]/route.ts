@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDocumentContent } from '@/lib/github-server';
+import { getDocumentContent, getDirectoryContents } from '@/lib/github-server';
 
 export const runtime = 'nodejs';
 
@@ -20,10 +20,13 @@ export async function GET(_: Request, context: RouteContext) {
   }
 
   const docPath = path.join('/');
+
+  // Try to fetch as file first
   try {
     const document = await getDocumentContent(projectId, docPath);
     const title = path[path.length - 1] ?? docPath;
     return NextResponse.json({
+      type: 'file',
       document: {
         repoName: document.projectName ?? projectId,
         path: docPath,
@@ -31,8 +34,23 @@ export async function GET(_: Request, context: RouteContext) {
         content: document.content,
       },
     });
+  } catch {
+    // File not found, try as directory
+  }
+
+  // Try to fetch as directory
+  try {
+    const entries = await getDirectoryContents(projectId, docPath);
+    return NextResponse.json({
+      type: 'directory',
+      directory: {
+        repoName: projectId,
+        path: docPath,
+        entries,
+      },
+    });
   } catch (error) {
-    console.error('[api/projects/[pid]/doc] Failed to load document', error);
+    console.error('[api/projects/[pid]/doc] Failed to load document or directory', error);
     return NextResponse.json({ error: 'Document not found' }, { status: 404 });
   }
 }

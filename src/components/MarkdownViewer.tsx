@@ -23,6 +23,7 @@ interface MarkdownViewerProps {
   isLoading?: boolean;
   variant?: MarkdownVariant;
   onDocLinkClick?: (path: string, label?: string) => void;
+  filename?: string;
 }
 
 export function MarkdownViewer({
@@ -34,16 +35,17 @@ export function MarkdownViewer({
   isLoading = false,
   variant = 'page',
   onDocLinkClick,
+  filename,
 }: MarkdownViewerProps) {
   const isChat = variant === 'chat';
 
-  const containerClass = isChat ? 'mx-auto max-w-3xl' : 'container mx-auto max-w-4xl px-4 py-8';
+  const containerClass = isChat ? 'mx-auto max-w-3xl' : 'container mx-auto max-w-4xl px-3 sm:px-4 pt-4 pb-8';
   const wrapperClass = isChat ? 'max-h-[60vh] overflow-y-auto px-4 py-4 bg-black/10 backdrop-blur-sm' : 'min-h-screen';
   const navClass = isChat
     ? 'flex items-center gap-2 text-xs text-white/60 mb-3'
-    : 'mb-8 flex items-center space-x-2 text-sm';
-  const iconClass = isChat ? 'h-3 w-3 text-white/50' : 'h-4 w-4 text-gray-600';
-  const markdownClass = isChat ? 'preserve-case' : 'preserve-case rounded-lg border border-gray-800 bg-gray-900/50 p-8';
+    : 'mt-2 mb-4 flex items-center space-x-2 text-sm';
+  const iconClass = isChat ? 'h-3 w-3 text-white/50' : 'h-4 w-4 text-white/50';
+  const markdownClass = 'preserve-case rounded-lg border border-gray-800 bg-black/80 p-4 ';
 
   if (isLoading) {
     return (
@@ -62,7 +64,7 @@ export function MarkdownViewer({
       <div className={cn(containerClass, isChat ? '' : undefined)}>
         <nav className={navClass}>
           {breadcrumbs.map((crumb, index) => (
-            <div key={index} className="flex items-center">
+            <div key={index} className="flex items-center gap-1">
               {index > 0 && <ChevronRight className={iconClass} />}
               {crumb.href ? (
                 <Link href={crumb.href} className="text-gray-400 transition-colors hover:text-white">
@@ -83,6 +85,10 @@ export function MarkdownViewer({
         </nav>
 
         {children}
+
+        {filename && (
+          <div className="mb-2 text-xs text-gray-500 font-mono">{filename}</div>
+        )}
 
         <div className={markdownClass} data-testid="markdown-viewer">
           <Markdown

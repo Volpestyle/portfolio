@@ -290,13 +290,7 @@ export function Markdown({
         );
       }) as Components['code'],
       pre: ({ children, ...props }) => (
-        <pre
-          className={cn(
-            'overflow-x-auto rounded-lg border border-white/20 bg-black/40',
-            isCompact ? 'my-3 p-3' : 'my-4 p-4'
-          )}
-          {...props}
-        >
+        <pre className={cn('overflow-x-auto rounded-lg', isCompact ? 'my-3 p-3' : 'my-4 p-4')} {...props}>
           {children}
         </pre>
       ),

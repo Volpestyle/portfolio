@@ -52,6 +52,7 @@ export function ProjectContent({
         handleImageClick={enableCarousel ? handleImageClick : undefined}
         variant={variant}
         onDocLinkClick={onDocLinkClick}
+        filename="README.md"
       >
         <div className={cn('mb-6', isChat ? 'px-2' : '')}>
           <div className="mb-3 flex items-center">

@@ -36,6 +36,7 @@ export function DocumentInlinePanel({
       breadcrumbs={breadcrumbs}
       variant="chat"
       onDocLinkClick={onDocLinkClick}
+      filename={path}
     />
   );
 }
