@@ -112,6 +112,7 @@ export class PortfolioStack extends Stack {
   private readonly postsTable: dynamodb.Table;
   private readonly blogContentBucket: s3.Bucket;
   private readonly blogMediaBucket: s3.Bucket;
+  private readonly chatExportBucket: s3.Bucket;
   private readonly blogPublishFunction: lambda.Function;
   private readonly blogSchedulerRole: iam.Role;
   private readonly chatCostTable: dynamodb.Table;
@@ -171,6 +172,7 @@ export class PortfolioStack extends Stack {
     this.postsTable = this.createBlogPostsTable();
     this.blogContentBucket = this.createBlogContentBucket();
     this.blogMediaBucket = this.createBlogMediaBucket();
+    this.chatExportBucket = this.createChatExportBucket();
     this.blogPublishFunction = this.createBlogPublishFunction();
     this.blogSchedulerRole = this.createBlogSchedulerRole(this.blogPublishFunction);
 
@@ -321,6 +323,10 @@ export class PortfolioStack extends Stack {
     new CfnOutput(this, 'BlogMediaBucketName', {
       value: this.blogMediaBucket.bucketName,
     });
+
+    new CfnOutput(this, 'ChatExportBucketName', {
+      value: this.chatExportBucket.bucketName,
+    });
   }
 
   private enrichRuntimeEnvironment(environment: Record<string, string>): Record<string, string> {
@@ -422,6 +428,25 @@ export class PortfolioStack extends Stack {
           enabled: true,
           expiration: Duration.days(90),
           prefix: 'posts/',
+        },
+      ],
+    });
+  }
+
+  private createChatExportBucket(): s3.Bucket {
+    return new s3.Bucket(this, 'ChatExportBucket', {
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      versioned: false,
+      removalPolicy: RemovalPolicy.RETAIN,
+      autoDeleteObjects: false,
+      lifecycleRules: [
+        {
+          enabled: true,
+          expiration: Duration.days(7),
+          prefix: 'chat/exports/',
+          abortIncompleteMultipartUploadAfter: Duration.days(7),
         },
       ],
     });
@@ -629,6 +654,7 @@ export class PortfolioStack extends Stack {
     env['POSTS_STATUS_INDEX'] = 'byStatusPublishedAt';
     env['CONTENT_BUCKET'] = this.blogContentBucket.bucketName;
     env['MEDIA_BUCKET'] = this.blogMediaBucket.bucketName;
+    env['CHAT_EXPORT_BUCKET'] = this.chatExportBucket.bucketName;
     env['BLOG_PUBLISH_FUNCTION_ARN'] = this.blogPublishFunction.functionArn;
     env['SCHEDULER_ROLE_ARN'] = this.blogSchedulerRole.roleArn;
 
@@ -1176,6 +1202,7 @@ export class PortfolioStack extends Stack {
     this.postsTable.grantReadWriteData(grantable);
     this.blogContentBucket.grantReadWrite(grantable);
     this.blogMediaBucket.grantReadWrite(grantable);
+    this.chatExportBucket.grantReadWrite(grantable);
   }
 
   private attachSchedulerPermissions(grantable: iam.IGrantable) {

@@ -16,12 +16,13 @@ export function ChatDevTools() {
   const isAdmin = useIsAdmin();
   const showDevTools = isDevEnvironment || isAdmin;
   const [isSaving, setSaving] = useState(false);
-  const [lastExportPath, setLastExportPath] = useState<string | null>(null);
+  const [lastExportInfo, setLastExportInfo] = useState<{ label: string; url?: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const [devReasoningView, setDevReasoningView] = useState(false);
   const [devReasoningInitialized, setDevReasoningInitialized] = useState(false);
   const hasMessages = messages.length > 0;
+  const isProd = process.env.NODE_ENV === 'production';
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -36,6 +37,7 @@ export function ChatDevTools() {
 
     setSaving(true);
     setErrorMessage(null);
+    setLastExportInfo(null);
 
     try {
       let debugLogs: ChatDebugLogEntry[] = [];
@@ -61,16 +63,36 @@ export function ChatDevTools() {
       });
 
       if (!response.ok) {
-        const details = await response.text();
+        let details = '';
+        try {
+          const errorBody = (await response.json()) as { error?: string };
+          details = typeof errorBody.error === 'string' ? errorBody.error : '';
+        } catch {
+          details = await response.text();
+        }
         throw new Error(details || 'Failed to write export.');
       }
 
-      const data = (await response.json()) as { relativePath?: string };
-      setLastExportPath(typeof data.relativePath === 'string' ? data.relativePath : null);
+      const data = (await response.json()) as {
+        storage?: string;
+        relativePath?: string;
+        bucket?: string;
+        key?: string;
+        downloadUrl?: string;
+      };
+
+      if (data.storage === 's3' && data.key) {
+        const label = data.bucket ? `${data.bucket}/${data.key}` : data.key;
+        setLastExportInfo({ label, url: data.downloadUrl });
+      } else if (data.relativePath) {
+        setLastExportInfo({ label: data.relativePath });
+      } else {
+        setLastExportInfo(null);
+      }
     } catch (err) {
       console.error('Chat export failed', err);
       setErrorMessage(err instanceof Error ? err.message : 'Unable to export chat.');
-      setLastExportPath(null);
+      setLastExportInfo(null);
     } finally {
       setSaving(false);
     }
@@ -116,10 +138,14 @@ export function ChatDevTools() {
         disabled={!hasMessages || isSaving}
         className="pointer-events-auto hidden rounded-full border border-white/30 bg-black/70 px-4 py-2 font-semibold uppercase tracking-wide text-white/70 shadow-lg transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40 sm:block"
         title={
-          hasMessages ? 'Write the current chat transcript into debug/chat-exports' : 'Start chatting to enable exports'
+          hasMessages
+            ? isProd
+              ? 'Save this chat log to AWS (admin-only)'
+              : 'Write the current chat transcript into debug/chat-exports'
+            : 'Start chatting to enable exports'
         }
       >
-        {isSaving ? 'Saving…' : 'Export Chat to Repo'}
+        {isSaving ? 'Saving…' : isProd ? 'Export Chat' : 'Export Chat to Repo'}
       </button>
       <button
         type="button"
@@ -129,9 +155,22 @@ export function ChatDevTools() {
       >
         {devReasoningView ? '← User Reasoning View' : '→ Dev Reasoning View'}
       </button>
-      {lastExportPath ? (
+      {lastExportInfo ? (
         <div className="pointer-events-auto rounded bg-emerald-500/20 px-3 py-2 font-mono text-[10px] text-emerald-100">
-          Saved to {lastExportPath}
+          <span>Saved to {lastExportInfo.label}</span>
+          {lastExportInfo.url ? (
+            <>
+              {' '}
+              <a
+                href={lastExportInfo.url}
+                target="_blank"
+                rel="noreferrer"
+                className="underline decoration-emerald-200/70 underline-offset-2 hover:text-emerald-50"
+              >
+                Download
+              </a>
+            </>
+          ) : null}
         </div>
       ) : null}
       {errorMessage ? (

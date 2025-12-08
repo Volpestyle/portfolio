@@ -26,6 +26,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <Link href="/admin" className="text-lg font-bold transition-colors hover:text-primary">
               Blog Admin
             </Link>
+            <Link href="/admin/chat-exports" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              Chat Exports
+            </Link>
             <Link href="/" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
               ← Back to Site
             </Link>
