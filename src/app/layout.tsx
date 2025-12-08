@@ -6,6 +6,8 @@ import { Metadata } from 'next';
 import { Providers } from './providers';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ConditionalLayout } from '@/components/ConditionalLayout';
+import { auth } from '@/auth';
+import { isAdminEmail } from '@/lib/auth/allowlist';
 
 export const metadata: Metadata = {
   title: {
@@ -43,7 +45,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const session = await auth();
+  const email = session?.user?.email;
+  const isAdmin = Boolean(email && isAdminEmail(email));
+
   return (
     <html
       lang="en"
@@ -51,7 +57,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <body className="bg-black font-geist-mono text-white">
         <ErrorBoundary>
-          <Providers>
+          <Providers isAdmin={isAdmin}>
             <ConditionalLayout>{children}</ConditionalLayout>
           </Providers>
         </ErrorBoundary>

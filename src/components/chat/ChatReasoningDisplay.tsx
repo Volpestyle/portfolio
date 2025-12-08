@@ -6,6 +6,7 @@ import { ChatReasoningPanel } from './ChatReasoningPanel';
 import { ChatReasoningDevPanel } from './ChatReasoningDevPanel';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 interface ChatReasoningDisplayProps {
   trace: PartialReasoningTrace | null;
@@ -26,19 +27,21 @@ export function ChatReasoningDisplay({
   className,
 }: ChatReasoningDisplayProps) {
   const isDev = process.env.NODE_ENV === 'development';
+  const isAdmin = useIsAdmin();
+  const showDevTools = isDev || isAdmin;
   const [showDevMode, setShowDevMode] = useState(false);
 
-  // Persist dev/user view preference in dev only
+  // Persist dev/user view preference when dev tools are available
   useEffect(() => {
-    if (!isDev || typeof window === 'undefined') return;
+    if (!showDevTools || typeof window === 'undefined') return;
     const stored = window.localStorage.getItem('chat:reasoningDevMode');
     if (stored === '1') {
       setShowDevMode(true);
     }
-  }, [isDev]);
+  }, [showDevTools]);
 
   useEffect(() => {
-    if (!isDev || typeof window === 'undefined') return;
+    if (!showDevTools || typeof window === 'undefined') return;
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<{ enabled?: boolean }>).detail;
       if (detail && typeof detail.enabled === 'boolean') {
@@ -56,10 +59,10 @@ export function ChatReasoningDisplay({
       window.removeEventListener('chat:reasoningDevModeChanged', handler as EventListener);
       window.removeEventListener('storage', onStorage);
     };
-  }, [isDev]);
+  }, [showDevTools]);
 
   useEffect(() => {
-    if (!isDev || typeof window === 'undefined') return;
+    if (!showDevTools || typeof window === 'undefined') return;
     try {
       if (showDevMode) {
         window.localStorage.setItem('chat:reasoningDevMode', '1');
@@ -69,7 +72,7 @@ export function ChatReasoningDisplay({
     } catch {
       // ignore storage errors
     }
-  }, [isDev, showDevMode]);
+  }, [showDevTools, showDevMode]);
 
   const hasRenderablePlan = Boolean(trace?.plan && (trace.plan.queries?.length ?? 0) > 0);
   const hasRetrieval = Boolean(trace?.retrieval && trace.retrieval.length);
@@ -81,11 +84,11 @@ export function ChatReasoningDisplay({
   const streamingHasPlan = Boolean(isStreaming && hasRenderablePlan);
   const shouldRenderUserPanel = Boolean(show && (hasTraceContent || streamingHasPlan));
   const hasTracePayload = trace !== null && trace !== undefined;
-  const allowDevPanel = isDev && showDevMode;
+  const allowDevPanel = showDevTools && showDevMode;
   const shouldRenderDevPanel = allowDevPanel && (hasTracePayload || isStreaming);
 
   const hasAnyPanel = shouldRenderUserPanel || shouldRenderDevPanel;
-  const shouldRenderContainer = hasAnyPanel || isDev;
+  const shouldRenderContainer = hasAnyPanel || showDevTools;
 
   // Keep hidden when nothing to render (non-dev)
   if (!shouldRenderContainer) {

@@ -3,10 +3,12 @@
 import { FormEvent, useCallback, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, LayoutGroup } from 'framer-motion';
+import { Code } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { AnimatedSendButton } from '@/components/ui/AnimatedSendButton';
 import { usePageTransition } from '@/components/PageTransition';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 interface ChatComposerProps {
   isBusy: boolean;
@@ -53,6 +55,46 @@ export function ChatComposer({ isBusy, hasMessages, onSend }: ChatComposerProps)
   const isSendDisabled = isBusy || !value.trim();
 
   const isFixedMode = hasMessages && isMobile;
+  const isAdmin = useIsAdmin();
+  const isDev = process.env.NODE_ENV === 'development';
+  const showDevTools = isDev || isAdmin;
+
+  // Dev mode toggle state (synced with localStorage)
+  const [devModeEnabled, setDevModeEnabled] = useState(false);
+  useEffect(() => {
+    if (!showDevTools) return;
+    const stored = window.localStorage.getItem('chat:reasoningDevMode');
+    setDevModeEnabled(stored === '1');
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'chat:reasoningDevMode') {
+        setDevModeEnabled(e.newValue === '1');
+      }
+    };
+    const onCustom = (e: Event) => {
+      const detail = (e as CustomEvent<{ enabled?: boolean }>).detail;
+      if (detail && typeof detail.enabled === 'boolean') {
+        setDevModeEnabled(detail.enabled);
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('chat:reasoningDevModeChanged', onCustom);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('chat:reasoningDevModeChanged', onCustom);
+    };
+  }, [showDevTools]);
+
+  const toggleDevMode = useCallback(() => {
+    const next = !devModeEnabled;
+    setDevModeEnabled(next);
+    if (next) {
+      window.localStorage.setItem('chat:reasoningDevMode', '1');
+    } else {
+      window.localStorage.removeItem('chat:reasoningDevMode');
+    }
+    window.dispatchEvent(new CustomEvent('chat:reasoningDevModeChanged', { detail: { enabled: next } }));
+  }, [devModeEnabled]);
 
   const formContent = (
     <motion.form
@@ -72,6 +114,24 @@ export function ChatComposer({ isBusy, hasMessages, onSend }: ChatComposerProps)
       }}
       transition={{ type: 'tween', duration: 0.4, ease: [0.2, 0, 0.2, 1] }}
     >
+      {/* Dev mode toggle button - visible in dev mode or to admins in fixed mobile mode */}
+      {isFixedMode && showDevTools && (
+        <div className="mx-auto mb-2 flex max-w-3xl justify-end">
+          <button
+            type="button"
+            onClick={toggleDevMode}
+            className={cn(
+              'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
+              devModeEnabled
+                ? 'bg-purple-500/20 text-purple-300'
+                : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60'
+            )}
+          >
+            <Code className="h-3 w-3" />
+            <span>Dev</span>
+          </button>
+        </div>
+      )}
       <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:flex-row sm:items-end">
         <Textarea
           ref={textareaRef}

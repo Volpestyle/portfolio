@@ -3,15 +3,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useChat } from '@/hooks/useChat';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { formatChatMessagesAsMarkdown } from '@/lib/chat-debug';
 import type { ChatDebugLogEntry } from '@portfolio/chat-next-api';
 
-const isDevEnvironment = process.env.NODE_ENV !== 'production';
+const isDevEnvironment = process.env.NODE_ENV === 'development';
 const DEV_MODE_STORAGE_KEY = 'chat:reasoningDevMode';
 const DEV_MODE_EVENT = 'chat:reasoningDevModeChanged';
 
 export function ChatDevTools() {
   const { messages } = useChat();
+  const isAdmin = useIsAdmin();
+  const showDevTools = isDevEnvironment || isAdmin;
   const [isSaving, setSaving] = useState(false);
   const [lastExportPath, setLastExportPath] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -73,17 +76,17 @@ export function ChatDevTools() {
     }
   }, [hasMessages, isSaving, messages]);
 
-  // Hydrate dev/user reasoning view toggle from localStorage in dev
+  // Hydrate dev/user reasoning view toggle from localStorage
   useEffect(() => {
-    if (!isDevEnvironment || typeof window === 'undefined') return;
+    if (!showDevTools || typeof window === 'undefined') return;
     const stored = window.localStorage.getItem(DEV_MODE_STORAGE_KEY);
     setDevReasoningView(stored === '1');
     setDevReasoningInitialized(true);
-  }, []);
+  }, [showDevTools]);
 
   // Persist and broadcast toggle changes after render (avoids cross-component setState during render)
   useEffect(() => {
-    if (!isDevEnvironment || typeof window === 'undefined' || !devReasoningInitialized) return;
+    if (!showDevTools || typeof window === 'undefined' || !devReasoningInitialized) return;
     try {
       if (devReasoningView) {
         window.localStorage.setItem(DEV_MODE_STORAGE_KEY, '1');
@@ -94,14 +97,14 @@ export function ChatDevTools() {
     } catch {
       // ignore storage errors
     }
-  }, [devReasoningView, devReasoningInitialized]);
+  }, [showDevTools, devReasoningView, devReasoningInitialized]);
 
   const toggleDevReasoningView = useCallback(() => {
-    if (!isDevEnvironment || typeof window === 'undefined') return;
+    if (!showDevTools || typeof window === 'undefined') return;
     setDevReasoningView((prev) => !prev);
-  }, []);
+  }, [showDevTools]);
 
-  if (!isDevEnvironment || !portalTarget) {
+  if (!showDevTools || !portalTarget) {
     return null;
   }
 
@@ -121,7 +124,7 @@ export function ChatDevTools() {
       <button
         type="button"
         onClick={toggleDevReasoningView}
-        className="pointer-events-auto rounded-full border border-white/20 bg-black/60 px-4 py-2 font-semibold uppercase tracking-wide text-white/60 shadow-lg transition hover:text-white"
+        className="pointer-events-auto hidden rounded-full border border-white/20 bg-black/60 px-4 py-2 font-semibold uppercase tracking-wide text-white/60 shadow-lg transition hover:text-white sm:block"
         title="Toggle between user-facing and developer reasoning panels"
       >
         {devReasoningView ? '← User Reasoning View' : '→ Dev Reasoning View'}
