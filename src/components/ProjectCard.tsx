@@ -133,11 +133,11 @@ export function ProjectCard({ project, repo, variant = 'default', onOpen, isExpa
         )}
 
         {tags.length > 0 && (
-          <div className="mb-4 mt-3 flex flex-wrap gap-2">
+          <div className="mb-4 mt-3 flex min-w-0 flex-wrap gap-2">
             {tags.map((tag) => (
               <span
                 key={`${resolveRepoKey(project)}-${tag}`}
-                className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80"
+                className="max-w-full break-words rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80"
               >
                 {tag}
               </span>
@@ -160,7 +160,7 @@ export function ProjectCard({ project, repo, variant = 'default', onOpen, isExpa
   }
 
   return (
-    <Card className="relative flex h-full flex-col border-white/30 bg-black/70 p-4 text-white backdrop-blur-sm">
+    <Card className="relative flex h-full flex-col overflow-hidden border-white/30 bg-black/70 p-4 text-white backdrop-blur-sm">
       <motion.h2 className="mb-2 flex items-center justify-between text-xl font-bold">
         <Link
           href={projectLink}
@@ -197,11 +197,11 @@ export function ProjectCard({ project, repo, variant = 'default', onOpen, isExpa
       )}
 
       {tags.length > 0 && (
-        <div className="mb-4 mt-3 flex flex-wrap gap-2">
+        <div className="mb-4 mt-3 flex min-w-0 flex-wrap gap-2">
           {tags.map((tag) => (
             <span
               key={`${slug}-tag-${tag}`}
-              className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80"
+              className="max-w-full break-words rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/80"
             >
               {tag}
             </span>
