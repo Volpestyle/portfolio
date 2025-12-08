@@ -139,6 +139,7 @@ export async function runProfileTask(context: PreprocessContext): Promise<Prepro
     styleGuidelines: styleGuidelines.length ? styleGuidelines : undefined,
     voiceExamples: voiceExamples.length ? voiceExamples : undefined,
     featuredExperiences,
+    resumeFilename: context.config.resume.filename,
     socialLinks: Array.isArray(profileSource.socialLinks)
       ? profileSource.socialLinks
           .map((link) => ({

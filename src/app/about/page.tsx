@@ -4,7 +4,6 @@ import { SocialLinks } from './SocialLinks';
 import type { Metadata } from 'next';
 import profile from '../../../generated/profile.json';
 import { PROFILE_BIO_PARAGRAPHS } from '@/constants/profile';
-import { resolveResumeFilename } from '@/server/chat/config';
 import { getProfileSocialLinks } from '@/lib/profile/socialLinks';
 
 export const metadata: Metadata = {
@@ -18,8 +17,10 @@ export const metadata: Metadata = {
   },
 };
 
+const DEFAULT_RESUME_FILENAME = 'resume.pdf';
+
 export default function About() {
-  const resumeFilename = resolveResumeFilename();
+  const resumeFilename = profile.resumeFilename ?? DEFAULT_RESUME_FILENAME;
   const aboutParagraphs = profile.about?.length ? profile.about : PROFILE_BIO_PARAGRAPHS;
   const socialLinks = getProfileSocialLinks();
   const normalizedAbout = Array.isArray(aboutParagraphs) ? aboutParagraphs : [aboutParagraphs].filter(Boolean);
