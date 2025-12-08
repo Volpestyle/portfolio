@@ -50,12 +50,12 @@ export function PostsFilters() {
           placeholder="Search posts by title or slug..."
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
-          className="pr-10"
+          className="border-white/20 bg-white/5 pr-10 text-white placeholder:text-white/40"
           aria-label="Search posts"
         />
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground"
+          className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/40"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -75,7 +75,7 @@ export function PostsFilters() {
         {STATUS_OPTIONS.map((option) => (
           <Button
             key={option.value}
-            variant={currentStatus === option.value ? 'default' : 'outline'}
+            variant={currentStatus === option.value ? 'default' : 'onBlack'}
             size="sm"
             onClick={() => handleStatusChange(option.value)}
             aria-pressed={currentStatus === option.value}

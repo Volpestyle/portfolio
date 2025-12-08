@@ -5,9 +5,5 @@ export const metadata = {
 };
 
 export default function NewPostPage() {
-  return (
-    <div className="min-h-screen bg-background">
-      <PostEditor />
-    </div>
-  );
+  return <PostEditor />;
 }

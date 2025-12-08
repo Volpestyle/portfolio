@@ -70,65 +70,65 @@ export function ChatExportsClient() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="space-y-1">
-          <p className="text-sm font-medium text-foreground">{statusLabel}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm font-medium text-white">{statusLabel}</p>
+          <p className="text-xs text-white/50">
             Links expire after several minutes. Click refresh to request fresh download links.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={fetchExports} variant="outline" size="sm" disabled={loading}>
+          <Button onClick={fetchExports} variant="onBlack" size="sm" disabled={loading}>
             {loading ? 'Refreshing…' : 'Refresh'}
           </Button>
         </div>
       </div>
 
       {error ? (
-        <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div className="rounded-md border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-400">
           {error}
         </div>
       ) : null}
 
       {loading ? (
-        <div className="rounded-md border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
+        <div className="rounded-md border border-dashed border-white/20 px-4 py-6 text-sm text-white/50">
           Fetching exports…
         </div>
       ) : exportsList.length === 0 ? (
-        <div className="rounded-md border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
+        <div className="rounded-md border border-dashed border-white/20 px-4 py-6 text-sm text-white/50">
           No chat exports saved yet. Export a chat from the chatbot to see it here.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border shadow-sm">
-          <table className="min-w-full divide-y divide-border text-sm">
-            <thead className="bg-muted/30">
+        <div className="overflow-hidden rounded-lg border border-white/20">
+          <table className="min-w-full divide-y divide-white/10 text-sm">
+            <thead className="bg-white/5">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold">File</th>
-                <th className="px-4 py-3 text-left font-semibold">Saved At</th>
-                <th className="px-4 py-3 text-left font-semibold">Size</th>
-                <th className="px-4 py-3 text-left font-semibold">Download</th>
+                <th className="px-4 py-3 text-left font-semibold text-white">File</th>
+                <th className="px-4 py-3 text-left font-semibold text-white">Saved At</th>
+                <th className="px-4 py-3 text-left font-semibold text-white">Size</th>
+                <th className="px-4 py-3 text-left font-semibold text-white">Download</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-white/10">
               {exportsList.map((item) => (
-                <tr key={item.key} className="hover:bg-muted/20">
+                <tr key={item.key} className="hover:bg-white/5">
                   <td className="px-4 py-3 align-top">
-                    <div className="font-mono text-xs text-foreground">{extractFilename(item.key)}</div>
-                    <div className="font-mono text-[11px] text-muted-foreground">Key: {item.key}</div>
-                    <div className="font-mono text-[11px] text-muted-foreground">Bucket: {item.bucket}</div>
+                    <div className="font-mono text-xs text-white">{extractFilename(item.key)}</div>
+                    <div className="font-mono text-[11px] text-white/50">Key: {item.key}</div>
+                    <div className="font-mono text-[11px] text-white/50">Bucket: {item.bucket}</div>
                   </td>
-                  <td className="px-4 py-3 align-top text-sm text-muted-foreground">{formatTimestamp(item.lastModified)}</td>
-                  <td className="px-4 py-3 align-top text-sm text-muted-foreground">{formatSize(item.size)}</td>
+                  <td className="px-4 py-3 align-top text-sm text-white/60">{formatTimestamp(item.lastModified)}</td>
+                  <td className="px-4 py-3 align-top text-sm text-white/60">{formatSize(item.size)}</td>
                   <td className="px-4 py-3 align-top">
                     {item.downloadUrl ? (
                       <a
                         href={item.downloadUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-primary underline-offset-2 hover:underline"
+                        className="text-blue-400 underline-offset-2 hover:text-blue-300 hover:underline"
                       >
                         Download
                       </a>
                     ) : (
-                      <span className="text-sm text-muted-foreground">Unavailable</span>
+                      <span className="text-sm text-white/40">Unavailable</span>
                     )}
                   </td>
                 </tr>

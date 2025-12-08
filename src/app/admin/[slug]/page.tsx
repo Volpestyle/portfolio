@@ -20,10 +20,8 @@ export default async function EditPostPage({ params }: PageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Suspense fallback={<div className="p-6">Loading editor...</div>}>
-        <PostEditor post={post} />
-      </Suspense>
-    </div>
+    <Suspense fallback={<div className="p-6 text-white/60">Loading editor...</div>}>
+      <PostEditor post={post} />
+    </Suspense>
   );
 }

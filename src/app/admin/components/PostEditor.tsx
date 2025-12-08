@@ -248,19 +248,19 @@ export function PostEditor({ post }: PostEditorProps) {
   }, [formData.version, post?.slug, router]);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{isNew ? 'New Post' : 'Edit Post'}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-white">{isNew ? 'New Post' : 'Edit Post'}</h1>
           {!isNew && (
-            <p className="mt-1 text-muted-foreground">
+            <p className="mt-1 text-sm text-white/60">
               Status: <span className="font-medium capitalize">{post.status}</span>
             </p>
           )}
         </div>
         <Link href="/admin">
-          <Button variant="outline">
+          <Button variant="onBlack">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="mr-2 h-4 w-4"
@@ -281,8 +281,8 @@ export function PostEditor({ post }: PostEditorProps) {
         <div
           className={`rounded-lg border p-4 ${
             message.includes('error') || message.includes('Failed')
-              ? 'border-destructive/50 bg-destructive/10 text-destructive'
-              : 'border-green-500/50 bg-green-500/10 text-green-500'
+              ? 'border-red-500/50 bg-red-500/10 text-red-400'
+              : 'border-green-500/50 bg-green-500/10 text-green-400'
           }`}
           role="alert"
           aria-live="polite"
@@ -294,15 +294,15 @@ export function PostEditor({ post }: PostEditorProps) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Main Editor */}
         <div className="space-y-6 lg:col-span-2">
-          <Card>
+          <Card className="border-white/20 bg-black/40 backdrop-blur-sm">
             <CardHeader>
-              <CardTitle>Post Details</CardTitle>
+              <CardTitle className="text-white">Post Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Title */}
               <div>
-                <label htmlFor="title" className="mb-2 block text-sm font-medium">
-                  Title <span className="text-destructive">*</span>
+                <label htmlFor="title" className="mb-2 block text-sm font-medium text-white/80">
+                  Title <span className="text-red-400">*</span>
                 </label>
                 <Input
                   id="title"
@@ -310,18 +310,18 @@ export function PostEditor({ post }: PostEditorProps) {
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="Enter post title"
-                  className="text-lg"
+                  className="border-white/20 bg-white/5 text-lg text-white placeholder:text-white/40"
                   required
                 />
               </div>
 
               {/* Slug */}
               <div>
-                <label htmlFor="slug" className="mb-2 block text-sm font-medium">
-                  Slug <span className="text-destructive">*</span>
+                <label htmlFor="slug" className="mb-2 block text-sm font-medium text-white/80">
+                  Slug <span className="text-red-400">*</span>
                 </label>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">/blog/</span>
+                  <span className="text-sm text-white/50">/blog/</span>
                   <Input
                     id="slug"
                     type="text"
@@ -332,17 +332,18 @@ export function PostEditor({ post }: PostEditorProps) {
                     required
                     disabled={!isNew}
                     maxLength={48}
+                    className="border-white/20 bg-white/5 text-white placeholder:text-white/40 disabled:opacity-50"
                   />
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-xs text-white/50">
                   Only lowercase letters, numbers, and hyphens{!isNew ? ' (slug is locked after creation)' : ''}
                 </p>
               </div>
 
               {/* Summary */}
               <div>
-                <label htmlFor="summary" className="mb-2 block text-sm font-medium">
-                  Summary <span className="text-destructive">*</span>
+                <label htmlFor="summary" className="mb-2 block text-sm font-medium text-white/80">
+                  Summary <span className="text-red-400">*</span>
                 </label>
                 <Textarea
                   id="summary"
@@ -351,12 +352,13 @@ export function PostEditor({ post }: PostEditorProps) {
                   placeholder="Brief summary of the post"
                   rows={3}
                   required
+                  className="border-white/20 bg-white/5 text-white placeholder:text-white/40"
                 />
               </div>
 
               {/* Tags */}
               <div>
-                <label htmlFor="tags" className="mb-2 block text-sm font-medium">
+                <label htmlFor="tags" className="mb-2 block text-sm font-medium text-white/80">
                   Tags
                 </label>
                 <Input
@@ -365,13 +367,14 @@ export function PostEditor({ post }: PostEditorProps) {
                   value={formData.tags}
                   onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
                   placeholder="react, typescript, web-dev (comma-separated)"
+                  className="border-white/20 bg-white/5 text-white placeholder:text-white/40"
                 />
-                <p className="mt-1 text-xs text-muted-foreground">Comma-separated list of tags</p>
+                <p className="mt-1 text-xs text-white/50">Comma-separated list of tags</p>
               </div>
 
               {/* Hero Image */}
               <div>
-                <label htmlFor="heroImage" className="mb-2 block text-sm font-medium">
+                <label htmlFor="heroImage" className="mb-2 block text-sm font-medium text-white/80">
                   Hero Image Key
                 </label>
                 <Input
@@ -380,23 +383,24 @@ export function PostEditor({ post }: PostEditorProps) {
                   value={formData.heroImageKey}
                   onChange={(e) => setFormData({ ...formData, heroImageKey: e.target.value })}
                   placeholder="images/2025/01/hero.jpg"
+                  className="border-white/20 bg-white/5 text-white placeholder:text-white/40"
                 />
-                <p className="mt-1 text-xs text-muted-foreground">S3 key for the hero image</p>
+                <p className="mt-1 text-xs text-white/50">S3 key for the hero image</p>
               </div>
             </CardContent>
           </Card>
 
           {/* Content Editor */}
-          <Card>
+          <Card className="border-white/20 bg-black/40 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Content</CardTitle>
+              <CardTitle className="text-white">Content</CardTitle>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => setShowPreview(!showPreview)}>
+                <Button type="button" variant="onBlack" size="sm" onClick={() => setShowPreview(!showPreview)}>
                   {showPreview ? 'Edit' : 'Preview'}
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="onBlack"
                   size="sm"
                   onClick={() => setShowMediaUploader(!showMediaUploader)}
                 >
@@ -422,16 +426,16 @@ export function PostEditor({ post }: PostEditorProps) {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Actions */}
-          <Card>
+          <Card className="border-white/20 bg-black/40 backdrop-blur-sm">
             <CardHeader>
-              <CardTitle>Actions</CardTitle>
+              <CardTitle className="text-white">Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <Button
                 onClick={() => handleSave(false)}
                 disabled={saving || publishing || scheduling || unscheduling}
                 className="w-full"
-                variant="outline"
+                variant="onBlack"
               >
                 {saving ? 'Saving...' : 'Save Draft'}
               </Button>
@@ -441,7 +445,7 @@ export function PostEditor({ post }: PostEditorProps) {
                   onClick={handlePreview}
                   disabled={saving || publishing || scheduling || unscheduling}
                   className="w-full"
-                  variant="secondary"
+                  variant="onBlack"
                 >
                   Preview Draft
                 </Button>
@@ -457,7 +461,7 @@ export function PostEditor({ post }: PostEditorProps) {
 
               {!isNew && (
                 <Link href={`/blog/${post.slug}`} target="_blank" className="block">
-                  <Button variant="ghost" className="w-full">
+                  <Button variant="onBlack" className="w-full">
                     View Live
                   </Button>
                 </Link>
@@ -467,15 +471,15 @@ export function PostEditor({ post }: PostEditorProps) {
 
           {/* Scheduling */}
           {!isNew && (
-            <Card>
+            <Card className="border-white/20 bg-black/40 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle>Schedule Publishing</CardTitle>
+                <CardTitle className="text-white">Schedule Publishing</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {post.status === 'scheduled' && post.scheduledFor && (
-                  <div className="mb-3 rounded-md border border-blue-500/50 bg-blue-500/10 p-3">
-                    <p className="mb-1 text-xs font-medium text-blue-500">Currently Scheduled</p>
-                    <p className="text-sm text-foreground">
+                  <div className="mb-3 rounded-md border border-blue-500/50 bg-blue-500/20 p-3">
+                    <p className="mb-1 text-xs font-medium text-blue-400">Currently Scheduled</p>
+                    <p className="text-sm text-white">
                       {new Date(post.scheduledFor).toLocaleString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -491,7 +495,7 @@ export function PostEditor({ post }: PostEditorProps) {
                 {post.status !== 'scheduled' && (
                   <>
                     <div>
-                      <label htmlFor="scheduleDate" className="mb-2 block text-sm font-medium">
+                      <label htmlFor="scheduleDate" className="mb-2 block text-sm font-medium text-white/80">
                         Schedule Date & Time
                       </label>
                       <Input
@@ -501,8 +505,9 @@ export function PostEditor({ post }: PostEditorProps) {
                         onChange={(e) => setScheduledFor(e.target.value)}
                         disabled={scheduling || unscheduling}
                         min={new Date().toISOString().slice(0, 16)}
+                        className="border-white/20 bg-white/5 text-white"
                       />
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="mt-1 text-xs text-white/50">
                         Post will be published automatically at this time
                       </p>
                     </div>
@@ -534,13 +539,13 @@ export function PostEditor({ post }: PostEditorProps) {
 
           {/* Post Info */}
           {!isNew && (
-            <Card>
+            <Card className="border-white/20 bg-black/40 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle>Post Info</CardTitle>
+                <CardTitle className="text-white">Post Info</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm">
+              <CardContent className="space-y-2 text-sm text-white">
                 <div>
-                  <span className="text-muted-foreground">Created:</span>
+                  <span className="text-white/50">Created:</span>
                   <br />
                   {new Date(post.updatedAt).toLocaleDateString('en-US', {
                     month: 'long',
@@ -550,7 +555,7 @@ export function PostEditor({ post }: PostEditorProps) {
                 </div>
                 {post.publishedAt && (
                   <div>
-                    <span className="text-muted-foreground">Published:</span>
+                    <span className="text-white/50">Published:</span>
                     <br />
                     {new Date(post.publishedAt).toLocaleDateString('en-US', {
                       month: 'long',
@@ -560,25 +565,25 @@ export function PostEditor({ post }: PostEditorProps) {
                   </div>
                 )}
                 <div>
-                  <span className="text-muted-foreground">Version:</span> {formData.version}
+                  <span className="text-white/50">Version:</span> {formData.version}
                 </div>
               </CardContent>
             </Card>
           )}
 
           {/* Keyboard Shortcuts */}
-          <Card>
+          <Card className="border-white/20 bg-black/40 backdrop-blur-sm">
             <CardHeader>
-              <CardTitle>Keyboard Shortcuts</CardTitle>
+              <CardTitle className="text-white">Keyboard Shortcuts</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1 text-xs">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Save Draft:</span>
-                <kbd className="rounded bg-muted px-2 py-1">⌘ + S</kbd>
+                <span className="text-white/50">Save Draft:</span>
+                <kbd className="rounded bg-white/10 px-2 py-1 text-white">⌘ + S</kbd>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Preview:</span>
-                <kbd className="rounded bg-muted px-2 py-1">⌘ + P</kbd>
+                <span className="text-white/50">Preview:</span>
+                <kbd className="rounded bg-white/10 px-2 py-1 text-white">⌘ + P</kbd>
               </div>
             </CardContent>
           </Card>

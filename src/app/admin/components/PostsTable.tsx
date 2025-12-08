@@ -41,15 +41,15 @@ export function PostsTable() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-muted-foreground">Loading posts...</div>
+        <div className="text-white/60">Loading posts...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-        <p className="text-sm text-destructive">Error: {error}</p>
+      <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-4">
+        <p className="text-sm text-red-400">Error: {error}</p>
       </div>
     );
   }
@@ -57,7 +57,7 @@ export function PostsTable() {
   if (posts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <p className="mb-4 text-lg text-muted-foreground">No posts found</p>
+        <p className="mb-4 text-lg text-white/60">No posts found</p>
         <Link href="/admin/new">
           <Button>Create your first post</Button>
         </Link>
@@ -69,12 +69,12 @@ export function PostsTable() {
     <div className="overflow-x-auto">
       <table className="w-full border-collapse">
         <thead>
-          <tr className="border-b border-border">
-            <th className="p-4 text-left font-semibold">Title</th>
-            <th className="min-w-[100px] p-4 text-left font-semibold">Status</th>
-            <th className="min-w-[140px] p-4 text-left font-semibold">Updated</th>
-            <th className="min-w-[140px] p-4 text-left font-semibold">Published</th>
-            <th className="min-w-[200px] p-4 text-right font-semibold">Actions</th>
+          <tr className="border-b border-white/20">
+            <th className="p-4 text-left font-semibold text-white">Title</th>
+            <th className="min-w-[100px] p-4 text-left font-semibold text-white">Status</th>
+            <th className="min-w-[140px] p-4 text-left font-semibold text-white">Updated</th>
+            <th className="min-w-[140px] p-4 text-left font-semibold text-white">Published</th>
+            <th className="min-w-[200px] p-4 text-right font-semibold text-white">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -181,22 +181,22 @@ function PostRow({ post, onUpdate }: { post: BlogPostRecord; onUpdate: () => voi
   };
 
   const statusColors = {
-    draft: 'bg-muted text-muted-foreground',
-    scheduled: 'bg-blue-500/10 text-blue-500',
-    published: 'bg-green-500/10 text-green-500',
-    archived: 'bg-orange-500/10 text-orange-500',
+    draft: 'bg-white/10 text-white/60',
+    scheduled: 'bg-blue-500/20 text-blue-400',
+    published: 'bg-green-500/20 text-green-400',
+    archived: 'bg-orange-500/20 text-orange-400',
   };
 
   return (
-    <tr className="border-b border-border transition-colors hover:bg-muted/50">
+    <tr className="border-b border-white/10 transition-colors hover:bg-white/5">
       <td className="p-4">
         <div>
-          <div className="font-medium">{post.title}</div>
-          <div className="text-sm text-muted-foreground">/{post.slug}</div>
+          <div className="font-medium text-white">{post.title}</div>
+          <div className="text-sm text-white/50">/{post.slug}</div>
           {post.tags.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {post.tags.map((tag) => (
-                <span key={tag} className="rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
+                <span key={tag} className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/70">
                   {tag}
                 </span>
               ))}
@@ -226,7 +226,7 @@ function PostRow({ post, onUpdate }: { post: BlogPostRecord; onUpdate: () => voi
             {post.status}
           </span>
           {post.status === 'scheduled' && post.scheduledFor && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-white/50">
               {new Date(post.scheduledFor).toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
@@ -238,14 +238,14 @@ function PostRow({ post, onUpdate }: { post: BlogPostRecord; onUpdate: () => voi
           )}
         </div>
       </td>
-      <td className="p-4 text-sm text-muted-foreground">
+      <td className="p-4 text-sm text-white/60">
         {new Date(post.updatedAt).toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
           year: 'numeric',
         })}
       </td>
-      <td className="p-4 text-sm text-muted-foreground">
+      <td className="p-4 text-sm text-white/60">
         {post.publishedAt
           ? new Date(post.publishedAt).toLocaleDateString('en-US', {
               month: 'short',
@@ -257,20 +257,20 @@ function PostRow({ post, onUpdate }: { post: BlogPostRecord; onUpdate: () => voi
       <td className="p-4">
         <div className="flex flex-wrap justify-end gap-2">
           <Link href={`/admin/${post.slug}`}>
-            <Button size="sm" variant="outline" disabled={actionLoading}>
+            <Button size="sm" variant="onBlack" disabled={actionLoading}>
               Edit
             </Button>
           </Link>
           {post.status === 'published' && (
             <Link href={`/blog/${post.slug}`} target="_blank">
-              <Button size="sm" variant="ghost" disabled={actionLoading}>
+              <Button size="sm" variant="onBlack" disabled={actionLoading}>
                 View
               </Button>
             </Link>
           )}
           {post.status === 'draft' && (
             <>
-              <Button size="sm" variant="secondary" onClick={() => setShowScheduleModal(true)} disabled={actionLoading}>
+              <Button size="sm" variant="onBlack" onClick={() => setShowScheduleModal(true)} disabled={actionLoading}>
                 Schedule
               </Button>
               <Button size="sm" variant="default" onClick={() => handleAction('publish')} disabled={actionLoading}>
@@ -283,13 +283,13 @@ function PostRow({ post, onUpdate }: { post: BlogPostRecord; onUpdate: () => voi
               <Button size="sm" variant="default" onClick={() => handleAction('publish')} disabled={actionLoading}>
                 Publish Now
               </Button>
-              <Button size="sm" variant="secondary" onClick={() => handleAction('unschedule')} disabled={actionLoading}>
+              <Button size="sm" variant="onBlack" onClick={() => handleAction('unschedule')} disabled={actionLoading}>
                 Unschedule
               </Button>
             </>
           )}
           {post.status === 'published' && (
-            <Button size="sm" variant="secondary" onClick={() => handleAction('archive')} disabled={actionLoading}>
+            <Button size="sm" variant="onBlack" onClick={() => handleAction('archive')} disabled={actionLoading}>
               Archive
             </Button>
           )}
@@ -298,17 +298,17 @@ function PostRow({ post, onUpdate }: { post: BlogPostRecord; onUpdate: () => voi
           </Button>
         </div>
         {actionMessage && (
-          <div className="mt-2 text-right text-xs" role="status" aria-live="polite">
+          <div className="mt-2 text-right text-xs text-white/70" role="status" aria-live="polite">
             {actionMessage}
           </div>
         )}
         {showScheduleModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="mx-4 w-full max-w-md rounded-lg border bg-background p-6">
-              <h3 className="mb-4 text-lg font-semibold">Schedule Post</h3>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+            <div className="mx-4 w-full max-w-md rounded-lg border border-white/20 bg-neutral-900 p-6">
+              <h3 className="mb-4 text-lg font-semibold text-white">Schedule Post</h3>
               <div className="space-y-4">
                 <div>
-                  <label htmlFor={`schedule-${post.slug}`} className="mb-2 block text-sm font-medium">
+                  <label htmlFor={`schedule-${post.slug}`} className="mb-2 block text-sm font-medium text-white/80">
                     Select Date & Time
                   </label>
                   <input
@@ -317,13 +317,13 @@ function PostRow({ post, onUpdate }: { post: BlogPostRecord; onUpdate: () => voi
                     value={scheduledFor}
                     onChange={(e) => setScheduledFor(e.target.value)}
                     min={new Date().toISOString().slice(0, 16)}
-                    className="w-full rounded-md border bg-background px-3 py-2"
+                    className="w-full rounded-md border border-white/20 bg-white/5 px-3 py-2 text-white"
                   />
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="onBlack"
                     onClick={() => {
                       setShowScheduleModal(false);
                       setScheduledFor('');

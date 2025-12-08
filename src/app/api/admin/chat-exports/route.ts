@@ -1,5 +1,3 @@
-'use server';
-
 import { NextResponse } from 'next/server';
 import { getAdminRequestContext } from '@/server/admin/auth';
 import { listChatExports } from '@/server/chat/exports';
