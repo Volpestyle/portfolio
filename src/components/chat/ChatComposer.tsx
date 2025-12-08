@@ -21,7 +21,9 @@ export function ChatComposer({ isBusy, hasMessages, onSend }: ChatComposerProps)
   const [textareaHeight, setTextareaHeight] = useState(40);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const { isTransitioning } = usePageTransition();
+  const { isTransitioning, isExiting } = usePageTransition();
+  // Hide during both exit (before navigation) and enter (after navigation) phases
+  const shouldHideForTransition = isExiting || isTransitioning;
 
   // Check if we're on mobile (below sm breakpoint)
   useEffect(() => {
@@ -109,8 +111,8 @@ export function ChatComposer({ isBusy, hasMessages, onSend }: ChatComposerProps)
       onSubmit={handleSubmit}
       initial={isFixedMode ? { opacity: 0, y: 10 } : false}
       animate={{
-        opacity: isTransitioning && isFixedMode ? 0 : 1,
-        y: isTransitioning && isFixedMode ? 10 : 0,
+        opacity: shouldHideForTransition && isFixedMode ? 0 : 1,
+        y: shouldHideForTransition && isFixedMode ? 10 : 0,
       }}
       transition={{ type: 'tween', duration: 0.4, ease: [0.2, 0, 0.2, 1] }}
     >

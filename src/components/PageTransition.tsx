@@ -19,7 +19,7 @@ import { FrozenRouter } from './FrozenRouter';
 import { Spinner } from '@/components/ui/spinner';
 
 const EXIT_DURATION_MS = 400;
-const BASELINE_DELAY_MS = 500;
+const BASELINE_DELAY_MS = 200;
 const SAFETY_TIMEOUT_MS = 5000;
 
 interface PageTransitionContextValue {
