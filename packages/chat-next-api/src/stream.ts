@@ -88,8 +88,25 @@ export function createChatSseStream(
           emit(chunk);
         }
       };
-      const sendErrorEvent = (code: string, message: string, retryable: boolean, retryAfterMs?: number) => {
-        sendEvent('error', { type: 'error', anchorId, itemId: anchorId, code, message, retryable, retryAfterMs });
+      const sendErrorEvent = (
+        code: string,
+        message: string,
+        retryable: boolean,
+        retryAfterMs?: number,
+        banner?: string,
+        replacement?: string
+      ) => {
+        sendEvent('error', {
+          type: 'error',
+          anchorId,
+          itemId: anchorId,
+          code,
+          message,
+          retryable,
+          retryAfterMs,
+          banner,
+          replacement,
+        });
       };
 
       sendEvent('item', { type: 'item', itemId: anchorId, anchorId });
@@ -129,29 +146,27 @@ export function createChatSseStream(
       let truncationApplied = false;
       let errorEmitted = false;
       try {
-        let streamed = false;
         const upstreamRunOptions = options?.runOptions;
-        const bufferToken = (token: string) => {
+        let streamed = false;
+        const handleToken = (token: string) => {
           if (!token) return;
           streamed = true;
-          emitChunked(token, (chunk) => bufferedTokens.push(chunk));
-          upstreamRunOptions?.onAnswerToken?.(token);
-        };
-        const streamToken = (token: string) => {
-          if (!token) return;
-          streamed = true;
-          emitChunked(token, enqueueToken);
+          resetTimeout();
+          if (moderationEnabled) {
+            emitChunked(token, (chunk) => {
+              bufferedTokens.push(chunk);
+              enqueueToken(chunk);
+            });
+          } else {
+            emitChunked(token, enqueueToken);
+          }
           upstreamRunOptions?.onAnswerToken?.(token);
         };
         const result = await api.run(client, messages, {
           ...upstreamRunOptions,
           abortSignal,
           onAnswerToken: (token) => {
-            if (moderationEnabled) {
-              bufferToken(token);
-              return;
-            }
-            streamToken(token);
+            handleToken(token);
           },
           onReasoningUpdate: (update) => {
             enqueueReasoningEvent(update);
@@ -196,10 +211,7 @@ export function createChatSseStream(
           return;
         }
 
-        const flushBufferedTokens = () => {
-          if (!bufferedTokens.length) return;
-          bufferedTokens.forEach((token) => enqueueToken(token));
-        };
+        resetTimeout();
 
         type ModerationClient = {
           moderations?: {
@@ -225,12 +237,15 @@ export function createChatSseStream(
 
         if (blockedByModeration) {
           errorEmitted = true;
-          sendErrorEvent('internal_error', refusalMessage, false);
+          sendErrorEvent(
+            'output_moderated',
+            refusalMessage,
+            false,
+            undefined,
+            moderationOptions?.refusalBanner,
+            refusalMessage
+          );
         } else {
-          if (moderationEnabled) {
-            flushBufferedTokens();
-          }
-
           if (!streamed && result.message) {
             for (const chunk of chunkForStream(result.message)) {
               enqueueToken(chunk);

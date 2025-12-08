@@ -940,6 +940,7 @@ async function runStreamingJsonResponse<T>({
     strict: responseFormatJsonSchema?.strict ?? true,
   };
   const stageLabel = usageStage ?? 'json_response';
+  const effectiveMaxAttempts = onTextDelta ? 1 : maxAttempts;
   const normalizeEscapes = (s: string) => s.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\r/g, '\r').replace(/\\\\/g, '\\');
   const sharedPrefixLength = (a: string, b: string) => {
     const max = Math.min(a.length, b.length);
@@ -972,7 +973,7 @@ async function runStreamingJsonResponse<T>({
     }
   };
 
-  while (attempt < maxAttempts) {
+  while (attempt < effectiveMaxAttempts) {
     attempt += 1;
     let stream: ReturnType<typeof client.responses.stream> | null = null;
     let abortListener: (() => void) | null = null;

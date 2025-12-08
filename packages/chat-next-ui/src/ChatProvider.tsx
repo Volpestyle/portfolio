@@ -563,6 +563,10 @@ export function ChatProvider({
       } catch (err) {
         console.error('Chat error', err);
         onError?.(err as Error);
+        const bannerMessage = (err as { banner?: string })?.banner;
+        if (bannerMessage) {
+          setBanner({ mode: 'warning', message: bannerMessage });
+        }
         setError((err as Error)?.message || 'Something went wrong. Mind trying again?');
         const hasStreamedContent = messagesRef.current.some(
           (msg) =>

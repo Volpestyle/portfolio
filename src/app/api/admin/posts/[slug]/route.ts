@@ -10,7 +10,8 @@ function normalizeTags(value: unknown): string[] {
 
 type RouteContext = { params: Promise<{ slug: string }> };
 
-export async function GET(_req: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
+  void request;
   try {
     const { slug } = await context.params;
     const post = await getAdminPost(slug);

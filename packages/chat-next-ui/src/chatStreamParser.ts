@@ -19,6 +19,8 @@ export type ChatStreamEvent =
       message?: string;
       retryable?: boolean;
       retryAfterMs?: number;
+      banner?: string;
+      replacement?: string;
       itemId?: string;
       anchorId?: string;
     }

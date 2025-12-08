@@ -224,15 +224,27 @@ export function useChatStream({
           }
           const errorMessage =
             (event as { message?: string }).message ?? (event as { error?: string }).error ?? 'Chat stream error';
+          const replacement =
+            typeof (event as { replacement?: unknown }).replacement === 'string'
+              ? ((event as { replacement: string }).replacement as string)
+              : undefined;
           const streamError = new Error(errorMessage) as Error & {
             code?: string;
             retryable?: boolean;
             retryAfterMs?: number;
+            banner?: string;
           };
           streamError.code = (event as { code?: string }).code;
           streamError.retryable = (event as { retryable?: boolean }).retryable;
           streamError.retryAfterMs = (event as { retryAfterMs?: number }).retryAfterMs;
+          streamError.banner =
+            typeof (event as { banner?: unknown }).banner === 'string'
+              ? ((event as { banner: string }).banner as string)
+              : undefined;
           applyAssistantChange((message) => {
+            if (replacement) {
+              message.parts = [{ kind: 'text', text: replacement, itemId }];
+            }
             message.animated = false;
           });
           sawError = true;

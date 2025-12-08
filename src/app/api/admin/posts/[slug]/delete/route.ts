@@ -3,7 +3,8 @@ import { deletePost } from '@/server/blog/actions';
 
 type RouteContext = { params: Promise<{ slug: string }> };
 
-export async function POST(_req: Request, context: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
+  void request;
   try {
     const { slug } = await context.params;
     await deletePost({ slug });

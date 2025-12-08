@@ -491,7 +491,7 @@ function DocsDropdown<T>({
   );
 }
 
-function renderProjectDoc(doc: RetrievedProjectDoc, _idx: number) {
+function renderProjectDoc(doc: RetrievedProjectDoc) {
   return (
     <div key={doc.id} className="rounded border border-purple-500/10 bg-purple-900/20 p-2">
       <div className="flex items-center justify-between">
@@ -515,7 +515,7 @@ function renderProjectDoc(doc: RetrievedProjectDoc, _idx: number) {
   );
 }
 
-function renderResumeDoc(doc: RetrievedResumeDoc, _idx: number) {
+function renderResumeDoc(doc: RetrievedResumeDoc) {
   const label = doc.title || doc.company || doc.institution || doc.id;
   return (
     <div key={doc.id} className="rounded border border-purple-500/10 bg-purple-900/20 p-2">

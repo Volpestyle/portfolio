@@ -5,7 +5,8 @@ type RouteContext = {
   params: Promise<{ owner: string; repo: string }>;
 };
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
+  void request;
   try {
     const { owner: rawOwner, repo: rawRepo } = await context.params;
     const owner = decodeURIComponent(rawOwner);
