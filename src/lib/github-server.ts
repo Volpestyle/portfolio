@@ -44,9 +44,6 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
   if (!token) {
     throw new Error('GitHub token is not configured');
   }
-  if (!process.env.PORTFOLIO_GIST_ID) {
-    throw new Error('Portfolio gist ID is not configured');
-  }
 
   const octokit = await createOctokit(token);
 
@@ -54,7 +51,7 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
     const portfolioConfig = await getPortfolioConfig();
 
     if (!portfolioConfig) {
-      throw new Error('Portfolio configuration file not found in gist');
+      throw new Error('Portfolio configuration not found');
     }
 
     if (!Array.isArray(portfolioConfig.repositories)) {

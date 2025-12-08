@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, FileText, MessageSquare, Settings, LogOut } from 'lucide-react';
+import { ArrowLeft, FileText, MessageSquare, Settings, LogOut, FolderGit2 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,6 +11,7 @@ import Link from 'next/link';
 
 const ADMIN_NAV_ITEMS = [
   { href: '/admin', icon: FileText, label: 'posts', expandedWidth: '5rem' },
+  { href: '/admin/portfolio', icon: FolderGit2, label: 'portfolio', expandedWidth: '6rem' },
   { href: '/admin/chat-exports', icon: MessageSquare, label: 'chats', expandedWidth: '5rem' },
 ] as const;
 
