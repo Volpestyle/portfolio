@@ -44,6 +44,8 @@ export function useChatStream({
 
       let mutableAssistant = assistantMessage;
       const itemOrder: string[] = [];
+      let sawDone = false;
+      let sawError = false;
 
       const applyAssistantChange = (mutator: (message: ChatMessage) => void) => {
         mutator(mutableAssistant);
@@ -222,10 +224,19 @@ export function useChatStream({
           }
           const errorMessage =
             (event as { message?: string }).message ?? (event as { error?: string }).error ?? 'Chat stream error';
+          const streamError = new Error(errorMessage) as Error & {
+            code?: string;
+            retryable?: boolean;
+            retryAfterMs?: number;
+          };
+          streamError.code = (event as { code?: string }).code;
+          streamError.retryable = (event as { retryable?: boolean }).retryable;
+          streamError.retryAfterMs = (event as { retryAfterMs?: number }).retryAfterMs;
           applyAssistantChange((message) => {
             message.animated = false;
           });
-          throw new Error(errorMessage);
+          sawError = true;
+          throw streamError;
         }
 
         if (event.type === 'done') {
@@ -248,16 +259,35 @@ export function useChatStream({
             });
           }
           registerItem(itemId);
+          sawDone = true;
+          return;
+        }
+
+        if (event.type === 'heartbeat') {
+          return;
         }
       };
 
       for await (const event of parseChatStream(response.body, {
         onParseError: (err) => console.warn('Failed to parse chat event', err),
+        idleTimeoutMs: 75000, // 75s client timeout, slightly longer than server's 65s soft timeout
+        onIdleTimeout: () => console.warn('Chat stream idle timeout - no data received'),
       })) {
         handleEvent(event);
         if (event.type === 'done') {
           break;
         }
+      }
+
+      if (!sawDone && !sawError) {
+        applyAssistantChange((message) => {
+          message.animated = false;
+        });
+        const timeoutError = new Error('The chat stream ended unexpectedly. Please retry.') as Error & {
+          retryable?: boolean;
+        };
+        timeoutError.retryable = true;
+        throw timeoutError;
       }
     },
     [applyAttachment, applyReasoningTrace, applyUiActions, recordCompletionTime, replaceMessage]

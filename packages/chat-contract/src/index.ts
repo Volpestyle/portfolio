@@ -239,9 +239,11 @@ export type ChatRole = 'user' | 'assistant';
 
 export type BannerState =
   | { mode: 'idle' }
-  | { mode: 'thinking' }
+  | { mode: 'thinking'; message?: string }
   | { mode: 'hover'; text?: string }
-  | { mode: 'chat'; text?: string };
+  | { mode: 'chat'; text?: string }
+  | { mode: 'error'; message?: string }
+  | { mode: 'warning'; message?: string };
 
 export type ChatTextPart = {
   kind: 'text';

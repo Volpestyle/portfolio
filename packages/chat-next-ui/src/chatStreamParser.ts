@@ -27,6 +27,9 @@ export type ChatStreamEvent =
 
 type ParseStreamOptions = {
   onParseError?: (error: unknown) => void;
+  signal?: AbortSignal;
+  idleTimeoutMs?: number;
+  onIdleTimeout?: () => void;
 };
 
 export async function* parseChatStream(
@@ -35,6 +38,7 @@ export async function* parseChatStream(
 ): AsyncGenerator<ChatStreamEvent> {
   const decoder = new TextDecoder();
   const pending: ChatStreamEvent[] = [];
+  const idleTimeoutMs = options?.idleTimeoutMs ?? 0;
   const parser: EventSourceParser = createParser(((event: ParseEvent) => {
     if (event.type !== 'event') {
       return;
@@ -54,13 +58,60 @@ export async function* parseChatStream(
   }) as EventSourceParseCallback);
 
   const reader = stream.getReader();
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  let idleTriggered = false;
+  const clearIdleTimer = () => {
+    if (idleTimer) {
+      clearTimeout(idleTimer);
+      idleTimer = null;
+    }
+  };
+  const resetIdleTimer = () => {
+    if (!Number.isFinite(idleTimeoutMs) || idleTimeoutMs <= 0) {
+      return;
+    }
+    clearIdleTimer();
+    idleTimer = setTimeout(() => {
+      idleTriggered = true;
+      options?.onIdleTimeout?.();
+      reader.cancel(new Error('chat_stream_idle')).catch(() => {});
+    }, idleTimeoutMs);
+  };
+
+  const abortSignal = options?.signal;
+  const abortHandler = () => {
+    clearIdleTimer();
+    reader.cancel(abortSignal?.reason).catch(() => {});
+  };
+  if (abortSignal) {
+    abortSignal.addEventListener('abort', abortHandler, { once: true });
+  }
+
+  resetIdleTimer();
   while (true) {
-    const { value, done } = await reader.read();
+    let value: Uint8Array | undefined;
+    let done = false;
+    try {
+      const readResult = await reader.read();
+      value = readResult.value;
+      done = readResult.done;
+    } catch (error) {
+      // If we intentionally cancelled the reader due to idle timeout, just exit.
+      if (idleTriggered) {
+        break;
+      }
+      if (abortSignal?.aborted) {
+        throw abortSignal.reason ?? error;
+      }
+      throw error;
+    }
     if (done) {
       break;
     }
+    resetIdleTimer();
     parser.feed(decoder.decode(value, { stream: true }));
     while (pending.length) {
+      resetIdleTimer();
       yield pending.shift() as ChatStreamEvent;
     }
   }
@@ -69,5 +120,10 @@ export async function* parseChatStream(
   parser.feed(decoder.decode());
   while (pending.length) {
     yield pending.shift() as ChatStreamEvent;
+  }
+
+  clearIdleTimer();
+  if (abortSignal) {
+    abortSignal.removeEventListener('abort', abortHandler);
   }
 }

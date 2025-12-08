@@ -35,10 +35,50 @@ export type ChatProviderProps = {
    * Defaults to true to stream reasoning by default.
    */
   reasoningOptIn?: boolean;
+  /**
+   * Retry configuration for failed chat requests.
+   */
+  retryConfig?: {
+    maxAttempts?: number;
+    baseDelayMs?: number;
+    maxDelayMs?: number;
+    backoffMultiplier?: number;
+  };
 };
 
 const STORAGE_KEY_CONVERSATION = 'chat:conversationId';
 const buildCompletionStorageKey = (conversationId: string) => `chat:completionTimes:${conversationId}`;
+
+const DEFAULT_RETRY_CONFIG = {
+  maxAttempts: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 10000,
+  backoffMultiplier: 2,
+} as const;
+
+function calculateRetryDelay(attempt: number, config: { maxAttempts: number; baseDelayMs: number; maxDelayMs: number; backoffMultiplier: number }): number {
+  const delay = config.baseDelayMs * Math.pow(config.backoffMultiplier, attempt - 1);
+  return Math.min(delay, config.maxDelayMs);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function getRetryInfo(error: unknown): { retryable: boolean; retryAfterMs?: number } {
+  if (error instanceof TypeError && error.message.includes('fetch')) {
+    return { retryable: true };
+  }
+  if (error && typeof error === 'object') {
+    const retryable = (error as { retryable?: unknown }).retryable;
+    const retryAfterMs = (error as { retryAfterMs?: unknown }).retryAfterMs;
+    return {
+      retryable: retryable === true,
+      retryAfterMs: typeof retryAfterMs === 'number' ? retryAfterMs : undefined,
+    };
+  }
+  return { retryable: false };
+}
 
 interface ChatContextValue {
   messages: ChatMessage[];
@@ -66,6 +106,7 @@ export function ChatProvider({
   requestFormatter,
   onError,
   reasoningOptIn = true,
+  retryConfig = {},
 }: ChatProviderProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isBusy, setBusy] = useState(false);
@@ -375,6 +416,49 @@ export function ChatProvider({
   });
   const shouldRequestReasoning = useMemo(() => Boolean(reasoningOptIn), [reasoningOptIn]);
   const reasoningEnabled = shouldRequestReasoning;
+  const mergedRetryConfig = useMemo(() => ({ ...DEFAULT_RETRY_CONFIG, ...retryConfig }), [retryConfig]);
+
+  const executeChatRequest = useCallback(async (
+    requestMessages: ChatRequestMessage[],
+    assistantMessage: ChatMessage,
+    anchorId: string
+  ): Promise<void> => {
+    const resolvedFetcher = resolveFetcher();
+
+    const response = await resolvedFetcher(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messages: requestMessages,
+        responseAnchorId: anchorId,
+        reasoningEnabled: shouldRequestReasoning,
+        conversationId: conversationIdRef.current,
+      }),
+    });
+
+    const contentType = response.headers.get('content-type') ?? '';
+    const isEventStream = contentType.includes('text/event-stream');
+    if (!isEventStream) {
+      const raw = await response.text();
+      try {
+        const parsed = JSON.parse(raw) as { error?: { message?: string } };
+        if (parsed?.error?.message) {
+          throw new Error(parsed.error.message);
+        }
+      } catch {
+        // ignore JSON parse errors
+      }
+      throw new Error(raw || 'Unable to start chat.');
+    }
+    if (!response.body) {
+      const message = await response.text();
+      throw new Error(message || 'Unable to start chat.');
+    }
+
+    await streamAssistantResponse({ response, assistantMessage });
+  }, [endpoint, resolveFetcher, shouldRequestReasoning, streamAssistantResponse]);
 
   const send = useCallback(
     async (text: string) => {
@@ -402,9 +486,9 @@ export function ChatProvider({
       setError(null);
 
       const assistantMessageId = createMessageId();
+      const assistantCreatedAt = new Date().toISOString();
       let assistantInserted = false;
       try {
-        const resolvedFetcher = resolveFetcher();
         const requestMessages = formatMessages(nextMessages);
 
         // Insert the streaming assistant placeholder immediately so loading state is tied to the new turn,
@@ -413,51 +497,88 @@ export function ChatProvider({
           id: assistantMessageId,
           role: 'assistant',
           parts: [{ kind: 'text', text: '', itemId: assistantMessageId }],
-          createdAt: new Date().toISOString(),
+          createdAt: assistantCreatedAt,
           animated: true,
         };
         pushMessage(assistantMessage);
         assistantInserted = true;
 
-        const response = await resolvedFetcher(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messages: requestMessages,
-            responseAnchorId: assistantMessageId,
-            reasoningEnabled: shouldRequestReasoning,
-            conversationId: conversationIdRef.current,
-          }),
-        });
+        const resetAssistantForRetry = (anchorId: string) => {
+          const refreshed: ChatMessage = {
+            id: assistantMessageId,
+            role: 'assistant',
+            parts: [{ kind: 'text', text: '', itemId: anchorId }],
+            createdAt: assistantCreatedAt,
+            animated: true,
+          };
+          commitMessages((prev) => prev.map((msg) => (msg.id === assistantMessageId ? refreshed : msg)));
+          applyReasoningTrace(assistantMessageId, undefined);
+          return refreshed;
+        };
 
-        const contentType = response.headers.get('content-type') ?? '';
-        const isEventStream = contentType.includes('text/event-stream');
-        if (!isEventStream) {
-          const raw = await response.text();
+        // Retry logic with exponential backoff
+        let lastError: Error | null = null;
+        let currentAssistant = assistantMessage;
+        for (let attempt = 1; attempt <= mergedRetryConfig.maxAttempts; attempt++) {
           try {
-            const parsed = JSON.parse(raw) as { error?: { message?: string } };
-            if (parsed?.error?.message) {
-              throw new Error(parsed.error.message);
+            const anchorId = attempt === 1 ? assistantMessageId : createMessageId();
+            if (attempt > 1) {
+              currentAssistant = resetAssistantForRetry(anchorId);
             }
-          } catch {
-            // ignore JSON parse errors
+
+            if (attempt > 1) {
+              // Update banner to show retry attempt
+              setBanner({ mode: 'thinking', message: `Retrying... (${attempt}/${mergedRetryConfig.maxAttempts})` });
+              const delay = calculateRetryDelay(attempt - 1, mergedRetryConfig);
+              await sleep(delay);
+            }
+
+            await executeChatRequest(requestMessages, currentAssistant, anchorId);
+            lastError = null; // Success, clear any previous error
+            break; // Exit retry loop on success
+
+          } catch (err) {
+            lastError = err as Error;
+            console.error(`Chat attempt ${attempt}/${mergedRetryConfig.maxAttempts} failed:`, err);
+
+            const retryInfo = getRetryInfo(err);
+            // Don't retry if error is not retryable or we've exhausted attempts
+            if (!retryInfo.retryable || attempt === mergedRetryConfig.maxAttempts) {
+              break;
+            }
+
+            const backoffDelay = calculateRetryDelay(attempt, mergedRetryConfig);
+            const retryDelay = Math.max(backoffDelay, retryInfo.retryAfterMs ?? 0);
+            if (retryDelay > 0) {
+              await sleep(retryDelay);
+            }
+            // Continue to next attempt
           }
-          throw new Error(raw || 'Unable to start chat.');
-        }
-        if (!response.body) {
-          const message = await response.text();
-          throw new Error(message || 'Unable to start chat.');
         }
 
-        await streamAssistantResponse({ response, assistantMessage });
+        // If we still have an error after all retries, throw it
+        if (lastError) {
+          throw lastError;
+        }
       } catch (err) {
         console.error('Chat error', err);
         onError?.(err as Error);
         setError((err as Error)?.message || 'Something went wrong. Mind trying again?');
+        const hasStreamedContent = messagesRef.current.some(
+          (msg) =>
+            msg.id === assistantMessageId &&
+            (msg.parts ?? []).some((part) => part.kind === 'text' && part.text.trim().length > 0)
+        );
         // Roll back the placeholder assistant message if the request failed before streaming.
-        commitMessages((prev) => (assistantInserted ? prev.filter((msg) => msg.id !== assistantMessageId) : prev));
+        commitMessages((prev) => {
+          if (!assistantInserted) {
+            return prev;
+          }
+          if (hasStreamedContent) {
+            return prev.map((msg) => (msg.id === assistantMessageId ? { ...msg, animated: false } : msg));
+          }
+          return prev.filter((msg) => msg.id !== assistantMessageId);
+        });
       } finally {
         setBanner((prev) => (prev.mode === 'thinking' ? { mode: 'hover' } : prev));
         setBusy(false);
@@ -471,9 +592,9 @@ export function ChatProvider({
       isBusy,
       onError,
       pushMessage,
-      resolveFetcher,
-      streamAssistantResponse,
-      shouldRequestReasoning,
+      executeChatRequest,
+      mergedRetryConfig,
+      applyReasoningTrace,
     ]
   );
 
