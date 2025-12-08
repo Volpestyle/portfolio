@@ -2151,10 +2151,12 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           });
         }
 
-        // Stream uiHints
-        const hints = coerceUiHints(candidate);
-        if (hints) {
-          emitUiFromHints(hints);
+        // Stream uiHints (only when retrieval was used, otherwise they'll be cleared)
+        if (hasQueries) {
+          const hints = coerceUiHints(candidate);
+          if (hints) {
+            emitUiFromHints(hints);
+          }
         }
       };
 

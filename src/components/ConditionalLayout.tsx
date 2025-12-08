@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import { Header } from '@/components/Header';
 import { AnimatedLayout } from '@/components/AnimatedLayout';
-import { PageTransition } from '@/components/PageTransition';
+import { PageTransition, PageTransitionProvider } from '@/components/PageTransition';
 
 interface ConditionalLayoutProps {
   children: ReactNode;
@@ -22,7 +22,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
 
   // Regular pages - full portfolio layout
   return (
-    <>
+    <PageTransitionProvider>
       <AnimatedBackground />
       <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
         <AnimatedLayout>
@@ -32,6 +32,6 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
           </PageTransition>
         </AnimatedLayout>
       </div>
-    </>
+    </PageTransitionProvider>
   );
 }

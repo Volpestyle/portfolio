@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { BookOpen, Mail, MessageSquare, Rocket, User } from 'lucide-react';
 import { HeaderTypewriter, resolveHeaderBaseText } from '@/components/HeaderTypewriter';
 import { useHover } from '@/context/HoverContext';
@@ -10,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { hoverMessages } from '@/constants/messages';
 import { motion } from 'framer-motion';
 import { springAnimations } from '@/lib/animations';
+import { TransitionLink } from '@/components/PageTransition';
 
 const NAV_ITEMS = [
   { href: '/', icon: MessageSquare, label: 'chat', message: '', expandedWidth: '4.5rem' },
@@ -39,9 +39,9 @@ export function Header() {
     <motion.header layout="position" className="relative z-20 border border-white/50 bg-black/70 py-2 backdrop-blur-sm">
       <div className="flex items-center justify-between px-4 py-3 sm:px-6">
         <div className="flex items-center gap-4">
-          <Link href="/" aria-label="Home">
+          <TransitionLink href="/" aria-label="Home">
             <HeaderTypewriter hoverText={headerHoverText} />
-          </Link>
+          </TransitionLink>
         </div>
 
         <nav className="flex items-center gap-2" aria-label="Primary">
@@ -67,7 +67,7 @@ export function Header() {
                 }}
                 transition={springAnimations.width}
               >
-                <Link
+                <TransitionLink
                   href={href}
                   aria-label={label}
                   className={cn(
@@ -101,7 +101,7 @@ export function Header() {
                   >
                     {label}
                   </motion.span>
-                </Link>
+                </TransitionLink>
               </motion.div>
             );
           })}
