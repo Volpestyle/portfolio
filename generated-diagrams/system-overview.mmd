@@ -1,0 +1,57 @@
+%%{init: {'theme': 'neutral', 'themeVariables': { 'primaryColor': '#e2e8f0', 'primaryTextColor': '#1e293b', 'primaryBorderColor': '#64748b', 'lineColor': '#64748b', 'secondaryColor': '#f1f5f9', 'tertiaryColor': '#fff' }}}%%
+flowchart TB
+    subgraph Client["Browser"]
+        UI[React App]
+        Chat[Chat Widget]
+    end
+
+    subgraph CloudFront["CloudFront CDN"]
+        CF[Distribution]
+    end
+
+    subgraph Lambda["AWS Lambda"]
+        Edge[Lambda@Edge<br/>SSR Server]
+        ChatFn[Chat Lambda<br/>Streaming]
+        ImageFn[Image Lambda<br/>Optimization]
+        RevalFn[Revalidation<br/>Worker]
+        PublishFn[Blog Publish<br/>Function]
+    end
+
+    subgraph Storage["Storage"]
+        S3Assets[(S3 Assets)]
+        S3Content[(S3 Blog Content)]
+        S3Media[(S3 Media)]
+    end
+
+    subgraph Database["Database"]
+        DDBPosts[(DynamoDB<br/>Blog Posts)]
+        DDBCache[(DynamoDB<br/>ISR Cache)]
+        DDBCost[(DynamoDB<br/>Chat Costs)]
+    end
+
+    subgraph External["External Services"]
+        OpenAI[OpenAI API]
+        GitHub[GitHub API]
+        Redis[Upstash Redis]
+    end
+
+    UI --> CF
+    Chat --> CF
+    CF --> Edge
+    CF --> ChatFn
+    CF --> ImageFn
+    CF --> S3Assets
+
+    Edge --> DDBPosts
+    Edge --> DDBCache
+    Edge --> S3Content
+    Edge --> GitHub
+
+    ChatFn --> OpenAI
+    ChatFn --> DDBCost
+    ChatFn --> Redis
+
+    ImageFn --> S3Assets
+
+    RevalFn --> DDBCache
+    PublishFn --> DDBPosts

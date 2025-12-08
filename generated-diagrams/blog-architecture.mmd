@@ -1,0 +1,64 @@
+%%{init: {'theme': 'neutral', 'themeVariables': { 'primaryColor': '#e2e8f0', 'primaryTextColor': '#1e293b', 'primaryBorderColor': '#64748b', 'lineColor': '#64748b' }}}%%
+flowchart TB
+    subgraph Admin["Admin Dashboard"]
+        Create[Create Post]
+        Edit[Edit Post]
+        Schedule[Schedule Post]
+        Publish[Publish Post]
+        Archive[Archive Post]
+        Upload[Upload Media]
+    end
+
+    subgraph API["API Routes"]
+        AdminAPI["/api/admin/blog/*"]
+        PublicAPI["/api/blog/*"]
+        MediaAPI["/api/admin/media/*"]
+        RevalAPI["/api/revalidate"]
+    end
+
+    subgraph Lambda["Lambda Functions"]
+        EdgeFn[Lambda@Edge<br/>SSR]
+        PublishFn[Blog Publisher]
+    end
+
+    subgraph Storage["Storage"]
+        PostsTable[(DynamoDB<br/>BlogPosts)]
+        ContentBucket[(S3<br/>Blog Content)]
+        MediaBucket[(S3<br/>Blog Media)]
+    end
+
+    subgraph Cache["Caching"]
+        CFCache[CloudFront Cache]
+        ISRCache[(S3 + DynamoDB<br/>ISR Cache)]
+    end
+
+    subgraph Scheduling["Scheduling"]
+        EventBridge[EventBridge<br/>Scheduler]
+    end
+
+    Create --> AdminAPI
+    Edit --> AdminAPI
+    Schedule --> AdminAPI
+    Publish --> AdminAPI
+    Archive --> AdminAPI
+    Upload --> MediaAPI
+
+    AdminAPI --> PostsTable
+    AdminAPI --> ContentBucket
+    AdminAPI --> EventBridge
+
+    MediaAPI -->|Presigned URL| MediaBucket
+
+    PublicAPI --> PostsTable
+    PublicAPI --> ContentBucket
+
+    EventBridge -->|At scheduled time| PublishFn
+    PublishFn --> PostsTable
+    PublishFn --> RevalAPI
+
+    EdgeFn --> PostsTable
+    EdgeFn --> ContentBucket
+    EdgeFn --> ISRCache
+
+    RevalAPI --> ISRCache
+    RevalAPI --> CFCache

@@ -1,0 +1,38 @@
+%%{init: {'theme': 'neutral', 'themeVariables': { 'primaryColor': '#e2e8f0', 'primaryTextColor': '#1e293b', 'primaryBorderColor': '#64748b', 'lineColor': '#64748b' }}}%%
+flowchart TB
+    subgraph Core["Core Contracts"]
+        Contract["@portfolio/chat-contract<br/><i>Zod Schemas</i>"]
+    end
+
+    subgraph DataLayer["Data Layer"]
+        Data["@portfolio/chat-data<br/><i>MiniSearch</i>"]
+        GitHub["@portfolio/github-data<br/><i>Octokit</i>"]
+    end
+
+    subgraph Logic["Business Logic"]
+        Orchestrator["@portfolio/chat-orchestrator<br/><i>OpenAI</i>"]
+    end
+
+    subgraph Integration["Integration"]
+        API["@portfolio/chat-next-api<br/><i>AWS SDK</i>"]
+        UI["@portfolio/chat-next-ui<br/><i>React</i>"]
+        CLI["@portfolio/chat-preprocess-cli<br/><i>CLI Tool</i>"]
+    end
+
+    subgraph Testing["Testing"]
+        TestSupport["@portfolio/test-support<br/><i>Fixtures</i>"]
+    end
+
+    Contract --> Data
+    Contract --> GitHub
+    Contract --> TestSupport
+
+    Data --> Orchestrator
+    GitHub --> CLI
+
+    Orchestrator --> API
+    Orchestrator --> UI
+
+    Contract --> Orchestrator
+    Data --> CLI
+    API --> TestSupport

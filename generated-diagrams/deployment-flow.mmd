@@ -1,0 +1,45 @@
+%%{init: {'theme': 'neutral', 'themeVariables': { 'primaryColor': '#e2e8f0', 'primaryTextColor': '#1e293b', 'primaryBorderColor': '#64748b', 'lineColor': '#64748b' }}}%%
+flowchart LR
+    subgraph Source["Source"]
+        Code[Source Code]
+        Push[git push main]
+    end
+
+    subgraph CI["GitHub Actions"]
+        Checkout[Checkout]
+        Install[Install Deps]
+        Build[Build OpenNext]
+        Test[E2E Tests]
+        CDKBuild[Build CDK]
+        Deploy[CDK Deploy]
+    end
+
+    subgraph AWS["AWS"]
+        CF[CloudFront]
+        Lambda[Lambda Functions]
+        S3[S3 Buckets]
+        DDB[DynamoDB]
+    end
+
+    subgraph PostDeploy["Post-Deploy"]
+        Invalidate[Cache Invalidation]
+        Revalidate[ISR Revalidation]
+        Smoke[Smoke Tests]
+    end
+
+    Code --> Push
+    Push --> Checkout
+    Checkout --> Install
+    Install --> Build
+    Build --> Test
+    Test --> CDKBuild
+    CDKBuild --> Deploy
+
+    Deploy --> CF
+    Deploy --> Lambda
+    Deploy --> S3
+    Deploy --> DDB
+
+    Deploy --> Invalidate
+    Invalidate --> Revalidate
+    Revalidate --> Smoke

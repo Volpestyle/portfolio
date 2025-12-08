@@ -1,65 +1,69 @@
 # @portfolio/chat-preprocess-cli
 
-Workspace-local CLI that powers `pnpm chat:preprocess`. It wraps the repo ingestion tasks (project knowledge, resume parsing, profile normalization) into a single command so other apps can eventually `npx chat-preprocess` with their own config.
+CLI tool for preprocessing portfolio content into chat-ready embeddings.
+
+## Overview
+
+This package generates the data required for the chat system's RAG pipeline:
+
+- Fetches portfolio data from GitHub gists
+- Generates text embeddings via OpenAI
+- Outputs indexed documents for runtime retrieval
+
+## Dependencies
+
+- `@aws-sdk/client-s3` - Optional S3 upload
+- `yaml` - Configuration parsing
+- `@portfolio/github-data` - GitHub API integration
+
+## Peer Dependencies
+
+- `@portfolio/chat-contract` - Document schemas
+- `@portfolio/chat-data` - Indexing utilities
 
 ## Usage
 
 ```bash
-pnpm chat:preprocess [--config path/to/config.(json|yaml|js)] [--env extra.env]
+# Run preprocessing
+pnpm chat:preprocess
+
+# Preprocess specific tasks
+CHAT_PREPROCESS_TASKS='profile,persona' pnpm chat:preprocess --seeOutput
 ```
 
-- `--config` points to a JSON/YAML/JS module that exports a `ChatPreprocessConfig`. Override paths like `generatedDir`, `resumePdf`, or the env-file list without touching the script.
-- `--env` may be repeated to append preprocess-specific `.env` files. When omitted the CLI tries `scripts/chat-preprocess.env`, `.env.local`, and `.env` in that order.
-- `--seeOutput` prints the contents of each task artifact to stdout after it is written (useful for debugging; note that embeddings files can be very large).
+## Output
 
-Persona generation is deterministic and sourced from `data/chat/profile.json` fields (`systemPersona`, first three `about` entries for `shortAbout`, `styleGuidelines`, `voiceExamples`). No OpenAI call is made for persona.
+Generates files in `generated/`:
 
-## Config Highlights
-
-```yaml
-# chat-preprocess.config.yml
-envFiles:
-  - scripts/chat-preprocess.env
-  - .env.shared
-resume:
-  filename: resume.pdf
-
-models:
-  textModel: gpt-5.1-2025-11-13
-  embeddingModel: text-embedding-3-large
-
-paths:
-  generatedDir: .out/chat
-  resumePdf: public/resume/resume.pdf # defaults to chat-preprocess.config.yml resume.filename (falls back to resume.pdf)
-  resumeJson: generated/resume-raw.json # default; point to a curated file to bypass PDF extraction
-
-  repos:
-    gistId: d3adb33f1234 # overrides PORTFOLIO_GIST_ID
-    include:
-      - my-org/flagship-app
-      - marketing-site
-    exclude:
-      - my-org/archive-app
-
-artifacts:
-  writers:
-    - type: s3
-      bucket: my-portfolio-artifacts
-      prefix: chat/
-      region: us-east-1
+```
+generated/
+├── persona.json              # AI persona definition
+├── profile.json              # Portfolio profile data
+├── projects.json             # Project list
+├── projects-embeddings.json  # Project vector embeddings
+├── resume.json               # Resume data
+└── resume-embeddings.json    # Resume vector embeddings
 ```
 
-- **Repo filters**: `include`/`exclude` accept `name` or `owner/name` values so you can focus preprocess runs on a curated subset without editing the gist or code.
-- **Gist override**: set `repos.gistId` when you want the CLI to read metadata from a different gist than the default `PORTFOLIO_GIST_ID`.
-- **Resume input**: by default, resume parsing starts from the PDF (filename defaults to `resume.filename` in `chat-preprocess.config.yml`, falling back to `resume.pdf`) and writes `generated/resume-raw.json`. If you maintain a handcrafted JSON source, set `paths.resumeJson` to that file and it will be used/merged instead.
-- **Artifact writers**: the local JSON writer always runs to keep downstream tasks working. Additional writers (e.g., S3) can stream each artifact to external services for automation or backup. S3 uploads honor the AWS credentials in your environment and accept optional `prefix`, `region`, and `kmsKeyId`.
+## Pipeline
 
-See `src/config.ts` and the types in `src/types.ts` for the full schema. The CLI re-exports `runPreprocessCli` so other pipelines can compose it programmatically.
+1. **Fetch** - Pull data from GitHub gist (`PORTFOLIO_GIST_ID`)
+2. **Transform** - Structure for embedding
+3. **Embed** - Generate vectors via OpenAI
+4. **Output** - Write to `generated/` directory
 
-## Building
+## Configuration
 
-```bash
-pnpm --filter @portfolio/chat-preprocess-cli build
-```
+Requires environment variables:
 
-Emits an ESM bundle to `dist/` so the package can be published or executed via `npx chat-preprocess`.
+| Variable | Description |
+|----------|-------------|
+| `PORTFOLIO_GIST_ID` | GitHub gist containing portfolio data |
+| `GH_TOKEN` | GitHub personal access token |
+| `OPENAI_API_KEY` | OpenAI API key for embeddings |
+
+## Related Packages
+
+- [@portfolio/github-data](../github-data/) - GitHub API client
+- [@portfolio/chat-data](../chat-data/) - Index generation
+- [@portfolio/chat-contract](../chat-contract/) - Output schemas

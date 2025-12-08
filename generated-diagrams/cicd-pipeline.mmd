@@ -1,0 +1,57 @@
+%%{init: {'theme': 'neutral', 'themeVariables': { 'primaryColor': '#e2e8f0', 'primaryTextColor': '#1e293b', 'primaryBorderColor': '#64748b', 'lineColor': '#64748b' }}}%%
+flowchart TB
+    subgraph Trigger["Triggers"]
+        PushMain[Push to main]
+        Manual[Manual Dispatch]
+    end
+
+    subgraph BuildJob["Build & Deploy Job"]
+        direction TB
+        Checkout[Checkout Code]
+        OIDC[Configure AWS OIDC]
+        Resolve[Resolve CF Outputs]
+        InstallDeps[Install Dependencies]
+        PlaywrightCache[Cache Playwright]
+        OpenNext[Build with OpenNext]
+        E2ETest[Run E2E Tests<br/>Fixture Mode]
+        CDKInstall[Install CDK Deps]
+        CDKBuild[Build CDK Stack]
+        CDKDeploy[CDK Deploy]
+        GetDist[Get Distribution ID]
+        CFInvalidate[Invalidate CloudFront]
+        ISRRevalidate[Revalidate ISR Cache]
+    end
+
+    subgraph SmokeJob["Smoke Tests Job"]
+        direction TB
+        SmokeSetup[Setup Environment]
+        APITests[Real API Tests]
+        UITests[Real UI Tests]
+    end
+
+    subgraph Artifacts["Artifacts"]
+        Report[Playwright Report]
+    end
+
+    PushMain --> BuildJob
+    Manual --> BuildJob
+
+    Checkout --> OIDC
+    OIDC --> Resolve
+    Resolve --> InstallDeps
+    InstallDeps --> PlaywrightCache
+    PlaywrightCache --> OpenNext
+    OpenNext --> E2ETest
+    E2ETest --> CDKInstall
+    CDKInstall --> CDKBuild
+    CDKBuild --> CDKDeploy
+    CDKDeploy --> GetDist
+    GetDist --> CFInvalidate
+    CFInvalidate --> ISRRevalidate
+
+    ISRRevalidate --> SmokeJob
+    SmokeSetup --> APITests
+    APITests --> UITests
+
+    E2ETest -.->|On Failure| Report
+    UITests -.->|On Failure| Report
