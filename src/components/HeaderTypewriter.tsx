@@ -62,7 +62,7 @@ export function HeaderTypewriter({
 
   return (
     <motion.div
-      className="text-md font-mono font-semibold text-white [@media(min-width:440px)]:text-2xl"
+      className="text-md font-mono font-semibold text-white sm:text-2xl"
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       animate={{
