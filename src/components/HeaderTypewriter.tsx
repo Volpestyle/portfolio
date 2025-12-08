@@ -13,8 +13,8 @@ export const ROUTE_BASE_TEXT = [
 ] as const;
 
 const DEFAULT_BASE_TEXT = 'JCV';
-const TYPE_SPEED = 140;
-const BACKSPACE_SPEED = 45;
+const DEFAULT_TYPE_SPEED = 140;
+const DEFAULT_BACKSPACE_SPEED = 45;
 
 export function resolveHeaderBaseText(pathname: string | null) {
   if (!pathname) return DEFAULT_BASE_TEXT;
@@ -24,9 +24,15 @@ export function resolveHeaderBaseText(pathname: string | null) {
 
 type HeaderTypewriterProps = {
   hoverText?: string;
+  typeSpeed?: number;
+  backspaceSpeed?: number;
 };
 
-export function HeaderTypewriter({ hoverText }: HeaderTypewriterProps) {
+export function HeaderTypewriter({
+  hoverText,
+  typeSpeed = DEFAULT_TYPE_SPEED,
+  backspaceSpeed = DEFAULT_BACKSPACE_SPEED,
+}: HeaderTypewriterProps) {
   const pathname = usePathname();
   const baseText = useMemo(() => resolveHeaderBaseText(pathname), [pathname]);
   const targetText = !hoverText?.length ? baseText : hoverText;
@@ -38,7 +44,7 @@ export function HeaderTypewriter({ hoverText }: HeaderTypewriterProps) {
 
     const commonLength = getCommonPrefixLength(displayText, targetText);
     const shouldDelete = displayText.length > commonLength;
-    const delay = shouldDelete ? BACKSPACE_SPEED : TYPE_SPEED;
+    const delay = shouldDelete ? backspaceSpeed : typeSpeed;
 
     const timer = setTimeout(() => {
       setDisplayText((prev) => {
@@ -52,11 +58,11 @@ export function HeaderTypewriter({ hoverText }: HeaderTypewriterProps) {
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [displayText, targetText]);
+  }, [displayText, targetText, typeSpeed, backspaceSpeed]);
 
   return (
     <motion.div
-      className="font-mono text-lg font-semibold text-white [@media(min-width:440px)]:text-2xl"
+      className="text-md font-mono font-semibold text-white [@media(min-width:440px)]:text-2xl"
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       animate={{

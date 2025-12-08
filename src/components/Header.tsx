@@ -40,7 +40,7 @@ export function Header() {
       <div className="flex items-center justify-between px-4 py-3 sm:px-6">
         <div className="flex items-center gap-4">
           <TransitionLink href="/" aria-label="Home">
-            <HeaderTypewriter hoverText={headerHoverText} />
+            <HeaderTypewriter hoverText={headerHoverText} typeSpeed={90} backspaceSpeed={40} />
           </TransitionLink>
         </div>
 
