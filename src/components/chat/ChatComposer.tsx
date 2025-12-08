@@ -19,7 +19,7 @@ export function ChatComposer({ isBusy, hasMessages, onSend }: ChatComposerProps)
   const [textareaHeight, setTextareaHeight] = useState(40);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const isTransitioning = usePageTransition();
+  const { isTransitioning } = usePageTransition();
 
   // Check if we're on mobile (below sm breakpoint)
   useEffect(() => {
