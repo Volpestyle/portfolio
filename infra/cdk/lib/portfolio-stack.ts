@@ -1251,31 +1251,27 @@ export class PortfolioStack extends Stack {
   }
 
   private grantSecretAccess(grantable: iam.IGrantable, edgeFunction?: cloudfrontExperimental.EdgeFunction) {
+    const secretArns: string[] = [];
     if (this.envSecret) {
       this.envSecret.grantRead(grantable);
+      secretArns.push(this.envSecret.secretArn);
     }
     if (this.repoSecret) {
       this.repoSecret.grantRead(grantable);
+      secretArns.push(this.repoSecret.secretArn);
     }
 
-    // For Lambda@Edge functions, explicitly add policy to handle imported secrets
-    // CDK's grantRead on imported secrets may not reliably attach policies to EdgeFunction roles
-    if (edgeFunction) {
-      const secretArns: string[] = [];
-      if (this.envSecret) {
-        secretArns.push(this.envSecret.secretArn);
-      }
-      if (this.repoSecret) {
-        secretArns.push(this.repoSecret.secretArn);
-      }
-      if (secretArns.length > 0) {
-        edgeFunction.addToRolePolicy(
-          new iam.PolicyStatement({
-            actions: ['secretsmanager:GetSecretValue'],
-            resources: secretArns,
-          })
-        );
-      }
+    // For Lambda@Edge functions, explicitly add policy to handle imported secrets and
+    // ensure the replicated execution role receives the statement.
+    if (edgeFunction && secretArns.length > 0) {
+      const secretResourceArns = secretArns.flatMap((arn) => [arn, `${arn}*`]);
+
+      edgeFunction.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ['secretsmanager:GetSecretValue', 'secretsmanager:DescribeSecret'],
+          resources: secretResourceArns,
+        })
+      );
     }
   }
 
