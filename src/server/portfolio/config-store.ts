@@ -70,9 +70,18 @@ async function readObjectFromS3(): Promise<string | null> {
     return body ?? null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (message?.toLowerCase().includes('nosuchkey')) {
+    const code = (error as { name?: string; Code?: string })?.name ?? (error as { Code?: string }).Code;
+    const status = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
+    const isMissing =
+      message?.toLowerCase().includes('nosuchkey') ||
+      code?.toLowerCase?.() === 'nosuchkey' ||
+      status === 404;
+
+    if (isMissing) {
+      console.warn(`[portfolio-config] No config found at ${bucket}/${key}; falling back to gist or defaults if available`);
       return null;
     }
+
     console.error('[portfolio-config] Failed to read config from S3', error);
     throw error;
   }

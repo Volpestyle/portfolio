@@ -197,6 +197,7 @@ function TransitionPane({
 interface TransitionLinkProps extends LinkProps {
   children: ReactNode;
   className?: string;
+  style?: React.CSSProperties;
   'aria-label'?: string;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
@@ -208,6 +209,7 @@ export function TransitionLink({
   href,
   children,
   className,
+  style,
   onMouseEnter,
   onMouseLeave,
   onFocus,
@@ -239,6 +241,7 @@ export function TransitionLink({
     <Link
       href={href}
       className={className}
+      style={style}
       onClick={handleClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}

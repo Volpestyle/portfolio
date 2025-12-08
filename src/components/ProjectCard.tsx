@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type ComponentType } from 'react';
-import Link from 'next/link';
+import { TransitionLink } from '@/components/PageTransition';
 import {
   ArrowRight,
   Briefcase,
@@ -162,7 +162,7 @@ export function ProjectCard({ project, repo, variant = 'default', onOpen, isExpa
   return (
     <Card className="relative flex h-full flex-col overflow-hidden border-white/30 bg-black/70 p-4 text-white backdrop-blur-sm">
       <motion.h2 className="mb-2 flex items-center justify-between text-xl font-bold">
-        <Link
+        <TransitionLink
           href={projectLink}
           className="group relative inline-flex items-center gap-2 rounded transition-all duration-200 hover:bg-white hover:text-black active:bg-white active:text-black"
           style={{
@@ -174,7 +174,7 @@ export function ProjectCard({ project, repo, variant = 'default', onOpen, isExpa
         >
           {project.name}
           <Icon className="h-4 w-4" />
-        </Link>
+        </TransitionLink>
         {repo?.isStarred && <StarIcon />}
       </motion.h2>
 

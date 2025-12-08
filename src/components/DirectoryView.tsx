@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronRight, FileText, Folder } from 'lucide-react';
-import Link from 'next/link';
+import { TransitionLink } from '@/components/PageTransition';
 
 interface DirectoryEntry {
   name: string;
@@ -30,9 +30,9 @@ export function DirectoryView({ pid, path, entries, breadcrumbs }: DirectoryView
             <div key={index} className="flex items-center gap-1">
               {index > 0 && <ChevronRight className="h-4 w-4 text-white/50" />}
               {crumb.href ? (
-                <Link href={crumb.href} className="text-gray-400 transition-colors hover:text-white">
+                <TransitionLink href={crumb.href} className="text-gray-400 transition-colors hover:text-white">
                   {crumb.label}
-                </Link>
+                </TransitionLink>
               ) : (
                 <span className="text-white">{crumb.label}</span>
               )}
@@ -49,7 +49,7 @@ export function DirectoryView({ pid, path, entries, breadcrumbs }: DirectoryView
             <ul className="divide-y divide-gray-800">
               {entries.map((entry) => (
                 <li key={entry.path}>
-                  <Link
+                  <TransitionLink
                     href={`/projects/${pid}/doc/${entry.path}`}
                     className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/5"
                   >
@@ -59,7 +59,7 @@ export function DirectoryView({ pid, path, entries, breadcrumbs }: DirectoryView
                       <FileText className="h-5 w-5 text-gray-400" />
                     )}
                     <span className="text-white">{entry.name}</span>
-                  </Link>
+                  </TransitionLink>
                 </li>
               ))}
             </ul>

@@ -2,7 +2,7 @@
 
 import { Markdown } from '@/components/Markdown';
 import { ChevronRight } from 'lucide-react';
-import Link from 'next/link';
+import { TransitionLink } from '@/components/PageTransition';
 import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -67,9 +67,9 @@ export function MarkdownViewer({
             <div key={index} className="flex items-center gap-1">
               {index > 0 && <ChevronRight className={iconClass} />}
               {crumb.href ? (
-                <Link href={crumb.href} className="text-gray-400 transition-colors hover:text-white">
+                <TransitionLink href={crumb.href} className="text-gray-400 transition-colors hover:text-white">
                   {crumb.label}
-                </Link>
+                </TransitionLink>
               ) : crumb.onClick ? (
                 <button
                   onClick={crumb.onClick}
