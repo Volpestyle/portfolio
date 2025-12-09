@@ -1,6 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  type DragEvent,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +32,152 @@ type RepoRow = {
 
 type ApiRepo = Omit<RepoRow, 'selected' | 'isStarred' | 'icon' | 'missing'>;
 
+type RepoItemProps = {
+  repo: RepoRow;
+  index: number;
+  totalCount: number;
+  onToggleSelected: (name: string, owner: string) => void;
+  onUpdateIcon: (name: string, owner: string, icon: string) => void;
+  onToggleStar: (name: string, owner: string) => void;
+  onMoveUp: (index: number) => void;
+  onMoveDown: (index: number) => void;
+  buildKey: (name: string, owner?: string) => string;
+  draggingKey: string | null;
+  dragOverKey: string | null;
+  dragOverPosition: 'before' | 'after';
+  onDragStart: (key: string) => void;
+  onDragEnter: (key: string) => void;
+  onDragOver: (key: string, event: DragEvent<HTMLDivElement>) => void;
+  onDrop: (key: string) => void;
+  onDragEnd: () => void;
+  itemRef: (node: HTMLDivElement | null) => void;
+};
+
+function RepoItem({
+  repo,
+  index,
+  totalCount,
+  onToggleSelected,
+  onUpdateIcon,
+  onToggleStar,
+  onMoveUp,
+  onMoveDown,
+  buildKey,
+  draggingKey,
+  dragOverKey,
+  dragOverPosition,
+  onDragStart,
+  onDragEnter,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  itemRef,
+}: RepoItemProps) {
+  const key = buildKey(repo.name, repo.owner);
+  const isDragging = draggingKey === key;
+  const isDragOver = dragOverKey === key && !isDragging;
+  const showDropIndicator = Boolean(draggingKey && isDragOver);
+  const indicatorAfter = dragOverPosition === 'after';
+
+  return (
+    <>
+      {showDropIndicator && !indicatorAfter ? <div className="h-0.5 rounded-full bg-white/40" /> : null}
+      <div
+        draggable
+        ref={itemRef}
+        onDragStart={() => onDragStart(key)}
+        onDragEnter={() => onDragEnter(key)}
+        onDragOver={(e) => onDragOver(key, e)}
+        onDrop={() => onDrop(key)}
+        onDragEnd={onDragEnd}
+        className={[
+          'cursor-grab rounded-lg border border-white/10 bg-white/5 p-4 shadow-sm transition hover:border-white/20 active:cursor-grabbing',
+          isDragging ? 'opacity-80 ring-2 ring-white/30' : '',
+          isDragOver ? 'border-white/30 bg-white/10' : '',
+        ].join(' ')}
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          {/* Reorder controls */}
+          <div className="flex flex-col items-center justify-center gap-1 pr-2">
+            <button
+              type="button"
+              onClick={() => onMoveUp(index)}
+              disabled={index === 0}
+              className="rounded p-0.5 text-white/40 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+              title="Move up"
+            >
+              <ChevronUp className="h-4 w-4" />
+            </button>
+            <div className="touch-none" title="Drag to reorder">
+              <GripVertical className="h-4 w-4 text-white/40 hover:text-white/60" />
+            </div>
+            <button
+              type="button"
+              onClick={() => onMoveDown(index)}
+              disabled={index === totalCount - 1}
+              className="rounded p-0.5 text-white/40 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+              title="Move down"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 text-white">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-white"
+                  checked={repo.selected}
+                  onChange={() => onToggleSelected(repo.name, repo.owner)}
+                />
+                <span className="font-semibold text-white">{repo.name}</span>
+              </label>
+              <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/70">{repo.owner}</span>
+              {repo.private ? (
+                <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-200">Private</span>
+              ) : null}
+              {repo.missing ? (
+                <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-xs text-red-100">Not found in GitHub</span>
+              ) : null}
+            </div>
+            {repo.description && <p className="text-sm text-white/60">{repo.description}</p>}
+            <div className="flex flex-wrap gap-2 text-xs text-white/50">
+              {repo.language ? <span className="rounded bg-white/10 px-2 py-0.5">{repo.language}</span> : null}
+              {repo.topics?.slice(0, 3).map((topic) => (
+                <span key={topic} className="rounded bg-white/5 px-2 py-0.5 text-white/60">
+                  {topic}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:items-end">
+            <label className="text-xs text-white/60">
+              Icon
+              <Input
+                value={repo.icon ?? ''}
+                onChange={(event) => onUpdateIcon(repo.name, repo.owner, event.target.value)}
+                placeholder="e.g. sparkles"
+                className="mt-1 w-40 bg-white/10 text-white"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-white/80">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-emerald-400"
+                checked={repo.isStarred}
+                onChange={() => onToggleStar(repo.name, repo.owner)}
+              />
+              Featured
+            </label>
+          </div>
+        </div>
+      </div>
+      {showDropIndicator && indicatorAfter ? <div className="h-0.5 rounded-full bg-white/40" /> : null}
+    </>
+  );
+}
+
 type StoredProject = {
   name: string;
   owner?: string;
@@ -38,13 +192,19 @@ type StoredProject = {
 };
 
 export function PortfolioConfigManager() {
-  const buildKey = (name: string, owner?: string) => `${(owner || '').toLowerCase()}/${name.toLowerCase()}`;
+  const buildKey = useCallback((name: string, owner?: string) => `${(owner || '').toLowerCase()}/${name.toLowerCase()}`, []);
   const [repos, setRepos] = useState<RepoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [draggingKey, setDraggingKey] = useState<string | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  const [dragOverPosition, setDragOverPosition] = useState<'before' | 'after'>('before');
+  const itemRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const prevPositions = useRef<Map<string, DOMRect>>(new Map());
+  const listRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -139,6 +299,11 @@ export function PortfolioConfigManager() {
 
   const selectedCount = useMemo(() => repos.filter((r) => r.selected).length, [repos]);
 
+  const visibleRepos = useMemo(
+    () => (search.trim() ? filteredRepos : repos),
+    [filteredRepos, repos, search]
+  );
+
   const toggleSelected = (name: string, owner: string) => {
     setRepos((prev) =>
       prev.map((repo) =>
@@ -212,6 +377,159 @@ export function PortfolioConfigManager() {
     });
     setStatus(null);
   }, []);
+
+  const moveItem = useCallback(
+    (fromKey: string, toKey: string, position: 'before' | 'after') => {
+      if (fromKey === toKey) return;
+      setRepos((prev) => {
+        const list = [...prev];
+        const fromIndex = list.findIndex((repo) => buildKey(repo.name, repo.owner) === fromKey);
+        const toIndex = list.findIndex((repo) => buildKey(repo.name, repo.owner) === toKey);
+        if (fromIndex === -1 || toIndex === -1) return prev;
+        const [item] = list.splice(fromIndex, 1);
+        let targetIndex = toIndex + (position === 'after' ? 1 : 0);
+        if (fromIndex < targetIndex) {
+          targetIndex -= 1;
+        }
+        list.splice(targetIndex, 0, item);
+        return list;
+      });
+      setStatus(null);
+    },
+    [buildKey]
+  );
+
+  const handleDragStart = useCallback((key: string) => {
+    setDraggingKey(key);
+    setDragOverKey(null);
+    setDragOverPosition('before');
+  }, []);
+
+  const handleDragEnter = useCallback(
+    (key: string) => {
+      if (draggingKey) {
+        setDragOverKey(key);
+        setDragOverPosition('before');
+      }
+    },
+    [draggingKey]
+  );
+
+  const handleDragOver = useCallback(
+    (key: string, event: DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      if (!draggingKey) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const isAfter = event.clientY > rect.top + rect.height / 2;
+      setDragOverKey(key);
+      setDragOverPosition(isAfter ? 'after' : 'before');
+    },
+    [draggingKey]
+  );
+
+  const findClosestTarget = useCallback(
+    (y: number) => {
+      const entries = Array.from(itemRefs.current.entries()).filter(([_, node]) => node?.isConnected);
+      if (!entries.length) return null;
+      const withRects = entries
+        .map(([key, node]) => ({ key, rect: node!.getBoundingClientRect() }))
+        .sort((a, b) => a.rect.top - b.rect.top);
+
+      for (const entry of withRects) {
+        const mid = entry.rect.top + entry.rect.height / 2;
+        if (y < mid) {
+          return { key: entry.key, position: 'before' as const };
+        }
+      }
+      const last = withRects[withRects.length - 1];
+      return { key: last.key, position: 'after' as const };
+    },
+    []
+  );
+
+  const handleListDragOver = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!draggingKey) return;
+      event.preventDefault();
+      const target = findClosestTarget(event.clientY);
+      if (target) {
+        setDragOverKey(target.key);
+        setDragOverPosition(target.position);
+      }
+    },
+    [draggingKey, findClosestTarget]
+  );
+
+  const handleListDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!draggingKey) return;
+      event.preventDefault();
+      const target = findClosestTarget(event.clientY) || (dragOverKey ? { key: dragOverKey, position: dragOverPosition } : null);
+      if (target) {
+        moveItem(draggingKey, target.key, target.position);
+      }
+      setDraggingKey(null);
+      setDragOverKey(null);
+      setDragOverPosition('before');
+    },
+    [dragOverKey, dragOverPosition, draggingKey, findClosestTarget, moveItem]
+  );
+
+  const handleDrop = useCallback(
+    (key: string) => {
+      if (!draggingKey) return;
+      moveItem(draggingKey, key, dragOverPosition);
+      setDraggingKey(null);
+      setDragOverKey(null);
+      setDragOverPosition('before');
+    },
+    [dragOverPosition, draggingKey, moveItem]
+  );
+
+  const handleDragEnd = useCallback(() => {
+    setDraggingKey(null);
+    setDragOverKey(null);
+    setDragOverPosition('before');
+  }, []);
+
+  // Animate position changes (FLIP-lite)
+  useLayoutEffect(() => {
+    const newPositions = new Map<string, DOMRect>();
+    itemRefs.current.forEach((node, key) => {
+      if (node) {
+        newPositions.set(key, node.getBoundingClientRect());
+      }
+    });
+
+    newPositions.forEach((newBox, key) => {
+      const prevBox = prevPositions.current.get(key);
+      const node = itemRefs.current.get(key);
+      if (!node || !prevBox) return;
+      const deltaX = prevBox.left - newBox.left;
+      const deltaY = prevBox.top - newBox.top;
+      if (deltaX !== 0 || deltaY !== 0) {
+        node.style.transition = 'none';
+        node.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+        requestAnimationFrame(() => {
+          node.style.transition = 'transform 180ms ease';
+          node.style.transform = '';
+        });
+      }
+    });
+
+    prevPositions.current = newPositions;
+  }, [visibleRepos]);
+
+  const setItemRef = useCallback(
+    (key: string) => (node: HTMLDivElement | null) => {
+      if (node) {
+        itemRefs.current.set(key, node);
+      } else {
+        itemRefs.current.delete(key);
+      }
+    },
+    []
+  );
 
   // Get the most recent update timestamp from all repos
   const lastUpdated = useMemo(() => {
@@ -344,92 +662,39 @@ export function PortfolioConfigManager() {
           </div>
         )}
 
-        <div className="space-y-3">
-          {filteredRepos.map((repo) => {
-            // Find the actual index in the full repos array for reordering
+        <div
+          ref={listRef}
+          className="space-y-3"
+          onDragOver={handleListDragOver}
+          onDrop={handleListDrop}
+        >
+          {visibleRepos.map((repo) => {
             const actualIndex = repos.findIndex(
               (r) => buildKey(r.name, r.owner) === buildKey(repo.name, repo.owner)
             );
-            return (
-            <div
-              key={`${repo.owner}/${repo.name}`}
-              className="rounded-lg border border-white/10 bg-white/5 p-4 shadow-sm transition hover:border-white/20"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                {/* Reorder controls */}
-                <div className="flex flex-col items-center justify-center gap-1 pr-2">
-                  <button
-                    type="button"
-                    onClick={() => moveUp(actualIndex)}
-                    disabled={actualIndex === 0}
-                    className="rounded p-0.5 text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="Move up"
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </button>
-                  <GripVertical className="h-4 w-4 text-white/20" />
-                  <button
-                    type="button"
-                    onClick={() => moveDown(actualIndex)}
-                    disabled={actualIndex === repos.length - 1}
-                    className="rounded p-0.5 text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="Move down"
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="flex-1 space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <label className="flex items-center gap-2 text-white">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 accent-white"
-                        checked={repo.selected}
-                        onChange={() => toggleSelected(repo.name, repo.owner)}
-                      />
-                      <span className="font-semibold text-white">{repo.name}</span>
-                    </label>
-                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/70">{repo.owner}</span>
-                    {repo.private ? (
-                      <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-200">Private</span>
-                    ) : null}
-                    {repo.missing ? (
-                      <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-xs text-red-100">Not found in GitHub</span>
-                    ) : null}
-                  </div>
-                  {repo.description && <p className="text-sm text-white/60">{repo.description}</p>}
-                  <div className="flex flex-wrap gap-2 text-xs text-white/50">
-                    {repo.language ? <span className="rounded bg-white/10 px-2 py-0.5">{repo.language}</span> : null}
-                    {repo.topics?.slice(0, 3).map((topic) => (
-                      <span key={topic} className="rounded bg-white/5 px-2 py-0.5 text-white/60">
-                        {topic}
-                      </span>
-                    ))}
-                  </div>
-                </div>
 
-                <div className="flex flex-col gap-2 sm:items-end">
-                  <label className="text-xs text-white/60">
-                    Icon
-                    <Input
-                      value={repo.icon ?? ''}
-                      onChange={(event) => updateIcon(repo.name, repo.owner, event.target.value)}
-                      placeholder="e.g. sparkles"
-                      className="mt-1 w-40 bg-white/10 text-white"
-                    />
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-white/80">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 accent-emerald-400"
-                      checked={repo.isStarred}
-                      onChange={() => toggleStar(repo.name, repo.owner)}
-                    />
-                    Featured
-                  </label>
-                </div>
-              </div>
-            </div>
+            return (
+              <RepoItem
+                key={buildKey(repo.name, repo.owner)}
+                repo={repo}
+                index={actualIndex}
+                totalCount={repos.length}
+                draggingKey={draggingKey}
+                dragOverKey={dragOverKey}
+                dragOverPosition={dragOverPosition}
+                onDragStart={handleDragStart}
+                onDragEnter={handleDragEnter}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onDragEnd={handleDragEnd}
+                onToggleSelected={toggleSelected}
+                onUpdateIcon={updateIcon}
+                onToggleStar={toggleStar}
+                onMoveUp={moveUp}
+                onMoveDown={moveDown}
+                buildKey={buildKey}
+                itemRef={setItemRef(buildKey(repo.name, repo.owner))}
+              />
             );
           })}
         </div>
