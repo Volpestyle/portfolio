@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
 
 type RepoRow = {
   name: string;
@@ -17,9 +18,24 @@ type RepoRow = {
   isStarred: boolean;
   icon?: string;
   missing?: boolean;
+  order?: number;
+  updatedAt?: string;
 };
 
 type ApiRepo = Omit<RepoRow, 'selected' | 'isStarred' | 'icon' | 'missing'>;
+
+type StoredProject = {
+  name: string;
+  owner?: string;
+  description?: string;
+  isStarred?: boolean;
+  icon?: string;
+  topics?: string[];
+  language?: string;
+  visible?: boolean;
+  order?: number;
+  updatedAt?: string;
+};
 
 export function PortfolioConfigManager() {
   const buildKey = (name: string, owner?: string) => `${(owner || '').toLowerCase()}/${name.toLowerCase()}`;
@@ -36,55 +52,68 @@ export function PortfolioConfigManager() {
         setLoading(true);
         setError(null);
 
-        const [configRes, reposRes] = await Promise.all([
-          fetch('/api/admin/portfolio/config'),
+        const [projectsRes, reposRes] = await Promise.all([
+          fetch('/api/admin/projects'),
           fetch('/api/admin/portfolio/repos'),
         ]);
 
-        if (!configRes.ok) {
+        if (!projectsRes.ok) {
           throw new Error('Failed to load saved configuration');
         }
         if (!reposRes.ok) {
           throw new Error('Failed to load GitHub repositories');
         }
 
-        const { config } = (await configRes.json()) as { config?: { repositories?: any[] } };
+        const { projects } = (await projectsRes.json()) as { projects?: StoredProject[] };
         const { repos: availableRepos } = (await reposRes.json()) as { repos: ApiRepo[] };
 
-        const configMap = new Map(
-          (config?.repositories ?? []).map((repo) => [buildKey(repo.name, repo.owner), repo])
+        const projectMap = new Map(
+          (projects ?? []).map((project) => [buildKey(project.name, project.owner || 'volpestyle'), project])
         );
         const seen = new Set<string>();
 
-        const merged: RepoRow[] = availableRepos.map((repo) => {
+        const merged: RepoRow[] = availableRepos.map((repo, index) => {
           const key = buildKey(repo.name, repo.owner);
-          const existing = configMap.get(key);
+          const existing = projectMap.get(key);
           seen.add(key);
           return {
             ...repo,
-            selected: Boolean(existing),
+            selected: existing ? existing.visible !== false : false,
             isStarred: Boolean(existing?.isStarred),
             icon: existing?.icon ?? '',
+            description: existing?.description ?? repo.description,
+            topics: existing?.topics ?? repo.topics,
+            language: existing?.language ?? repo.language,
+            order: existing?.order ?? index,
+            updatedAt: existing?.updatedAt,
           };
         });
 
-        const missingFromGitHub: RepoRow[] = (config?.repositories ?? [])
-          .filter((repo) => !seen.has(buildKey(repo?.name, repo?.owner)))
-          .map((repo) => ({
-            name: repo.name,
-            owner: repo.owner || 'volpestyle',
-            description: repo.description ?? 'Configured repo not found in GitHub list',
-            private: Boolean(repo.isPrivate),
+        const missingFromGitHub: RepoRow[] = (projects ?? [])
+          .filter((project) => !seen.has(buildKey(project?.name, project?.owner || 'volpestyle')))
+          .map((project) => ({
+            name: project.name,
+            owner: project.owner || 'volpestyle',
+            description: project.description ?? 'Configured repo not found in GitHub list',
+            private: true,
             html_url: undefined,
-            language: repo.language,
-            topics: repo.topics,
-            selected: true,
-            isStarred: Boolean(repo.isStarred),
-            icon: repo.icon ?? '',
+            language: project.language,
+            topics: project.topics,
+            selected: project.visible !== false,
+            isStarred: Boolean(project.isStarred),
+            icon: project.icon ?? '',
+            order: project.order,
             missing: true,
+            updatedAt: project.updatedAt,
           }));
 
-        setRepos([...merged, ...missingFromGitHub]);
+        const ordered = [...merged, ...missingFromGitHub].sort((a, b) => {
+          const orderA = typeof a.order === 'number' ? a.order : Number.MAX_SAFE_INTEGER;
+          const orderB = typeof b.order === 'number' ? b.order : Number.MAX_SAFE_INTEGER;
+          return orderA - orderB;
+        });
+
+        setRepos(ordered);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unable to load portfolio configuration');
       } finally {
@@ -163,6 +192,38 @@ export function PortfolioConfigManager() {
     setStatus(null);
   };
 
+  // Reorder functions
+  const moveUp = useCallback((index: number) => {
+    if (index <= 0) return;
+    setRepos((prev) => {
+      const newRepos = [...prev];
+      [newRepos[index - 1], newRepos[index]] = [newRepos[index], newRepos[index - 1]];
+      return newRepos;
+    });
+    setStatus(null);
+  }, []);
+
+  const moveDown = useCallback((index: number) => {
+    setRepos((prev) => {
+      if (index >= prev.length - 1) return prev;
+      const newRepos = [...prev];
+      [newRepos[index], newRepos[index + 1]] = [newRepos[index + 1], newRepos[index]];
+      return newRepos;
+    });
+    setStatus(null);
+  }, []);
+
+  // Get the most recent update timestamp from all repos
+  const lastUpdated = useMemo(() => {
+    const timestamps = repos
+      .map((r) => r.updatedAt)
+      .filter((t): t is string => Boolean(t))
+      .map((t) => new Date(t).getTime())
+      .filter((t) => !Number.isNaN(t));
+    if (timestamps.length === 0) return null;
+    return new Date(Math.max(...timestamps)).toLocaleString();
+  }, [repos]);
+
   const save = async () => {
     const selectedRepos = repos.filter((repo) => repo.selected);
     if (!selectedRepos.length) {
@@ -176,21 +237,21 @@ export function PortfolioConfigManager() {
 
     try {
       const payload = {
-        repositories: selectedRepos.map((repo) => ({
+        projects: repos.map((repo, index) => ({
           name: repo.name,
           owner: repo.owner,
-          description: repo.description,
-          isPrivate: repo.private,
+          description: repo.description ?? undefined,
           isStarred: repo.isStarred,
-          icon: repo.icon,
+          icon: repo.icon || undefined,
           topics: repo.topics,
-          language: repo.language,
-          homepage: repo.html_url,
+          language: repo.language ?? undefined,
+          visible: repo.selected,
+          order: index,
         })),
       };
 
-      const response = await fetch('/api/admin/portfolio/config', {
-        method: 'PUT',
+      const response = await fetch('/api/admin/projects', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -264,17 +325,60 @@ export function PortfolioConfigManager() {
 
         <div className="flex items-center justify-between text-sm text-white/60">
           <span>{repos.length} repos loaded</span>
-          <span>{selectedCount} selected</span>
+          <div className="flex items-center gap-4">
+            {lastUpdated && <span className="text-xs">Last saved: {lastUpdated}</span>}
+            <span>{selectedCount} selected</span>
+          </div>
         </div>
 
+        {/* Empty state for no repos selected */}
+        {repos.length > 0 && selectedCount === 0 && (
+          <div className="rounded-lg border border-dashed border-yellow-500/30 bg-yellow-500/5 px-4 py-6 text-center">
+            <p className="text-sm text-yellow-200">No repos selected</p>
+            <p className="mt-1 text-xs text-white/50">
+              Select repos below to feature them in your portfolio, then click Save config.
+            </p>
+            <Button variant="onBlack" size="sm" onClick={selectAll} className="mt-3">
+              Select all repos
+            </Button>
+          </div>
+        )}
+
         <div className="space-y-3">
-          {filteredRepos.map((repo) => (
+          {filteredRepos.map((repo) => {
+            // Find the actual index in the full repos array for reordering
+            const actualIndex = repos.findIndex(
+              (r) => buildKey(r.name, r.owner) === buildKey(repo.name, repo.owner)
+            );
+            return (
             <div
               key={`${repo.owner}/${repo.name}`}
               className="rounded-lg border border-white/10 bg-white/5 p-4 shadow-sm transition hover:border-white/20"
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-1">
+                {/* Reorder controls */}
+                <div className="flex flex-col items-center justify-center gap-1 pr-2">
+                  <button
+                    type="button"
+                    onClick={() => moveUp(actualIndex)}
+                    disabled={actualIndex === 0}
+                    className="rounded p-0.5 text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Move up"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </button>
+                  <GripVertical className="h-4 w-4 text-white/20" />
+                  <button
+                    type="button"
+                    onClick={() => moveDown(actualIndex)}
+                    disabled={actualIndex === repos.length - 1}
+                    className="rounded p-0.5 text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Move down"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex-1 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <label className="flex items-center gap-2 text-white">
                       <input
@@ -326,7 +430,8 @@ export function PortfolioConfigManager() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </CardContent>
     </Card>
