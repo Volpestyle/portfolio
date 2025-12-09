@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { hoverMessages } from '@/constants/messages';
 import { motion } from 'framer-motion';
 import { springAnimations } from '@/lib/animations';
-import { TransitionLink } from '@/components/PageTransition';
+import { TransitionLink, usePageTransition } from '@/components/PageTransition';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 const NAV_ITEMS = [
@@ -26,6 +26,7 @@ export function Header() {
   const isAdmin = useIsAdmin();
   const [headerHoverText, setHeaderHoverText] = useState('');
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const { headerRef } = usePageTransition();
   const brandTarget = isAdmin ? '/admin' : '/';
 
   useEffect(() => {
@@ -39,7 +40,11 @@ export function Header() {
   };
 
   return (
-    <motion.header layout="position" className="relative z-20 border border-white/50 bg-black/70 py-2 backdrop-blur-sm">
+    <motion.header
+      ref={headerRef}
+      layout="position"
+      className="relative z-20 border border-white/50 bg-black/70 py-2 backdrop-blur-sm"
+    >
       <div className="flex items-center justify-between px-4 py-3 sm:px-6">
         <div className="flex items-center gap-4">
           <TransitionLink

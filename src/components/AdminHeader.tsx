@@ -22,13 +22,18 @@ export function AdminHeader() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsHovered, setSettingsHovered] = useState(false);
   const [adminHoverText, setAdminHoverText] = useState('');
+  const { headerRef } = usePageTransition();
 
   const clearHoverStates = () => {
     setHoveredIndex(null);
   };
 
   return (
-    <motion.header layout="position" className="relative z-20 border border-white/50 bg-black/70 py-2 backdrop-blur-sm">
+    <motion.header
+      ref={headerRef}
+      layout="position"
+      className="relative z-20 border border-white/50 bg-black/70 py-2 backdrop-blur-sm"
+    >
       <div className="flex items-center justify-between px-4 py-3 sm:px-6">
         {/* Left side: Admin typewriter title that links home */}
         <TransitionLink

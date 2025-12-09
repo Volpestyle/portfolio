@@ -21,6 +21,7 @@ import { Spinner } from '@/components/ui/spinner';
 const EXIT_DURATION_MS = 400;
 const BASELINE_DELAY_MS = 200;
 const SAFETY_TIMEOUT_MS = 5000;
+const SPINNER_OFFSET_FROM_HEADER_PX = 120;
 
 interface PageTransitionContextValue {
   isTransitioning: boolean;
@@ -29,6 +30,8 @@ interface PageTransitionContextValue {
   markReady: (ready: boolean) => void;
   /** Triggers exit animation, returns promise that resolves when animation completes */
   startExit: () => Promise<void>;
+  /** Ref callback to attach to the header for spinner positioning */
+  headerRef: (element: HTMLElement | null) => void;
 }
 
 const PageTransitionContext = createContext<PageTransitionContextValue>({
@@ -36,6 +39,7 @@ const PageTransitionContext = createContext<PageTransitionContextValue>({
   isExiting: false,
   markReady: () => {},
   startExit: () => Promise.resolve(),
+  headerRef: () => {},
 });
 
 export function usePageTransition() {
@@ -54,8 +58,11 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [timerDone, setTimerDone] = useState(true);
   const [contentReady, setContentReady] = useState(true);
+  const [spinnerTop, setSpinnerTop] = useState<number | null>(null);
   const prevPathname = useRef(pathname);
   const exitResolveRef = useRef<(() => void) | null>(null);
+  const headerElementRef = useRef<HTMLElement | null>(null);
+  const headerResizeObserverRef = useRef<ResizeObserver | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -115,11 +122,55 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const updateSpinnerPosition = useCallback(() => {
+    if (!headerElementRef.current) {
+      setSpinnerTop(null);
+      return;
+    }
+
+    const rect = headerElementRef.current.getBoundingClientRect();
+    setSpinnerTop(rect.bottom + SPINNER_OFFSET_FROM_HEADER_PX);
+  }, []);
+
+  const headerRef = useCallback(
+    (element: HTMLElement | null) => {
+      headerResizeObserverRef.current?.disconnect();
+      headerResizeObserverRef.current = null;
+      headerElementRef.current = element;
+
+      if (element) {
+        updateSpinnerPosition();
+        headerResizeObserverRef.current = new ResizeObserver(() => updateSpinnerPosition());
+        headerResizeObserverRef.current.observe(element);
+      } else {
+        setSpinnerTop(null);
+      }
+    },
+    [updateSpinnerPosition]
+  );
+
+  useEffect(() => {
+    const handleWindowChange = () => updateSpinnerPosition();
+    window.addEventListener('resize', handleWindowChange);
+    window.addEventListener('scroll', handleWindowChange, true);
+
+    return () => {
+      window.removeEventListener('resize', handleWindowChange);
+      window.removeEventListener('scroll', handleWindowChange, true);
+      headerResizeObserverRef.current?.disconnect();
+    };
+  }, [updateSpinnerPosition]);
+
+  useLayoutEffect(() => {
+    updateSpinnerPosition();
+  }, [pathname, updateSpinnerPosition]);
+
   const contextValue: PageTransitionContextValue = {
     isTransitioning,
     isExiting,
     markReady,
     startExit,
+    headerRef,
   };
 
   return (
@@ -129,11 +180,22 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
       {mounted &&
         createPortal(
           <div
-            className={`pointer-events-none fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${
+            className={`pointer-events-none fixed inset-0 z-50 transition-opacity duration-200 ${
               isTransitioning || isExiting ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            <Spinner variant="ring" size="lg" />
+            <motion.div
+              className="absolute left-1/2"
+              initial={false}
+              animate={{
+                top: spinnerTop ?? '50%',
+                translateX: '-50%',
+                translateY: spinnerTop !== null ? 0 : '-50%',
+              }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <Spinner variant="ring" size="lg" />
+            </motion.div>
           </div>,
           document.body
         )}
