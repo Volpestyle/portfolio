@@ -10,6 +10,7 @@ import { hoverMessages } from '@/constants/messages';
 import { motion } from 'framer-motion';
 import { springAnimations } from '@/lib/animations';
 import { TransitionLink } from '@/components/PageTransition';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 const NAV_ITEMS = [
   { href: '/', icon: MessageSquare, label: 'chat', message: '', expandedWidth: '4.5rem' },
@@ -22,8 +23,10 @@ const NAV_ITEMS = [
 export function Header() {
   const { setHoverText } = useHover();
   const pathname = usePathname();
+  const isAdmin = useIsAdmin();
   const [headerHoverText, setHeaderHoverText] = useState('');
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const brandTarget = isAdmin ? '/admin' : '/';
 
   useEffect(() => {
     setHeaderHoverText('');
@@ -39,8 +42,35 @@ export function Header() {
     <motion.header layout="position" className="relative z-20 border border-white/50 bg-black/70 py-2 backdrop-blur-sm">
       <div className="flex items-center justify-between px-4 py-3 sm:px-6">
         <div className="flex items-center gap-4">
-          <TransitionLink href="/" aria-label="Home">
-            <HeaderTypewriter hoverText={headerHoverText} typeSpeed={90} backspaceSpeed={40} />
+          <TransitionLink
+            href={brandTarget}
+            aria-label={isAdmin ? 'Admin' : 'Home'}
+            className="group inline-flex min-w-[7rem] items-center justify-start rounded px-3 py-1"
+            onMouseEnter={() => {
+              if (!isAdmin) return;
+              setHeaderHoverText('Admin');
+              setHoveredIndex(null);
+            }}
+            onMouseLeave={() => {
+              if (!isAdmin) return;
+              setHeaderHoverText('');
+            }}
+            onFocus={() => {
+              if (!isAdmin) return;
+              setHeaderHoverText('Admin');
+              setHoveredIndex(null);
+            }}
+            onBlur={() => {
+              if (!isAdmin) return;
+              setHeaderHoverText('');
+            }}
+          >
+            <HeaderTypewriter
+              hoverText={headerHoverText}
+              typeSpeed={90}
+              backspaceSpeed={40}
+              className="block w-full text-left"
+            />
           </TransitionLink>
         </div>
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 export const ROUTE_BASE_TEXT = [
   { match: (pathname: string) => pathname === '/', text: 'JCV' },
@@ -10,6 +11,7 @@ export const ROUTE_BASE_TEXT = [
   { match: (pathname: string) => pathname.startsWith('/about'), text: 'about me' },
   { match: (pathname: string) => pathname.startsWith('/blog'), text: 'my thoughts' },
   { match: (pathname: string) => pathname.startsWith('/contact'), text: 'contact me' },
+  { match: (pathname: string) => pathname.startsWith('/admin'), text: 'Admin' },
 ] as const;
 
 const DEFAULT_BASE_TEXT = 'JCV';
@@ -26,15 +28,22 @@ type HeaderTypewriterProps = {
   hoverText?: string;
   typeSpeed?: number;
   backspaceSpeed?: number;
+  baseTextOverride?: string;
+  className?: string;
 };
 
 export function HeaderTypewriter({
   hoverText,
   typeSpeed = DEFAULT_TYPE_SPEED,
   backspaceSpeed = DEFAULT_BACKSPACE_SPEED,
+  baseTextOverride,
+  className,
 }: HeaderTypewriterProps) {
   const pathname = usePathname();
-  const baseText = useMemo(() => resolveHeaderBaseText(pathname), [pathname]);
+  const baseText = useMemo(
+    () => baseTextOverride ?? resolveHeaderBaseText(pathname),
+    [baseTextOverride, pathname]
+  );
   const targetText = !hoverText?.length ? baseText : hoverText;
   const [displayText, setDisplayText] = useState('');
   const [isHovered, setIsHovered] = useState(false);
@@ -62,7 +71,7 @@ export function HeaderTypewriter({
 
   return (
     <motion.div
-      className="text-md font-mono font-semibold text-white sm:text-2xl"
+      className={cn('text-md font-mono font-semibold text-white sm:text-2xl', className)}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       animate={{

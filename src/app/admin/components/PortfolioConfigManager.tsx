@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
+import { usePageTransition } from '@/components/PageTransition';
 
 type RepoRow = {
   name: string;
@@ -192,6 +193,7 @@ type StoredProject = {
 };
 
 export function PortfolioConfigManager() {
+  const { markReady } = usePageTransition();
   const buildKey = useCallback((name: string, owner?: string) => `${(owner || '').toLowerCase()}/${name.toLowerCase()}`, []);
   const [repos, setRepos] = useState<RepoRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -207,6 +209,9 @@ export function PortfolioConfigManager() {
   const listRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    // Signal to page transition that we're loading async content
+    markReady(false);
+
     async function load() {
       try {
         setLoading(true);
@@ -278,11 +283,13 @@ export function PortfolioConfigManager() {
         setError(err instanceof Error ? err.message : 'Unable to load portfolio configuration');
       } finally {
         setLoading(false);
+        // Signal to page transition that content is ready
+        markReady(true);
       }
     }
 
     load();
-  }, []);
+  }, [markReady]);
 
   const filteredRepos = useMemo(() => {
     if (!search.trim()) return repos;

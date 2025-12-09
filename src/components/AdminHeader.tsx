@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, FileText, MessageSquare, Settings, LogOut, FolderGit2 } from 'lucide-react';
+import { FileText, MessageSquare, Settings, LogOut, FolderGit2 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { springAnimations } from '@/lib/animations';
-import { TransitionLink } from '@/components/PageTransition';
+import { TransitionLink, usePageTransition } from '@/components/PageTransition';
 import Link from 'next/link';
+import { HeaderTypewriter } from '@/components/HeaderTypewriter';
 
 const ADMIN_NAV_ITEMS = [
   { href: '/admin', icon: FileText, label: 'posts', expandedWidth: '5rem' },
@@ -20,6 +21,7 @@ export function AdminHeader() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsHovered, setSettingsHovered] = useState(false);
+  const [adminHoverText, setAdminHoverText] = useState('');
 
   const clearHoverStates = () => {
     setHoveredIndex(null);
@@ -28,22 +30,24 @@ export function AdminHeader() {
   return (
     <motion.header layout="position" className="relative z-20 border border-white/50 bg-black/70 py-2 backdrop-blur-sm">
       <div className="flex items-center justify-between px-4 py-3 sm:px-6">
-        {/* Left side: Back to Site */}
-        <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            className="group flex items-center gap-2 text-white/70 transition-colors hover:text-white"
-            aria-label="Back to site"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm font-medium">Site</span>
-          </Link>
-
-          {/* Admin title */}
-          <TransitionLink href="/admin" aria-label="Admin home">
-            <span className="text-md font-mono font-semibold text-white sm:text-2xl">Admin</span>
-          </TransitionLink>
-        </div>
+        {/* Left side: Admin typewriter title that links home */}
+        <TransitionLink
+          href="/"
+          aria-label="Back to site"
+          onMouseEnter={() => setAdminHoverText('JCV')}
+          onMouseLeave={() => setAdminHoverText('')}
+          onFocus={() => setAdminHoverText('JCV')}
+          onBlur={() => setAdminHoverText('')}
+          className="group inline-flex min-w-[7rem] items-center justify-start rounded px-3 py-1"
+        >
+          <HeaderTypewriter
+            baseTextOverride="Admin"
+            hoverText={adminHoverText}
+            typeSpeed={90}
+            backspaceSpeed={40}
+            className="block w-full text-left"
+          />
+        </TransitionLink>
 
         {/* Right side: Nav items + Settings */}
         <nav className="flex items-center gap-2" aria-label="Admin navigation">
