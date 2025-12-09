@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { fetchPortfolioRepos, fetchRepoReadme } from '@portfolio/github-data';
+import { fetchPortfolioRepos, fetchPortfolioReposFromDynamo, fetchRepoReadme } from '@portfolio/github-data';
 import type { RepoData } from '@portfolio/chat-contract';
 import type { EmbeddingEntry, ProjectRecord } from '@portfolio/chat-data';
 import { requireEnv } from '../env';
@@ -498,18 +498,44 @@ async function buildEmbedding(
   return response.data[0]?.embedding ?? [];
 }
 
+async function fetchPortfolioWithFallback(repoSelection: ResolvedRepoSelection): Promise<{ starred: RepoData[]; normal: RepoData[] }> {
+  const tableName = process.env.ADMIN_TABLE_NAME ?? process.env.PORTFOLIO_TABLE ?? '';
+
+  // Try DynamoDB first if configured
+  if (tableName) {
+    try {
+      console.log(`${LOG_PREFIX} Fetching portfolio from DynamoDB (${tableName})...`);
+      const result = await fetchPortfolioReposFromDynamo({ tableName });
+      if (result.starred.length > 0 || result.normal.length > 0) {
+        console.log(`${LOG_PREFIX} Found ${result.starred.length + result.normal.length} repos in DynamoDB`);
+        return result;
+      }
+      console.log(`${LOG_PREFIX} DynamoDB empty, falling back to gist...`);
+    } catch (error) {
+      console.warn(`${LOG_PREFIX} DynamoDB fetch failed, falling back to gist:`, error);
+    }
+  }
+
+  // Fall back to gist
+  const gistId = repoSelection.gistId || process.env.PORTFOLIO_GIST_ID || '';
+  if (!gistId) {
+    console.warn(`${LOG_PREFIX} No ADMIN_TABLE_NAME or PORTFOLIO_GIST_ID configured`);
+    return { starred: [], normal: [] };
+  }
+
+  console.log(`${LOG_PREFIX} Fetching portfolio from gist...`);
+  return fetchPortfolioRepos({ gistId });
+}
+
 export async function runProjectKnowledgeTask(context: PreprocessContext): Promise<PreprocessTaskResult> {
   requireEnv('GH_TOKEN');
-  requireEnv('PORTFOLIO_GIST_ID');
   const openAiKey = requireEnv('OPENAI_API_KEY');
   const { projectsOutput, projectsEmbeddingsOutput } = context.paths;
   const repoSelection = context.repoSelection;
 
   const client = new OpenAI({ apiKey: openAiKey });
   const { projectTextModel, projectEmbeddingModel } = context.models;
-  const { starred, normal } = await fetchPortfolioRepos({
-    gistId: repoSelection.gistId || process.env.PORTFOLIO_GIST_ID || '',
-  });
+  const { starred, normal } = await fetchPortfolioWithFallback(repoSelection);
   const repos = filterReposBySelection([...starred, ...normal], repoSelection);
 
   if (!repos.length) {

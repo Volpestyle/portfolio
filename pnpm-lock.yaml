@@ -340,6 +340,12 @@ importers:
 
   packages/github-data:
     dependencies:
+      '@aws-sdk/client-dynamodb':
+        specifier: ^3.637.0
+        version: 3.943.0
+      '@aws-sdk/lib-dynamodb':
+        specifier: ^3.637.0
+        version: 3.943.0(@aws-sdk/client-dynamodb@3.943.0)
       '@octokit/rest':
         specifier: ^21.1.0
         version: 21.1.1

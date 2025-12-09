@@ -1,4 +1,6 @@
 import { Octokit } from '@octokit/rest';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand, type QueryCommandOutput } from '@aws-sdk/lib-dynamodb';
 import type { RepoData } from '@portfolio/chat-contract';
 
 type PortfolioRepoConfig = {
@@ -59,7 +61,38 @@ type FetchRepoReadmeOptions = ResolveOctokitOptions & {
   publicRepoName?: string;
 };
 
+type DynamoProjectRecord = {
+  name: string;
+  owner?: string;
+  visible?: boolean;
+  order?: number;
+  description?: string;
+  icon?: string;
+  isStarred?: boolean;
+  topics?: string[];
+  language?: string;
+  updatedAt?: string;
+};
+
+type FetchPortfolioFromDynamoOptions = ResolveOctokitOptions & {
+  tableName: string;
+  region?: string;
+  defaultUsername?: string;
+};
+
 const DEFAULT_USERNAME = 'volpestyle';
+const PROJECTS_PK = 'PROJECTS';
+let dynamoDocClient: DynamoDBDocumentClient | null = null;
+
+function getDynamoClient(region: string): DynamoDBDocumentClient {
+  if (!dynamoDocClient) {
+    dynamoDocClient = DynamoDBDocumentClient.from(
+      new DynamoDBClient({ region }),
+      { marshallOptions: { removeUndefinedValues: true } }
+    );
+  }
+  return dynamoDocClient;
+}
 const DEFAULT_CONFIG_FILENAME = 'portfolio-config.json';
 const octokitByToken = new Map<string, Octokit>();
 
@@ -214,6 +247,84 @@ export async function fetchPortfolioRepos(options: FetchPortfolioReposOptions): 
 
   const repos: RepoData[] = [];
   for (const repoConfig of portfolioConfig.repositories) {
+    repos.push(await buildRepoRecord(repoConfig, octokit, defaultUsername));
+  }
+
+  return {
+    starred: repos.filter((repo) => repo.isStarred),
+    normal: repos.filter((repo) => !repo.isStarred),
+  };
+}
+
+async function queryDynamoProjects(tableName: string, region: string): Promise<DynamoProjectRecord[]> {
+  const client = getDynamoClient(region);
+  const projects: DynamoProjectRecord[] = [];
+  let lastKey: Record<string, unknown> | undefined;
+
+  do {
+    const response: QueryCommandOutput = await client.send(
+      new QueryCommand({
+        TableName: tableName,
+        KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
+        ExpressionAttributeValues: {
+          ':pk': PROJECTS_PK,
+          ':prefix': 'REPO#',
+        },
+        ExclusiveStartKey: lastKey,
+      })
+    );
+
+    for (const item of response.Items ?? []) {
+      projects.push({
+        name: item.name as string,
+        owner: item.owner as string | undefined,
+        visible: item.visible as boolean | undefined,
+        order: item.order as number | undefined,
+        description: item.description as string | undefined,
+        icon: item.icon as string | undefined,
+        isStarred: item.isStarred as boolean | undefined,
+        topics: item.topics as string[] | undefined,
+        language: item.language as string | undefined,
+        updatedAt: item.updatedAt as string | undefined,
+      });
+    }
+
+    lastKey = response.LastEvaluatedKey;
+  } while (lastKey);
+
+  return projects.sort((a, b) => {
+    const orderA = typeof a.order === 'number' ? a.order : Number.MAX_SAFE_INTEGER;
+    const orderB = typeof b.order === 'number' ? b.order : Number.MAX_SAFE_INTEGER;
+    return orderA - orderB;
+  });
+}
+
+export async function fetchPortfolioReposFromDynamo(
+  options: FetchPortfolioFromDynamoOptions
+): Promise<PortfolioReposResponse> {
+  const octokit = await resolveOctokit(options);
+  const defaultUsername = options.defaultUsername ?? DEFAULT_USERNAME;
+  const region = options.region ?? process.env.AWS_REGION ?? 'us-east-1';
+
+  const projects = await queryDynamoProjects(options.tableName, region);
+  const visibleProjects = projects.filter((p) => p.visible !== false);
+
+  if (!visibleProjects.length) {
+    return { starred: [], normal: [] };
+  }
+
+  const repos: RepoData[] = [];
+  for (const project of visibleProjects) {
+    const repoConfig: PortfolioRepoConfig = {
+      name: project.name,
+      owner: project.owner,
+      description: project.description,
+      icon: project.icon,
+      isStarred: project.isStarred,
+      topics: project.topics,
+      language: project.language,
+      updatedAt: project.updatedAt,
+    };
     repos.push(await buildRepoRecord(repoConfig, octokit, defaultUsername));
   }
 
