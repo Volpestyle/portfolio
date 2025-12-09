@@ -1,17 +1,11 @@
 import { NextResponse } from 'next/server';
 import { listAllGitHubRepos } from '@/lib/github-api';
-import { getAdminRequestContext } from '@/server/admin/auth';
 import { shouldServeFixturesForRequest } from '@/lib/test-flags';
 import { TEST_REPO } from '@portfolio/test-support/fixtures';
 
 export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
-  const admin = await getAdminRequestContext();
-  if (!admin.isAdmin) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-  }
-
   if (shouldServeFixturesForRequest(request.headers)) {
     return NextResponse.json({
       repos: [

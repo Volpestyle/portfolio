@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { springAnimations } from '@/lib/animations';
-import Link from 'next/link';
+import { TransitionLink } from '@/components/PageTransition';
 
 interface AnimatedExpandButtonProps {
   /** Icon component to display when collapsed */
@@ -121,7 +121,7 @@ export function AnimatedExpandButton({
               {animatedContent}
             </a>
           ) : (
-            <Link href={href}>{animatedContent}</Link>
+            <TransitionLink href={href}>{animatedContent}</TransitionLink>
           )}
         </Button>
       ) : (

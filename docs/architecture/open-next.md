@@ -97,7 +97,7 @@ FIFO queue for processing revalidation requests:
 ```json
 {
   "tag": "posts",
-  "paths": ["/blog", "/api/blog/posts"]
+  "paths": ["/blog", "/api/posts"]
 }
 ```
 

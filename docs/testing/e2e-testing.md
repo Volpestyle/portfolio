@@ -81,7 +81,7 @@ test('navigate to projects', async ({ page }) => {
 import { test, expect } from '@playwright/test';
 
 test('blog posts API returns data', async ({ request }) => {
-  const response = await request.get('/api/blog/posts');
+  const response = await request.get('/api/posts');
   expect(response.ok()).toBeTruthy();
 
   const data = await response.json();

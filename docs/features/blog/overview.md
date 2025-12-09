@@ -47,8 +47,8 @@ draft ──┬──▶ published
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/blog/posts` | GET | List published posts |
-| `/api/blog/posts/[slug]` | GET | Get single post |
+| `/api/posts` | GET | List published posts |
+| `/api/posts/[slug]` | GET | Get single post |
 
 ### Admin
 

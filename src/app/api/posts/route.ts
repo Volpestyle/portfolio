@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import { listPublishedPosts, InvalidBlogCursorError } from '@/server/blog/store';
 import { BLOG_FIXTURE_RUNTIME_FLAG, shouldServeFixturesForRequest } from '@/lib/test-flags';
 
+export const runtime = 'nodejs';
+
 export async function GET(req: Request) {
-  // Return deterministic fixtures for E2E tests
+// Reuse fixtures for E2E consistency
   if (shouldServeFixturesForRequest(req.headers, { fixtureFlag: BLOG_FIXTURE_RUNTIME_FLAG })) {
     const { TEST_BLOG_POSTS } = await import('@portfolio/test-support/fixtures');
     const published = TEST_BLOG_POSTS.filter((post) => post.status === 'published');
@@ -29,7 +31,7 @@ export async function GET(req: Request) {
     if (error instanceof InvalidBlogCursorError) {
       return NextResponse.json({ message: 'Invalid cursor' }, { status: 400 });
     }
-    console.error('[api/blog/posts] Error fetching posts:', error);
+    console.error('[api/posts] Error fetching posts:', error);
     return NextResponse.json({ message: 'Failed to fetch posts' }, { status: 500 });
   }
 }

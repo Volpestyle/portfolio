@@ -25,7 +25,7 @@ export function BlogList({ initialPosts, initialCursor, initialHasMore }: BlogLi
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/blog/posts?cursor=${encodeURIComponent(cursor)}&limit=20`);
+      const response = await fetch(`/api/posts?cursor=${encodeURIComponent(cursor)}&limit=20`);
 
       if (!response.ok) {
         throw new Error('Failed to load more posts');
