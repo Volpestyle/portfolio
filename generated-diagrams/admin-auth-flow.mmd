@@ -1,0 +1,10 @@
+%%{init: {'theme': 'neutral', 'themeVariables': { 'primaryColor': '#e2e8f0', 'primaryTextColor': '#1e293b', 'primaryBorderColor': '#64748b', 'lineColor': '#64748b', 'secondaryColor': '#f1f5f9', 'tertiaryColor': '#fff' }}}%%
+flowchart TD
+    A["User clicks Sign In"] --> B["GitHub OAuth<br/>consent screen"]
+    B --> C["Callback to<br/>/api/auth/callback/github"]
+    C --> D{"middleware.ts:<br/>isAdminEmail?"}
+    D -->|Yes| E["Access Granted"]
+    D -->|No| F["Redirect to<br/>signin page"]
+
+    style E fill:#86efac,stroke:#22c55e
+    style F fill:#fca5a5,stroke:#ef4444

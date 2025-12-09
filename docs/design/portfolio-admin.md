@@ -17,26 +17,7 @@ A self-service admin backend for managing a personal developer portfolio. Allows
 
 ### 3.1 High-Level Diagram
 
-```
-┌─────────────────────────────────────────────────────┐
-│                    CloudFront                       │
-│                 (CDN + Edge Cache)                  │
-└────────────────────────┬────────────────────────────┘
-                         │
-         ┌───────────────┴───────────────┐
-         │                               │
-   ┌─────▼─────┐                 ┌───────▼───────┐
-   │    S3     │                 │    Lambda     │
-   │ (Static)  │                 │   (OpenNext)  │
-   └───────────┘                 └───────┬───────┘
-                                         │
-           ┌─────────────────────────────┼─────────────────────────────┐
-           │                             │                             │
-   ┌───────▼───────┐             ┌───────▼───────┐             ┌───────▼───────┐
-   │   DynamoDB    │             │      S3       │             │    GitHub     │
-   │  (Metadata)   │             │  (Log Files)  │             │     API       │
-   └───────────────┘             └───────────────┘             └───────────────┘
-```
+![System Architecture](../../generated-diagrams/admin-system-architecture.png)
 
 ### 3.2 Component Breakdown
 
@@ -53,24 +34,7 @@ Using NextAuth with GitHub and Google OAuth providers. Only emails in the admin 
 
 ### 4.1 Auth Flow
 
-```
-User clicks "Sign In"
-        │
-        ▼
-GitHub OAuth consent screen
-        │
-        ▼
-Callback to /api/auth/callback/github
-        │
-        ▼
-middleware.ts: isAdminEmail(session.user.email)?
-        │
-    ┌───┴───┐
-   Yes     No
-    │       │
-    ▼       ▼
- Access   Redirect to signin
-```
+![Auth Flow](../../generated-diagrams/admin-auth-flow.png)
 
 ### 4.2 Protection Layers
 
@@ -85,11 +49,11 @@ middleware.ts: isAdminEmail(session.user.email)?
 
 Admin entities share one table, differentiated by partition key (PK) and sort key (SK).
 
-| PK         | SK               | Attributes                                            |
-| ---------- | ---------------- | ----------------------------------------------------- |
-| `PROJECTS` | `REPO#{name}`    | visible, order, description, icon, starred, updatedAt |
+| PK         | SK               | Attributes                                              |
+| ---------- | ---------------- | ------------------------------------------------------- |
+| `PROJECTS` | `REPO#{name}`    | visible, order, description, icon, starred, updatedAt   |
 | `LOGS`     | `LOG#{filename}` | s3Key, timestamp, tags[], sessionId, size, messageCount |
-| `SETTINGS` | `CONFIG`         | monthlyCostLimitUsd, chatEnabled, updatedAt           |
+| `SETTINGS` | `CONFIG`         | monthlyCostLimitUsd, chatEnabled, updatedAt             |
 
 **Blog posts** live in a dedicated blog table (`BlogPosts`, PK `slug`, GSI on `status/publishedAt`) with content stored in S3; not in the admin table.
 
@@ -107,11 +71,11 @@ Log files are immutable once written. Metadata in the admin table (`LOGS#LOG#{fi
 
 The portfolio chatbot allows visitors to ask questions about the portfolio owner's work and experience. Designed for low latency and cost efficiency.
 
-### 6.1 Why Single-Call Architecture
+### 6.1 Single-Call Architecture
 
 For a portfolio chatbot with a small, static corpus (10-30 projects, some blog posts, a bio), a two-call "plan then answer" approach adds latency without meaningful quality improvement.
 
-**Two-Call Approach (Not Recommended):**
+**1 vs. 2 Call Approach:**
 
 ```
 User: "what react work have you done"
@@ -129,7 +93,7 @@ User: "what react work have you done"
 
 **Total LLM time: 5-14 seconds** — The planning step duplicates what embeddings already do.
 
-**Single-Call Approach (Recommended):**
+**Single-Call Approach:**
 
 ```
 User: "what react work have you done"
@@ -144,6 +108,8 @@ User: "what react work have you done"
 
 **Total LLM time: 3-8 seconds** — Vector search already maps intent to relevant content.
 
+**We lose contextual hinting** 2 turns ago user asked for \_, if we use just the exact message for query, we lose that ability to retrieve something mentioned last turn.
+
 **When Two Calls Makes Sense:**
 
 - Large, diverse corpus (thousands of docs across different domains)
@@ -153,42 +119,7 @@ User: "what react work have you done"
 
 ### 6.2 Request Flow
 
-```
-┌─────────────────┐
-│  User sends     │
-│  message        │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────┐
-│  Parallel pre-checks:                       │
-│   • Rate limit check      (Upstash Redis)   │
-│   • Cost threshold check  (DynamoDB)        │
-│   • API key               (cached)          │
-└──────────────────────┬──────────────────────┘
-                       │
-           ┌───────────┴───────────┐
-           │                       │
-        Pass                    Fail
-           │                       │
-           ▼                       ▼
-  ┌─────────────────┐    ┌─────────────────┐
-  │ Vector search   │    │  Return 429     │
-  │ (user's query)  │    │  or 503         │
-  └────────┬────────┘    └─────────────────┘
-           │
-           ▼
-  ┌─────────────────┐
-  │ Single LLM call │
-  │ (streaming)     │
-  └────────┬────────┘
-           │
-           ▼
-  ┌─────────────────┐
-  │ Stream response │
-  │ to client       │
-  └─────────────────┘
-```
+![Chatbot Request Flow](../../generated-diagrams/admin-chatbot-flow.png)
 
 ### 6.3 Latency Budget
 
@@ -214,33 +145,7 @@ User: "what react work have you done"
 
 The chatbot uses a **planner + answer** architecture with pre-generated embeddings:
 
-```
-User message
-     │
-     ▼
-┌─────────────────────────────────────────┐
-│  Planner Stage (LLM Call #1)            │
-│  - Analyzes user intent                 │
-│  - Generates retrieval queries          │
-│  - Outputs: queries[], topic, thoughts  │
-└────────────────┬────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────┐
-│  Retrieval Stage (Vector Search)        │
-│  - Executes planner's queries           │
-│  - Searches pre-embedded projects/resume│
-│  - Filters by relevance score           │
-└────────────────┬────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────┐
-│  Answer Stage (LLM Call #2)             │
-│  - Uses retrieved docs as context       │
-│  - Generates response + UI hints        │
-│  - Streams message to client            │
-└─────────────────────────────────────────┘
-```
+![Two-Call Pipeline](../../generated-diagrams/admin-two-call-pipeline.png)
 
 Key features:
 
@@ -561,18 +466,18 @@ Single table with this structure:
 
 ### ✅ Fully Implemented
 
-| Feature                            | Notes                                                                                 |
-| ---------------------------------- | ------------------------------------------------------------------------------------- |
-| **Auth with email allowlist**      | NextAuth with GitHub + Google providers; `middleware.ts` + `isAdminEmail()` enforced  |
-| **Admin middleware coverage**      | Middleware guards `/admin/*`, `/api/admin/*` (and debug routes once moved under admin)|
-| **Portfolio in DynamoDB**          | `src/server/portfolio/store.ts` uses `PROJECTS#REPO#{name}` rows as source of truth   |
-| **Settings page + settings row**   | `/admin/settings` backed by `SETTINGS#CONFIG` in DynamoDB                             |
-| **Chat log metadata + tagging**    | S3 log bodies with DynamoDB metadata + tags; UI/editor in `/admin/chat-exports`       |
-| **Blog post management**           | Full CRUD with draft/scheduled/published/archived lifecycle                           |
-| **DynamoDB + S3 for blog**         | Metadata in DynamoDB, content revisions in S3                                         |
-| **Upstash rate limiting**          | Multi-tier (5/min, 40/hr, 120/day)                                                    |
-| **Two-call chatbot pipeline**      | Planner → retrieval → answer with streaming + reasoning traces                        |
-| **Header navigation**              | Animated pill buttons for admin nav                                                   |
+| Feature                          | Notes                                                                                  |
+| -------------------------------- | -------------------------------------------------------------------------------------- |
+| **Auth with email allowlist**    | NextAuth with GitHub + Google providers; `middleware.ts` + `isAdminEmail()` enforced   |
+| **Admin middleware coverage**    | Middleware guards `/admin/*`, `/api/admin/*` (and debug routes once moved under admin) |
+| **Portfolio in DynamoDB**        | `src/server/portfolio/store.ts` uses `PROJECTS#REPO#{name}` rows as source of truth    |
+| **Settings page + settings row** | `/admin/settings` backed by `SETTINGS#CONFIG` in DynamoDB                              |
+| **Chat log metadata + tagging**  | S3 log bodies with DynamoDB metadata + tags; UI/editor in `/admin/chat-exports`        |
+| **Blog post management**         | Full CRUD with draft/scheduled/published/archived lifecycle                            |
+| **DynamoDB + S3 for blog**       | Metadata in DynamoDB, content revisions in S3                                          |
+| **Upstash rate limiting**        | Multi-tier (5/min, 40/hr, 120/day)                                                     |
+| **Two-call chatbot pipeline**    | Planner → retrieval → answer with streaming + reasoning traces                         |
+| **Header navigation**            | Animated pill buttons for admin nav                                                    |
 
 ### ⚠️ Partially Aligned
 

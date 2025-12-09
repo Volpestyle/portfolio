@@ -1,0 +1,20 @@
+%%{init: {'theme': 'neutral', 'themeVariables': { 'primaryColor': '#e2e8f0', 'primaryTextColor': '#1e293b', 'primaryBorderColor': '#64748b', 'lineColor': '#64748b', 'secondaryColor': '#f1f5f9', 'tertiaryColor': '#fff' }}}%%
+flowchart TD
+    A["User sends message"] --> B["Parallel pre-checks"]
+
+    subgraph Checks["Pre-flight Checks"]
+        C1["Rate limit<br/>(Upstash Redis)"]
+        C2["Cost threshold<br/>(DynamoDB)"]
+        C3["API key<br/>(cached)"]
+    end
+
+    B --> Checks
+
+    Checks --> D{"All checks<br/>pass?"}
+    D -->|No| E["Return 429<br/>or 503"]
+    D -->|Yes| F["Vector search<br/>(user's query)"]
+    F --> G["Single LLM call<br/>(streaming)"]
+    G --> H["Stream response<br/>to client"]
+
+    style E fill:#fca5a5,stroke:#ef4444
+    style H fill:#86efac,stroke:#22c55e

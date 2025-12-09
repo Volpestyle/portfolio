@@ -1,0 +1,35 @@
+%%{init: {'theme': 'neutral', 'themeVariables': { 'primaryColor': '#e2e8f0', 'primaryTextColor': '#1e293b', 'primaryBorderColor': '#64748b', 'lineColor': '#64748b', 'secondaryColor': '#f1f5f9', 'tertiaryColor': '#fff' }}}%%
+flowchart TD
+    A["User message"] --> B
+
+    subgraph Planner["Planner Stage (LLM Call #1)"]
+        B["Analyze user intent"]
+        B --> B2["Generate retrieval queries"]
+        B2 --> B3["Output: queries[], topic, thoughts"]
+    end
+
+    B3 --> C
+
+    subgraph Retrieval["Retrieval Stage (Vector Search)"]
+        C["Execute planner's queries"]
+        C --> C2["Search pre-embedded<br/>projects/resume"]
+        C2 --> C3["Filter by relevance score"]
+    end
+
+    C3 --> D
+
+    subgraph Answer["Answer Stage (LLM Call #2)"]
+        D["Use retrieved docs<br/>as context"]
+        D --> D2["Generate response<br/>+ UI hints"]
+        D2 --> D3["Stream message<br/>to client"]
+    end
+
+    style B fill:#dbeafe,stroke:#3b82f6
+    style B2 fill:#dbeafe,stroke:#3b82f6
+    style B3 fill:#dbeafe,stroke:#3b82f6
+    style C fill:#fef3c7,stroke:#f59e0b
+    style C2 fill:#fef3c7,stroke:#f59e0b
+    style C3 fill:#fef3c7,stroke:#f59e0b
+    style D fill:#dcfce7,stroke:#22c55e
+    style D2 fill:#dcfce7,stroke:#22c55e
+    style D3 fill:#dcfce7,stroke:#22c55e

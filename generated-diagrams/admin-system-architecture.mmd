@@ -1,0 +1,30 @@
+%%{init: {'theme': 'neutral', 'themeVariables': { 'primaryColor': '#e2e8f0', 'primaryTextColor': '#1e293b', 'primaryBorderColor': '#64748b', 'lineColor': '#64748b', 'secondaryColor': '#f1f5f9', 'tertiaryColor': '#fff' }}}%%
+flowchart TB
+    subgraph CDN["CloudFront"]
+        CF[CDN + Edge Cache]
+    end
+
+    subgraph Static["Static Assets"]
+        S3Static[(S3 Static)]
+    end
+
+    subgraph Compute["Serverless Compute"]
+        Lambda[Lambda<br/>OpenNext]
+    end
+
+    subgraph Data["Data Layer"]
+        DDB[(DynamoDB<br/>Metadata)]
+        S3Logs[(S3<br/>Log Files)]
+    end
+
+    subgraph External["External APIs"]
+        GitHub[GitHub API]
+        Redis[Upstash Redis<br/>Rate Limiting]
+    end
+
+    CF --> S3Static
+    CF --> Lambda
+    Lambda --> DDB
+    Lambda --> S3Logs
+    Lambda --> GitHub
+    Lambda --> Redis
