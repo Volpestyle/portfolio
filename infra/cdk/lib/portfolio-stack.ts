@@ -1,16 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { CfnOutput, CustomResource, Duration, Fn, RemovalPolicy, Size, Stack, StackProps } from 'aws-cdk-lib';
+import { CfnOutput, Duration, RemovalPolicy, Size, Stack } from 'aws-cdk-lib';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import { experimental as cloudfrontExperimental } from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
-import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
-import * as cloudwatchActions from 'aws-cdk-lib/aws-cloudwatch-actions';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import * as s3 from 'aws-cdk-lib/aws-s3';
@@ -18,78 +15,29 @@ import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as logs from 'aws-cdk-lib/aws-logs';
-import * as sns from 'aws-cdk-lib/aws-sns';
-import * as subs from 'aws-cdk-lib/aws-sns-subscriptions';
-import { Provider } from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
-
-type BaseFunction = {
-  handler: string;
-  bundle: string;
-};
-
-interface OpenNextFunctionOrigin extends BaseFunction {
-  type: 'function';
-  streaming?: boolean;
-}
-
-interface OpenNextS3Origin {
-  type: 's3';
-  originPath: string;
-  copy: {
-    from: string;
-    to: string;
-    cached: boolean;
-    versionedSubDir?: string;
-  }[];
-}
-
-type OpenNextOrigin = OpenNextFunctionOrigin | OpenNextS3Origin;
-
-interface OpenNextOutput {
-  edgeFunctions?: Record<string, BaseFunction>;
-  origins: {
-    s3: OpenNextS3Origin;
-    default: OpenNextFunctionOrigin;
-    imageOptimizer: OpenNextFunctionOrigin;
-    [key: string]: OpenNextOrigin;
-  };
-  behaviors: {
-    pattern: string;
-    origin?: string;
-    edgeFunction?: string;
-  }[];
-  additionalProps?: {
-    disableIncrementalCache?: boolean;
-    disableTagCache?: boolean;
-    initializationFunction?: BaseFunction;
-    warmer?: BaseFunction;
-    revalidationFunction?: BaseFunction;
-  };
-}
-
-type FunctionOriginResource = {
-  origin: cloudfront.IOrigin;
-  function?: lambda.Function;
-  functionUrl?: lambda.IFunctionUrl;
-};
-
-type ImageOptimizationResources = {
-  origin: cloudfront.IOrigin;
-  function: lambda.Function;
-  functionUrl: lambda.IFunctionUrl;
-};
-
-interface PortfolioStackProps extends StackProps {
-  domainName?: string;
-  hostedZoneDomain?: string;
-  certificateArn?: string;
-  alternateDomainNames?: string[];
-  environment?: Record<string, string>;
-  appDirectory?: string;
-  openNextPath?: string;
-  validationMode?: boolean;
-}
+import {
+  FunctionOriginResource,
+  ImageOptimizationResources,
+  OpenNextFunctionOrigin,
+  OpenNextOutput,
+  OpenNextS3Origin,
+  PortfolioStackProps,
+} from './types';
+import {
+  buildEdgeRuntimeHeaders,
+  buildEdgeSecretHeaders,
+  patchEdgeServerBundle,
+  EDGE_RUNTIME_HEADER_NAME,
+  EDGE_ENV_SECRET_HEADER_NAME,
+  EDGE_REPO_SECRET_HEADER_NAME,
+  EDGE_SECRETS_REGION_HEADER_NAME,
+  EDGE_SECRETS_FALLBACK_REGION_HEADER_NAME,
+} from './config/edge-runtime';
+import { buildEnvironmentFromRules, resolveEdgeRuntimeEnvRules } from './config/env-rules';
+import { BlogInfra } from './constructs/blog-infra';
+import { ChatInfra } from './constructs/chat-infra';
+import { CacheInfra } from './constructs/cache-infra';
 
 export class PortfolioStack extends Stack {
   private readonly appDirectoryPath: string;
@@ -101,12 +49,7 @@ export class PortfolioStack extends Stack {
   private readonly runtimeEnvironment: Record<string, string>;
   private readonly envSecret?: secretsmanager.ISecret;
   private readonly repoSecret?: secretsmanager.ISecret;
-  private readonly edgeRuntimeHeaderName = 'x-opn-runtime-config';
   private readonly edgeRuntimeEntriesPerHeader = 8;
-  private readonly edgeEnvSecretIdHeaderName = 'x-opn-env-secret-id';
-  private readonly edgeRepoSecretIdHeaderName = 'x-opn-repo-secret-id';
-  private readonly edgeSecretsRegionHeaderName = 'x-opn-secrets-region';
-  private readonly edgeSecretsFallbackRegionHeaderName = 'x-opn-secrets-fallback-region';
   private edgeRuntimeHeaderValues?: Record<string, string>;
   private readonly protectedFunctionUrls: { url: lambda.IFunctionUrl; fn: lambda.Function }[] = [];
   private readonly postsTable: dynamodb.Table;
@@ -148,10 +91,10 @@ export class PortfolioStack extends Stack {
         ? acm.Certificate.fromCertificateArn(this, 'PortfolioCertificate', certificateArn)
         : domainName && hostedZone
           ? new acm.Certificate(this, 'PortfolioCertificate', {
-              domainName,
-              validation: acm.CertificateValidation.fromDns(hostedZone),
-              subjectAlternativeNames: alternateDomainNames,
-            })
+            domainName,
+            validation: acm.CertificateValidation.fromDns(hostedZone),
+            subjectAlternativeNames: alternateDomainNames,
+          })
           : undefined;
 
     this.runtimeEnvironment = this.enrichRuntimeEnvironment(environment);
@@ -168,21 +111,37 @@ export class PortfolioStack extends Stack {
     );
 
     this.assetsBucket = this.createAssetsBucket();
-    this.postsTable = this.createBlogPostsTable();
-    this.adminDataTable = this.createAdminDataTable();
-    this.blogContentBucket = this.createBlogContentBucket();
-    this.blogMediaBucket = this.createBlogMediaBucket();
-    this.chatExportBucket = this.createChatExportBucket();
-    this.chatCostTable = this.createChatCostTable();
-    this.revalidationTable = this.createRevalidationTable();
-    this.revalidationQueue = this.createRevalidationQueue();
+
+    const blogInfra = new BlogInfra(this, 'BlogInfra', {
+      runtimeEnvironment: this.runtimeEnvironment,
+      primaryDomainName: this.primaryDomainName,
+      alternateDomainNames,
+    });
+    this.postsTable = blogInfra.postsTable;
+    this.adminDataTable = blogInfra.adminDataTable;
+    this.blogContentBucket = blogInfra.contentBucket;
+    this.blogMediaBucket = blogInfra.mediaBucket;
+
+    const chatInfra = new ChatInfra(this, 'ChatInfra', {
+      runtimeEnvironment: this.runtimeEnvironment,
+    });
+    this.chatExportBucket = chatInfra.chatExportBucket;
+    this.chatCostTable = chatInfra.chatCostTable;
+
+    const cacheInfra = new CacheInfra(this, 'CacheInfra', {
+      openNextOutput: this.openNextOutput,
+      resolveBundlePath: this.resolveBundlePath.bind(this),
+      grantSecretAccess: this.grantSecretAccess.bind(this),
+    });
+    this.revalidationTable = cacheInfra.revalidationTable;
+    this.revalidationQueue = cacheInfra.revalidationQueue;
 
     const baseEnv = this.buildBaseEnvironment();
 
-    this.createOpenAiCostAlarm();
-
-    this.createCacheInitializer(baseEnv);
-    const revalidationWorker = this.createRevalidationConsumer(baseEnv);
+    cacheInfra.addInitializer(baseEnv, (keys) => this.buildLambdaRuntimeEnv(baseEnv, keys));
+    const revalidationWorker = cacheInfra.addRevalidationConsumer(baseEnv, (keys) =>
+      this.buildLambdaRuntimeEnv(baseEnv, keys)
+    );
     if (revalidationWorker) {
       this.grantRuntimeAccess(revalidationWorker, { allowQueueSend: false });
       this.revalidationQueue.grantConsumeMessages(revalidationWorker);
@@ -394,123 +353,6 @@ export class PortfolioStack extends Stack {
     });
   }
 
-  private createBlogPostsTable(): dynamodb.Table {
-    const tableName = `${Stack.of(this).stackName}-BlogPosts`;
-    const table = new dynamodb.Table(this, 'BlogPostsTable', {
-      partitionKey: { name: 'slug', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: RemovalPolicy.RETAIN,
-      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
-      tableName,
-    });
-
-    table.addGlobalSecondaryIndex({
-      indexName: 'byStatusPublishedAt',
-      partitionKey: { name: 'status', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'publishedAt', type: dynamodb.AttributeType.STRING },
-      projectionType: dynamodb.ProjectionType.ALL,
-    });
-
-    return table;
-  }
-
-  private createAdminDataTable(): dynamodb.Table {
-    const tableName = `${Stack.of(this).stackName}-AdminData`;
-    return new dynamodb.Table(this, 'AdminDataTable', {
-      partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: RemovalPolicy.RETAIN,
-      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
-      tableName,
-    });
-  }
-
-  private createBlogContentBucket(): s3.Bucket {
-    return new s3.Bucket(this, 'BlogContentBucket', {
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      enforceSSL: true,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      versioned: true,
-      removalPolicy: RemovalPolicy.RETAIN,
-      autoDeleteObjects: false,
-      lifecycleRules: [
-        {
-          enabled: true,
-          noncurrentVersionExpiration: Duration.days(30),
-          abortIncompleteMultipartUploadAfter: Duration.days(7),
-        },
-        {
-          enabled: true,
-          expiration: Duration.days(90),
-          prefix: 'posts/',
-        },
-      ],
-    });
-  }
-
-  private createChatExportBucket(): s3.Bucket {
-    return new s3.Bucket(this, 'ChatExportBucket', {
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      enforceSSL: true,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      versioned: false,
-      removalPolicy: RemovalPolicy.RETAIN,
-      autoDeleteObjects: false,
-      lifecycleRules: [
-        {
-          enabled: true,
-          expiration: Duration.days(7),
-          prefix: 'chat/exports/',
-          abortIncompleteMultipartUploadAfter: Duration.days(7),
-        },
-      ],
-    });
-  }
-
-  private resolveMediaCorsOrigins(): string[] {
-    const origins = new Set<string>(['http://localhost:3000', 'https://localhost:3000']);
-    const siteUrl = this.runtimeEnvironment['NEXT_PUBLIC_SITE_URL'];
-    if (siteUrl) {
-      origins.add(siteUrl.replace(/\/$/, ''));
-    }
-    if (this.primaryDomainName) {
-      origins.add(`https://${this.primaryDomainName}`);
-    }
-    for (const domain of this.alternateDomains ?? []) {
-      if (domain) {
-        origins.add(`https://${domain}`);
-      }
-    }
-    return Array.from(origins);
-  }
-
-  private createBlogMediaBucket(): s3.Bucket {
-    return new s3.Bucket(this, 'BlogMediaBucket', {
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      enforceSSL: true,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      versioned: true,
-      removalPolicy: RemovalPolicy.RETAIN,
-      autoDeleteObjects: false,
-      lifecycleRules: [
-        {
-          enabled: true,
-          noncurrentVersionExpiration: Duration.days(30),
-          abortIncompleteMultipartUploadAfter: Duration.days(7),
-        },
-      ],
-      cors: [
-        {
-          allowedHeaders: ['*'],
-          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.PUT, s3.HttpMethods.HEAD],
-          allowedOrigins: this.resolveMediaCorsOrigins(),
-          maxAge: 3000,
-        },
-      ],
-    });
-  }
-
   private deployStaticAssets(config: OpenNextS3Origin, distribution: cloudfront.IDistribution) {
     config.copy.forEach((copy, index) => {
       const sourcePath = this.resolveBundlePath(copy.from);
@@ -533,60 +375,12 @@ export class PortfolioStack extends Stack {
         ephemeralStorageSize: Size.gibibytes(4),
         cacheControl: copy.cached
           ? [
-              s3deploy.CacheControl.setPublic(),
-              s3deploy.CacheControl.immutable(),
-              s3deploy.CacheControl.maxAge(Duration.days(365)),
-            ]
+            s3deploy.CacheControl.setPublic(),
+            s3deploy.CacheControl.immutable(),
+            s3deploy.CacheControl.maxAge(Duration.days(365)),
+          ]
           : [s3deploy.CacheControl.setPublic(), s3deploy.CacheControl.noCache()],
       });
-    });
-  }
-
-  private createChatCostTable(): dynamodb.Table {
-    return new dynamodb.Table(this, 'ChatRuntimeCostTable', {
-      partitionKey: { name: 'owner_env', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'year_month', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
-      removalPolicy: RemovalPolicy.RETAIN,
-      tableName: `${Stack.of(this).stackName}-ChatRuntimeCost`,
-    });
-  }
-
-  private createRevalidationTable(): dynamodb.Table {
-    const table = new dynamodb.Table(this, 'RevalidationTable', {
-      partitionKey: { name: 'tag', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'path', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
-      removalPolicy: RemovalPolicy.DESTROY,
-      tableName: `${Stack.of(this).stackName}-Revalidation`,
-    });
-
-    table.addGlobalSecondaryIndex({
-      indexName: 'revalidate',
-      partitionKey: { name: 'path', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'revalidatedAt', type: dynamodb.AttributeType.NUMBER },
-    });
-
-    return table;
-  }
-
-  private createRevalidationQueue(): sqs.Queue {
-    const deadLetterQueue = new sqs.Queue(this, 'RevalidationDLQ', {
-      fifo: true,
-      contentBasedDeduplication: true,
-      retentionPeriod: Duration.days(14),
-    });
-
-    return new sqs.Queue(this, 'RevalidationQueue', {
-      fifo: true,
-      contentBasedDeduplication: true,
-      visibilityTimeout: Duration.seconds(45),
-      deadLetterQueue: {
-        queue: deadLetterQueue,
-        maxReceiveCount: 5,
-      },
     });
   }
 
@@ -631,153 +425,6 @@ export class PortfolioStack extends Stack {
     return env;
   }
 
-  private createOpenAiCostAlarm() {
-    const email = this.runtimeEnvironment['OPENAI_COST_ALERT_EMAIL'];
-    const metricsEnabled = this.runtimeEnvironment['OPENAI_COST_METRICS_ENABLED'] === 'true';
-    if (!email || !metricsEnabled) {
-      return;
-    }
-
-    const namespace = this.runtimeEnvironment['OPENAI_COST_METRIC_NAMESPACE'] ?? 'PortfolioChat/OpenAI';
-    const metricName = this.runtimeEnvironment['OPENAI_COST_METRIC_NAME'] ?? 'EstimatedCost';
-
-    const dailyCost = new cloudwatch.Metric({
-      namespace,
-      metricName,
-      statistic: 'Sum',
-      period: Duration.days(1),
-    });
-
-    const rolling30d = new cloudwatch.MathExpression({
-      // Rolling sum of the past 30 one-day data points.
-      expression: 'SUM([cost], 30)',
-      usingMetrics: { cost: dailyCost },
-      period: Duration.days(1),
-      label: 'OpenAICost30d',
-    });
-
-    const alarm = new cloudwatch.Alarm(this, 'OpenAICostAlarm', {
-      metric: rolling30d,
-      threshold: 10,
-      evaluationPeriods: 1,
-      datapointsToAlarm: 1,
-      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
-      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-      alarmDescription: 'OpenAI estimated cost over the last ~30 days exceeded $10.',
-    });
-
-    const missingDataAlarm = new cloudwatch.Alarm(this, 'OpenAICostMetricMissing', {
-      metric: dailyCost.with({ statistic: 'SampleCount' }),
-      threshold: 1,
-      evaluationPeriods: 3,
-      datapointsToAlarm: 3,
-      treatMissingData: cloudwatch.TreatMissingData.BREACHING,
-      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
-      alarmDescription: 'No OpenAI cost metrics received for 3 days; publishing may be broken.',
-    });
-
-    const topic = new sns.Topic(this, 'OpenAICostAlarmTopic', {
-      displayName: 'OpenAI Cost Alarm',
-    });
-    topic.addSubscription(new subs.EmailSubscription(email));
-
-    alarm.addAlarmAction(new cloudwatchActions.SnsAction(topic));
-    alarm.addOkAction(new cloudwatchActions.SnsAction(topic));
-    missingDataAlarm.addAlarmAction(new cloudwatchActions.SnsAction(topic));
-    missingDataAlarm.addOkAction(new cloudwatchActions.SnsAction(topic));
-  }
-
-  private createCacheInitializer(baseEnv: Record<string, string>) {
-    const initConfig = this.openNextOutput.additionalProps?.initializationFunction;
-    const bundlePath = initConfig?.bundle
-      ? this.resolveBundlePath(initConfig.bundle)
-      : this.resolveBundlePath('dynamodb-provider');
-
-    if (!fs.existsSync(bundlePath)) {
-      return;
-    }
-
-    const initLogGroup = new logs.LogGroup(this, 'CacheInitializationFunctionLogs', {
-      retention: logs.RetentionDays.TWO_WEEKS,
-      removalPolicy: RemovalPolicy.DESTROY,
-    });
-
-    const initFn = new lambda.Function(this, 'CacheInitializationFunction', {
-      runtime: lambda.Runtime.NODEJS_20_X,
-      architecture: lambda.Architecture.ARM_64,
-      handler: initConfig?.handler ?? 'index.handler',
-      code: lambda.Code.fromAsset(bundlePath),
-      timeout: Duration.minutes(5),
-      memorySize: 256,
-      environment: this.pickRuntimeEnv(baseEnv, ['CACHE_DYNAMO_TABLE', 'NODE_ENV', 'NEXT_PUBLIC_SITE_URL']),
-      logGroup: initLogGroup,
-    });
-
-    this.revalidationTable.grantReadWriteData(initFn);
-    this.grantSecretAccess(initFn);
-
-    const providerLogGroup = new logs.LogGroup(this, 'CacheInitializationProviderLogs', {
-      retention: logs.RetentionDays.ONE_DAY,
-      removalPolicy: RemovalPolicy.DESTROY,
-    });
-
-    const provider = new Provider(this, 'CacheInitializationProvider', {
-      onEventHandler: initFn,
-      logGroup: providerLogGroup,
-    });
-
-    new CustomResource(this, 'CacheInitializationResource', {
-      serviceToken: provider.serviceToken,
-      properties: {
-        version: Date.now().toString(),
-      },
-    });
-  }
-
-  private createRevalidationConsumer(baseEnv: Record<string, string>): lambda.Function | undefined {
-    const revalidationConfig = this.openNextOutput.additionalProps?.revalidationFunction;
-    if (!revalidationConfig?.bundle) {
-      return undefined;
-    }
-
-    const bundlePath = this.resolveBundlePath(revalidationConfig.bundle);
-    if (!fs.existsSync(bundlePath)) {
-      return undefined;
-    }
-
-    const workerLogGroup = new logs.LogGroup(this, 'RevalidationWorkerLogs', {
-      retention: logs.RetentionDays.TWO_WEEKS,
-      removalPolicy: RemovalPolicy.DESTROY,
-    });
-
-    const fn = new lambda.Function(this, 'RevalidationWorkerFunction', {
-      runtime: lambda.Runtime.NODEJS_20_X,
-      architecture: lambda.Architecture.ARM_64,
-      handler: revalidationConfig.handler,
-      code: lambda.Code.fromAsset(bundlePath),
-      timeout: Duration.seconds(30),
-      memorySize: 512,
-      environment: this.pickRuntimeEnv(baseEnv, [
-        'CACHE_DYNAMO_TABLE',
-        'REVALIDATION_QUEUE_URL',
-        'REVALIDATION_QUEUE_REGION',
-        'AWS_REGION',
-        'AWS_SECRETS_MANAGER_PRIMARY_REGION',
-        'NODE_ENV',
-        'NEXT_PUBLIC_SITE_URL',
-      ]),
-      logGroup: workerLogGroup,
-    });
-
-    fn.addEventSource(
-      new lambdaEventSources.SqsEventSource(this.revalidationQueue, {
-        batchSize: 5,
-      })
-    );
-
-    return fn;
-  }
-
   private createServerEdgeFunction(baseEnv: Record<string, string>): cloudfrontExperimental.EdgeFunction {
     const serverOrigin = this.openNextOutput.origins.default;
     if (serverOrigin.type !== 'function') {
@@ -790,11 +437,23 @@ export class PortfolioStack extends Stack {
     }
 
     const edgeEnv = this.buildEdgeEnvironment(baseEnv);
-    this.edgeRuntimeHeaderValues = this.buildEdgeRuntimeHeaders(edgeEnv);
+    this.assertEdgeEnvironment(edgeEnv);
+    this.edgeRuntimeHeaderValues = buildEdgeRuntimeHeaders(edgeEnv, {
+      runtimeHeaderName: EDGE_RUNTIME_HEADER_NAME,
+      entriesPerHeader: this.edgeRuntimeEntriesPerHeader,
+    });
     if (!this.edgeRuntimeHeaderValues || Object.keys(this.edgeRuntimeHeaderValues).length === 0) {
       throw new Error('Edge runtime configuration is empty; ensure required environment values are provided.');
     }
-    this.patchEdgeServerBundle(bundlePath);
+    patchEdgeServerBundle({
+      bundlePath,
+      runtimeHeaders: this.edgeRuntimeHeaderValues,
+      runtimeHeaderName: EDGE_RUNTIME_HEADER_NAME,
+      envSecretHeaderName: EDGE_ENV_SECRET_HEADER_NAME,
+      repoSecretHeaderName: EDGE_REPO_SECRET_HEADER_NAME,
+      secretsRegionHeaderName: EDGE_SECRETS_REGION_HEADER_NAME,
+      secretsFallbackRegionHeaderName: EDGE_SECRETS_FALLBACK_REGION_HEADER_NAME,
+    });
 
     return new cloudfrontExperimental.EdgeFunction(this, 'ServerEdgeFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -830,7 +489,7 @@ export class PortfolioStack extends Stack {
       code: lambda.Code.fromAsset(bundlePath),
       timeout: Duration.seconds(30),
       memorySize: 1024,
-      environment: this.pickRuntimeEnv(baseEnv, [
+      environment: this.buildLambdaRuntimeEnv(baseEnv, [
         'BUCKET_NAME',
         'BUCKET_KEY_PREFIX',
         'CACHE_BUCKET_NAME',
@@ -886,7 +545,7 @@ export class PortfolioStack extends Stack {
           code: lambda.Code.fromAsset(bundlePath),
           timeout: Duration.seconds(30),
           memorySize: 1024,
-          environment: this.filterReservedLambdaEnv(baseEnv),
+          environment: this.buildLambdaRuntimeEnv(baseEnv),
           logGroup: fnLogGroup,
         });
 
@@ -1011,12 +670,12 @@ export class PortfolioStack extends Stack {
       // (like 'chat') handle requests themselves and don't need the edge function.
       const edgeLambdas = isDefaultOrigin
         ? [
-            {
-              eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
-              functionVersion: serverEdgeFunction.currentVersion,
-              includeBody: true,
-            },
-          ]
+          {
+            eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
+            functionVersion: serverEdgeFunction.currentVersion,
+            includeBody: true,
+          },
+        ]
         : undefined;
 
       const behaviorOptions: cloudfront.BehaviorOptions = {
@@ -1042,9 +701,9 @@ export class PortfolioStack extends Stack {
     certificate?: acm.ICertificate
   ):
     | {
-        domainNames: string[];
-        certificate: acm.ICertificate;
-      }
+      domainNames: string[];
+      certificate: acm.ICertificate;
+    }
     | undefined {
     if (!domainName) {
       return undefined;
@@ -1252,10 +911,10 @@ export class PortfolioStack extends Stack {
       secretId.startsWith('arn:')
         ? secretId
         : stack.formatArn({
-            service: 'secretsmanager',
-            resource: 'secret',
-            resourceName: secretId,
-          });
+          service: 'secretsmanager',
+          resource: 'secret',
+          resourceName: secretId,
+        });
 
     const resourceName = baseArn.split(':secret:')[1] ?? secretId;
     const normalizedName = resourceName.replace(/-[A-Za-z0-9]{6}$/, '');
@@ -1296,176 +955,43 @@ export class PortfolioStack extends Stack {
   }
 
   private buildEdgeEnvironment(source: Record<string, string>): Record<string, string> {
-    const { prefixes, explicitKeys, blocklist } = this.resolveEdgeRuntimeEnvRules();
-    const env: Record<string, string> = {};
-    for (const [key, value] of Object.entries(source)) {
-      if (value === undefined) {
-        continue;
-      }
-      if (blocklist.has(key)) {
-        continue;
-      }
-      const isExplicit = explicitKeys.has(key);
-      const matchesPrefix = prefixes.some((prefix) => key.startsWith(prefix));
-      if (!isExplicit && !matchesPrefix) {
-        continue;
-      }
-      env[key] = value;
-    }
-    return env;
+    const rules = resolveEdgeRuntimeEnvRules(this.runtimeEnvironment);
+    return buildEnvironmentFromRules(source, rules);
   }
 
-  private resolveEdgeRuntimeEnvRules(): {
-    prefixes: string[];
-    explicitKeys: Set<string>;
-    blocklist: Set<string>;
-  } {
-    const splitList = (value?: string) =>
-      value
-        ? value
-            .split(',')
-            .map((entry) => entry.trim())
-            .filter(Boolean)
-        : [];
+  private assertEdgeEnvironment(edgeEnv: Record<string, string>) {
+    const requiredKeys = ['NODE_ENV', 'AWS_REGION', 'CACHE_BUCKET_NAME', 'CACHE_DYNAMO_TABLE'];
+    const missing = requiredKeys.filter((key) => !edgeEnv[key]);
+    if (missing.length) {
+      throw new Error(`Edge runtime configuration missing required keys: ${missing.join(', ')}`);
+    }
+  }
 
-    const defaultPrefixes = ['NEXT_PUBLIC_'];
-    const configuredPrefixes = splitList(this.runtimeEnvironment['EDGE_RUNTIME_ENV_PREFIXES']);
-    const prefixes = Array.from(new Set([...defaultPrefixes, ...configuredPrefixes]));
-
-    const defaultExplicitKeys = [
-      'NODE_ENV',
-      'APP_ENV',
-      'APP_STAGE',
-      'APP_HOST',
-      'AWS_REGION',
-      'CACHE_BUCKET_NAME',
-      'CACHE_BUCKET_KEY_PREFIX',
-      'CACHE_BUCKET_REGION',
-      'CACHE_DYNAMO_TABLE',
-      'COST_TABLE_NAME',
-      'REVALIDATION_QUEUE_URL',
-      'REVALIDATION_QUEUE_REGION',
-      'BUCKET_NAME',
-      'BUCKET_KEY_PREFIX',
-      'POSTS_TABLE',
-      'POSTS_STATUS_INDEX',
-      'CONTENT_BUCKET',
-      'MEDIA_BUCKET',
-      'BLOG_PUBLISH_FUNCTION_ARN',
-      'SCHEDULER_ROLE_ARN',
-      'CLOUDFRONT_DISTRIBUTION_ID',
-      'NEXTAUTH_URL',
-      'GH_CLIENT_ID',
-      'GOOGLE_CLIENT_ID',
-      'ADMIN_EMAILS',
-      'PORTFOLIO_GIST_ID',
-    ];
-    const configuredKeys = splitList(this.runtimeEnvironment['EDGE_RUNTIME_ENV_KEYS']);
-    const explicitKeys = new Set<string>([...defaultExplicitKeys, ...configuredKeys]);
-
-    const blocklist = new Set<string>([
-      'AWS_ACCESS_KEY_ID',
-      'AWS_SECRET_ACCESS_KEY',
-      'AWS_SESSION_TOKEN',
+  private buildLambdaRuntimeEnv(source: Record<string, string>, keys?: string[]): Record<string, string> {
+    const rules = resolveEdgeRuntimeEnvRules(this.runtimeEnvironment);
+    const env = buildEnvironmentFromRules(source, rules);
+    for (const key of [
       'SECRETS_MANAGER_ENV_SECRET_ID',
       'SECRETS_MANAGER_REPO_SECRET_ID',
       'AWS_SECRETS_MANAGER_PRIMARY_REGION',
       'AWS_SECRETS_MANAGER_FALLBACK_REGION',
-      'OPENAI_API_KEY',
-      'GH_TOKEN',
-      'REVALIDATE_SECRET',
-      'NEXTAUTH_SECRET',
-      'GH_CLIENT_SECRET',
-      'GOOGLE_CLIENT_SECRET',
-      'DATABASE_URL',
-      'API_KEY',
-    ]);
-    for (const key of splitList(this.runtimeEnvironment['EDGE_RUNTIME_ENV_BLOCKLIST'])) {
-      blocklist.add(key);
+    ]) {
+      const value = source[key];
+      if (value !== undefined) {
+        env[key] = value;
+      }
     }
-
-    return {
-      prefixes,
-      explicitKeys,
-      blocklist,
-    };
-  }
-
-  private buildEdgeRuntimeHeaders(env: Record<string, string>): Record<string, string> {
-    const entries = Object.entries(env);
-    if (!entries.length) {
-      return {};
+    if (keys && keys.length > 0) {
+      return this.pickRuntimeEnv(env, keys);
     }
-
-    const headers: Record<string, string> = {};
-    const chunkSize = Math.max(1, this.edgeRuntimeEntriesPerHeader);
-
-    for (let start = 0; start < entries.length; start += chunkSize) {
-      const chunkEntries = entries.slice(start, start + chunkSize);
-      const templateParts: string[] = ['{'];
-      const substitutions: Record<string, string> = {};
-
-      chunkEntries.forEach(([key, value], index) => {
-        const placeholder = `v${index}`;
-        templateParts.push(`"${key}":"\${${placeholder}}"`);
-        if (index < chunkEntries.length - 1) {
-          templateParts.push(',');
-        }
-        substitutions[placeholder] = value;
-      });
-
-      templateParts.push('}');
-      const jsonTemplate = templateParts.join('');
-      const json = Fn.sub(jsonTemplate, substitutions);
-      const encoded = Fn.base64(json);
-
-      const chunkIndex = Math.floor(start / chunkSize);
-      const headerName =
-        chunkIndex === 0 && entries.length <= chunkSize
-          ? this.edgeRuntimeHeaderName
-          : `${this.edgeRuntimeHeaderName}-${chunkIndex + 1}`;
-
-      headers[headerName] = encoded;
-    }
-
-    return headers;
-  }
-
-  private buildEdgeSecretHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {};
-    const envSecretId = this.runtimeEnvironment['SECRETS_MANAGER_ENV_SECRET_ID'];
-    if (envSecretId) {
-      headers[this.edgeEnvSecretIdHeaderName] = envSecretId;
-    }
-
-    const repoSecretId = this.runtimeEnvironment['SECRETS_MANAGER_REPO_SECRET_ID'];
-    if (repoSecretId) {
-      headers[this.edgeRepoSecretIdHeaderName] = repoSecretId;
-    }
-
-    const primaryRegion =
-      this.runtimeEnvironment['AWS_SECRETS_MANAGER_PRIMARY_REGION'] ?? this.runtimeEnvironment['AWS_REGION'];
-    if (primaryRegion) {
-      headers[this.edgeSecretsRegionHeaderName] = primaryRegion;
-    }
-
-    const fallbackRegion = this.runtimeEnvironment['AWS_SECRETS_MANAGER_FALLBACK_REGION'];
-    if (fallbackRegion && fallbackRegion !== primaryRegion) {
-      headers[this.edgeSecretsFallbackRegionHeaderName] = fallbackRegion;
-    }
-
-    return headers;
+    return this.filterReservedLambdaEnv(env);
   }
 
   private buildOriginCustomHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {};
-    for (const [name, value] of Object.entries(this.edgeRuntimeHeaderValues ?? {})) {
-      headers[name] = value;
-    }
-
-    for (const [key, value] of Object.entries(this.buildEdgeSecretHeaders())) {
-      headers[key] = value;
-    }
+    const headers: Record<string, string> = {
+      ...this.edgeRuntimeHeaderValues,
+      ...buildEdgeSecretHeaders(this.runtimeEnvironment),
+    };
 
     const chatOriginSecret =
       this.runtimeEnvironment['CHAT_ORIGIN_SECRET'] ?? this.runtimeEnvironment['REVALIDATE_SECRET'];
@@ -1474,141 +1000,6 @@ export class PortfolioStack extends Stack {
     }
 
     return headers;
-  }
-
-  private patchEdgeServerBundle(bundlePath: string) {
-    const indexPath = path.join(bundlePath, 'index.mjs');
-    const handlerPath = path.join(bundlePath, 'server-handler.mjs');
-
-    if (!fs.existsSync(handlerPath)) {
-      if (!fs.existsSync(indexPath)) {
-        throw new Error(`Expected OpenNext server bundle at ${indexPath}`);
-      }
-      fs.renameSync(indexPath, handlerPath);
-    }
-
-    const runtimeHeaderNames = Object.keys(this.edgeRuntimeHeaderValues ?? {});
-    if (!runtimeHeaderNames.length) {
-      throw new Error('Edge runtime configuration headers missing; ensure buildEdgeRuntimeHeaders ran first.');
-    }
-    const runtimeHeaderLiteral = JSON.stringify(runtimeHeaderNames);
-
-    const wrapperSource = `import { Buffer } from 'node:buffer';
-
-const RUNTIME_CONFIG_HEADERS = ${runtimeHeaderLiteral};
-const RUNTIME_CONFIG_BASE_HEADER = '${this.edgeRuntimeHeaderName}';
-const ENV_SECRET_HEADER = '${this.edgeEnvSecretIdHeaderName}';
-const REPO_SECRET_HEADER = '${this.edgeRepoSecretIdHeaderName}';
-const SECRETS_REGION_HEADER = '${this.edgeSecretsRegionHeaderName}';
-const SECRETS_FALLBACK_REGION_HEADER = '${this.edgeSecretsFallbackRegionHeaderName}';
-let cachedHandlerPromise;
-
-function readCustomHeader(origin, name) {
-  const entries = origin?.customHeaders?.[name];
-  if (!entries || entries.length === 0) {
-    return undefined;
-  }
-  return entries[0]?.value;
-}
-
-function extractRuntimeConfig(event) {
-  try {
-    const record = event?.Records?.[0];
-    const request = record?.cf?.request;
-    if (!request) {
-      return undefined;
-    }
-    const origin = request.origin?.s3 ?? request.origin?.custom;
-    const encodedChunks = [];
-    for (const headerName of RUNTIME_CONFIG_HEADERS) {
-      const value = readCustomHeader(origin, headerName);
-      if (value) {
-        encodedChunks.push(value);
-      }
-    }
-    if (encodedChunks.length === 0) {
-      const fallback = readCustomHeader(origin, RUNTIME_CONFIG_BASE_HEADER);
-      if (fallback) {
-        encodedChunks.push(fallback);
-      }
-    }
-    if (encodedChunks.length === 0) {
-      console.error('Lambda@Edge runtime config header missing');
-      return undefined;
-    }
-    const runtimeConfig = {};
-    for (const encoded of encodedChunks) {
-      const json = Buffer.from(encoded, 'base64').toString('utf-8');
-      const parsed = JSON.parse(json);
-      if (parsed && typeof parsed === 'object') {
-        Object.assign(runtimeConfig, parsed);
-      }
-    }
-
-    const envSecretId = readCustomHeader(origin, ENV_SECRET_HEADER);
-    if (envSecretId) {
-      runtimeConfig.SECRETS_MANAGER_ENV_SECRET_ID = envSecretId;
-    }
-
-    const repoSecretId = readCustomHeader(origin, REPO_SECRET_HEADER);
-    if (repoSecretId) {
-      runtimeConfig.SECRETS_MANAGER_REPO_SECRET_ID = repoSecretId;
-    }
-
-    const primaryRegion = readCustomHeader(origin, SECRETS_REGION_HEADER);
-    if (primaryRegion) {
-      runtimeConfig.AWS_SECRETS_MANAGER_PRIMARY_REGION = primaryRegion;
-    }
-
-    const fallbackRegion = readCustomHeader(origin, SECRETS_FALLBACK_REGION_HEADER);
-    if (fallbackRegion) {
-      runtimeConfig.AWS_SECRETS_MANAGER_FALLBACK_REGION = fallbackRegion;
-    }
-
-    return runtimeConfig;
-  } catch (error) {
-    console.error('Failed to parse Lambda@Edge runtime configuration', error);
-    return undefined;
-  }
-}
-
-function applyRuntimeConfig(config) {
-  if (!config) {
-    return;
-  }
-
-  for (const [key, value] of Object.entries(config)) {
-    if (typeof value === 'string' && process.env[key] === undefined) {
-      process.env[key] = value;
-    }
-  }
-}
-
-async function loadHandler(event) {
-  if (!cachedHandlerPromise) {
-    const config = extractRuntimeConfig(event);
-    if (!config) {
-      throw new Error('Missing Lambda@Edge runtime configuration header');
-    }
-    applyRuntimeConfig(config);
-    cachedHandlerPromise = import('./server-handler.mjs').then((mod) => mod.handler);
-  }
-  return cachedHandlerPromise;
-}
-
-export const handler = async (event, context, callback) => {
-  if (!event?.Records?.[0]?.cf?.request) {
-    if (event?.type === 'warmer') {
-      return { type: 'warmer', serverId: 'edge' };
-    }
-  }
-
-  const actualHandler = await loadHandler(event);
-  return actualHandler(event, context, callback);
-};
-`;
-
-    fs.writeFileSync(indexPath, wrapperSource, { encoding: 'utf-8' });
   }
 
   private toPascalCase(value: string): string {

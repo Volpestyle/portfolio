@@ -65,17 +65,6 @@ Processes ISR revalidation queue:
 | Timeout | 30 seconds |
 | Trigger | SQS event source |
 
-### Blog Publish Function
-
-Publishes scheduled blog posts:
-
-| Property | Value |
-|----------|-------|
-| Runtime | Node.js 20.x |
-| Memory | 256 MB |
-| Timeout | 30 seconds |
-| Trigger | EventBridge Scheduler |
-
 ## Storage
 
 ### Assets Bucket

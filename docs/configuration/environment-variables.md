@@ -222,6 +222,164 @@ OPENAI_COST_ALERT_EMAIL=alerts@example.com
 4. `.env.[environment]`
 5. `.env`
 
+## Source of Truth: `.env.production`
+
+The `.env.production` file serves as the single source of truth for production configuration. It syncs to both GitHub Actions and AWS Secrets Manager.
+
+### File Format
+
+Variables are categorized using section headers:
+
+```bash
+# .env.production
+
+# ENV VARS
+# Environment-scoped GitHub Actions variables
+NODE_ENV=production
+NEXT_PUBLIC_SITE_URL=https://example.com
+
+# ENV SECRETS
+# Environment-scoped GitHub Actions secrets (also synced to AWS Secrets Manager)
+OPENAI_API_KEY=sk-...
+NEXTAUTH_SECRET=...
+REVALIDATE_SECRET=...
+
+# REPO VARS
+# Repository-level GitHub Actions variables
+SECRETS_MANAGER_REPO_SECRET_ID=portfolio/repo
+
+# REPO SECRETS
+# Repository-level GitHub Actions secrets (also synced to AWS Secrets Manager)
+GH_TOKEN=ghp_...
+ADMIN_EMAILS=admin@example.com
+```
+
+The parser (`infra/cdk/scripts/env-parser.ts`) reads these sections and routes values to the appropriate destinations during sync.
+
+### Sync Commands
+
+```bash
+# Sync to GitHub Actions (variables + secrets)
+pnpm sync:prod:github
+
+# Sync to AWS Secrets Manager
+pnpm sync:prod:aws
+
+# Sync to both
+pnpm sync:prod
+```
+
+### Sync Flow
+
+```
+.env.production
+       │
+       ├──────────────────┬────────────────────┐
+       ▼                  ▼                    ▼
+   GitHub Env         GitHub Repo         AWS Secrets
+   Variables          Variables           Manager
+   & Secrets          & Secrets
+       │                  │                    │
+       └──────────────────┴────────────────────┘
+                          │
+                          ▼
+                    CDK Deployment
+                    (reads from GitHub)
+                          │
+                          ▼
+                    Lambda Runtime
+```
+
+## CDK Environment Processing
+
+CDK processes environment variables through a multi-stage pipeline before injecting them into Lambda functions.
+
+### Processing Pipeline
+
+```
+props.environment (from GitHub Actions)
+       │
+       ▼
+enrichRuntimeEnvironment()
+  - Sets NODE_ENV=production
+  - Strips test fixtures (BLOG_TEST_FIXTURES, PORTFOLIO_TEST_FIXTURES)
+  - Derives AWS_SECRETS_MANAGER_PRIMARY_REGION from AWS_REGION
+       │
+       ▼
+buildBaseEnvironment()
+  - Adds infra-derived keys from CDK resources:
+    • POSTS_TABLE ← BlogPosts DynamoDB table name
+    • ADMIN_TABLE_NAME ← AdminData table name
+    • CONTENT_BUCKET ← Blog content S3 bucket
+    • MEDIA_BUCKET ← Blog media S3 bucket
+    • CHAT_EXPORT_BUCKET ← Chat export S3 bucket
+    • CACHE_BUCKET_NAME ← Assets bucket name
+    • CACHE_DYNAMO_TABLE ← Revalidation table name
+    • REVALIDATION_QUEUE_URL ← SQS queue URL
+    • COST_TABLE_NAME ← Chat cost tracking table
+       │
+       ▼
+Post-distribution setup
+  - CLOUDFRONT_DISTRIBUTION_ID added via addEnvironment() after CloudFront is created
+       │
+       ▼
+resolveEdgeRuntimeEnvRules() + buildEnvironmentFromRules()
+  - Filters variables based on rules:
+    • Prefix matching (NEXT_PUBLIC_*)
+    • Explicit allowlist
+    • Blocklist (secrets that should never be exposed)
+       │
+       ▼
+Filtered env for Lambda/Edge
+       │
+       ▼
+buildLambdaRuntimeEnv()
+  - Re-applies the allowlist for regional Lambdas
+  - Adds only secret *IDs* (not values) so runtime code can fetch from Secrets Manager
+```
+
+### Edge Environment Rules
+
+Defined in `infra/cdk/lib/config/env-rules.ts`:
+
+**Prefix Matching:**
+- `NEXT_PUBLIC_*` - Always included
+
+**Explicit Allowlist:**
+```
+NODE_ENV, APP_ENV, AWS_REGION, CACHE_BUCKET_NAME,
+CACHE_DYNAMO_TABLE, POSTS_TABLE, CONTENT_BUCKET,
+MEDIA_BUCKET, NEXTAUTH_URL, GH_CLIENT_ID, ...
+```
+
+**Blocklist (never exposed in edge env):**
+```
+AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+OPENAI_API_KEY, GH_TOKEN, NEXTAUTH_SECRET,
+GH_CLIENT_SECRET, GOOGLE_CLIENT_SECRET, ...
+```
+
+### Lambda@Edge vs Regional Lambda
+
+| Aspect | Lambda@Edge | Regional Lambda |
+|--------|-------------|-----------------|
+| Env vars | Via CloudFront headers | Allowlisted `environment` (same rules as edge) |
+| Secrets | IDs passed via headers; values fetched on cold start | Secret IDs in env; values fetched on cold start |
+| Config delivery | Base64-encoded JSON in `x-opn-runtime-config` | Standard Lambda env vars |
+
+### Edge Runtime Header Injection
+
+Lambda@Edge cannot use environment variables, so CDK injects config via CloudFront origin custom headers:
+
+```
+x-opn-runtime-config     → Base64 JSON of filtered env vars
+x-opn-env-secret-id      → SECRETS_MANAGER_ENV_SECRET_ID
+x-opn-repo-secret-id     → SECRETS_MANAGER_REPO_SECRET_ID
+x-opn-secrets-region     → AWS_SECRETS_MANAGER_PRIMARY_REGION
+```
+
+The edge function wrapper (defined in `infra/cdk/lib/config/edge-runtime.ts`, injected at build time) reads these headers on cold start and populates `process.env`.
+
 ## Runtime Injection
 
 In production, secrets are injected at runtime:
