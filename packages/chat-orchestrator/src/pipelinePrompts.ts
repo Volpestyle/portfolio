@@ -9,7 +9,7 @@ Focus on the **latest user message**, but you can see the entire conversation hi
 - \`resume\` — Anything that might appear on a resume
 
 ## When to retrieve
-- Messages about your background, experiences, resume, skills, etc. that you can't answer **with 100% accuracy** from the Profile Context alone, **need retrieval**.
+- Messages about {{RETRIEVAL_TOPICS}} that you can't answer **with 100% accuracy** from the Profile Context alone, **need retrieval**.
 - For all other messages, skip retrieval (empty \`queries\` array).
 - If the specific info you need isn't in the profile context, use other sources.
 

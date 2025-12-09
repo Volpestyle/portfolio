@@ -23,6 +23,7 @@ type ProfileSource = {
     url: string;
     blurb?: string;
   }>;
+  retrievalTriggers?: string[];
 };
 
 type ExperienceRecord = {
@@ -142,14 +143,15 @@ export async function runProfileTask(context: PreprocessContext): Promise<Prepro
     resumeFilename: context.config.resume.filename,
     socialLinks: Array.isArray(profileSource.socialLinks)
       ? profileSource.socialLinks
-          .map((link) => ({
-            platform: link.platform?.trim(),
-            label: link.label?.trim(),
-            url: link.url?.trim(),
-            blurb: link.blurb?.trim() || undefined,
-          }))
-          .filter((link) => link.platform && link.label && link.url)
+        .map((link) => ({
+          platform: link.platform?.trim(),
+          label: link.label?.trim(),
+          url: link.url?.trim(),
+          blurb: link.blurb?.trim() || undefined,
+        }))
+        .filter((link) => link.platform && link.label && link.url)
       : undefined,
+    retrievalTriggers: normalizeDistinctStrings(profileSource.retrievalTriggers),
   };
 
   const artifact = await context.artifacts.writeJson({

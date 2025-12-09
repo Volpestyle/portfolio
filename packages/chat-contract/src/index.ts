@@ -181,6 +181,7 @@ export type ProfileSummary = {
   voiceExamples?: string[];
   featuredExperiences?: ExperienceRecord[];
   socialLinks?: ProfileSocialLink[];
+  retrievalTriggers?: string[];
 };
 
 export type PersonaProfile = {

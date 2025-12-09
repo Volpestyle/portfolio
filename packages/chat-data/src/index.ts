@@ -163,6 +163,7 @@ export const profileSummarySchema: z.ZodType<ProfileSummary> = z.object({
       })
     )
     .optional(),
+  retrievalTriggers: z.array(z.string()).optional(),
 });
 
 export function assertProjectEmbeddings(data: unknown): EmbeddingIndex {

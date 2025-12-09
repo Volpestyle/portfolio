@@ -66,5 +66,12 @@
       "url": "https://open.spotify.com/artist/1s7neYGdYg0kCnUizWy3bk?si=GMzqI3G0RfialSx1-1NjDg",
       "blurb": "Original music and sound design experiments."
     }
+  ],
+  "retrievalTriggers": [
+    "background",
+    "locations",
+    "experiences",
+    "resume",
+    "skills"
   ]
 }

@@ -93,6 +93,7 @@ type ProfileContext = {
   topSkills?: string[];
   socialLinks?: Array<{ platform?: string; url?: string; blurb?: string | null }>;
   featuredExperienceIds?: string[];
+  retrievalTriggers?: string[];
 };
 
 export type ChatRuntimeOptions = {
@@ -343,7 +344,14 @@ const DEFAULT_PROFILE_IDENTITY = {
 function applyProfileTemplate(prompt: string, profileContext?: ProfileContext): string {
   const ownerName = profileContext?.fullName?.trim() || DEFAULT_PROFILE_IDENTITY.fullName;
   const domainLabel = profileContext?.domainLabel?.trim() || profileContext?.headline?.trim() || DEFAULT_PROFILE_IDENTITY.domainLabel;
-  return prompt.replace(/{{OWNER_NAME}}/g, ownerName).replace(/{{DOMAIN_LABEL}}/g, domainLabel);
+  const retrievalTopics = profileContext?.retrievalTriggers?.length
+    ? profileContext.retrievalTriggers.join(', ')
+    : 'your background, locations, experiences, resume, skills, etc.';
+
+  return prompt
+    .replace(/{{OWNER_NAME}}/g, ownerName)
+    .replace(/{{DOMAIN_LABEL}}/g, domainLabel)
+    .replace(/{{RETRIEVAL_TOPICS}}/g, retrievalTopics);
 }
 
 function formatProfileContextForPrompt(profileContext?: ProfileContext): string {
@@ -597,6 +605,7 @@ function sanitizeProfileContext(profile?: ProfileContext): ProfileContext | unde
         blurb: link.blurb,
       })),
     featuredExperienceIds: profile.featuredExperienceIds?.filter(Boolean),
+    retrievalTriggers: profile.retrievalTriggers?.filter(Boolean),
   };
   const hasData = Object.values(sanitized).some((value) => {
     if (Array.isArray(value)) {
@@ -619,6 +628,7 @@ function buildProfileContext(profile?: ProfileSummary, persona?: PersonaSummary)
     topSkills: profile?.topSkills?.length ? profile.topSkills : personaProfile?.topSkills,
     socialLinks: (profile?.socialLinks as ProfileContext['socialLinks']) ?? personaProfile?.socialLinks,
     featuredExperienceIds: personaProfile?.featuredExperienceIds,
+    retrievalTriggers: profile?.retrievalTriggers,
   };
   return sanitizeProfileContext(candidate);
 }

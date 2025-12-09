@@ -246,11 +246,11 @@ models:
 
 Quick at-a-glance view of purpose, inputs/outputs, and primary tech. See §5 for detailed behavior and prompts.
 
-| Stage     | Purpose                                        | Inputs                                                                              | Outputs                                                             | Primary tech                                                                        |
-| --------- | ---------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Planner   | Decide what to search                          | Latest user message + short history; OwnerConfig + persona baked into system prompt | PlannerLLMOutput (`queries[]`, optional `topic` + `thoughts`)       | OpenAI Responses API (json schema) with `ModelConfig.plannerModel`                  |
-| Retrieval | Turn planner queries into ranked document sets | PlannerLLMOutput.queries + corpora (projects/resume/profile) + embedding indexes    | Retrieved docs per source (scored and filtered)                     | MiniSearch BM25 + embedding re-rank + recency scoring; profile short-circuited      |
-| Answer    | Turn retrieval into first-person text + UI hints | PlannerLLMOutput + retrieved docs + persona/profile + short history               | AnswerPayload (message + optional thoughts + optional uiHints)      | OpenAI Responses API with `ModelConfig.answerModel`, streaming tokens               |
+| Stage     | Purpose                                          | Inputs                                                                              | Outputs                                                        | Primary tech                                                                   |
+| --------- | ------------------------------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Planner   | Decide what to search                            | Latest user message + short history; OwnerConfig + persona baked into system prompt | PlannerLLMOutput (`queries[]`, optional `topic` + `thoughts`)  | OpenAI Responses API (json schema) with `ModelConfig.plannerModel`             |
+| Retrieval | Turn planner queries into ranked document sets   | PlannerLLMOutput.queries + corpora (projects/resume/profile) + embedding indexes    | Retrieved docs per source (scored and filtered)                | MiniSearch BM25 + embedding re-rank + recency scoring; profile short-circuited |
+| Answer    | Turn retrieval into first-person text + UI hints | PlannerLLMOutput + retrieved docs + persona/profile + short history                 | AnswerPayload (message + optional thoughts + optional uiHints) | OpenAI Responses API with `ModelConfig.answerModel`, streaming tokens          |
 
 ---
 
@@ -485,6 +485,7 @@ type ProfileDoc = {
     url: string;
     blurb?: string | null;
   }[];
+  retrievalTriggers?: string[]; // topics that trigger retrieval
 };
 
 type PersonaSummary = {
@@ -504,6 +505,7 @@ type PersonaSummary = {
       blurb?: string | null;
     }>;
     featuredExperienceIds?: string[];
+    retrievalTriggers?: string[];
   };
   generatedAt: string;
 };
@@ -996,14 +998,14 @@ done: {}
 
 `stage` events fire at the start and end of each pipeline stage:
 
-| Stage Event          | Timing           | UI Suggestion                                               |
-| -------------------- | ---------------- | ----------------------------------------------------------- |
-| `planner_start`      | Immediately      | "Understanding your question..."                            |
+| Stage Event          | Timing           | UI Suggestion                                                  |
+| -------------------- | ---------------- | -------------------------------------------------------------- |
+| `planner_start`      | Immediately      | "Understanding your question..."                               |
 | `planner_complete`   | ~200-400ms       | Show detected topic/queries (e.g., "Searching: Go experience") |
-| `retrieval_start`    | After planner    | "Searching portfolio..."                                    |
-| `retrieval_complete` | ~100-300ms       | "Found X relevant items"                                    |
-| `answer_start`       | After retrieval  | Typing indicator / cursor                                   |
-| `answer_complete`    | After last token | Hide typing indicator                                       |
+| `retrieval_start`    | After planner    | "Searching portfolio..."                                       |
+| `retrieval_complete` | ~100-300ms       | "Found X relevant items"                                       |
+| `answer_start`       | After retrieval  | Typing indicator / cursor                                      |
+| `answer_complete`    | After last token | Hide typing indicator                                          |
 
 `reasoning` events stream incrementally as each stage progresses. Payloads may include `delta` text (append-only) plus structured trace fragments so dev tooling can show both a running transcript and the final trace.
 
@@ -1039,12 +1041,12 @@ Client-side UI can switch on `event` to drive streaming text, UI cards, dev reas
 
 **Minimal vs Rich Progress UX**
 
-| Mode         | Behavior                                                         |
-| ------------ | ---------------------------------------------------------------- |
-| **Minimal**  | Show generic "Thinking..." until first token                     |
+| Mode         | Behavior                                                          |
+| ------------ | ----------------------------------------------------------------- |
+| **Minimal**  | Show generic "Thinking..." until first token                      |
 | **Standard** | Show stage names: "Planning..." → "Searching..." → "Answering..." |
-| **Rich**     | Show stage names + metadata: "Found 5 relevant projects"         |
-| **Dev**      | Full reasoning trace panel with deltas and final trace           |
+| **Rich**     | Show stage names + metadata: "Found 5 relevant projects"          |
+| **Dev**      | Full reasoning trace panel with deltas and final trace            |
 
 ### 6.5 Streaming Error Recovery
 
