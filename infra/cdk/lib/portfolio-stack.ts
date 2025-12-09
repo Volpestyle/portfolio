@@ -1294,21 +1294,34 @@ export class PortfolioStack extends Stack {
   }
 
   private grantSecretAccess(grantable: iam.IGrantable, edgeFunction?: cloudfrontExperimental.EdgeFunction) {
-    const secretArns: string[] = [];
+    const configuredSecretIds = [
+      this.runtimeEnvironment['SECRETS_MANAGER_ENV_SECRET_ID'],
+      this.runtimeEnvironment['SECRETS_MANAGER_REPO_SECRET_ID'],
+    ].filter((value): value is string => typeof value === 'string' && value.length > 0);
+
     if (this.envSecret) {
       this.envSecret.grantRead(grantable);
-      secretArns.push(this.envSecret.secretArn);
     }
     if (this.repoSecret) {
       this.repoSecret.grantRead(grantable);
-      secretArns.push(this.repoSecret.secretArn);
+    }
+
+    const secretResourceArns = Array.from(
+      new Set(configuredSecretIds.flatMap((secretId) => this.buildSecretResourceArns(secretId)))
+    );
+
+    if (secretResourceArns.length > 0) {
+      grantable.grantPrincipal.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          actions: ['secretsmanager:GetSecretValue', 'secretsmanager:DescribeSecret'],
+          resources: secretResourceArns,
+        })
+      );
     }
 
     // For Lambda@Edge functions, explicitly add policy to handle imported secrets and
     // ensure the replicated execution role receives the statement.
-    if (edgeFunction && secretArns.length > 0) {
-      const secretResourceArns = secretArns.flatMap((arn) => [arn, `${arn}*`]);
-
+    if (edgeFunction && secretResourceArns.length > 0) {
       edgeFunction.addToRolePolicy(
         new iam.PolicyStatement({
           actions: ['secretsmanager:GetSecretValue', 'secretsmanager:DescribeSecret'],
@@ -1316,6 +1329,29 @@ export class PortfolioStack extends Stack {
         })
       );
     }
+  }
+
+  private buildSecretResourceArns(secretId: string): string[] {
+    const stack = Stack.of(this);
+    const baseArn =
+      secretId.startsWith('arn:')
+        ? secretId
+        : stack.formatArn({
+            service: 'secretsmanager',
+            resource: 'secret',
+            resourceName: secretId,
+          });
+
+    const resourceName = baseArn.split(':secret:')[1] ?? secretId;
+    const normalizedName = resourceName.replace(/-[A-Za-z0-9]{6}$/, '');
+
+    const wildcardArn = stack.formatArn({
+      service: 'secretsmanager',
+      resource: 'secret',
+      resourceName: `${normalizedName}*`,
+    });
+
+    return [baseArn, wildcardArn];
   }
 
   private restrictFunctionUrlAccess(distribution: cloudfront.Distribution) {
