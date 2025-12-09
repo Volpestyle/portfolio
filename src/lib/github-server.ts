@@ -2,7 +2,6 @@ import type { RepoData } from '@portfolio/chat-contract';
 import { GH_CONFIG } from './constants';
 import {
   createOctokit,
-  getPortfolioConfig,
   resolveGitHubToken,
   fetchRepoLanguages,
   calculateLanguagePercentages,
@@ -10,6 +9,8 @@ import {
 import { unstable_cache } from 'next/cache';
 import { convertRelativeToAbsoluteUrls } from './readme-utils';
 import { assertNoFixtureFlagsInProd, shouldUseFixtureRuntime } from '@/lib/test-flags';
+import { getVisibleProjects, getAllProjects, type PortfolioProjectRecord } from '@/server/portfolio/store';
+import { normalizeProjectKey } from '@/lib/projects/normalize';
 
 export type { RepoData };
 
@@ -27,6 +28,11 @@ export type PortfolioReposResponse = {
   starred: RepoData[];
   normal: RepoData[];
 };
+
+function findProjectMetadata(projects: PortfolioProjectRecord[], repo: string): PortfolioProjectRecord | null {
+  const target = normalizeProjectKey(repo);
+  return projects.find((project) => normalizeProjectKey(project.name) === target) ?? null;
+}
 
 // Removed cloneRepo function - no longer needed since we don't return mock data
 
@@ -48,14 +54,46 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
   const octokit = await createOctokit(token);
 
   try {
-    const portfolioConfig = await getPortfolioConfig();
+    const projects = await getVisibleProjects();
 
-    if (!portfolioConfig) {
-      throw new Error('Portfolio configuration not found');
-    }
+    // If no projects configured, fall back to showing all public repos
+    if (!projects.length) {
+      const repos = await octokit.rest.repos.listForUser({
+        username: GH_CONFIG.USERNAME,
+        per_page: 100,
+        sort: 'updated',
+      });
 
-    if (!Array.isArray(portfolioConfig.repositories)) {
-      throw new Error('Invalid portfolio configuration: repositories must be an array');
+      const publicRepos: RepoData[] = await Promise.all(
+        repos.data
+          .filter((repo) => !repo.private && !repo.fork)
+          .slice(0, 12)
+          .map(async (repo) => {
+            const languagesBreakdown = await fetchRepoLanguages(repo.owner?.login || GH_CONFIG.USERNAME, repo.name);
+            const languagePercentages = languagesBreakdown ? calculateLanguagePercentages(languagesBreakdown) : undefined;
+            return {
+              id: repo.id,
+              name: repo.name,
+              full_name: repo.full_name,
+              description: repo.description,
+              created_at: repo.created_at || new Date().toISOString(),
+              pushed_at: repo.pushed_at || repo.updated_at || null,
+              updated_at: repo.updated_at || null,
+              html_url: repo.html_url,
+              default_branch: repo.default_branch,
+              private: repo.private,
+              owner: repo.owner,
+              homepage: repo.homepage,
+              language: repo.language,
+              topics: repo.topics,
+              isStarred: false,
+              languagesBreakdown: languagesBreakdown ?? undefined,
+              languagePercentages,
+            };
+          })
+      );
+
+      return { starred: [], normal: publicRepos };
     }
 
     const repos = await octokit.rest.repos.listForUser({
@@ -63,24 +101,24 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
       per_page: 100,
     });
 
-    const publicRepoMap = new Map(repos.data.map((r) => [r.name, r]));
+    const publicRepoMap = new Map(repos.data.map((repo) => [normalizeProjectKey(repo.name), repo]));
+    const starred: RepoData[] = [];
+    const normal: RepoData[] = [];
 
-    const processedRepos: RepoData[] = [];
-
-    for (const repoConfig of portfolioConfig.repositories) {
-      const publicRepo = publicRepoMap.get(repoConfig.name);
+    for (const project of projects) {
+      const projectKey = normalizeProjectKey(project.name);
+      const publicRepo = publicRepoMap.get(projectKey);
+      const owner = project.owner || GH_CONFIG.USERNAME;
 
       if (publicRepo) {
-        // Fetch language data for public repos
-        const owner = publicRepo.owner?.login || GH_CONFIG.USERNAME;
-        const languagesBreakdown = await fetchRepoLanguages(owner, publicRepo.name);
+        const languagesBreakdown = await fetchRepoLanguages(publicRepo.owner?.login || owner, publicRepo.name);
         const languagePercentages = languagesBreakdown ? calculateLanguagePercentages(languagesBreakdown) : undefined;
 
-        processedRepos.push({
+        const repoRecord: RepoData = {
           id: publicRepo.id,
           name: publicRepo.name,
           full_name: publicRepo.full_name,
-          description: publicRepo.description,
+          description: project.description ?? publicRepo.description,
           created_at: publicRepo.created_at || new Date().toISOString(),
           pushed_at: publicRepo.pushed_at || publicRepo.updated_at || null,
           updated_at: publicRepo.updated_at || null,
@@ -88,37 +126,48 @@ export async function fetchPortfolioRepos(): Promise<PortfolioReposResponse> {
           default_branch: publicRepo.default_branch,
           private: publicRepo.private,
           owner: publicRepo.owner,
-          isStarred: repoConfig.isStarred || false,
-          icon: repoConfig.icon,
+          homepage: publicRepo.homepage,
+          language: project.language ?? publicRepo.language,
+          topics: project.topics ?? publicRepo.topics,
+          isStarred: Boolean(project.isStarred),
+          icon: project.icon,
           languagesBreakdown: languagesBreakdown ?? undefined,
           languagePercentages,
-        });
-      } else if (repoConfig.isPrivate) {
-        const privateRepoData: RepoData = {
-          name: repoConfig.name,
-          full_name: `${repoConfig.owner || GH_CONFIG.USERNAME}/${repoConfig.name}`,
-          private: true,
-          owner: {
-            login: repoConfig.owner || GH_CONFIG.USERNAME,
-          },
-          description: repoConfig.description || null,
-          homepage: repoConfig.homepage || repoConfig.demoUrl || null,
-          language: repoConfig.language || null,
-          topics: repoConfig.topics,
-          created_at: repoConfig.createdAt || new Date().toISOString(),
-          updated_at: repoConfig.updatedAt || new Date().toISOString(),
-          isStarred: repoConfig.isStarred || false,
-          icon: repoConfig.icon,
-          languagePercentages: repoConfig.languages,
         };
-        processedRepos.push(privateRepoData);
+
+        if (project.isStarred) {
+          starred.push(repoRecord);
+        } else {
+          normal.push(repoRecord);
+        }
+        continue;
+      }
+
+      const fallbackRepo: RepoData = {
+        name: project.name,
+        full_name: `${owner}/${project.name}`,
+        private: true,
+        owner: {
+          login: owner,
+        },
+        description: project.description ?? null,
+        homepage: null,
+        language: project.language ?? null,
+        topics: project.topics,
+        created_at: project.updatedAt || new Date().toISOString(),
+        updated_at: project.updatedAt || new Date().toISOString(),
+        isStarred: Boolean(project.isStarred),
+        icon: project.icon,
+      };
+
+      if (project.isStarred) {
+        starred.push(fallbackRepo);
+      } else {
+        normal.push(fallbackRepo);
       }
     }
 
-    return {
-      starred: processedRepos.filter((repo) => repo.isStarred),
-      normal: processedRepos.filter((repo) => !repo.isStarred),
-    };
+    return { starred, normal };
   } catch (error) {
     console.error('Error fetching portfolio repos:', error);
     throw error;
@@ -140,34 +189,10 @@ export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.U
   const token = await resolveGitHubToken();
   if (!token) throw new Error('GitHub token is not configured');
   const octokit = await createOctokit(token);
+  const allProjects = await getAllProjects();
+  const projectMetadata = findProjectMetadata(allProjects, repo);
 
   try {
-    // First try to get from portfolio config for private repos
-    const portfolioConfig = await getPortfolioConfig();
-    const repoConfig = portfolioConfig?.repositories?.find((r) => r.name === repo);
-
-    if (repoConfig?.isPrivate) {
-      return {
-        name: repoConfig.name,
-        full_name: `${repoConfig.owner || owner}/${repoConfig.name}`,
-        private: true,
-        owner: {
-          login: repoConfig.owner || owner,
-        },
-        description: repoConfig.description || null,
-        homepage: repoConfig.homepage || repoConfig.demoUrl || null,
-        language: repoConfig.language || null,
-        topics: repoConfig.topics,
-        created_at: repoConfig.createdAt || new Date().toISOString(),
-        updated_at: repoConfig.updatedAt || new Date().toISOString(),
-        pushed_at: repoConfig.updatedAt || new Date().toISOString(),
-        isStarred: repoConfig.isStarred || false,
-        icon: repoConfig.icon,
-        languagePercentages: repoConfig.languages,
-      };
-    }
-
-    // For public repos, fetch from GitHub
     const { data } = await octokit.rest.repos.get({
       owner,
       repo,
@@ -190,14 +215,35 @@ export async function fetchRepoDetails(repo: string, owner: string = GH_CONFIG.U
       private: data.private,
       owner: data.owner,
       homepage: data.homepage,
-      language: data.language,
-      topics: data.topics,
-      isStarred: repoConfig?.isStarred || false,
-      icon: repoConfig?.icon,
+      language: projectMetadata?.language ?? data.language,
+      topics: projectMetadata?.topics ?? data.topics,
+      isStarred: Boolean(projectMetadata?.isStarred),
+      icon: projectMetadata?.icon,
       languagesBreakdown: languagesBreakdown ?? undefined,
       languagePercentages,
     };
   } catch (error) {
+    if (projectMetadata) {
+      const repoOwner = projectMetadata.owner || owner;
+      return {
+        name: projectMetadata.name,
+        full_name: `${repoOwner}/${projectMetadata.name}`,
+        private: true,
+        owner: {
+          login: repoOwner,
+        },
+        description: projectMetadata.description ?? null,
+        homepage: null,
+        language: projectMetadata.language ?? null,
+        topics: projectMetadata.topics,
+        created_at: projectMetadata.updatedAt || new Date().toISOString(),
+        updated_at: projectMetadata.updatedAt || new Date().toISOString(),
+        pushed_at: projectMetadata.updatedAt || null,
+        isStarred: Boolean(projectMetadata.isStarred),
+        icon: projectMetadata.icon,
+      };
+    }
+
     console.error('Error fetching repo details:', error);
     throw error;
   }
@@ -219,28 +265,10 @@ export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.US
   if (!token) throw new Error('GitHub token is not configured');
   const octokit = await createOctokit(token);
 
-  let actualRepoName = repo;
-
   try {
-    // First check portfolio config for private repos
-    const portfolioConfig = await getPortfolioConfig();
-    const repoConfig = portfolioConfig?.repositories?.find((r) => r.name === repo);
-
-    // Determine the actual repo name to fetch from
-    if (repoConfig?.isPrivate) {
-      actualRepoName = repoConfig.publicRepo || `${repo}-public`;
-    }
-
-    // If we have inline README content for private repos
-    if (repoConfig?.isPrivate && repoConfig.readme) {
-      // Transform relative URLs to point to the public repo
-      return convertRelativeToAbsoluteUrls(repoConfig.readme, owner, actualRepoName, undefined, 'README.md');
-    }
-
-    // Fetch README from GitHub (public repo or public counterpart of private repo)
     const { data } = await octokit.rest.repos.getReadme({
       owner,
-      repo: actualRepoName,
+      repo,
     });
 
     const readmeData = data as {
@@ -253,10 +281,10 @@ export async function fetchRepoReadme(repo: string, owner: string = GH_CONFIG.US
     const branchFromDownloadUrl = extractBranchFromDownloadUrl(readmeData?.download_url);
 
     // Transform relative URLs to absolute URLs pointing to the correct repo
-    return convertRelativeToAbsoluteUrls(readmeContent, owner, actualRepoName, branchFromDownloadUrl, 'README.md');
+    return convertRelativeToAbsoluteUrls(readmeContent, owner, repo, branchFromDownloadUrl, 'README.md');
   } catch (error) {
     if (isGithubNotFoundError(error)) {
-      console.warn(`[github-server] README not found for ${owner}/${actualRepoName}. Using placeholder content.`);
+      console.warn(`[github-server] README not found for ${owner}/${repo}. Using placeholder content.`);
       return buildMissingReadmeMessage(repo);
     }
 
@@ -315,49 +343,10 @@ export async function fetchDocumentContent(
   const octokit = await createOctokit(token);
 
   try {
-    // Check portfolio config for private repos and document overrides
-    const portfolioConfig = await getPortfolioConfig();
-    const repoConfig = portfolioConfig?.repositories?.find((r) => r.name === repo);
-
-    // Check if document is configured in gist
-    if (repoConfig?.documents) {
-      const docConfig = repoConfig.documents.find((d) => d.path === docPath);
-
-      if (docConfig) {
-        // Fetch from gist
-        const docGistResponse = await octokit.rest.gists.get({
-          gist_id: docConfig.gistId,
-        });
-
-        const files = docGistResponse.data.files;
-        if (files && Object.keys(files).length > 0) {
-          let docFile;
-          if (docConfig.filename) {
-            docFile = files[docConfig.filename];
-          } else {
-            docFile = files[Object.keys(files)[0]];
-          }
-
-          if (docFile && docFile.content) {
-            return {
-              content: docFile.content,
-              projectName: repoConfig.name,
-            };
-          }
-        }
-      }
-    }
-
-    // For private repos, use public counterpart
-    let repoToFetch = repo;
-    if (repoConfig?.isPrivate) {
-      repoToFetch = repoConfig.publicRepo || `${repo}-public`;
-    }
-
     // Fetch from GitHub repository
     const response = await octokit.rest.repos.getContent({
       owner,
-      repo: repoToFetch,
+      repo,
       path: docPath,
     });
 
@@ -367,7 +356,7 @@ export async function fetchDocumentContent(
       const normalizedContent = convertRelativeToAbsoluteUrls(
         content,
         owner,
-        repoToFetch,
+        repo,
         branchFromDownloadUrl,
         docPath
       );
@@ -404,17 +393,9 @@ async function fetchDirectoryContents(
   if (!token) throw new Error('GitHub token is not configured');
   const octokit = await createOctokit(token);
 
-  const portfolioConfig = await getPortfolioConfig();
-  const repoConfig = portfolioConfig?.repositories?.find((r) => r.name === repo);
-
-  let repoToFetch = repo;
-  if (repoConfig?.isPrivate) {
-    repoToFetch = repoConfig.publicRepo || `${repo}-public`;
-  }
-
   const response = await octokit.rest.repos.getContent({
     owner,
-    repo: repoToFetch,
+    repo,
     path: dirPath,
   });
 
