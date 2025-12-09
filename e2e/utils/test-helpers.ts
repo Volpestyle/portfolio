@@ -149,6 +149,7 @@ export async function mockChatStream(page: Page) {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        type: 'file',
         document: {
           repoName: project.slug,
           path: docPath,

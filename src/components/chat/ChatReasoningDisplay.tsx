@@ -83,7 +83,6 @@ export function ChatReasoningDisplay({
   const hasTraceContent = hasRenderablePlan || hasRetrieval || hasAnswerWithQueries || hasError;
   const streamingHasPlan = Boolean(isStreaming && hasRenderablePlan);
   const shouldRenderUserPanel = Boolean(show && (hasTraceContent || streamingHasPlan));
-  const hasTracePayload = trace !== null && trace !== undefined;
   const allowDevPanel = showDevTools && showDevMode;
   const shouldRenderDevPanel = allowDevPanel;
 

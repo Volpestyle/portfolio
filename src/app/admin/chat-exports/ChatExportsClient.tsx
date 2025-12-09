@@ -4,7 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { X, Upload, Eye } from 'lucide-react';
-import type { CombinedExport, ChatLogMetadata } from './types';
+import type { CombinedExport, ChatLogMetadata, ChatExport } from './types';
+
+type LogDetailData = {
+  log: ChatLogMetadata;
+  body: string | null;
+};
 
 type ChatExportsClientProps = {
   initialExports?: CombinedExport[];
@@ -161,13 +166,14 @@ export function ChatExportsClient({ initialExports, initialError = null }: ChatE
       if (!response.ok) {
         throw new Error(data?.error || 'Failed to save tags');
       }
-      if (data.log) {
-        setDetailData((prev) => prev ? { ...prev, log: data.log! } : null);
+      const { log } = data;
+      if (log) {
+        setDetailData((prev) => (prev ? { ...prev, log } : null));
         // Update the main list
         setExportsList((prev) =>
           prev.map((exp) =>
             extractFilename(exp.key) === selectedLog
-              ? { ...exp, metadata: exp.metadata ? { ...exp.metadata, tags: data.log!.tags } : undefined }
+              ? { ...exp, metadata: exp.metadata ? { ...exp.metadata, tags: log.tags } : undefined }
               : exp
           )
         );

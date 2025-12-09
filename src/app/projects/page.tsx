@@ -21,14 +21,22 @@ export default async function Projects() {
     getVisibleProjects(),
   ]);
 
-  const orderMap = new Map<string, number>();
-  visibleProjects.forEach((project, index) => orderMap.set(normalizeProjectKey(project.name), index));
-  const visibleKeys = new Set(orderMap.keys());
+  const visibleOrderMap = new Map<string, number>();
+  visibleProjects.forEach((project, index) => visibleOrderMap.set(normalizeProjectKey(project.name), index));
+  const visibleKeys = new Set(visibleOrderMap.keys());
 
-  const filteredRecords =
-    orderMap.size > 0
+  const matchedRecords =
+    visibleOrderMap.size > 0
       ? projectRecords.filter((record) => visibleKeys.has(normalizeProjectKey(record.slug ?? record.name)))
       : projectRecords;
+
+  // If visibleProjects is configured but none of the records match (common in fixture mode),
+  // fall back to showing all projects so the page never renders empty.
+  const useFallback = visibleOrderMap.size > 0 && matchedRecords.length === 0;
+  const effectiveOrderMap = useFallback ? new Map<string, number>() : visibleOrderMap;
+  const effectiveVisibleKeys = useFallback ? new Set<string>() : visibleKeys;
+
+  const filteredRecords = useFallback ? projectRecords : matchedRecords;
   const summaries = filteredRecords.map((project) => buildProjectSummary(project));
 
   const orderedRepos = [...repoResponse.starred, ...repoResponse.normal];
@@ -41,17 +49,21 @@ export default async function Projects() {
       return {
         project: summary,
         repo: repoByKey.get(key),
-        order: orderMap.get(key) ?? Number.MAX_SAFE_INTEGER,
+        order: effectiveOrderMap.get(key) ?? Number.MAX_SAFE_INTEGER,
       };
     })
-    .filter((entry) => (visibleKeys.size ? visibleKeys.has(normalizeProjectKey(entry.project.slug ?? entry.project.name)) : true))
+    .filter((entry) =>
+      effectiveVisibleKeys.size
+        ? effectiveVisibleKeys.has(normalizeProjectKey(entry.project.slug ?? entry.project.name))
+        : true
+    )
     .sort((a, b) => {
       const starredA = Boolean(a.repo?.isStarred);
       const starredB = Boolean(b.repo?.isStarred);
       if (starredA !== starredB) {
         return Number(starredB) - Number(starredA);
       }
-      if (orderMap.size) {
+      if (effectiveOrderMap.size) {
         if (a.order !== b.order) {
           return a.order - b.order;
         }

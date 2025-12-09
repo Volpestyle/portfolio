@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { listAllGitHubRepos } from '@/lib/github-api';
 import { shouldServeFixturesForRequest } from '@/lib/test-flags';
-import { TEST_REPO } from '@portfolio/test-support/fixtures';
 
 export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
   if (shouldServeFixturesForRequest(request.headers)) {
+    const { TEST_REPO } = await import('@portfolio/test-support/fixtures');
+
     return NextResponse.json({
       repos: [
         {

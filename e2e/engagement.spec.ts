@@ -103,5 +103,12 @@ test.describe('Engagement surfaces', () => {
     const markdownViewer = page.getByTestId('markdown-viewer');
     await expect(markdownViewer).toBeVisible();
     await expect(markdownViewer).toContainText(/surface inline documentation/i);
+
+    const docLink = page.getByRole('link', { name: /api contract/i }).first();
+    await expect(docLink).toBeVisible();
+    await docLink.click();
+
+    await expect(page.getByRole('heading', { name: /api reference/i })).toBeVisible();
+    await expect(page.getByTestId('markdown-viewer')).toContainText(/post \/api\/chat/i);
   });
 });

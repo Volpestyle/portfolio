@@ -21,6 +21,16 @@ const nextConfig = {
     '@portfolio/chat-next-api',
     '@portfolio/test-support',
   ],
+  // Allow Playwright/dev assets to be fetched from loopback origins during local runs.
+  allowedDevOrigins: [
+    // Explicit origins used by Playwright/local dev (with and without protocol)
+    'http://127.0.0.1:3000',
+    'http://localhost:3000',
+    'https://127.0.0.1:3000',
+    'https://localhost:3000',
+    '127.0.0.1',
+    'localhost',
+  ],
   images: {
     qualities: [75, 85],
     remotePatterns: [

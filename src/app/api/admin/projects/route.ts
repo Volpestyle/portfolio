@@ -16,8 +16,10 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json().catch(() => ({}));
-    const projects = Array.isArray((body as any).projects) ? (body as any).projects : [];
+    type ProjectsPayload = { projects?: unknown };
+    const body: unknown = await request.json().catch(() => ({}));
+    const payload: ProjectsPayload = body && typeof body === 'object' ? (body as ProjectsPayload) : {};
+    const projects = Array.isArray(payload.projects) ? payload.projects : [];
     const saved = await saveProjects(projects);
 
     await revalidateContent({ tags: ['github-repos'], paths: ['/projects'] });

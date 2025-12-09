@@ -14,7 +14,7 @@ export const metadata = {
 };
 
 type PageProps = {
-  searchParams?: { search?: string; status?: string };
+  searchParams?: Promise<{ search?: string; status?: string }>;
 };
 
 function normalizeStatus(value?: string | null): BlogPostStatus | 'all' {
@@ -30,7 +30,8 @@ function buildFilters(params: { search?: string; status?: string } | undefined) 
 }
 
 export default async function AdminPage({ searchParams }: PageProps) {
-  const { search, status } = buildFilters(searchParams);
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const { search, status } = buildFilters(resolvedSearchParams);
 
   let initialPosts: BlogPostRecord[] = [];
   let initialError: string | null = null;

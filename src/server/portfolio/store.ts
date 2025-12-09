@@ -1,7 +1,6 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { BatchWriteCommand, QueryCommand, type BatchWriteCommandOutput, type QueryCommandOutput } from '@aws-sdk/lib-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
-import { TEST_REPO } from '@portfolio/test-support/fixtures';
 import { assertNoFixtureFlagsInProd, shouldUseFixtureRuntime } from '@/lib/test-flags';
 
 export type PortfolioProjectRecord = {
@@ -168,8 +167,9 @@ function useFixtureStore(): boolean {
   return shouldUseFixtureRuntime();
 }
 
-function getFixtureProjects(): PortfolioProjectRecord[] {
+async function getFixtureProjects(): Promise<PortfolioProjectRecord[]> {
   if (!fixtureProjects) {
+    const { TEST_REPO } = await import('@portfolio/test-support/fixtures');
     fixtureProjects = [
       {
         name: TEST_REPO.name,
@@ -237,7 +237,7 @@ async function writeProjects(projects: PortfolioProjectRecord[]): Promise<void> 
 
 export async function getAllProjects(): Promise<PortfolioProjectRecord[]> {
   if (useFixtureStore()) {
-    return getFixtureProjects().sort(sortProjects);
+    return (await getFixtureProjects()).sort(sortProjects);
   }
 
   const stored = await queryProjects();
@@ -261,7 +261,7 @@ export async function saveProjects(projects: unknown[]): Promise<PortfolioProjec
 
   if (useFixtureStore()) {
     fixtureProjects = deduped;
-    return getFixtureProjects().sort(sortProjects);
+    return (await getFixtureProjects()).sort(sortProjects);
   }
 
   if (deduped.length === 0) {
