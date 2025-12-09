@@ -1,5 +1,3 @@
-'use server';
-
 import { NextResponse } from 'next/server';
 import { getChatDebugLogs } from '@portfolio/chat-next-api';
 import { getAdminRequestContext } from '@/server/admin/auth';

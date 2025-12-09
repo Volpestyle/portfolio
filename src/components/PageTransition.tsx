@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
+import { AnimatePresence, motion, useAnimationFrame, useIsPresent, useMotionValue, useSpring } from 'framer-motion';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   createContext,
@@ -21,7 +21,7 @@ import { Spinner } from '@/components/ui/spinner';
 const EXIT_DURATION_MS = 400;
 const BASELINE_DELAY_MS = 200;
 const SAFETY_TIMEOUT_MS = 5000;
-const SPINNER_OFFSET_FROM_HEADER_PX = 120;
+const SPINNER_OFFSET_FROM_HEADER_PX = 140;
 
 interface PageTransitionContextValue {
   isTransitioning: boolean;
@@ -58,11 +58,16 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [timerDone, setTimerDone] = useState(true);
   const [contentReady, setContentReady] = useState(true);
-  const [spinnerTop, setSpinnerTop] = useState<number | null>(null);
+
+  // Use MotionValues for high-performance updates without re-renders
+  const spinnerTop = useMotionValue(0);
+  // Higher stiffness + lighter mass keeps the spinner closely in sync with header movement
+  const spinnerTopSmooth = useSpring(spinnerTop, { stiffness: 420, damping: 32, mass: 0.7 });
+  const [hasMeasuredHeader, setHasMeasuredHeader] = useState(false);
+
   const prevPathname = useRef(pathname);
   const exitResolveRef = useRef<(() => void) | null>(null);
   const headerElementRef = useRef<HTMLElement | null>(null);
-  const headerResizeObserverRef = useRef<ResizeObserver | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -122,48 +127,49 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const updateSpinnerPosition = useCallback(() => {
-    if (!headerElementRef.current) {
-      setSpinnerTop(null);
-      return;
-    }
-
-    const rect = headerElementRef.current.getBoundingClientRect();
-    setSpinnerTop(rect.bottom + SPINNER_OFFSET_FROM_HEADER_PX);
-  }, []);
-
   const headerRef = useCallback(
     (element: HTMLElement | null) => {
-      headerResizeObserverRef.current?.disconnect();
-      headerResizeObserverRef.current = null;
       headerElementRef.current = element;
 
       if (element) {
-        updateSpinnerPosition();
-        headerResizeObserverRef.current = new ResizeObserver(() => updateSpinnerPosition());
-        headerResizeObserverRef.current.observe(element);
-      } else {
-        setSpinnerTop(null);
+        // Initial sync
+        const rect = element.getBoundingClientRect();
+        spinnerTop.set(rect.bottom + SPINNER_OFFSET_FROM_HEADER_PX);
+        setHasMeasuredHeader(true);
       }
     },
-    [updateSpinnerPosition]
+    [spinnerTop]
   );
 
+  // Continuously update spinner position while transitioning to track any layout animations (like FLIP)
+  // useAnimationFrame syncs with Framer Motion's internal loop, ensuring we read/write
+  // in the same phase as the Header's own layout animations.
+  useAnimationFrame(() => {
+    if (!isTransitioning && !isExiting) return;
+
+    if (headerElementRef.current) {
+      const rect = headerElementRef.current.getBoundingClientRect();
+      spinnerTop.set(rect.bottom + SPINNER_OFFSET_FROM_HEADER_PX);
+      if (!hasMeasuredHeader) {
+        setHasMeasuredHeader(true);
+      }
+    }
+  });
+
+  // Listen to resize always to keep position fresh
   useEffect(() => {
-    const handleWindowChange = () => updateSpinnerPosition();
-    window.addEventListener('resize', handleWindowChange);
-    window.addEventListener('scroll', handleWindowChange, true);
-
-    return () => {
-      window.removeEventListener('resize', handleWindowChange);
-      window.removeEventListener('scroll', handleWindowChange, true);
-      headerResizeObserverRef.current?.disconnect();
+    const handleResize = () => {
+      if (headerElementRef.current) {
+        const rect = headerElementRef.current.getBoundingClientRect();
+        spinnerTop.set(rect.bottom + SPINNER_OFFSET_FROM_HEADER_PX);
+        if (!hasMeasuredHeader) {
+          setHasMeasuredHeader(true);
+        }
+      }
     };
-  }, [updateSpinnerPosition]);
-
-  useLayoutEffect(() => {
-    updateSpinnerPosition();
-  }, [pathname, updateSpinnerPosition]);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [hasMeasuredHeader, spinnerTop]);
 
   const contextValue: PageTransitionContextValue = {
     isTransitioning,
@@ -187,12 +193,11 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
             <motion.div
               className="absolute left-1/2"
               initial={false}
-              animate={{
-                top: spinnerTop ?? '50%',
-                translateX: '-50%',
-                translateY: spinnerTop !== null ? 0 : '-50%',
+              style={{
+                top: hasMeasuredHeader ? spinnerTopSmooth : '50%',
+                x: '-50%',
+                y: '-50%', // Always center vertically on the point
               }}
-              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             >
               <Spinner variant="ring" size="lg" />
             </motion.div>
