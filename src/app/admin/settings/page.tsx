@@ -1,5 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { getRuntimeCostClients, getRuntimeCostState } from '@/server/chat/runtimeCost';
+import { getSettings } from '@/server/admin/settings-store';
+import type { AdminSettings, CostStateResponse } from './types';
 import { SettingsClient } from './SettingsClient';
 
 export const metadata = {
@@ -8,7 +11,29 @@ export const metadata = {
 
 export const dynamic = 'force-dynamic';
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  let initialSettings: AdminSettings | null = null;
+  let initialCostState: CostStateResponse | null = null;
+
+  try {
+    initialSettings = await getSettings();
+  } catch (error) {
+    console.error('[admin/settings] Failed to prefetch settings', error);
+  }
+
+  try {
+    const clients = await getRuntimeCostClients();
+    if (clients) {
+      const state = await getRuntimeCostState(clients);
+      initialCostState = { available: true, state };
+    } else {
+      initialCostState = { available: false, error: 'Cost tracking not configured' };
+    }
+  } catch (error) {
+    console.error('[admin/settings] Failed to prefetch cost state', error);
+    initialCostState = { available: false, error: 'Failed to fetch cost state' };
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -30,7 +55,7 @@ export default function SettingsPage() {
           <CardTitle className="text-white">Chatbot Configuration</CardTitle>
         </CardHeader>
         <CardContent>
-          <SettingsClient />
+          <SettingsClient initialSettings={initialSettings} initialCostState={initialCostState} />
         </CardContent>
       </Card>
 

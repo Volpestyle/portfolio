@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
-import { PostEditor } from '../components/PostEditor';
 import { notFound } from 'next/navigation';
+import { PostEditor } from '../components/PostEditor';
+import { AdminPageSkeleton } from '../components/AdminPageSkeleton';
 import { getAdminPost } from '@/server/blog/actions';
 
 export const metadata = {
@@ -20,7 +21,7 @@ export default async function EditPostPage({ params }: PageProps) {
   }
 
   return (
-    <Suspense fallback={<div className="p-6 text-white/60">Loading editor...</div>}>
+    <Suspense fallback={<AdminPageSkeleton rows={2} withFilters={false} showAction={false} />}>
       <PostEditor post={post} />
     </Suspense>
   );

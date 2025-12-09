@@ -14,6 +14,10 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
 import { usePageTransition } from '@/components/PageTransition';
+import { GH_CONFIG } from '@/lib/constants';
+
+const DEFAULT_OWNER = GH_CONFIG.USERNAME;
+const buildRepoKey = (name: string, owner?: string) => `${(owner || DEFAULT_OWNER).toLowerCase()}/${name.toLowerCase()}`;
 
 type RepoRow = {
   name: string;
@@ -192,11 +196,66 @@ type StoredProject = {
   updatedAt?: string;
 };
 
-export function PortfolioConfigManager() {
+type PortfolioConfigManagerProps = {
+  initialProjects?: StoredProject[];
+  initialRepos?: ApiRepo[];
+};
+
+function mergeRepoData(projects: StoredProject[] | undefined, availableRepos: ApiRepo[] | undefined): RepoRow[] {
+  const projectMap = new Map(
+    (projects ?? []).map((project) => [buildRepoKey(project.name, project.owner || DEFAULT_OWNER), project])
+  );
+  const seen = new Set<string>();
+
+  const merged: RepoRow[] = (availableRepos ?? []).map((repo, index) => {
+    const key = buildRepoKey(repo.name, repo.owner);
+    const existing = projectMap.get(key);
+    seen.add(key);
+    return {
+      ...repo,
+      selected: existing ? existing.visible !== false : false,
+      isStarred: Boolean(existing?.isStarred),
+      icon: existing?.icon ?? '',
+      description: existing?.description ?? repo.description,
+      topics: existing?.topics ?? repo.topics,
+      language: existing?.language ?? repo.language,
+      order: existing?.order ?? index,
+      updatedAt: existing?.updatedAt,
+    };
+  });
+
+  const missingFromGitHub: RepoRow[] = (projects ?? [])
+    .filter((project) => !seen.has(buildRepoKey(project.name, project.owner || DEFAULT_OWNER)))
+    .map((project) => ({
+      name: project.name,
+      owner: project.owner || DEFAULT_OWNER,
+      description: project.description ?? 'Configured repo not found in GitHub list',
+      private: true,
+      html_url: undefined,
+      language: project.language,
+      topics: project.topics,
+      selected: project.visible !== false,
+      isStarred: Boolean(project.isStarred),
+      icon: project.icon ?? '',
+      order: project.order,
+      missing: true,
+      updatedAt: project.updatedAt,
+    }));
+
+  return [...merged, ...missingFromGitHub].sort((a, b) => {
+    const orderA = typeof a.order === 'number' ? a.order : Number.MAX_SAFE_INTEGER;
+    const orderB = typeof b.order === 'number' ? b.order : Number.MAX_SAFE_INTEGER;
+    return orderA - orderB;
+  });
+}
+
+export function PortfolioConfigManager({ initialProjects, initialRepos }: PortfolioConfigManagerProps) {
   const { markReady } = usePageTransition();
-  const buildKey = useCallback((name: string, owner?: string) => `${(owner || '').toLowerCase()}/${name.toLowerCase()}`, []);
-  const [repos, setRepos] = useState<RepoRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const hasInitialData = Boolean(initialProjects && initialRepos);
+  const [repos, setRepos] = useState<RepoRow[]>(() =>
+    hasInitialData ? mergeRepoData(initialProjects, initialRepos) : []
+  );
+  const [loading, setLoading] = useState(!hasInitialData);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -207,8 +266,13 @@ export function PortfolioConfigManager() {
   const itemRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const prevPositions = useRef<Map<string, DOMRect>>(new Map());
   const listRef = useRef<HTMLDivElement | null>(null);
+  const buildKey = useCallback((name: string, owner?: string) => buildRepoKey(name, owner), []);
 
   useEffect(() => {
+    if (hasInitialData) {
+      return;
+    }
+
     // Signal to page transition that we're loading async content
     markReady(false);
 
@@ -232,53 +296,7 @@ export function PortfolioConfigManager() {
         const { projects } = (await projectsRes.json()) as { projects?: StoredProject[] };
         const { repos: availableRepos } = (await reposRes.json()) as { repos: ApiRepo[] };
 
-        const projectMap = new Map(
-          (projects ?? []).map((project) => [buildKey(project.name, project.owner || 'volpestyle'), project])
-        );
-        const seen = new Set<string>();
-
-        const merged: RepoRow[] = availableRepos.map((repo, index) => {
-          const key = buildKey(repo.name, repo.owner);
-          const existing = projectMap.get(key);
-          seen.add(key);
-          return {
-            ...repo,
-            selected: existing ? existing.visible !== false : false,
-            isStarred: Boolean(existing?.isStarred),
-            icon: existing?.icon ?? '',
-            description: existing?.description ?? repo.description,
-            topics: existing?.topics ?? repo.topics,
-            language: existing?.language ?? repo.language,
-            order: existing?.order ?? index,
-            updatedAt: existing?.updatedAt,
-          };
-        });
-
-        const missingFromGitHub: RepoRow[] = (projects ?? [])
-          .filter((project) => !seen.has(buildKey(project?.name, project?.owner || 'volpestyle')))
-          .map((project) => ({
-            name: project.name,
-            owner: project.owner || 'volpestyle',
-            description: project.description ?? 'Configured repo not found in GitHub list',
-            private: true,
-            html_url: undefined,
-            language: project.language,
-            topics: project.topics,
-            selected: project.visible !== false,
-            isStarred: Boolean(project.isStarred),
-            icon: project.icon ?? '',
-            order: project.order,
-            missing: true,
-            updatedAt: project.updatedAt,
-          }));
-
-        const ordered = [...merged, ...missingFromGitHub].sort((a, b) => {
-          const orderA = typeof a.order === 'number' ? a.order : Number.MAX_SAFE_INTEGER;
-          const orderB = typeof b.order === 'number' ? b.order : Number.MAX_SAFE_INTEGER;
-          return orderA - orderB;
-        });
-
-        setRepos(ordered);
+        setRepos(mergeRepoData(projects, availableRepos));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unable to load portfolio configuration');
       } finally {
@@ -289,7 +307,7 @@ export function PortfolioConfigManager() {
     }
 
     load();
-  }, [markReady]);
+  }, [hasInitialData, markReady]);
 
   const filteredRepos = useMemo(() => {
     if (!search.trim()) return repos;

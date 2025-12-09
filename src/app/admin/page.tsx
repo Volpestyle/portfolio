@@ -5,13 +5,46 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TransitionLink } from '@/components/PageTransition';
 import { PostsTable } from './components/PostsTable';
 import { PostsFilters } from './components/PostsFilters';
+import { listAdminPosts } from '@/server/blog/actions';
+import type { BlogPostRecord, BlogPostStatus } from '@/types/blog';
 
 export const metadata = {
   title: 'Admin - Blog Posts',
   description: 'Manage blog posts',
 };
 
-export default function AdminPage() {
+type PageProps = {
+  searchParams?: { search?: string; status?: string };
+};
+
+function normalizeStatus(value?: string | null): BlogPostStatus | 'all' {
+  if (!value || value === 'all') return 'all';
+  const allowed: BlogPostStatus[] = ['draft', 'scheduled', 'published', 'archived'];
+  return allowed.includes(value as BlogPostStatus) ? (value as BlogPostStatus) : 'all';
+}
+
+function buildFilters(params: { search?: string; status?: string } | undefined) {
+  const search = params?.search?.trim() || '';
+  const status = normalizeStatus(params?.status);
+  return { search, status };
+}
+
+export default async function AdminPage({ searchParams }: PageProps) {
+  const { search, status } = buildFilters(searchParams);
+
+  let initialPosts: BlogPostRecord[] = [];
+  let initialError: string | null = null;
+
+  try {
+    initialPosts = await listAdminPosts({
+      search: search || undefined,
+      status: status === 'all' ? undefined : status,
+    });
+  } catch (error) {
+    console.error('[admin] Failed to prefetch posts', error);
+    initialError = 'Failed to load posts';
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -44,7 +77,7 @@ export default function AdminPage() {
               </div>
             }
           >
-            <PostsTable />
+            <PostsTable initialPosts={initialPosts} initialError={initialError} />
           </Suspense>
         </CardContent>
       </Card>

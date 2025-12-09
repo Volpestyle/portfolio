@@ -3,46 +3,28 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, TrendingUp } from 'lucide-react';
+import type { AdminSettings, CostState, CostStateResponse } from './types';
 
-type AdminSettings = {
-  monthlyCostLimitUsd: number;
-  chatEnabled: boolean;
-  updatedAt: string;
+type SettingsClientProps = {
+  initialSettings?: AdminSettings | null;
+  initialCostState?: CostStateResponse | null;
 };
 
-type CostLevel = 'ok' | 'warning' | 'critical' | 'exceeded';
-
-type CostState = {
-  monthKey: string;
-  spendUsd: number;
-  turnCount: number;
-  budgetUsd: number;
-  percentUsed: number;
-  remainingUsd: number;
-  level: CostLevel;
-  estimatedTurnsRemaining: number;
-  updatedAt: string;
-};
-
-type CostStateResponse =
-  | { available: true; state: CostState }
-  | { available: false; error?: string };
-
-export function SettingsClient() {
-  const [settings, setSettings] = useState<AdminSettings | null>(null);
-  const [loading, setLoading] = useState(true);
+export function SettingsClient({ initialSettings = null, initialCostState = null }: SettingsClientProps) {
+  const [settings, setSettings] = useState<AdminSettings | null>(initialSettings);
+  const [loading, setLoading] = useState(!initialSettings);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   // Local state for form
-  const [monthlyCostLimit, setMonthlyCostLimit] = useState(10);
-  const [chatEnabled, setChatEnabled] = useState(true);
+  const [monthlyCostLimit, setMonthlyCostLimit] = useState(initialSettings?.monthlyCostLimitUsd ?? 10);
+  const [chatEnabled, setChatEnabled] = useState(initialSettings?.chatEnabled ?? true);
 
   // Cost state (read-only)
-  const [costState, setCostState] = useState<CostState | null>(null);
-  const [costAvailable, setCostAvailable] = useState<boolean | null>(null);
-  const [costError, setCostError] = useState<string | null>(null);
+  const [costState, setCostState] = useState<CostState | null>(initialCostState?.available ? initialCostState.state : null);
+  const [costAvailable, setCostAvailable] = useState<boolean | null>(initialCostState ? initialCostState.available : null);
+  const [costError, setCostError] = useState<string | null>(!initialCostState?.available ? initialCostState?.error ?? null : null);
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -86,9 +68,19 @@ export function SettingsClient() {
   }, []);
 
   useEffect(() => {
-    fetchSettings();
-    fetchCostState();
-  }, [fetchSettings, fetchCostState]);
+    const needsSettings = !initialSettings;
+    const needsCostState = !initialCostState;
+
+    if (!needsSettings) {
+      setLoading(false);
+    } else {
+      fetchSettings();
+    }
+
+    if (needsCostState) {
+      fetchCostState();
+    }
+  }, [fetchSettings, fetchCostState, initialCostState, initialSettings]);
 
   const handleSave = async () => {
     setSaving(true);

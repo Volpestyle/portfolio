@@ -4,32 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { X, Upload, Eye } from 'lucide-react';
+import type { CombinedExport, ChatLogMetadata } from './types';
 
-type ChatExport = {
-  key: string;
-  bucket: string;
-  size?: number;
-  lastModified?: string;
-  downloadUrl?: string;
-};
-
-type ChatLogMetadata = {
-  filename: string;
-  s3Key: string;
-  timestamp: string;
-  sessionId: string;
-  messageCount: number;
-  tags: string[];
-  size: number;
-};
-
-type CombinedExport = ChatExport & {
-  metadata?: ChatLogMetadata;
-};
-
-type LogDetailData = {
-  log: ChatLogMetadata;
-  body: string | null;
+type ChatExportsClientProps = {
+  initialExports?: CombinedExport[];
+  initialError?: string | null;
 };
 
 function formatSize(bytes?: number) {
@@ -53,10 +32,10 @@ function extractFilename(key: string) {
   return parts.length ? parts[parts.length - 1] : key;
 }
 
-export function ChatExportsClient() {
-  const [exportsList, setExportsList] = useState<CombinedExport[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function ChatExportsClient({ initialExports, initialError = null }: ChatExportsClientProps) {
+  const [exportsList, setExportsList] = useState<CombinedExport[]>(initialExports ?? []);
+  const [loading, setLoading] = useState(!initialExports && !initialError);
+  const [error, setError] = useState<string | null>(initialError);
   const [tagFilter, setTagFilter] = useState<string>('');
   const [sessionFilter, setSessionFilter] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
@@ -122,8 +101,13 @@ export function ChatExportsClient() {
   }, []);
 
   useEffect(() => {
+    if (initialExports || initialError) {
+      setLoading(false);
+      setError(initialError ?? null);
+      return;
+    }
     fetchExports();
-  }, [fetchExports]);
+  }, [fetchExports, initialError, initialExports]);
 
   // Fetch log detail
   const fetchLogDetail = useCallback(async (filename: string) => {

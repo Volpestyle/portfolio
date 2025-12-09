@@ -1,33 +1,57 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { useState, useEffect } from 'react';
 import type { BlogPostRecord } from '@/types/blog';
 
-export function PostsTable() {
+type PostsTableProps = {
+  initialPosts?: BlogPostRecord[];
+  initialError?: string | null;
+};
+
+export function PostsTable({ initialPosts, initialError = null }: PostsTableProps) {
   const searchParams = useSearchParams();
-  const [posts, setPosts] = useState<BlogPostRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [posts, setPosts] = useState<BlogPostRecord[]>(initialPosts ?? []);
+  const [loading, setLoading] = useState(!initialPosts);
+  const [error, setError] = useState<string | null>(initialError);
+  const firstLoadRef = useRef(true);
+  const initialQueryRef = useRef<string>('');
 
   useEffect(() => {
     async function fetchPosts() {
+      const params = new URLSearchParams();
+      const search = searchParams.get('search');
+      const status = searchParams.get('status');
+
+      if (search) params.set('search', search);
+      if (status && status !== 'all') params.set('status', status);
+
+      const query = params.toString();
+
+      // First render: seed from server if provided, skip duplicate fetch
+      if (firstLoadRef.current) {
+        firstLoadRef.current = false;
+        initialQueryRef.current = query;
+        if (initialPosts) {
+          setLoading(false);
+          setError(initialError);
+          return;
+        }
+      } else if (initialQueryRef.current === query) {
+        return;
+      }
+
       try {
         setLoading(true);
-        const params = new URLSearchParams();
-        const search = searchParams.get('search');
-        const status = searchParams.get('status');
-
-        if (search) params.set('search', search);
-        if (status && status !== 'all') params.set('status', status);
-
-        const response = await fetch(`/api/admin/posts?${params.toString()}`);
+        setError(null);
+        const response = await fetch(`/api/admin/posts?${query}`);
         if (!response.ok) throw new Error('Failed to fetch posts');
 
         const data = await response.json();
         setPosts(data.posts || []);
+        initialQueryRef.current = query;
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
@@ -36,7 +60,7 @@ export function PostsTable() {
     }
 
     fetchPosts();
-  }, [searchParams]);
+  }, [initialError, initialPosts, searchParams]);
 
   if (loading) {
     return (
