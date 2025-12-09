@@ -1,10 +1,10 @@
-interface DocumentConfig {
+export interface DocumentConfig {
   path: string;
   gistId: string;
   filename?: string;
 }
 
-interface PortfolioRepoConfig {
+export interface PortfolioRepoConfig {
   name: string;
   publicRepo?: string;
   isStarred?: boolean;

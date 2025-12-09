@@ -177,6 +177,13 @@ export function AdminHeader() {
                   }}
                 >
                   <Link
+                    href="/admin/settings"
+                    className="flex items-center gap-2 border-b border-white/10 px-4 py-3 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                  >
+                    <Settings className="h-4 w-4" />
+                    Settings
+                  </Link>
+                  <Link
                     href="/api/auth/signout"
                     className="flex items-center gap-2 px-4 py-3 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white"
                   >

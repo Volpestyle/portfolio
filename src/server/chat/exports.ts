@@ -1,6 +1,7 @@
 import { PutObjectCommand, ListObjectsV2Command, GetObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3Client } from '@aws-sdk/client-s3';
+import { createChatLogMetadata, deleteChatLogMetadata } from '@/server/admin/logs-store';
 
 const DEFAULT_PREFIX = 'chat/exports';
 const DEFAULT_RETENTION_DAYS = 7;
@@ -66,6 +67,8 @@ type UploadOptions = {
   exportedBy?: string | null;
   includeDownloadUrl?: boolean;
   urlExpiresInSeconds?: number;
+  sessionId?: string;
+  messageCount?: number;
 };
 
 export async function uploadChatExport(markdown: string, options: UploadOptions = {}): Promise<ChatExportLocation> {
@@ -94,6 +97,20 @@ export async function uploadChatExport(markdown: string, options: UploadOptions 
       new GetObjectCommand({ Bucket: bucket, Key: key }),
       { expiresIn: options.urlExpiresInSeconds ?? 600 }
     );
+  }
+
+  // Write metadata to DynamoDB (best-effort, don't fail upload if this fails)
+  const filename = key.split('/').pop() ?? key;
+  try {
+    await createChatLogMetadata({
+      filename,
+      s3Key: key,
+      sessionId: options.sessionId ?? 'unknown',
+      messageCount: options.messageCount ?? 0,
+      size: Buffer.byteLength(markdown, 'utf8'),
+    });
+  } catch (err) {
+    console.warn('Failed to write chat log metadata to DynamoDB:', err);
   }
 
   await pruneExpiredChatExports({ maxDeletions: 200 });
@@ -228,6 +245,20 @@ export async function pruneExpiredChatExports(options: PruneOptions = {}): Promi
             })
           );
           deleted += chunk.length;
+
+          // Also delete metadata from DynamoDB (best-effort)
+          await Promise.all(
+            chunk.map(async (key) => {
+              const filename = key?.split('/').pop();
+              if (filename) {
+                try {
+                  await deleteChatLogMetadata(filename);
+                } catch {
+                  // Ignore metadata deletion failures
+                }
+              }
+            })
+          );
         }
       }
 

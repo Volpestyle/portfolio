@@ -99,6 +99,7 @@ Complete reference for all environment variables used in the portfolio.
 | Variable | Description |
 |----------|-------------|
 | `POSTS_TABLE` | Blog posts table name |
+| `ADMIN_TABLE_NAME` | Admin data table (projects/settings/logs) |
 | `POSTS_STATUS_INDEX` | GSI for status queries |
 | `COST_TABLE_NAME` | Chat cost tracking table |
 | `CACHE_DYNAMO_TABLE` | ISR revalidation table |

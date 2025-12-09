@@ -4,12 +4,14 @@ import {
   getRuntimeCostClients,
   recordRuntimeCost,
   shouldThrottleForBudget,
+  setRuntimeCostBudget,
 } from '@portfolio/chat-next-api';
 import { shouldServeFixturesForRequest } from '@/lib/test-flags';
 import { buildRateLimitHeaders, enforceChatRateLimit } from '@/lib/rate-limit';
 import { getOpenAIClient } from '@/server/openai/client';
 import { chatApi, chatLogger, chatRuntimeOptions, chatModerationOptions } from '@/server/chat/pipeline';
 import { resolveSecretValue } from '@/lib/secrets/manager';
+import { getSettings } from '@/server/admin/settings-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -77,6 +79,26 @@ export async function POST(request: NextRequest) {
         return new Response('Forbidden', { status: 403 });
       }
     }
+  }
+
+  // Load runtime settings (chat enabled + monthly cost limit)
+  let chatEnabled = true;
+  let monthlyCostLimit: number | undefined;
+  try {
+    const settings = await getSettings();
+    chatEnabled = settings.chatEnabled;
+    monthlyCostLimit = settings.monthlyCostLimitUsd;
+  } catch {
+    // Fail open: keep defaults
+  }
+
+  if (!chatEnabled) {
+    return new Response('Chat is temporarily disabled', { status: 503 });
+  }
+
+  // Update runtime cost budget from admin settings (if configured)
+  if (typeof monthlyCostLimit === 'number' && monthlyCostLimit > 0) {
+    setRuntimeCostBudget(monthlyCostLimit);
   }
 
   return chatHandler.POST(request);

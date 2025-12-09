@@ -110,6 +110,7 @@ export class PortfolioStack extends Stack {
   private edgeRuntimeHeaderValues?: Record<string, string>;
   private readonly protectedFunctionUrls: { url: lambda.IFunctionUrl; fn: lambda.Function }[] = [];
   private readonly postsTable: dynamodb.Table;
+  private readonly adminDataTable: dynamodb.Table;
   private readonly blogContentBucket: s3.Bucket;
   private readonly blogMediaBucket: s3.Bucket;
   private readonly chatExportBucket: s3.Bucket;
@@ -170,6 +171,7 @@ export class PortfolioStack extends Stack {
 
     this.assetsBucket = this.createAssetsBucket();
     this.postsTable = this.createBlogPostsTable();
+    this.adminDataTable = this.createAdminDataTable();
     this.blogContentBucket = this.createBlogContentBucket();
     this.blogMediaBucket = this.createBlogMediaBucket();
     this.chatExportBucket = this.createChatExportBucket();
@@ -408,6 +410,18 @@ export class PortfolioStack extends Stack {
     });
 
     return table;
+  }
+
+  private createAdminDataTable(): dynamodb.Table {
+    const tableName = `${Stack.of(this).stackName}-AdminData`;
+    return new dynamodb.Table(this, 'AdminDataTable', {
+      partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: RemovalPolicy.RETAIN,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
+      tableName,
+    });
   }
 
   private createBlogContentBucket(): s3.Bucket {
@@ -651,6 +665,7 @@ export class PortfolioStack extends Stack {
     env['REVALIDATION_QUEUE_REGION'] = region;
     env['BUCKET_NAME'] = env['BUCKET_NAME'] ?? this.assetsBucket.bucketName;
     env['POSTS_TABLE'] = this.postsTable.tableName;
+    env['ADMIN_TABLE_NAME'] = this.adminDataTable.tableName;
     env['POSTS_STATUS_INDEX'] = 'byStatusPublishedAt';
     env['CONTENT_BUCKET'] = this.blogContentBucket.bucketName;
     env['MEDIA_BUCKET'] = this.blogMediaBucket.bucketName;
@@ -1192,6 +1207,7 @@ export class PortfolioStack extends Stack {
 
     this.revalidationTable.grantReadWriteData(grantable);
     this.chatCostTable.grantReadWriteData(grantable);
+    this.adminDataTable.grantReadWriteData(grantable);
 
     if (options.allowQueueSend !== false) {
       this.revalidationQueue.grantSendMessages(grantable);
