@@ -32,6 +32,9 @@ importers:
       '@aws-sdk/client-sns':
         specifier: ^3.940.0
         version: 3.943.0
+      '@aws-sdk/credential-provider-env':
+        specifier: ^3.637.0
+        version: 3.943.0
       '@aws-sdk/lib-dynamodb':
         specifier: ^3.927.0
         version: 3.943.0(@aws-sdk/client-dynamodb@3.943.0)

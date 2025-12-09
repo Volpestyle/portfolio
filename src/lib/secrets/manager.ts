@@ -1,4 +1,5 @@
 import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
+import { fromEnv } from '@aws-sdk/credential-provider-env';
 import { FetchHttpHandler } from '@smithy/fetch-http-handler';
 
 type SecretScope = 'env' | 'repo';
@@ -90,6 +91,9 @@ export class SecretsManagerCache {
     const client = new SecretsManagerClient({
       region,
       maxAttempts: 2,
+      // Use environment variable credentials - Lambda injects AWS_ACCESS_KEY_ID,
+      // AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN from the execution role.
+      credentials: fromEnv(),
       // FetchHttpHandler works in both Node (>=18) and the Edge runtime, so we
       // don't pull in the node-only http/https modules that Edge can't bundle.
       requestHandler: new FetchHttpHandler({
