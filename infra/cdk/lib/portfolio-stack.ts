@@ -114,8 +114,6 @@ export class PortfolioStack extends Stack {
   private readonly blogContentBucket: s3.Bucket;
   private readonly blogMediaBucket: s3.Bucket;
   private readonly chatExportBucket: s3.Bucket;
-  private readonly blogPublishFunction: lambda.Function;
-  private readonly blogSchedulerRole: iam.Role;
   private readonly chatCostTable: dynamodb.Table;
   private readonly alternateDomains: string[] = [];
   private readonly primaryDomainName?: string;
@@ -175,9 +173,6 @@ export class PortfolioStack extends Stack {
     this.blogContentBucket = this.createBlogContentBucket();
     this.blogMediaBucket = this.createBlogMediaBucket();
     this.chatExportBucket = this.createChatExportBucket();
-    this.blogPublishFunction = this.createBlogPublishFunction();
-    this.blogSchedulerRole = this.createBlogSchedulerRole(this.blogPublishFunction);
-
     this.chatCostTable = this.createChatCostTable();
     this.revalidationTable = this.createRevalidationTable();
     this.revalidationQueue = this.createRevalidationQueue();
@@ -207,7 +202,6 @@ export class PortfolioStack extends Stack {
     }
     this.grantRuntimeAccess(serverEdgeFunction);
     this.grantBlogDataAccess(serverEdgeFunction);
-    this.attachSchedulerPermissions(serverEdgeFunction);
     this.attachSesPermissions(serverEdgeFunction);
     this.grantSecretAccess(serverEdgeFunction, serverEdgeFunction);
     this.attachCostMetricPermissions(serverEdgeFunction);
@@ -328,6 +322,14 @@ export class PortfolioStack extends Stack {
 
     new CfnOutput(this, 'ChatExportBucketName', {
       value: this.chatExportBucket.bucketName,
+    });
+
+    new CfnOutput(this, 'AdminDataTableName', {
+      value: this.adminDataTable.tableName,
+    });
+
+    new CfnOutput(this, 'ChatRuntimeCostTableName', {
+      value: this.chatCostTable.tableName,
     });
   }
 
@@ -509,66 +511,6 @@ export class PortfolioStack extends Stack {
     });
   }
 
-  private resolveSiteUrl(): string {
-    const fromEnv = this.runtimeEnvironment['NEXT_PUBLIC_SITE_URL'];
-    if (fromEnv) {
-      return fromEnv.replace(/\/$/, '');
-    }
-    if (this.primaryDomainName) {
-      return `https://${this.primaryDomainName}`;
-    }
-    throw new Error(
-      'NEXT_PUBLIC_SITE_URL or domainName must be set to configure blog publishing. Provide NEXT_PUBLIC_SITE_URL in your env file.'
-    );
-  }
-
-  private createBlogPublishFunction(): lambda.Function {
-    const assetPath = path.resolve(__dirname, '..', 'functions', 'blog-publisher');
-    if (!fs.existsSync(assetPath)) {
-      throw new Error(`Blog publisher function assets missing at ${assetPath}`);
-    }
-
-    const secretEnv = this.pickRuntimeEnv(this.runtimeEnvironment, [
-      'SECRETS_MANAGER_ENV_SECRET_ID',
-      'SECRETS_MANAGER_REPO_SECRET_ID',
-      'AWS_SECRETS_MANAGER_PRIMARY_REGION',
-      'AWS_SECRETS_MANAGER_FALLBACK_REGION',
-    ]);
-
-    const fn = new lambda.Function(this, 'BlogPublishFunction', {
-      runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'index.handler',
-      code: lambda.Code.fromAsset(assetPath),
-      timeout: Duration.seconds(30),
-      memorySize: 256,
-      description: 'Publishes scheduled blog posts and triggers cache revalidation',
-      environment: {
-        POSTS_TABLE: this.postsTable.tableName,
-        REVALIDATE_ENDPOINT: `${this.resolveSiteUrl()}/api/revalidate`,
-        ...secretEnv,
-      },
-    });
-
-    this.postsTable.grantReadWriteData(fn);
-    this.grantSecretAccess(fn);
-    return fn;
-  }
-
-  private createBlogSchedulerRole(target: lambda.Function): iam.Role {
-    const role = new iam.Role(this, 'BlogSchedulerRole', {
-      assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com'),
-    });
-
-    role.addToPolicy(
-      new iam.PolicyStatement({
-        actions: ['lambda:InvokeFunction'],
-        resources: [target.functionArn],
-      })
-    );
-
-    return role;
-  }
-
   private deployStaticAssets(config: OpenNextS3Origin, distribution: cloudfront.IDistribution) {
     config.copy.forEach((copy, index) => {
       const sourcePath = this.resolveBundlePath(copy.from);
@@ -670,8 +612,6 @@ export class PortfolioStack extends Stack {
     env['CONTENT_BUCKET'] = this.blogContentBucket.bucketName;
     env['MEDIA_BUCKET'] = this.blogMediaBucket.bucketName;
     env['CHAT_EXPORT_BUCKET'] = this.chatExportBucket.bucketName;
-    env['BLOG_PUBLISH_FUNCTION_ARN'] = this.blogPublishFunction.functionArn;
-    env['SCHEDULER_ROLE_ARN'] = this.blogSchedulerRole.roleArn;
 
     const s3OriginPath = this.openNextOutput.origins.s3.originPath ?? '/';
     env['BUCKET_KEY_PREFIX'] = s3OriginPath.replace(/^\//, ''); // '' if originPath is '/'
@@ -1219,31 +1159,6 @@ export class PortfolioStack extends Stack {
     this.blogContentBucket.grantReadWrite(grantable);
     this.blogMediaBucket.grantReadWrite(grantable);
     this.chatExportBucket.grantReadWrite(grantable);
-  }
-
-  private attachSchedulerPermissions(grantable: iam.IGrantable) {
-    if (!this.blogSchedulerRole?.roleArn || !grantable.grantPrincipal) {
-      return;
-    }
-
-    grantable.grantPrincipal.addToPrincipalPolicy(
-      new iam.PolicyStatement({
-        actions: ['scheduler:CreateSchedule', 'scheduler:UpdateSchedule', 'scheduler:DeleteSchedule'],
-        resources: ['*'],
-      })
-    );
-
-    grantable.grantPrincipal.addToPrincipalPolicy(
-      new iam.PolicyStatement({
-        actions: ['iam:PassRole'],
-        resources: [this.blogSchedulerRole.roleArn],
-        conditions: {
-          StringEquals: {
-            'iam:PassedToService': 'scheduler.amazonaws.com',
-          },
-        },
-      })
-    );
   }
 
   private attachCloudFrontInvalidationPermission(fn: cloudfrontExperimental.EdgeFunction) {
