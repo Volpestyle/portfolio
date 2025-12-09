@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight, FileText, Folder } from 'lucide-react';
+import { ChevronRight, FileText, Folder, type LucideIcon } from 'lucide-react';
 import { TransitionLink } from '@/components/PageTransition';
 
 interface DirectoryEntry {
@@ -12,6 +12,8 @@ interface DirectoryEntry {
 interface BreadcrumbItem {
   label: string;
   href?: string;
+  icon?: LucideIcon;
+  iconClassName?: string;
 }
 
 interface DirectoryViewProps {
@@ -22,22 +24,32 @@ interface DirectoryViewProps {
 }
 
 export function DirectoryView({ pid, path, entries, breadcrumbs }: DirectoryViewProps) {
+  const breadcrumbIconClass = 'h-4 w-4 text-blue-300';
+
   return (
     <div className="min-h-screen">
       <div className="container mx-auto max-w-4xl px-3 pt-4 pb-8 sm:px-4">
         <nav className="mt-2 mb-4 flex items-center space-x-2 text-sm">
-          {breadcrumbs.map((crumb, index) => (
-            <div key={index} className="flex items-center gap-1">
-              {index > 0 && <ChevronRight className="h-4 w-4 text-white/50" />}
-              {crumb.href ? (
-                <TransitionLink href={crumb.href} className="text-gray-400 transition-colors hover:text-white">
-                  {crumb.label}
-                </TransitionLink>
-              ) : (
-                <span className="text-white">{crumb.label}</span>
-              )}
-            </div>
-          ))}
+          {breadcrumbs.map((crumb, index) => {
+            const Icon = crumb.icon;
+            const iconClassName = Icon
+              ? [breadcrumbIconClass, crumb.iconClassName].filter(Boolean).join(' ')
+              : undefined;
+
+            return (
+              <div key={index} className="flex items-center gap-1.5">
+                {index > 0 && <ChevronRight className="h-4 w-4 text-white/50" />}
+                {Icon && <Icon className={iconClassName} />}
+                {crumb.href ? (
+                  <TransitionLink href={crumb.href} className="text-gray-400 transition-colors hover:text-white">
+                    {crumb.label}
+                  </TransitionLink>
+                ) : (
+                  <span className="text-white">{crumb.label}</span>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="mb-2 font-mono text-xs text-gray-500">{path}/</div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { Markdown } from '@/components/Markdown';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, type LucideIcon } from 'lucide-react';
 import { TransitionLink } from '@/components/PageTransition';
 import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,8 @@ interface BreadcrumbItem {
   label: string;
   href?: string;
   onClick?: () => void;
+  icon?: LucideIcon;
+  iconClassName?: string;
 }
 
 type MarkdownVariant = 'page' | 'chat';
@@ -45,7 +47,8 @@ export function MarkdownViewer({
     ? 'flex items-center gap-2 text-xs text-white/60 mb-3'
     : 'mt-2 mb-4 flex items-center space-x-2 text-sm';
   const iconClass = isChat ? 'h-3 w-3 text-white/50' : 'h-4 w-4 text-white/50';
-  const markdownClass = 'preserve-case rounded-lg border border-gray-800 bg-black/80 p-4 ';
+  const breadcrumbIconClass = isChat ? 'h-3 w-3 text-blue-300' : 'h-4 w-4 text-blue-300';
+  const markdownClass = 'preserve-case rounded-lg border border-gray-800 bg-gray-900/50 backdrop-blur-sm p-4 ';
 
   if (isLoading) {
     return (
@@ -63,32 +66,36 @@ export function MarkdownViewer({
     <div className={wrapperClass}>
       <div className={cn(containerClass, isChat ? '' : undefined)}>
         <nav className={navClass}>
-          {breadcrumbs.map((crumb, index) => (
-            <div key={index} className="flex items-center gap-1">
-              {index > 0 && <ChevronRight className={iconClass} />}
-              {crumb.href ? (
-                <TransitionLink href={crumb.href} className="text-gray-400 transition-colors hover:text-white">
-                  {crumb.label}
-                </TransitionLink>
-              ) : crumb.onClick ? (
-                <button
-                  onClick={crumb.onClick}
-                  className="cursor-pointer text-gray-400 transition-colors hover:text-white"
-                >
-                  {crumb.label}
-                </button>
-              ) : (
-                <span className="text-white">{crumb.label}</span>
-              )}
-            </div>
-          ))}
+          {breadcrumbs.map((crumb, index) => {
+            const Icon = crumb.icon;
+            const iconClassName = Icon ? cn(breadcrumbIconClass, crumb.iconClassName) : undefined;
+
+            return (
+              <div key={index} className="flex items-center gap-1.5">
+                {index > 0 && <ChevronRight className={iconClass} />}
+                {Icon && <Icon className={iconClassName} />}
+                {crumb.href ? (
+                  <TransitionLink href={crumb.href} className="text-gray-400 transition-colors hover:text-white">
+                    {crumb.label}
+                  </TransitionLink>
+                ) : crumb.onClick ? (
+                  <button
+                    onClick={crumb.onClick}
+                    className="cursor-pointer text-gray-400 transition-colors hover:text-white"
+                  >
+                    {crumb.label}
+                  </button>
+                ) : (
+                  <span className="text-white">{crumb.label}</span>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         {children}
 
-        {filename && (
-          <div className="mb-2 text-xs text-gray-500 font-mono">{filename}</div>
-        )}
+        {filename && <div className="mb-2 font-mono text-xs text-gray-500">{filename}</div>}
 
         <div className={markdownClass} data-testid="markdown-viewer">
           <Markdown
