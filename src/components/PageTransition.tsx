@@ -127,20 +127,38 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const updateSpinnerPosition = useCallback(
+    (options?: { instant?: boolean }) => {
+      if (!headerElementRef.current) return;
+
+      const rect = headerElementRef.current.getBoundingClientRect();
+      // Clamp to avoid the spinner shooting above the viewport when the header is off-screen
+      const targetTop = Math.max(rect.bottom + SPINNER_OFFSET_FROM_HEADER_PX, SPINNER_OFFSET_FROM_HEADER_PX);
+
+      if (options?.instant) {
+        spinnerTop.set(targetTop);
+        spinnerTopSmooth.jump(targetTop);
+      } else {
+        spinnerTop.set(targetTop);
+      }
+
+      if (!hasMeasuredHeader) {
+        setHasMeasuredHeader(true);
+      }
+    },
+    [hasMeasuredHeader, spinnerTop, spinnerTopSmooth]
+  );
+
   const headerRef = useCallback(
     (element: HTMLElement | null) => {
       headerElementRef.current = element;
 
       if (element) {
         // Initial sync - use jump() to instantly set the spring value without animating from 0
-        const rect = element.getBoundingClientRect();
-        const targetTop = rect.bottom + SPINNER_OFFSET_FROM_HEADER_PX;
-        spinnerTop.set(targetTop);
-        spinnerTopSmooth.jump(targetTop);
-        setHasMeasuredHeader(true);
+        updateSpinnerPosition({ instant: true });
       }
     },
-    [spinnerTop, spinnerTopSmooth]
+    [spinnerTop, spinnerTopSmooth, updateSpinnerPosition]
   );
 
   // Continuously update spinner position while transitioning to track any layout animations (like FLIP)
@@ -149,29 +167,17 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
   useAnimationFrame(() => {
     if (!isTransitioning && !isExiting) return;
 
-    if (headerElementRef.current) {
-      const rect = headerElementRef.current.getBoundingClientRect();
-      spinnerTop.set(rect.bottom + SPINNER_OFFSET_FROM_HEADER_PX);
-      if (!hasMeasuredHeader) {
-        setHasMeasuredHeader(true);
-      }
-    }
+    updateSpinnerPosition();
   });
 
   // Listen to resize always to keep position fresh
   useEffect(() => {
     const handleResize = () => {
-      if (headerElementRef.current) {
-        const rect = headerElementRef.current.getBoundingClientRect();
-        spinnerTop.set(rect.bottom + SPINNER_OFFSET_FROM_HEADER_PX);
-        if (!hasMeasuredHeader) {
-          setHasMeasuredHeader(true);
-        }
-      }
+      updateSpinnerPosition();
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [hasMeasuredHeader, spinnerTop]);
+  }, [updateSpinnerPosition]);
 
   const contextValue: PageTransitionContextValue = {
     isTransitioning,
