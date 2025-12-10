@@ -71,15 +71,16 @@ async function getChatOriginSecret(): Promise<string | null> {
 
 export async function POST(request: NextRequest) {
   const isDev = process.env.NODE_ENV === 'development';
-  if (!isDev) {
-    const expectedSecret = await getChatOriginSecret();
-    if (expectedSecret) {
-      const provided = request.headers.get('x-chat-origin-secret');
-      if (provided !== expectedSecret) {
-        return new Response('Forbidden', { status: 403 });
-      }
-    }
-  }
+  // Temporarily disable origin secret enforcement
+  // if (!isDev) {
+  //   const expectedSecret = await getChatOriginSecret();
+  //   if (expectedSecret) {
+  //     const provided = request.headers.get('x-chat-origin-secret');
+  //     if (provided !== expectedSecret) {
+  //       return new Response('Forbidden', { status: 403 });
+  //     }
+  //   }
+  // }
 
   // Load runtime settings (chat enabled + monthly cost limit)
   let chatEnabled = true;
