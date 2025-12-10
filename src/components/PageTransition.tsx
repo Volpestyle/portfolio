@@ -132,13 +132,15 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
       headerElementRef.current = element;
 
       if (element) {
-        // Initial sync
+        // Initial sync - use jump() to instantly set the spring value without animating from 0
         const rect = element.getBoundingClientRect();
-        spinnerTop.set(rect.bottom + SPINNER_OFFSET_FROM_HEADER_PX);
+        const targetTop = rect.bottom + SPINNER_OFFSET_FROM_HEADER_PX;
+        spinnerTop.set(targetTop);
+        spinnerTopSmooth.jump(targetTop);
         setHasMeasuredHeader(true);
       }
     },
-    [spinnerTop]
+    [spinnerTop, spinnerTopSmooth]
   );
 
   // Continuously update spinner position while transitioning to track any layout animations (like FLIP)
