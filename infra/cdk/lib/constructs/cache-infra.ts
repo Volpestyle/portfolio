@@ -137,6 +137,7 @@ export class CacheInfra extends Construct {
       sortKey: { name: 'path', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
+      // Allow replacement if schema changes; be sure data loss is acceptable before deploy.
       removalPolicy: RemovalPolicy.DESTROY,
       tableName: `${Stack.of(this).stackName}-Revalidation`,
     });

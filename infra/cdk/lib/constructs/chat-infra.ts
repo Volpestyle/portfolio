@@ -48,7 +48,7 @@ export class ChatInfra extends Construct {
       sortKey: { name: 'year_month', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
-      removalPolicy: RemovalPolicy.RETAIN,
+      removalPolicy: RemovalPolicy.DESTROY,
       tableName: `${Stack.of(this).stackName}-ChatRuntimeCost`,
     });
   }
