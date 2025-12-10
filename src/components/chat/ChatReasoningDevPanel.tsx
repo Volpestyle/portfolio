@@ -542,7 +542,7 @@ function CardReasoningDevSection({ cardReasoning }: { cardReasoning?: CardSelect
     { key: 'experiences', label: 'Experiences', data: cardReasoning.experiences, hideExcluded: false },
     { key: 'education', label: 'Education', data: cardReasoning.education, hideExcluded: false },
     { key: 'links', label: 'Links', data: cardReasoning.links, hideExcluded: true },
-  ].filter((c) => c.data && (c.data.included.length > 0 || c.data.excluded.length > 0));
+  ].filter((c) => c.data && ((c.data.included?.length ?? 0) > 0 || (c.data.excluded?.length ?? 0) > 0));
 
   if (categories.length === 0) return null;
 
