@@ -104,6 +104,7 @@ jobs:
 
           if [ -z "$outputs_json" ] || [ "$outputs_json" = "null" ]; then
             echo "PortfolioStack not found (likely first deploy). Falling back to fixture runtime for this build."
+            echo "ALLOW_TEST_FIXTURES_IN_PROD=true" >> "$GITHUB_ENV"
             echo "BLOG_TEST_FIXTURES=true" >> "$GITHUB_ENV"
             echo "PORTFOLIO_TEST_FIXTURES=true" >> "$GITHUB_ENV"
             exit 0
@@ -116,6 +117,7 @@ jobs:
             value=$(echo "$outputs_json" | jq -r ".[] | select(.OutputKey==\"${key}\") | .OutputValue" | head -n 1)
             if [ -z "$value" ] || [ "$value" = "null" ]; then
               echo "Missing CloudFormation output ${key}. Falling back to fixture runtime for this build."
+              echo "ALLOW_TEST_FIXTURES_IN_PROD=true" >> "$GITHUB_ENV"
               echo "BLOG_TEST_FIXTURES=true" >> "$GITHUB_ENV"
               echo "PORTFOLIO_TEST_FIXTURES=true" >> "$GITHUB_ENV"
               exit 0

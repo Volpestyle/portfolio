@@ -128,7 +128,7 @@ For initial deployment without existing resources:
 
 ```bash
 # Use fixture mode for first deploy
-BLOG_TEST_FIXTURES=true PORTFOLIO_TEST_FIXTURES=true pnpm build
+ALLOW_TEST_FIXTURES_IN_PROD=true BLOG_TEST_FIXTURES=true PORTFOLIO_TEST_FIXTURES=true pnpm build
 cd infra/cdk && pnpm deploy
 ```
 
@@ -136,6 +136,7 @@ After first deploy:
 1. Create Secrets Manager secrets
 2. Update GitHub environment variables
 3. Redeploy without fixtures
+4. Remove `ALLOW_TEST_FIXTURES_IN_PROD` and the fixture flags once real data stores exist
 
 ## Environment-Specific Configuration
 

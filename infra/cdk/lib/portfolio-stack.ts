@@ -297,8 +297,11 @@ export class PortfolioStack extends Stack {
       NODE_ENV: 'production',
       ...environment,
     };
-    delete env['BLOG_TEST_FIXTURES'];
-    delete env['PORTFOLIO_TEST_FIXTURES'];
+    const allowProdFixtures = env['ALLOW_TEST_FIXTURES_IN_PROD'] === 'true';
+    if (!allowProdFixtures) {
+      delete env['BLOG_TEST_FIXTURES'];
+      delete env['PORTFOLIO_TEST_FIXTURES'];
+    }
 
     if (!env['AWS_SECRETS_MANAGER_PRIMARY_REGION'] && env['AWS_REGION']) {
       env['AWS_SECRETS_MANAGER_PRIMARY_REGION'] = env['AWS_REGION'];

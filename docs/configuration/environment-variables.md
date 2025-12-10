@@ -147,6 +147,7 @@ Complete reference for all environment variables used in the portfolio.
 
 | Variable | Description |
 |----------|-------------|
+| `ALLOW_TEST_FIXTURES_IN_PROD` | Allow fixture runtime even when `NODE_ENV=production` (bootstrap only) |
 | `BLOG_TEST_FIXTURES` | Use mock blog data |
 | `PORTFOLIO_TEST_FIXTURES` | Use mock portfolio data |
 

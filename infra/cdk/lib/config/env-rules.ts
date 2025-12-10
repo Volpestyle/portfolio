@@ -7,15 +7,18 @@ export type EdgeEnvRules = {
 const splitList = (value?: string) =>
   value
     ? value
-        .split(',')
-        .map((entry) => entry.trim())
-        .filter(Boolean)
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
     : [];
 
 const defaultExplicitEdgeKeys = [
   'NODE_ENV',
   'APP_ENV',
   'APP_STAGE',
+  'ALLOW_TEST_FIXTURES_IN_PROD',
+  'BLOG_TEST_FIXTURES',
+  'PORTFOLIO_TEST_FIXTURES',
   'APP_HOST',
   'AWS_REGION',
   'CACHE_BUCKET_NAME',
@@ -31,8 +34,6 @@ const defaultExplicitEdgeKeys = [
   'POSTS_STATUS_INDEX',
   'CONTENT_BUCKET',
   'MEDIA_BUCKET',
-  'BLOG_PUBLISH_FUNCTION_ARN',
-  'SCHEDULER_ROLE_ARN',
   'CLOUDFRONT_DISTRIBUTION_ID',
   'NEXTAUTH_URL',
   'GH_CLIENT_ID',

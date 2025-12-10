@@ -2,12 +2,14 @@ const TEST_MODE_HEADER = 'x-portfolio-test-mode';
 const ADMIN_SECRET_HEADER = 'x-portfolio-admin-secret';
 const PORTFOLIO_FIXTURE_RUNTIME_FLAG = 'PORTFOLIO_TEST_FIXTURES';
 const BLOG_FIXTURE_RUNTIME_FLAG = 'BLOG_TEST_FIXTURES';
+const ALLOW_FIXTURES_IN_PROD_FLAG = 'ALLOW_TEST_FIXTURES_IN_PROD';
 
 type HeadersLike = Pick<Headers, 'get'>;
 type TestMode = 'e2e' | 'integration' | null;
 
 const isProduction = () => process.env.NODE_ENV === 'production';
 const flagEnabled = (flag: string) => process.env[flag] === 'true';
+const allowProdFixtures = () => flagEnabled(ALLOW_FIXTURES_IN_PROD_FLAG);
 
 function shouldSkipFixtures(): boolean {
   if (process.env.E2E_USE_REAL_APIS === 'true') {
@@ -23,6 +25,9 @@ export function assertNoFixtureFlagsInProd(): void {
   if (!isProduction()) {
     return;
   }
+  if (allowProdFixtures()) {
+    return;
+  }
   const enabledFlags = [PORTFOLIO_FIXTURE_RUNTIME_FLAG, BLOG_FIXTURE_RUNTIME_FLAG].filter((flag) => flagEnabled(flag));
   if (enabledFlags.length > 0) {
     throw new Error(
@@ -32,7 +37,7 @@ export function assertNoFixtureFlagsInProd(): void {
 }
 
 export function shouldUseFixtureRuntime(flag: string = PORTFOLIO_FIXTURE_RUNTIME_FLAG): boolean {
-  if (isProduction()) {
+  if (isProduction() && !allowProdFixtures()) {
     assertNoFixtureFlagsInProd();
     return false;
   }
