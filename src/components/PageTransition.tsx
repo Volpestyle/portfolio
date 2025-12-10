@@ -240,6 +240,8 @@ function TransitionPane({
   const isPresent = useIsPresent();
   // Hide content during exit OR during enter transition
   const shouldHide = isExiting || (isTransitioning && isPresent);
+  // Only freeze the exiting tree; keep the entering tree live so it can hydrate
+  const content = isPresent ? children : <FrozenRouter>{children}</FrozenRouter>;
 
   return (
     <motion.div
@@ -258,7 +260,7 @@ function TransitionPane({
       aria-hidden={!isPresent}
       style={!isPresent ? { pointerEvents: 'none' } : undefined}
     >
-      <FrozenRouter>{children}</FrozenRouter>
+      {content}
     </motion.div>
   );
 }
