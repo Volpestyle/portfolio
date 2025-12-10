@@ -53,7 +53,7 @@ const chatHandler = createNextChatHandler({
 let chatOriginSecret: string | null | undefined;
 let chatOriginSecretPromise: Promise<string | null> | null = null;
 
-async function getChatOriginSecret(): Promise<string | null> {
+async function _getChatOriginSecret(): Promise<string | null> {
   if (chatOriginSecret !== undefined) {
     return chatOriginSecret;
   }
@@ -70,7 +70,7 @@ async function getChatOriginSecret(): Promise<string | null> {
 }
 
 export async function POST(request: NextRequest) {
-  const isDev = process.env.NODE_ENV === 'development';
+  const _isDev = process.env.NODE_ENV === 'development';
   // Temporarily disable origin secret enforcement
   // if (!isDev) {
   //   const expectedSecret = await getChatOriginSecret();
