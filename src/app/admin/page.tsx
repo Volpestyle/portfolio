@@ -13,6 +13,8 @@ export const metadata = {
   description: 'Manage blog posts',
 };
 
+export const dynamic = 'force-dynamic';
+
 type PageProps = {
   searchParams?: Promise<{ search?: string; status?: string }>;
 };

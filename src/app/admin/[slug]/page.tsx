@@ -8,6 +8,8 @@ export const metadata = {
   title: 'Edit Post',
 };
 
+export const dynamic = 'force-dynamic';
+
 type PageProps = {
   params: Promise<{ slug: string }>;
 };
