@@ -46,11 +46,11 @@ export function Header() {
       className="relative z-20 border border-white/50 bg-black/70 py-2 backdrop-blur-sm"
     >
       <div className="flex items-center justify-between px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-4">
+        <div className="min-w-0 flex-1">
           <TransitionLink
             href={brandTarget}
             aria-label={isAdmin ? 'Admin' : 'Home'}
-            className="group inline-flex min-w-[7rem] items-center justify-start rounded px-3 py-1"
+            className="group inline-flex items-center justify-start rounded px-3 py-1"
             onMouseEnter={() => {
               if (!isAdmin) return;
               setHeaderHoverText('Admin');
@@ -79,7 +79,7 @@ export function Header() {
           </TransitionLink>
         </div>
 
-        <nav className="flex items-center gap-1 sm:gap-2" aria-label="Primary">
+        <nav className="flex shrink-0 items-center gap-1 sm:gap-2" aria-label="Primary">
           {NAV_ITEMS.map(({ href, icon: Icon, label, message, expandedWidth }, index) => {
             const isActive = pathname === href;
             const headerCopy = resolveHeaderBaseText(href);
@@ -94,15 +94,10 @@ export function Header() {
             const isOtherHovered = hoveredIndex !== null && hoveredIndex !== index;
             const shouldDimActive = isActive && isOtherHovered;
 
-            // When another item is hovered, shrink this one to make room
-            const isAnotherHovered = hoveredIndex !== null && !isHovered;
-            // Shrink to 1.75rem when another is hovered (keeps total width ~constant)
-            const width = isHovered ? expandedWidth : isAnotherHovered ? '1.75rem' : '2.5rem';
-
             return (
               <motion.div
                 key={href}
-                animate={{ width }}
+                animate={{ width: isHovered ? expandedWidth : '2.5rem' }}
                 transition={springAnimations.width}
                 className="h-10"
               >
