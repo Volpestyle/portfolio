@@ -79,7 +79,7 @@ export function Header() {
           </TransitionLink>
         </div>
 
-        <nav className="flex items-center gap-2" aria-label="Primary">
+        <nav className="flex items-center gap-1 sm:gap-2" aria-label="Primary">
           {NAV_ITEMS.map(({ href, icon: Icon, label, message, expandedWidth }, index) => {
             const isActive = pathname === href;
             const headerCopy = resolveHeaderBaseText(href);
@@ -94,53 +94,54 @@ export function Header() {
             const isOtherHovered = hoveredIndex !== null && hoveredIndex !== index;
             const shouldDimActive = isActive && isOtherHovered;
 
+            // When another item is hovered, shrink this one to make room
+            const isAnotherHovered = hoveredIndex !== null && !isHovered;
+            // Shrink to 1.75rem when another is hovered (keeps total width ~constant)
+            const width = isHovered ? expandedWidth : isAnotherHovered ? '1.75rem' : '2.5rem';
+
             return (
-              <div key={href} className="relative h-10 w-10">
-                <motion.div
-                  animate={{
-                    width: isHovered ? expandedWidth : '2.5rem',
-                  }}
-                  style={{ zIndex: isHovered ? 10 : 1 }}
-                  transition={springAnimations.width}
-                  className="absolute right-0 top-0 h-10"
+              <motion.div
+                key={href}
+                animate={{ width }}
+                transition={springAnimations.width}
+                className="h-10"
+              >
+                <TransitionLink
+                  href={href}
+                  aria-label={label}
+                  className={cn(
+                    'group relative inline-flex h-10 w-full items-center justify-center overflow-hidden rounded-full border transition-opacity duration-200',
+                    isActive
+                      ? 'border-white bg-white text-black'
+                      : 'border-white/20 text-white hover:border-white hover:bg-white hover:text-black active:border-white active:bg-white active:text-black',
+                    shouldDimActive && 'opacity-50'
+                  )}
+                  onMouseEnter={setHoverStates}
+                  onMouseLeave={clearHoverStates}
+                  onFocus={setHoverStates}
+                  onBlur={clearHoverStates}
                 >
-                  <TransitionLink
-                    href={href}
-                    aria-label={label}
-                    className={cn(
-                      'group relative inline-flex h-10 w-full items-center justify-center overflow-hidden rounded-full border transition-opacity duration-200',
-                      isActive
-                        ? 'border-white bg-white text-black'
-                        : 'border-white/20 text-white hover:border-white hover:bg-white hover:text-black active:border-white active:bg-white active:text-black',
-                      shouldDimActive && 'opacity-50'
-                    )}
-                    onMouseEnter={setHoverStates}
-                    onMouseLeave={clearHoverStates}
-                    onFocus={setHoverStates}
-                    onBlur={clearHoverStates}
+                  <motion.div
+                    animate={{
+                      x: isHovered ? 32 : 0,
+                      opacity: isHovered ? 0 : 1,
+                    }}
+                    transition={springAnimations.iconText}
+                    className="absolute"
                   >
-                    <motion.div
-                      animate={{
-                        x: isHovered ? 32 : 0,
-                        opacity: isHovered ? 0 : 1,
-                      }}
-                      transition={springAnimations.iconText}
-                      className="absolute"
-                    >
-                      <Icon className={cn('h-5 w-5', isActive ? 'text-black' : '')} />
-                    </motion.div>
-                    <motion.span
-                      animate={{
-                        opacity: isHovered ? 1 : 0,
-                      }}
-                      transition={springAnimations.fade}
-                      className={cn('whitespace-nowrap text-sm font-medium', isActive ? 'text-black' : '')}
-                    >
-                      {label}
-                    </motion.span>
-                  </TransitionLink>
-                </motion.div>
-              </div>
+                    <Icon className={cn('h-5 w-5', isActive ? 'text-black' : '')} />
+                  </motion.div>
+                  <motion.span
+                    animate={{
+                      opacity: isHovered ? 1 : 0,
+                    }}
+                    transition={springAnimations.fade}
+                    className={cn('whitespace-nowrap text-sm font-medium', isActive ? 'text-black' : '')}
+                  >
+                    {label}
+                  </motion.span>
+                </TransitionLink>
+              </motion.div>
             );
           })}
         </nav>
