@@ -280,6 +280,7 @@ interface TransitionLinkProps extends LinkProps {
   onMouseLeave?: () => void;
   onFocus?: () => void;
   onBlur?: () => void;
+  onClick?: () => void;
 }
 
 export function TransitionLink({
@@ -291,6 +292,7 @@ export function TransitionLink({
   onMouseLeave,
   onFocus,
   onBlur,
+  onClick,
   ...props
 }: TransitionLinkProps) {
   const router = useRouter();
@@ -298,6 +300,9 @@ export function TransitionLink({
   const { startExit, isExiting } = usePageTransition();
 
   const handleClick = async (e: MouseEvent<HTMLAnchorElement>) => {
+    // Call external onClick handler first
+    onClick?.();
+
     const targetPath = typeof href === 'string' ? href : href.pathname;
 
     // Skip transition for same page or external links
