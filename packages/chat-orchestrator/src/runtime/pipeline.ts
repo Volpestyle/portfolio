@@ -180,7 +180,7 @@ const UiHintsSchema = AnswerPayloadSchema.shape.uiHints;
 
 // --- Utilities ---
 
-function extractResponseOutputText(response: { output_text?: string; output?: unknown[] } | null | undefined): string {
+function _extractResponseOutputText(response: { output_text?: string; output?: unknown[] } | null | undefined): string {
   if (!response) return '';
   if (typeof response.output_text === 'string' && response.output_text.trim().length) {
     return response.output_text.trim();
@@ -206,7 +206,7 @@ function extractResponseOutputText(response: { output_text?: string; output?: un
   return parts.join('\n').trim();
 }
 
-function extractResponseParsedContent(response: { output?: unknown[] } | null | undefined): unknown {
+function _extractResponseParsedContent(response: { output?: unknown[] } | null | undefined): unknown {
   if (!response) return undefined;
   const outputItems = Array.isArray(response.output) ? (response.output as Array<Record<string, unknown>>) : [];
   for (const item of outputItems) {

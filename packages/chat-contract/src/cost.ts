@@ -107,6 +107,17 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     prompt: { amount: 0.8, perTokens: TOKENS_PER_MILLION },
     completion: { amount: 4.0, perTokens: TOKENS_PER_MILLION },
   },
+  // Claude Haiku 4.5 (pricing per 1M tokens)
+  // Source: https://platform.claude.com/docs/en/about-claude/pricing
+  'claude-haiku-4-5': {
+    prompt: { amount: 1.0, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 5.0, perTokens: TOKENS_PER_MILLION },
+  },
+  // Alternate naming seen in some contexts; map to same pricing.
+  'claude-4-5-haiku': {
+    prompt: { amount: 1.0, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 5.0, perTokens: TOKENS_PER_MILLION },
+  },
 };
 
 export const MODEL_ALIASES: Record<string, string> = {
@@ -122,6 +133,8 @@ export const MODEL_ALIASES: Record<string, string> = {
   'gpt-3.5-turbo-0125': 'gpt-3.5-turbo',
   'gpt-3.5-turbo-1106': 'gpt-3.5-turbo',
   'claude-3-5-haiku-latest': 'claude-3-5-haiku',
+  'claude-haiku-4-5-latest': 'claude-haiku-4-5',
+  'claude-4-5-haiku-latest': 'claude-haiku-4-5',
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {

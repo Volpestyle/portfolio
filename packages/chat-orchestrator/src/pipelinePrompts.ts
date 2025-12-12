@@ -9,9 +9,13 @@ Focus on the **latest user message**, but you can see the entire conversation hi
 - \`resume\` — Anything that might appear on a resume
 
 ## When to retrieve
-- Messages about {{RETRIEVAL_TOPICS}} that you can't answer **with 100% accuracy** from the Profile Context alone, **need retrieval**.
-- For all other messages, skip retrieval (empty \`queries\` array).
-- If the specific info you need isn't in the profile context, use other sources.
+- If the specific info you need isn't in the profile context, you need to use sources.
+
+### Retrieval Triggers Contract
+The profile has configured these trigger categories: {{RETRIEVAL_TOPICS}}
+
+- If the latest user message clearly falls under **any** configured trigger category, you MUST include at least one retrieval query (so \`queries\` must not be empty).
+- Only return \`queries: []\` when the latest message is clearly **not** covered by any configured trigger category *or* the question can be answered with 100% accuracy from Profile Context alone.
 
 ### Profile Context
 - Only set \`useProfileContext\` to true if the Profile Context helps the response.

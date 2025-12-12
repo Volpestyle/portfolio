@@ -102,7 +102,10 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                     {plan.queries.length > 0 && (
                       <div className="space-y-1.5">
                         {plan.queries.map((q, idx) => (
-                          <div key={`${q.source}-${idx}`} className="rounded border border-purple-500/10 bg-purple-950/30 p-2">
+                          <div
+                            key={`${q.source}-${idx}`}
+                            className="rounded border border-purple-500/10 bg-purple-950/30 p-2"
+                          >
                             <div className="flex items-center justify-between text-[11px]">
                               <span className="font-medium text-purple-200">{capitalize(q.source)}</span>
                               <span className="text-purple-300/50">topK: {q.limit ?? '—'}</span>
@@ -114,7 +117,9 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                     )}
                     {plan.topic && (
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                        <span className="text-purple-300/60">Topic: <span className="text-purple-100">{plan.topic}</span></span>
+                        <span className="text-purple-300/60">
+                          Topic: <span className="text-purple-100">{plan.topic}</span>
+                        </span>
                       </div>
                     )}
                     <Collapsible label="Planner JSON">{JSON.stringify(plan, null, 2)}</Collapsible>
@@ -124,7 +129,9 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                         <Collapsible label="User prompt">{debug.plannerPrompt.user}</Collapsible>
                       </div>
                     )}
-                    {debug?.plannerRawResponse && <Collapsible label="Raw LLM response">{debug.plannerRawResponse}</Collapsible>}
+                    {debug?.plannerRawResponse && (
+                      <Collapsible label="Raw LLM response">{debug.plannerRawResponse}</Collapsible>
+                    )}
                   </div>
                 ) : plannerStreamingText ? (
                   <StreamingText text={plannerStreamingText} />
@@ -137,22 +144,35 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                 {trace.retrieval !== undefined ? (
                   <div className="space-y-2">
                     {retrievals[0]?.embeddingModel && (
-                      <p className="text-xs text-purple-300/60">Model: <span className="text-purple-100">{retrievals[0].embeddingModel}</span></p>
+                      <p className="text-xs text-purple-300/60">
+                        Model: <span className="text-purple-100">{retrievals[0].embeddingModel}</span>
+                      </p>
                     )}
                     {retrievals.length === 0 ? (
                       <p className="text-xs text-purple-300/50">No retrievals</p>
                     ) : (
                       <div className="space-y-1.5">
                         {retrievalDocs?.projects && retrievalDocs.projects.length > 0 && (
-                          <DocsDropdown label={`Projects (${retrievalDocs.projects.length})`} docs={retrievalDocs.projects} renderDoc={renderProjectDoc} />
+                          <DocsDropdown
+                            label={`Projects (${retrievalDocs.projects.length})`}
+                            docs={retrievalDocs.projects}
+                            renderDoc={renderProjectDoc}
+                          />
                         )}
                         {retrievalDocs?.resume && retrievalDocs.resume.length > 0 && (
-                          <DocsDropdown label={`Resume (${retrievalDocs.resume.length})`} docs={retrievalDocs.resume} renderDoc={renderResumeDoc} />
+                          <DocsDropdown
+                            label={`Resume (${retrievalDocs.resume.length})`}
+                            docs={retrievalDocs.resume}
+                            renderDoc={renderResumeDoc}
+                          />
                         )}
                         {!retrievalDocs && (
                           <div className="flex flex-wrap gap-2">
                             {retrievals.map((r, idx) => (
-                              <div key={`${r.source}-${idx}`} className="rounded border border-purple-500/10 bg-purple-950/30 px-2 py-1">
+                              <div
+                                key={`${r.source}-${idx}`}
+                                className="rounded border border-purple-500/10 bg-purple-950/30 px-2 py-1"
+                              >
                                 <span className="text-xs font-medium text-purple-200">{capitalize(r.source)}</span>
                                 <span className="ml-1.5 text-xs text-purple-300/50">{r.numResults}</span>
                               </div>
@@ -161,7 +181,9 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                         )}
                       </div>
                     )}
-                    {retrievals.length > 0 && <Collapsible label="Retrieval JSON">{JSON.stringify(retrievals, null, 2)}</Collapsible>}
+                    {retrievals.length > 0 && (
+                      <Collapsible label="Retrieval JSON">{JSON.stringify(retrievals, null, 2)}</Collapsible>
+                    )}
                   </div>
                 ) : retrievalStreamingText ? (
                   <StreamingText text={retrievalStreamingText} />
@@ -195,9 +217,16 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                     <CardReasoningDevSection cardReasoning={answer.cardReasoning ?? undefined} />
                     {answer.uiHints && (
                       <div className="flex gap-3 text-xs text-purple-300/60">
-                        <span>Projects: <span className="text-purple-100">{answer.uiHints.projects?.length ?? 0}</span></span>
-                        <span>Experiences: <span className="text-purple-100">{answer.uiHints.experiences?.length ?? 0}</span></span>
-                        <span>Links: <span className="text-purple-100">{answer.uiHints.links?.length ?? 0}</span></span>
+                        <span>
+                          Projects: <span className="text-purple-100">{answer.uiHints.projects?.length ?? 0}</span>
+                        </span>
+                        <span>
+                          Experiences:{' '}
+                          <span className="text-purple-100">{answer.uiHints.experiences?.length ?? 0}</span>
+                        </span>
+                        <span>
+                          Links: <span className="text-purple-100">{answer.uiHints.links?.length ?? 0}</span>
+                        </span>
                       </div>
                     )}
                     <Collapsible label="Answer JSON">{JSON.stringify(answer, null, 2)}</Collapsible>
@@ -207,13 +236,11 @@ export function ChatReasoningDevPanel({ trace, isStreaming = false, className }:
                         <Collapsible label="User prompt">{debug.answerPrompt.user}</Collapsible>
                       </div>
                     )}
-                    {debug?.answerRawResponse && <Collapsible label="Raw LLM response">{debug.answerRawResponse}</Collapsible>}
+                    {debug?.answerRawResponse && (
+                      <Collapsible label="Raw LLM response">{debug.answerRawResponse}</Collapsible>
+                    )}
                     {answerStreamingText && effectivelyStreaming && (
-                      <motion.span
-                        className="inline-flex gap-0.5"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                      >
+                      <motion.span className="inline-flex gap-0.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                         <motion.span
                           className="h-1.5 w-1.5 rounded-full bg-purple-400"
                           animate={{ opacity: [0.3, 1, 0.3] }}
@@ -290,8 +317,16 @@ function ModelMeta({
   const tokens = usage ? formatTokens(usage) : null;
   const duration = formatDuration(durationMs);
   const cost = formatCost(costUsd);
+  const effortValue = typeof effort === 'string' ? effort : null;
+  const shouldShowEffort = (() => {
+    if (!effortValue) return false;
+    if (!model) return true;
+    const normalized = model.trim().toLowerCase();
+    // "Reasoning effort" is an OpenAI-only concept in this codebase (gpt-5* and o* models).
+    return normalized.startsWith('gpt-5') || normalized.startsWith('o');
+  })();
 
-  if (!model && !effort && !tokens && !duration && !cost) {
+  if (!model && !shouldShowEffort && !tokens && !duration && !cost) {
     return null;
   }
 
@@ -303,10 +338,10 @@ function ModelMeta({
           <span className="text-purple-100">{model}</span>
         </>
       )}
-      {effort && (
+      {shouldShowEffort && effortValue && (
         <>
           <span className="text-purple-300/60">Effort</span>
-          <span className="text-purple-100">{capitalize(effort)}</span>
+          <span className="text-purple-100">{capitalize(effortValue)}</span>
         </>
       )}
       {tokens && (
@@ -428,11 +463,7 @@ function StreamingText({ text }: { text: string }) {
   return (
     <div className="space-y-1">
       <p className="whitespace-pre-wrap text-xs leading-relaxed text-purple-100/70">{text}</p>
-      <motion.span
-        className="inline-flex gap-0.5"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-      >
+      <motion.span className="inline-flex gap-0.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <motion.span
           className="h-1.5 w-1.5 rounded-full bg-purple-400"
           animate={{ opacity: [0.3, 1, 0.3] }}
@@ -481,9 +512,7 @@ function DocsDropdown<T>({
             transition={{ duration: 0.15 }}
             className="max-h-60 overflow-auto border-t border-purple-500/10"
           >
-            <div className="space-y-1 p-2">
-              {docs.map((doc, idx) => renderDoc(doc, idx))}
-            </div>
+            <div className="space-y-1 p-2">{docs.map((doc, idx) => renderDoc(doc, idx))}</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -528,7 +557,7 @@ function renderResumeDoc(doc: RetrievedResumeDoc) {
       {doc.type && <span className="text-[10px] text-purple-300/60">{capitalize(doc.type)}</span>}
       {doc.company && doc.title && <p className="text-[11px] text-purple-100/60">{doc.company}</p>}
       {doc.institution && <p className="text-[11px] text-purple-100/60">{doc.institution}</p>}
-      {doc.summary && <p className="mt-0.5 text-[11px] text-purple-100/50 line-clamp-2">{doc.summary}</p>}
+      {doc.summary && <p className="mt-0.5 line-clamp-2 text-[11px] text-purple-100/50">{doc.summary}</p>}
       <p className="mt-1 text-[10px] text-purple-300/40">ID: {doc.id}</p>
     </div>
   );
