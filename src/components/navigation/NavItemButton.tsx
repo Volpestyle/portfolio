@@ -68,7 +68,7 @@ export function NavItemButton({
 
   // Calculate stagger delays
   const enterDelay = index * navItemTransition.staggerDelay;
-  // Exit in reverse order (rightmost exits first) for a natural sweep-left feel
+  // Exit in reverse order (rightmost exits first) for a true reverse-stagger
   const exitDelay = (totalItems - 1 - index) * navItemTransition.staggerDelay;
 
   return (
@@ -90,11 +90,12 @@ export function NavItemButton({
       }}
       exit={{
         opacity: 0,
-        x: -30,
+        // Reverse of enter: slide back to the right (toward initial x)
+        x: 30,
         transition: {
-          // Exit: quick ease-out with reverse stagger
-          opacity: { duration: navItemTransition.exitDuration, ease: 'easeOut', delay: exitDelay },
-          x: { duration: navItemTransition.exitDuration, ease: 'easeOut', delay: exitDelay },
+          // Exit: same spring feel as enter, with reverse-stagger
+          opacity: { ...navItemTransition.spring, delay: exitDelay },
+          x: { ...navItemTransition.spring, delay: exitDelay },
         },
       }}
     >

@@ -9,6 +9,7 @@ import { usePageTransition, TransitionLink } from '@/components/PageTransition';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { getNavConfig, resolveNavConfigId } from '@/config/navigation';
+import { navItemTransition } from '@/lib/animations';
 import { NavItemButton } from './NavItemButton';
 import { AdminSettingsDropdown } from './AdminSettingsDropdown';
 import type { NavItem } from '@/types/navigation';
@@ -140,7 +141,10 @@ export function UnifiedHeader() {
 
         {/* Navigation Items */}
         <nav className="flex items-center gap-2" aria-label={navConfig.id === 'admin' ? 'Admin navigation' : 'Primary'}>
-          <AnimatePresence mode="popLayout">
+          {/* When switching between base/admin nav variants, we want a true "swap":
+              - old icons animate OUT completely
+              - then the new icon set animates IN (no overlap/jank) */}
+          <AnimatePresence mode="wait">
             {navConfig.items.map((item, index) => {
               const isActive = pathname === item.href;
               const isHovered = hoveredIndex === index;
@@ -166,10 +170,37 @@ export function UnifiedHeader() {
                 />
               );
             })}
-          </AnimatePresence>
 
-          {/* Admin trailing element (settings dropdown) */}
-          {navConfig.id === 'admin' && <AdminSettingsDropdown />}
+            {/* Admin trailing element (settings dropdown) - animate in/out with the nav swap */}
+            {navConfig.id === 'admin' && (
+              <motion.div
+                key={`${navConfig.id}-settings`}
+                initial={{ opacity: 0, x: 16 }}
+                animate={{
+                  opacity: 1,
+                  x: 0,
+                  transition: {
+                    opacity: {
+                      ...navItemTransition.spring,
+                      delay: navConfig.items.length * navItemTransition.staggerDelay,
+                    },
+                    x: { ...navItemTransition.spring, delay: navConfig.items.length * navItemTransition.staggerDelay },
+                  },
+                }}
+                exit={{
+                  opacity: 0,
+                  // Reverse of enter: slide back to the right
+                  x: 16,
+                  transition: {
+                    opacity: { ...navItemTransition.spring, delay: 0 },
+                    x: { ...navItemTransition.spring, delay: 0 },
+                  },
+                }}
+              >
+                <AdminSettingsDropdown />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </nav>
       </div>
     </motion.header>
