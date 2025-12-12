@@ -15,6 +15,12 @@ type RetrievalWeightsConfig = {
 };
 
 export type ChatConfig = {
+  /**
+   * LLM provider for planner/answer runtime.
+   * - openai: OpenAI Responses API (current default)
+   * - anthropic: Claude models via Anthropic Messages API
+   */
+  provider?: 'openai' | 'anthropic';
   models?: {
     default?: string;
     plannerModel?: string;
@@ -158,6 +164,14 @@ const normalizeString = (value: unknown): string | undefined => {
   return trimmed.length ? trimmed : undefined;
 };
 
+const normalizeProvider = (value: unknown): 'openai' | 'anthropic' | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'openai') return 'openai';
+  if (normalized === 'anthropic' || normalized === 'claude') return 'anthropic';
+  return undefined;
+};
+
 const normalizeNumber = (value: unknown): number | undefined => {
   if (typeof value !== 'number') return undefined;
   if (!Number.isFinite(value)) return undefined;
@@ -193,10 +207,10 @@ export function resolveChatModelConfig(config?: ChatConfig): Partial<ModelConfig
 
   const reasoning: StageReasoningConfig | undefined = config.models.reasoning
     ? {
-        planner: config.models.reasoning.planner,
-        answer: config.models.reasoning.answer,
-        answerNoRetrieval: config.models.reasoning.answerNoRetrieval,
-      }
+      planner: config.models.reasoning.planner,
+      answer: config.models.reasoning.answer,
+      answerNoRetrieval: config.models.reasoning.answerNoRetrieval,
+    }
     : undefined;
 
   return trimModelConfig({
@@ -211,6 +225,10 @@ export function resolveChatModelConfig(config?: ChatConfig): Partial<ModelConfig
 
 export function resolveCostBudget(config?: ChatConfig): number | undefined {
   return normalizeNumber(config?.cost?.budgetUsd);
+}
+
+export function resolveChatProvider(config?: ChatConfig): 'openai' | 'anthropic' {
+  return normalizeProvider(config?.provider) ?? 'openai';
 }
 
 export function resolveChatRuntimeOptions(config?: ChatConfig): ChatRuntimeOptions | undefined {

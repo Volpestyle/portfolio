@@ -5,6 +5,10 @@ import type { ChatRequestMessage, StageReasoningConfig } from '@portfolio/chat-c
 // --- Config ---
 
 export type EvalConfig = {
+  /**
+   * LLM provider for the pipeline + judge. Similarity embeddings remain OpenAI.
+   */
+  provider?: 'openai' | 'anthropic';
   models: {
     plannerModel: string;
     answerModel: string;

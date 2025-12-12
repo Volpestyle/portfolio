@@ -18,8 +18,8 @@ import Link, { type LinkProps } from 'next/link';
 import { FrozenRouter } from './FrozenRouter';
 import { Spinner } from '@/components/ui/spinner';
 
-const EXIT_DURATION_MS = 400;
-const BASELINE_DELAY_MS = 200;
+const EXIT_DURATION_MS = 200;
+const BASELINE_DELAY_MS = 0;
 const SAFETY_TIMEOUT_MS = 5000;
 const SPINNER_OFFSET_FROM_HEADER_PX = 140;
 
@@ -115,18 +115,6 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
     setContentReady(ready);
   }, []);
 
-  const startExit = useCallback((): Promise<void> => {
-    return new Promise((resolve) => {
-      setIsExiting(true);
-      exitResolveRef.current = resolve;
-      // Resolve after exit animation duration
-      setTimeout(() => {
-        exitResolveRef.current?.();
-        exitResolveRef.current = null;
-      }, EXIT_DURATION_MS);
-    });
-  }, []);
-
   const updateSpinnerPosition = useCallback(
     (options?: { instant?: boolean }) => {
       if (!headerElementRef.current) return;
@@ -149,6 +137,19 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
     [hasMeasuredHeader, spinnerTop, spinnerTopSmooth]
   );
 
+  const startExit = useCallback((): Promise<void> => {
+    return new Promise((resolve) => {
+      updateSpinnerPosition({ instant: true });
+      setIsExiting(true);
+      exitResolveRef.current = resolve;
+      // Resolve after exit animation duration
+      setTimeout(() => {
+        exitResolveRef.current?.();
+        exitResolveRef.current = null;
+      }, EXIT_DURATION_MS);
+    });
+  }, [updateSpinnerPosition]);
+
   const headerRef = useCallback(
     (element: HTMLElement | null) => {
       headerElementRef.current = element;
@@ -158,7 +159,7 @@ export function PageTransitionProvider({ children }: { children: ReactNode }) {
         updateSpinnerPosition({ instant: true });
       }
     },
-    [spinnerTop, spinnerTopSmooth, updateSpinnerPosition]
+    [updateSpinnerPosition]
   );
 
   // Continuously update spinner position while transitioning to track any layout animations (like FLIP)

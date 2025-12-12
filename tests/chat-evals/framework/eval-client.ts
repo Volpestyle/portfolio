@@ -1,6 +1,7 @@
 // EvalClient implementation - decouples API calls from test logic
 
 import type OpenAI from 'openai';
+import type { LlmClient } from '@portfolio/chat-llm';
 import type { ChatRequestMessage } from '@portfolio/chat-contract';
 import type { ChatApi } from '@portfolio/chat-next-api';
 import type { EvalClient, EvalConfig, JudgeInput, JudgeResult, PipelineResponse } from './types';
@@ -8,17 +9,18 @@ import { computeSemanticSimilarity } from './similarity';
 import { runJudge } from './judge';
 
 export type CreateEvalClientOptions = {
-  openaiClient: OpenAI;
+  llmClient: LlmClient;
+  embeddingClient: OpenAI;
   chatApi: ChatApi;
   config: EvalConfig;
 };
 
 export function createEvalClient(options: CreateEvalClientOptions): EvalClient {
-  const { openaiClient, chatApi, config } = options;
+  const { llmClient, embeddingClient, chatApi, config } = options;
 
   return {
     async runPipeline(messages: ChatRequestMessage[]): Promise<PipelineResponse> {
-      const response = await chatApi.run(openaiClient, messages, {
+      const response = await chatApi.run(llmClient, messages, {
         softTimeoutMs: config.timeout.softTimeoutMs,
         reasoningEnabled: true,
       });
@@ -45,11 +47,11 @@ export function createEvalClient(options: CreateEvalClientOptions): EvalClient {
     },
 
     async computeSimilarity(actual: string, golden: string) {
-      return computeSemanticSimilarity(openaiClient, actual, golden, config.models.similarityModel);
+      return computeSemanticSimilarity(embeddingClient, actual, golden, config.models.similarityModel);
     },
 
     async runJudge(input: JudgeInput): Promise<JudgeResult> {
-      return runJudge(openaiClient, input, config.models.judgeModel);
+      return runJudge(llmClient, input, config.models.judgeModel);
     },
   };
 }

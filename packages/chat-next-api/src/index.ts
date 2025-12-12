@@ -1,4 +1,4 @@
-import type OpenAI from 'openai';
+import type { LlmClient } from '@portfolio/chat-llm';
 import type { ChatRequestMessage, ReasoningUpdate, UiPayload } from '@portfolio/chat-contract';
 import type { PipelineStage, StageMeta, StageStatus } from '@portfolio/chat-orchestrator';
 import {
@@ -25,7 +25,7 @@ export type RunOptions = {
 };
 
 export type ChatApi = {
-  run(client: OpenAI, messages: ChatRequestMessage[], options?: RunOptions): Promise<ChatbotResponse>;
+  run(client: LlmClient, messages: ChatRequestMessage[], options?: RunOptions): Promise<ChatbotResponse>;
 };
 
 const normalizeMinRelevanceScore = (value?: number): number | undefined => {

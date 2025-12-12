@@ -32,9 +32,8 @@ import {
   parseUsage,
   estimateCostUsd,
 } from '@portfolio/chat-contract';
-import type OpenAI from 'openai';
+import type { JsonSchema, LlmClient } from '@portfolio/chat-llm';
 import { zodResponseFormat } from 'openai/helpers/zod';
-import type { ResponseFormatTextJSONSchemaConfig } from 'openai/resources/responses/responses';
 import type { Reasoning } from 'openai/resources/shared';
 import { getEncoding } from 'js-tiktoken';
 import { z } from 'zod';
@@ -139,7 +138,7 @@ export type StageUsage = {
 };
 
 type JsonResponseArgs<T> = {
-  client: OpenAI;
+  client: LlmClient;
   model: string;
   systemPrompt: string;
   userContent: string;
@@ -775,13 +774,17 @@ async function _runJsonResponse<T>({
 }: JsonResponseArgs<T>): Promise<T> {
   let attempt = 0;
   let lastError: unknown = null;
-  const responseFormat = zodResponseFormat(schema, responseFormatName ?? usageStage ?? 'json_payload');
   const responseFormatNameValue = responseFormatName ?? usageStage ?? 'json_payload';
-  const responseFormatJsonSchema = (responseFormat as { json_schema?: Partial<ResponseFormatTextJSONSchemaConfig> & { schema?: Record<string, unknown> } }).json_schema;
-  const jsonSchemaFormat: ResponseFormatTextJSONSchemaConfig = {
+  const responseFormat = zodResponseFormat(schema, responseFormatNameValue);
+  const responseFormatJsonSchema = (
+    responseFormat as {
+      json_schema?: { name?: string; schema?: Record<string, unknown>; description?: string; strict?: boolean };
+    }
+  ).json_schema;
+  const jsonSchemaFormat: JsonSchema = {
     type: 'json_schema',
     name: responseFormatJsonSchema?.name ?? responseFormatNameValue,
-    schema: (responseFormatJsonSchema?.schema as Record<string, unknown>) ?? {},
+    schema: responseFormatJsonSchema?.schema ?? {},
     description: responseFormatJsonSchema?.description,
     strict: responseFormatJsonSchema?.strict ?? true,
   };
@@ -789,125 +792,112 @@ async function _runJsonResponse<T>({
 
   while (attempt < maxAttempts) {
     attempt += 1;
-    let response: Awaited<ReturnType<typeof client.responses.create>>;
     logger?.('chat.pipeline.model.request', {
       stage: stageLabel,
       model,
       attempt,
       reasoning: reasoning ?? null,
       maxTokens: maxTokens ?? null,
+      provider: client.provider,
     });
     try {
-      response = await client.responses.create(
-        {
+      const result = await client.createStructuredJson({
+        model,
+        systemPrompt,
+        userContent,
+        jsonSchema: jsonSchemaFormat,
+        maxOutputTokens:
+          typeof maxTokens === 'number' && Number.isFinite(maxTokens) && maxTokens > 0 ? Math.floor(maxTokens) : undefined,
+        temperature: typeof temperature === 'number' && Number.isFinite(temperature) ? temperature : undefined,
+        openAiReasoning: reasoning,
+        signal,
+        stage: stageLabel,
+        logger: logger ?? undefined,
+      });
+
+      const usage = result.usage;
+      if (usage) {
+        logger?.('chat.pipeline.tokens', { stage: stageLabel, model, attempt, usage });
+        onUsage?.(stageLabel, model, usage);
+      }
+
+      const rawContent = (result.rawText ?? '').trim();
+      const structuredCandidate = result.structured;
+      logger?.('chat.pipeline.model.raw', { stage: stageLabel, model, raw: rawContent, attempt });
+
+      let candidate: unknown = typeof structuredCandidate !== 'undefined' ? structuredCandidate : undefined;
+      let parsedFrom: 'structured' | 'text' | undefined =
+        typeof structuredCandidate !== 'undefined' ? 'structured' : undefined;
+
+      if (typeof candidate === 'undefined') {
+        const trimmedContent = rawContent.trim();
+        let parseError: unknown = null;
+        if (trimmedContent.length > 0) {
+          try {
+            candidate = JSON.parse(trimmedContent);
+            parsedFrom = 'text';
+          } catch (initialError) {
+            try {
+              const fallback = extractFirstJsonBlock(trimmedContent);
+              if (!fallback) {
+                throw initialError;
+              }
+              candidate = JSON.parse(fallback);
+              parsedFrom = 'text';
+            } catch (error) {
+              parseError = error;
+            }
+          }
+        } else {
+          parseError = new Error('json_parse_failure');
+        }
+
+        if (typeof candidate === 'undefined') {
+          lastError = parseError;
+          logger?.('chat.pipeline.model.parse_error', {
+            stage: stageLabel,
+            model,
+            raw: rawContent.slice(0, 2000),
+            error: formatLogValue(parseError ?? 'unknown'),
+            attempt,
+          });
+          continue;
+        }
+      }
+
+      const validated = schema.safeParse(candidate);
+      if (!validated.success) {
+        lastError = validated.error.issues;
+        logger?.('chat.pipeline.model.validation_error', { stage: stageLabel, model, attempt, issues: validated.error.issues });
+        let candidatePreview: string | undefined;
+        try {
+          if (candidate === null) {
+            candidatePreview = 'null';
+          } else if (typeof candidate === 'object') {
+            candidatePreview = JSON.stringify(candidate).slice(0, 2000);
+          } else {
+            candidatePreview = String(candidate).slice(0, 2000);
+          }
+        } catch {
+          candidatePreview = '[unserializable]';
+        }
+        logger?.('chat.pipeline.model.raw_candidate', {
+          stage: stageLabel,
           model,
-          stream: false,
-          text: { format: jsonSchemaFormat },
-          input: [
-            { role: 'system', content: systemPrompt, type: 'message' },
-            { role: 'user', content: userContent, type: 'message' },
-          ],
-          ...(typeof maxTokens === 'number' && Number.isFinite(maxTokens) && maxTokens > 0
-            ? { max_output_tokens: Math.floor(maxTokens) }
-            : {}),
-          ...(reasoning ? { reasoning } : {}),
-          ...(typeof temperature === 'number' && Number.isFinite(temperature) ? { temperature } : {}),
-        },
-        signal ? { signal } : undefined
-      );
+          attempt,
+          candidateSource: parsedFrom ?? 'unknown',
+          candidateType: candidate === null ? 'null' : typeof candidate,
+          candidatePreview,
+          rawTextPreview: rawContent.slice(0, 2000),
+        });
+        continue;
+      }
+      return validated.data;
     } catch (error) {
       lastError = error;
       logger?.('chat.pipeline.model.error', { stage: stageLabel, model, error: formatLogValue(error), attempt });
       continue;
     }
-
-    const usage = (response as { usage?: unknown })?.usage;
-    if (usage) {
-      logger?.('chat.pipeline.tokens', {
-        stage: stageLabel,
-        model,
-        attempt,
-        usage,
-      });
-      onUsage?.(stageLabel, model, usage);
-    }
-
-    const rawContent = extractResponseOutputText(response);
-    const structuredCandidate = extractResponseParsedContent(response);
-    logger?.('chat.pipeline.model.raw', { stage: stageLabel, model, raw: rawContent, attempt });
-
-    let candidate = structuredCandidate;
-    let parsedFrom: 'structured' | 'text' | undefined = typeof structuredCandidate !== 'undefined' ? 'structured' : undefined;
-
-    if (typeof candidate === 'undefined') {
-      const trimmedContent = typeof rawContent === 'string' ? rawContent.trim() : '';
-      let parseError: unknown = null;
-      if (trimmedContent.length > 0) {
-        try {
-          candidate = JSON.parse(trimmedContent);
-          parsedFrom = 'text';
-        } catch (initialError) {
-          try {
-            const fallback = extractFirstJsonBlock(trimmedContent);
-            if (!fallback) {
-              throw initialError;
-            }
-            candidate = JSON.parse(fallback);
-            parsedFrom = 'text';
-          } catch (error) {
-            parseError = error;
-          }
-        }
-      } else {
-        parseError = new Error('json_parse_failure');
-      }
-
-      if (typeof candidate === 'undefined') {
-        lastError = parseError;
-        logger?.('chat.pipeline.model.parse_error', {
-          stage: stageLabel,
-          model,
-          raw: typeof rawContent === 'string' ? rawContent.slice(0, 2000) : rawContent,
-          error: formatLogValue(parseError ?? 'unknown'),
-          attempt,
-        });
-        continue;
-      }
-    }
-
-    const validated = schema.safeParse(candidate);
-    if (!validated.success) {
-      lastError = validated.error.issues;
-      logger?.('chat.pipeline.model.validation_error', {
-        stage: stageLabel,
-        model,
-        attempt,
-        issues: validated.error.issues,
-      });
-      let candidatePreview: string | undefined;
-      try {
-        if (candidate === null) {
-          candidatePreview = 'null';
-        } else if (typeof candidate === 'object') {
-          candidatePreview = JSON.stringify(candidate).slice(0, 2000);
-        } else {
-          candidatePreview = String(candidate).slice(0, 2000);
-        }
-      } catch {
-        candidatePreview = '[unserializable]';
-      }
-      logger?.('chat.pipeline.model.raw_candidate', {
-        stage: stageLabel,
-        model,
-        attempt,
-        candidateSource: parsedFrom ?? 'unknown',
-        candidateType: candidate === null ? 'null' : typeof candidate,
-        candidatePreview,
-        rawTextPreview: rawContent.slice(0, 2000),
-      });
-      continue;
-    }
-    return validated.data;
   }
 
   logger?.('chat.pipeline.model.fallback', { stage: stageLabel, model, lastError: formatLogValue(lastError ?? 'unknown') });
@@ -939,13 +929,17 @@ async function runStreamingJsonResponse<T>({
 }: JsonResponseArgs<T>): Promise<T> {
   let attempt = 0;
   let lastError: unknown = null;
-  const responseFormat = zodResponseFormat(schema, responseFormatName ?? usageStage ?? 'json_payload');
   const responseFormatNameValue = responseFormatName ?? usageStage ?? 'json_payload';
-  const responseFormatJsonSchema = (responseFormat as { json_schema?: Partial<ResponseFormatTextJSONSchemaConfig> & { schema?: Record<string, unknown> } }).json_schema;
-  const jsonSchemaFormat: ResponseFormatTextJSONSchemaConfig = {
+  const responseFormat = zodResponseFormat(schema, responseFormatNameValue);
+  const responseFormatJsonSchema = (
+    responseFormat as {
+      json_schema?: { name?: string; schema?: Record<string, unknown>; description?: string; strict?: boolean };
+    }
+  ).json_schema;
+  const jsonSchemaFormat: JsonSchema = {
     type: 'json_schema',
     name: responseFormatJsonSchema?.name ?? responseFormatNameValue,
-    schema: (responseFormatJsonSchema?.schema as Record<string, unknown>) ?? {},
+    schema: responseFormatJsonSchema?.schema ?? {},
     description: responseFormatJsonSchema?.description,
     strict: responseFormatJsonSchema?.strict ?? true,
   };
@@ -985,7 +979,6 @@ async function runStreamingJsonResponse<T>({
 
   while (attempt < effectiveMaxAttempts) {
     attempt += 1;
-    let stream: ReturnType<typeof client.responses.stream> | null = null;
     let abortListener: (() => void) | null = null;
     let emitMessageDelta: ((message: string | null | undefined) => void) | null = null;
     let streamedText = '';
@@ -999,37 +992,12 @@ async function runStreamingJsonResponse<T>({
       reasoning: reasoning ?? null,
       maxTokens: maxTokens ?? null,
       streaming: true,
+      provider: client.provider,
     });
     try {
-      stream = client.responses.stream(
-        {
-          model,
-          stream: true,
-          text: { format: jsonSchemaFormat },
-          input: [
-            { role: 'system', content: systemPrompt, type: 'message' },
-            { role: 'user', content: userContent, type: 'message' },
-          ],
-          ...(typeof maxTokens === 'number' && Number.isFinite(maxTokens) && maxTokens > 0
-            ? { max_output_tokens: Math.floor(maxTokens) }
-            : {}),
-          ...(reasoning ? { reasoning } : {}),
-          ...(typeof temperature === 'number' && Number.isFinite(temperature) ? { temperature } : {}),
-        },
-        signal ? { signal } : undefined
-      );
-
       if (signal) {
-        if (signal.aborted) {
-          stream.abort();
-          throw signal.reason ?? new Error('aborted');
-        }
         abortListener = () => {
-          try {
-            stream?.abort();
-          } catch (err) {
-            logger?.('chat.pipeline.error', { stage: `${stageLabel}_abort`, model, error: formatLogValue(err) });
-          }
+          // Best-effort: provider clients use AbortSignal for cancellation.
         };
         signal.addEventListener('abort', abortListener, { once: true });
       }
@@ -1053,55 +1021,60 @@ async function runStreamingJsonResponse<T>({
             logger?.('chat.pipeline.error', { stage: `${stageLabel}_delta_emit`, model, error: formatLogValue(err) });
           }
         };
+      }
 
-        const handleTextSnapshot = (snapshot: string) => {
-          streamedText = snapshot;
-          const trimmed = streamedText.trim();
-          if (!trimmed) return;
+      const handleTextSnapshot = (snapshot: string) => {
+        streamedText = snapshot;
+        const trimmed = streamedText.trim();
+        if (!trimmed) return;
 
-          const parsedCandidate = parseStreamingJsonCandidate(trimmed);
-          if (typeof parsedCandidate !== 'undefined') {
-            streamedParsed = parsedCandidate;
-            const messageValue =
-              typeof (parsedCandidate as { message?: unknown }).message === 'string'
-                ? ((parsedCandidate as { message: string }).message as string)
-                : null;
-            emitMessageDelta?.(messageValue);
-            try {
-              onParsedDelta?.(parsedCandidate);
-            } catch (err) {
-              logger?.('chat.pipeline.error', { stage: `${stageLabel}_parsed_delta`, model, error: formatLogValue(err) });
-            }
-          } else {
-            const partialMessage = extractMessageFromPartialJson(trimmed);
-            if (partialMessage && partialMessage.length > lastEmittedMessage.length) {
-              emitMessageDelta?.(normalizeEscapes(partialMessage));
-            }
-          }
-        };
-
-        stream.on('response.output_text.delta', (event) => {
+        const parsedCandidate = parseStreamingJsonCandidate(trimmed);
+        if (typeof parsedCandidate !== 'undefined') {
+          streamedParsed = parsedCandidate;
+          const messageValue =
+            typeof (parsedCandidate as { message?: unknown }).message === 'string'
+              ? ((parsedCandidate as { message: string }).message as string)
+              : null;
+          emitMessageDelta?.(messageValue);
           try {
-            const snapshot =
-              typeof (event as { snapshot?: unknown }).snapshot === 'string'
-                ? ((event as { snapshot: string }).snapshot as string)
-                : typeof event.delta === 'string'
-                  ? event.delta
-                  : '';
-            if (!snapshot) return;
+            onParsedDelta?.(parsedCandidate);
+          } catch (err) {
+            logger?.('chat.pipeline.error', { stage: `${stageLabel}_parsed_delta`, model, error: formatLogValue(err) });
+          }
+        } else {
+          const partialMessage = extractMessageFromPartialJson(trimmed);
+          if (partialMessage && partialMessage.length > lastEmittedMessage.length) {
+            emitMessageDelta?.(normalizeEscapes(partialMessage));
+          }
+        }
+      };
+
+      const finalResponse = await client.streamStructuredJson({
+        model,
+        systemPrompt,
+        userContent,
+        jsonSchema: jsonSchemaFormat,
+        maxOutputTokens:
+          typeof maxTokens === 'number' && Number.isFinite(maxTokens) && maxTokens > 0 ? Math.floor(maxTokens) : undefined,
+        temperature: typeof temperature === 'number' && Number.isFinite(temperature) ? temperature : undefined,
+        openAiReasoning: reasoning,
+        signal,
+        stage: stageLabel,
+        logger: logger ?? undefined,
+        onTextSnapshot: (snapshot: string) => {
+          try {
             handleTextSnapshot(snapshot);
           } catch (err) {
             logger?.('chat.pipeline.error', { stage: `${stageLabel}_delta`, model, error: formatLogValue(err) });
           }
-        });
-      }
+        },
+      });
 
-      const finalResponse = await stream.finalResponse();
       if (abortListener && signal) {
         signal.removeEventListener('abort', abortListener);
       }
 
-      const usage = (finalResponse as { usage?: unknown })?.usage;
+      const usage = finalResponse.usage;
       if (usage) {
         logger?.('chat.pipeline.tokens', {
           stage: stageLabel,
@@ -1112,7 +1085,7 @@ async function runStreamingJsonResponse<T>({
         onUsage?.(stageLabel, model, usage);
       }
 
-      const rawContent = streamedText || extractResponseOutputText(finalResponse);
+      const rawContent = (finalResponse.rawText || streamedText).trim();
       if (typeof rawContent === 'string' && rawContent.length) {
         try {
           onRawResponse?.(rawContent);
@@ -1120,7 +1093,7 @@ async function runStreamingJsonResponse<T>({
           logger?.('chat.pipeline.error', { stage: `${stageLabel}_raw_debug`, model, error: formatLogValue(err) });
         }
       }
-      const structuredCandidate = extractResponseParsedContent(finalResponse) ?? streamedParsed;
+      const structuredCandidate = typeof finalResponse.structured !== 'undefined' ? finalResponse.structured : streamedParsed;
       logger?.('chat.pipeline.model.raw', { stage: stageLabel, model, raw: rawContent, attempt });
 
       let candidate = structuredCandidate;
@@ -1787,7 +1760,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
   };
 
   return {
-    async run(client: OpenAI, messages: ChatRequestMessage[], runOptions?: RunChatPipelineOptions): Promise<ChatbotResponse> {
+    async run(client: LlmClient, messages: ChatRequestMessage[], runOptions?: RunChatPipelineOptions): Promise<ChatbotResponse> {
       const tStart = performance.now();
       const devDebugEnabled = process.env.NODE_ENV !== 'production';
       const timings: Record<string, number> = {};

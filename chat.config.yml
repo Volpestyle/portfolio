@@ -1,6 +1,9 @@
+provider: anthropic # openai | anthropic (Claude)
 models:
-  plannerModel: gpt-5-nano-2025-08-07
-  answerModel: gpt-5-mini-2025-08-07
+  # plannerModel: gpt-5-nano-2025-08-07
+  # answerModel: gpt-5-mini-2025-08-07
+  plannerModel: claude-3-5-haiku-latest
+  answerModel: claude-3-5-haiku-latest
   # answerModelNoRetrieval: gpt-5-nano-2025-08-07
   embeddingModel: text-embedding-3-small
   reasoning:

@@ -11,6 +11,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { getOpenAIClient } from '../src/server/openai/client';
+import { getLlmClient } from '../src/server/llm/client';
 import { createFixtureChatServer, personaFile, profileFile } from '../tests/chat-evals/fixtures/bootstrap';
 import {
   RETRIEVAL_REQUEST_TOPK_DEFAULT,
@@ -27,6 +28,7 @@ import {
 } from '../tests/chat-evals';
 
 const DEFAULT_EVAL_CONFIG: EvalConfig = {
+  provider: 'openai',
   models: {
     plannerModel: 'gpt-4o-mini',
     answerModel: 'gpt-4o-mini',
@@ -103,6 +105,14 @@ const normalizeThreshold = (value: unknown, name: string, fallback: number): num
   return value;
 };
 
+const normalizeProvider = (value: unknown): EvalConfig['provider'] => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'openai') return 'openai';
+  if (normalized === 'anthropic' || normalized === 'claude') return 'anthropic';
+  return undefined;
+};
+
 // --- Config Loading ---
 
 function loadEvalConfig(): EvalConfig {
@@ -114,6 +124,7 @@ function loadEvalConfig(): EvalConfig {
 
   const raw = readFileSync(configPath, 'utf-8');
   const parsed = parseYaml(raw) as Partial<EvalConfig>;
+  const provider = normalizeProvider(parsed.provider) ?? DEFAULT_EVAL_CONFIG.provider;
   const models: Partial<EvalConfig['models']> = parsed.models ?? {};
 
   const answerModel = models.answerModel?.trim();
@@ -130,30 +141,30 @@ function loadEvalConfig(): EvalConfig {
   const retrievalWeights = parsed.retrieval?.weights;
   const weights = retrievalWeights
     ? {
-        textWeight: normalizeWeight(retrievalWeights.textWeight, 'retrieval.weights.textWeight'),
-        semanticWeight: normalizeWeight(
-          retrievalWeights.semanticWeight,
-          'retrieval.weights.semanticWeight'
-        ),
-        recencyLambda: normalizeWeight(
-          retrievalWeights.recencyLambda,
-          'retrieval.weights.recencyLambda'
-        ),
-      }
+      textWeight: normalizeWeight(retrievalWeights.textWeight, 'retrieval.weights.textWeight'),
+      semanticWeight: normalizeWeight(
+        retrievalWeights.semanticWeight,
+        'retrieval.weights.semanticWeight'
+      ),
+      recencyLambda: normalizeWeight(
+        retrievalWeights.recencyLambda,
+        'retrieval.weights.recencyLambda'
+      ),
+    }
     : undefined;
 
   const retrieval = parsed.retrieval
     ? {
-        defaultTopK: normalizeTopK(parsed.retrieval.defaultTopK, 'retrieval.defaultTopK'),
-        maxTopK: normalizeTopK(parsed.retrieval.maxTopK, 'retrieval.maxTopK'),
-        minRelevanceScore: normalizeMinRelevanceScore(parsed.retrieval.minRelevanceScore),
-        weights: weights &&
-          (weights.textWeight !== undefined ||
-            weights.semanticWeight !== undefined ||
-            weights.recencyLambda !== undefined)
-          ? weights
-          : undefined,
-      }
+      defaultTopK: normalizeTopK(parsed.retrieval.defaultTopK, 'retrieval.defaultTopK'),
+      maxTopK: normalizeTopK(parsed.retrieval.maxTopK, 'retrieval.maxTopK'),
+      minRelevanceScore: normalizeMinRelevanceScore(parsed.retrieval.minRelevanceScore),
+      weights: weights &&
+        (weights.textWeight !== undefined ||
+          weights.semanticWeight !== undefined ||
+          weights.recencyLambda !== undefined)
+        ? weights
+        : undefined,
+    }
     : undefined;
 
   if (retrieval?.maxTopK && retrieval.defaultTopK && retrieval.defaultTopK > retrieval.maxTopK) {
@@ -162,23 +173,24 @@ function loadEvalConfig(): EvalConfig {
 
   const normalizedRetrieval = retrieval
     ? {
-        ...retrieval,
-        defaultTopK:
-          retrieval.defaultTopK ??
-          (retrieval.maxTopK !== undefined
-            ? Math.min(RETRIEVAL_REQUEST_TOPK_DEFAULT, retrieval.maxTopK)
-            : undefined),
-      }
+      ...retrieval,
+      defaultTopK:
+        retrieval.defaultTopK ??
+        (retrieval.maxTopK !== undefined
+          ? Math.min(RETRIEVAL_REQUEST_TOPK_DEFAULT, retrieval.maxTopK)
+          : undefined),
+    }
     : undefined;
 
   const tokens = parsed.tokens
     ? {
-        planner: normalizeTokenLimit(parsed.tokens.planner, 'tokens.planner'),
-        answer: normalizeTokenLimit(parsed.tokens.answer, 'tokens.answer'),
-      }
+      planner: normalizeTokenLimit(parsed.tokens.planner, 'tokens.planner'),
+      answer: normalizeTokenLimit(parsed.tokens.answer, 'tokens.answer'),
+    }
     : undefined;
 
   return {
+    provider,
     models: {
       plannerModel,
       answerModel,
@@ -229,7 +241,8 @@ async function main() {
     config.thresholds.minJudgeScore
   );
 
-  const openaiClient = await getOpenAIClient();
+  const embeddingClient = await getOpenAIClient();
+  const llmClient = await getLlmClient(config.provider ?? 'openai');
 
   // Create chat API with eval config models + persona/profile for context
   // Uses frozen fixture data for stable, reproducible evals
@@ -252,7 +265,8 @@ async function main() {
 
   // Create eval client (decoupled from test logic)
   const evalClient = createEvalClient({
-    openaiClient,
+    llmClient,
+    embeddingClient,
     chatApi,
     config,
   });

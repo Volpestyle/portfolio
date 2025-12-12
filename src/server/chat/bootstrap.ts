@@ -12,10 +12,12 @@ import {
   resolveRetrievalOverrides,
   resolveModerationOptions,
   resolveCostBudget,
+  resolveChatProvider,
   type ResolvedModerationOptions,
 } from './config';
 
 const chatConfig = loadChatConfig();
+export const chatProvider = resolveChatProvider(chatConfig);
 export const chatRuntimeOptions = resolveChatRuntimeOptions(chatConfig);
 export const chatModerationOptions: ResolvedModerationOptions | undefined = resolveModerationOptions(chatConfig);
 const configuredBudgetUsd = resolveCostBudget(chatConfig);

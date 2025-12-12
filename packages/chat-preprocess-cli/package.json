@@ -16,7 +16,9 @@
   },
   "dependencies": {
     "@portfolio/github-data": "workspace:*",
+    "@portfolio/chat-llm": "workspace:*",
     "@aws-sdk/client-s3": "^3.927.0",
+    "openai": "^6.9.1",
     "yaml": "^2.6.0"
   },
   "peerDependencies": {

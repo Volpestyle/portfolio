@@ -1,25 +1,25 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import OpenAI from 'openai';
-import type { ResponseFormatTextJSONSchemaConfig } from 'openai/resources/responses/responses';
+import type { JsonSchema, LlmClient } from '@portfolio/chat-llm';
 import { PreprocessError, PREPROCESS_ERROR_CODES } from '../errors';
 import { requireEnv } from '../env';
 import type { PreprocessMetrics } from '../metrics';
 import type { PreprocessContext, PreprocessTaskResult } from '../types';
 import { normalizeDistinctStrings } from '../utils';
+import { getPreprocessLlmClient } from '../llm';
 import type { RawAward, RawEducation, RawExperience, RawSkill, ResumeSource } from './resume';
 import { detectExperienceType } from './resume';
 
 // pdf-parse expects DOM-like globals in Node; provide minimal stubs to avoid ReferenceErrors.
 const globalAny = globalThis as Record<string, unknown>;
 if (typeof globalAny.DOMMatrix === 'undefined') {
-  globalAny.DOMMatrix = class DOMMatrix {};
+  globalAny.DOMMatrix = class DOMMatrix { };
 }
 if (typeof globalAny.ImageData === 'undefined') {
-  globalAny.ImageData = class ImageData {};
+  globalAny.ImageData = class ImageData { };
 }
 if (typeof globalAny.Path2D === 'undefined') {
-  globalAny.Path2D = class Path2D {};
+  globalAny.Path2D = class Path2D { };
 }
 
 type PdfParseFn = typeof import('pdf-parse').PDFParse;
@@ -69,21 +69,6 @@ function truncateForPrompt(text: string): string {
     return text;
   }
   return `${text.slice(0, MAX_PROMPT_CHARS)}\n\n[truncated ${text.length - MAX_PROMPT_CHARS} chars]`;
-}
-
-function extractTextFromResponse(response: OpenAI.Responses.Response): string {
-  const chunks: string[] = [];
-  for (const item of response.output ?? []) {
-    if (item.type !== 'message' || !('content' in item)) {
-      continue;
-    }
-    for (const content of item.content ?? []) {
-      if (content.type === 'output_text') {
-        chunks.push(content.text);
-      }
-    }
-  }
-  return chunks.join('\n').trim();
 }
 
 function extractFirstJsonObject(raw: string): string {
@@ -303,7 +288,7 @@ function mergeSections<T extends { id?: string | null }>(incoming: T[] | undefin
 }
 
 async function extractExperiencesFromPdf(
-  client: OpenAI,
+  llm: LlmClient,
   pdfPath: string,
   model: string,
   metrics?: PreprocessMetrics
@@ -329,9 +314,10 @@ async function extractExperiencesFromPdf(
 
   const truncated = truncateForPrompt(cleaned);
 
-  const schema: ResponseFormatTextJSONSchemaConfig = {
+  const schema: JsonSchema = {
     type: 'json_schema',
     name: 'ResumeExtraction',
+    strict: true,
     schema: {
       type: 'object',
       additionalProperties: false,
@@ -461,41 +447,29 @@ async function extractExperiencesFromPdf(
     },
   };
 
+  const systemPrompt =
+    'You are a meticulous resume parser. Convert resume text into structured resume objects (experiences, education, awards, skills). Preserve factual bullet points and keep wording concise. Dates must be ISO formatted (YYYY-MM-DD).';
+  const userPrompt = `Resume text:\n${truncated}`;
+
   const response = await (metrics
     ? metrics.wrapLlm({ stage: 'other', model, meta: { pdf: path.basename(pdfPath) } }, () =>
-        client.responses.create({
-          model,
-          text: { format: schema },
-          input: [
-            {
-              role: 'system',
-              content:
-                'You are a meticulous resume parser. Convert resume text into structured resume objects (experiences, education, awards, skills). Preserve factual bullet points and keep wording concise. Dates must be ISO formatted (YYYY-MM-DD).',
-            },
-            {
-              role: 'user',
-              content: `Resume text:\n${truncated}`,
-            },
-          ],
-        })
-      )
-    : client.responses.create({
+      llm.createStructuredJson({
         model,
-        text: { format: schema },
-        input: [
-          {
-            role: 'system',
-            content:
-              'You are a meticulous resume parser. Convert resume text into structured resume objects (experiences, education, awards, skills). Preserve factual bullet points and keep wording concise. Dates must be ISO formatted (YYYY-MM-DD).',
-          },
-          {
-            role: 'user',
-            content: `Resume text:\n${truncated}`,
-          },
-        ],
-      }));
+        systemPrompt,
+        userContent: userPrompt,
+        jsonSchema: schema,
+        stage: 'resume_pdf',
+      })
+    )
+    : llm.createStructuredJson({
+      model,
+      systemPrompt,
+      userContent: userPrompt,
+      jsonSchema: schema,
+      stage: 'resume_pdf',
+    }));
 
-  const raw = extractTextFromResponse(response);
+  const raw = response.rawText ?? '';
   const cleanJson = extractFirstJsonObject(raw);
   const parsed = JSON.parse(cleanJson) as ResumeExtraction;
   const normalized: RawExperience[] = [];
@@ -523,12 +497,17 @@ export async function runResumePdfTask(context: PreprocessContext): Promise<Prep
     );
   });
 
-  const openAiKey = requireEnv('OPENAI_API_KEY', 'OPENAI_API_KEY is required for resume ingestion');
-  const client = new OpenAI({ apiKey: openAiKey });
+  // Ensure provider API key is present (OPENAI_API_KEY or ANTHROPIC_API_KEY).
+  if (context.config.provider === 'openai') {
+    requireEnv('OPENAI_API_KEY', 'OPENAI_API_KEY is required for resume ingestion');
+  } else {
+    requireEnv('ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY is required for resume ingestion when provider=anthropic');
+  }
+  const llm = getPreprocessLlmClient(context.config.provider);
   const { resumeTextModel } = context.models;
 
   const [extracted, existingPrimary] = await Promise.all([
-    extractExperiencesFromPdf(client, pdfPath, resumeTextModel, context.metrics),
+    extractExperiencesFromPdf(llm, pdfPath, resumeTextModel, context.metrics),
     readExistingResume(outputPath),
   ]);
   const existing = existingPrimary;

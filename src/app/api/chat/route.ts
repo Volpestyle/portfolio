@@ -8,8 +8,8 @@ import {
 } from '@portfolio/chat-next-api';
 import { shouldServeFixturesForRequest } from '@/lib/test-flags';
 import { buildRateLimitHeaders, enforceChatRateLimit } from '@/lib/rate-limit';
-import { getOpenAIClient } from '@/server/openai/client';
-import { chatApi, chatLogger, chatRuntimeOptions, chatModerationOptions } from '@/server/chat/pipeline';
+import { getLlmClient } from '@/server/llm/client';
+import { chatApi, chatLogger, chatRuntimeOptions, chatModerationOptions, chatProvider } from '@/server/chat/pipeline';
 import { resolveSecretValue } from '@/lib/secrets/manager';
 import { getSettings } from '@/server/admin/settings-store';
 
@@ -20,7 +20,7 @@ const chatHandler = createNextChatHandler({
   chatApi,
   chatLogger,
   chatRuntimeOptions,
-  getOpenAIClient,
+  getLlmClient: () => getLlmClient(chatProvider),
   enforceRateLimit: async (request: NextRequest) => {
     const result = await enforceChatRateLimit(request);
     return {

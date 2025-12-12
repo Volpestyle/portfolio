@@ -32,6 +32,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function normalizeProvider(value: unknown): 'openai' | 'anthropic' | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'openai') return 'openai';
+  if (normalized === 'anthropic' || normalized === 'claude') return 'anthropic';
+  return undefined;
+}
+
 function toArray<T>(value: T | T[] | undefined): T[] | undefined {
   if (value === undefined) {
     return undefined;
@@ -118,6 +128,9 @@ export function mergeConfigs(configs: Array<ChatPreprocessConfig | undefined>): 
 
   for (const current of configs) {
     if (!current) continue;
+    if (current.provider) {
+      merged.provider = current.provider;
+    }
     if (current.envFiles) {
       merged.envFiles = current.envFiles;
     }
@@ -212,6 +225,7 @@ export function resolvePreprocessConfig(config?: ChatPreprocessConfig): Resolved
   const writerConfigs: ArtifactWriterConfig[] = config?.artifacts?.writers ?? [];
 
   return {
+    provider: normalizeProvider(config?.provider) ?? 'openai',
     envFiles: config?.envFiles?.length ? config.envFiles : DEFAULT_ENV_FILES,
     paths,
     repos: repoSelection,

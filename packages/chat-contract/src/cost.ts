@@ -29,6 +29,7 @@ const PROMPT_TOKEN_KEYS = ['prompt_tokens', 'promptTokens', 'input_tokens'] as c
 const COMPLETION_TOKEN_KEYS = ['completion_tokens', 'completionTokens', 'output_tokens'] as const;
 const MODEL_SUFFIXES = ['-latest', '-preview'] as const;
 const ISO_DATE_SUFFIX = /-\d{4}-\d{2}-\d{2}$/;
+const COMPACT_DATE_SUFFIX = /-\d{8}$/; // e.g. claude-3-5-haiku-20241022
 
 // Pricing in USD per 1M tokens to mirror OpenAI public pricing.
 export const MODEL_PRICING: Record<string, ModelPricing> = {
@@ -101,6 +102,11 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     prompt: { amount: 0.13, perTokens: TOKENS_PER_MILLION },
     completion: { amount: 0, perTokens: TOKENS_PER_MILLION },
   },
+  // Anthropic Claude (pricing per 1M tokens)
+  'claude-3-5-haiku': {
+    prompt: { amount: 0.8, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 4.0, perTokens: TOKENS_PER_MILLION },
+  },
 };
 
 export const MODEL_ALIASES: Record<string, string> = {
@@ -115,6 +121,7 @@ export const MODEL_ALIASES: Record<string, string> = {
   'gpt-4-turbo-preview': 'gpt-4-turbo',
   'gpt-3.5-turbo-0125': 'gpt-3.5-turbo',
   'gpt-3.5-turbo-1106': 'gpt-3.5-turbo',
+  'claude-3-5-haiku-latest': 'claude-3-5-haiku',
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -184,6 +191,9 @@ function stripModelSuffix(model: string): string {
   }
   if (ISO_DATE_SUFFIX.test(model)) {
     return model.replace(ISO_DATE_SUFFIX, '');
+  }
+  if (COMPACT_DATE_SUFFIX.test(model)) {
+    return model.replace(COMPACT_DATE_SUFFIX, '');
   }
   return model;
 }

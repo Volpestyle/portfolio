@@ -14,6 +14,7 @@
     "@aws-sdk/client-dynamodb": "^3.927.0",
     "@aws-sdk/client-sns": "^3.940.0",
     "@portfolio/chat-contract": "workspace:*",
+    "@portfolio/chat-llm": "workspace:*",
     "@portfolio/chat-orchestrator": "workspace:*"
   }
 }

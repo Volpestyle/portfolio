@@ -1,9 +1,9 @@
 import { randomUUID } from 'crypto';
 import { NextRequest } from 'next/server';
-import type OpenAI from 'openai';
+import type { LlmClient } from '@portfolio/chat-llm';
 import { createChatSseStream, SSE_HEADERS } from './stream';
 import { validateChatPostBody, resolveReasoningEnabled, type ChatPostBody } from './validation';
-import { moderateChatMessages } from './moderation';
+import { moderateChatMessagesForProvider } from './moderation';
 import { logChatDebug, resetChatDebugLogs, runWithChatLogContext, type ChatServerLogger } from './server';
 import type { ChatApi } from './index';
 import type { ChatRuntimeOptions } from '@portfolio/chat-orchestrator';
@@ -27,7 +27,7 @@ export type NextChatHandlerOptions = {
   chatApi: ChatApi;
   chatLogger: ChatServerLogger;
   chatRuntimeOptions?: ChatRuntimeOptions;
-  getOpenAIClient: () => Promise<OpenAI>;
+  getLlmClient: () => Promise<LlmClient>;
   enforceRateLimit?: (request: NextRequest) => Promise<RateLimitResult>;
   buildRateLimitHeaders?: (result: RateLimitResult) => HeadersInit;
   shouldServeFixtures?: (headers: Headers) => boolean;
@@ -192,9 +192,9 @@ export function createNextChatHandler(options: NextChatHandlerOptions) {
         }
 
         try {
-          const client = await options.getOpenAIClient();
+          const client = await options.getLlmClient();
           if (inputModeration.enabled) {
-            const moderation = await moderateChatMessages(client, messages, { model: inputModeration.model });
+            const moderation = await moderateChatMessagesForProvider(client, messages, { model: inputModeration.model });
             if (moderation.flagged) {
               logChatDebug('api.chat.moderation_blocked', {
                 categories: moderation.categories ?? [],
@@ -211,33 +211,33 @@ export function createNextChatHandler(options: NextChatHandlerOptions) {
             runOptions: { reasoningEnabled },
             outputModeration: outputModeration.enabled
               ? {
-                  enabled: outputModeration.enabled,
-                  model: outputModeration.model,
-                  refusalMessage: outputModeration.refusalMessage,
-                  refusalBanner: outputModeration.refusalBanner,
-                }
+                enabled: outputModeration.enabled,
+                model: outputModeration.model,
+                refusalMessage: outputModeration.refusalMessage,
+                refusalBanner: outputModeration.refusalBanner,
+              }
               : undefined,
             runtimeCost:
               runtimeCostClients && options.runtimeCost
                 ? {
-                    budgetExceededMessage,
-                    onResult: async (result) => {
-                      const fromUsage = Array.isArray(result.usage)
-                        ? result.usage.reduce((acc, entry) => acc + (entry?.costUsd ?? 0), 0)
-                        : 0;
-                      const costUsd = typeof result.totalCostUsd === 'number' ? result.totalCostUsd : fromUsage;
-                      try {
-                        return await options.runtimeCost!.recordRuntimeCost(
-                          runtimeCostClients,
-                          costUsd,
-                          options.chatLogger
-                        );
-                      } catch (error) {
-                        logChatDebug('api.chat.cost_record_error', { error: String(error), correlationId });
-                        return undefined;
-                      }
-                    },
-                  }
+                  budgetExceededMessage,
+                  onResult: async (result) => {
+                    const fromUsage = Array.isArray(result.usage)
+                      ? result.usage.reduce((acc, entry) => acc + (entry?.costUsd ?? 0), 0)
+                      : 0;
+                    const costUsd = typeof result.totalCostUsd === 'number' ? result.totalCostUsd : fromUsage;
+                    try {
+                      return await options.runtimeCost!.recordRuntimeCost(
+                        runtimeCostClients,
+                        costUsd,
+                        options.chatLogger
+                      );
+                    } catch (error) {
+                      logChatDebug('api.chat.cost_record_error', { error: String(error), correlationId });
+                      return undefined;
+                    }
+                  },
+                }
                 : undefined,
             onError: (error: unknown) =>
               logChatDebug('api.chat.pipeline_error', { error: String(error), correlationId }),

@@ -1,6 +1,8 @@
 # Chat Eval Configuration
 # Configure models and settings for running chat evals
 
+provider: openai # openai | anthropic (Claude)
+
 models:
   # Pipeline models
   plannerModel: gpt-5-nano-2025-08-07

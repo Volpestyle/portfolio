@@ -1,6 +1,6 @@
 // LLM-as-a-judge for evaluating chatbot responses
 
-import type OpenAI from 'openai';
+import type { JsonSchema, LlmClient } from '@portfolio/chat-llm';
 import { estimateCostUsd, parseUsage } from '@portfolio/chat-contract';
 import type { JudgeInput, JudgeResult } from './types';
 
@@ -37,35 +37,34 @@ Score the ACTUAL response.`;
 }
 
 export async function runJudge(
-  client: OpenAI,
+  client: LlmClient,
   input: JudgeInput,
   model: string
 ): Promise<JudgeResult> {
-  const response = await client.responses.create({
-    model,
-    input: [
-      { role: 'system', content: JUDGE_SYSTEM_PROMPT, type: 'message' },
-      { role: 'user', content: buildJudgePrompt(input), type: 'message' },
-    ],
-    text: {
-      format: {
-        type: 'json_schema',
-        name: 'judge_result',
-        schema: {
-          type: 'object',
-          properties: {
-            score: { type: 'number', description: 'Score from 0.0 to 1.0' },
-            reasoning: { type: 'string', description: 'Brief explanation of score' },
-          },
-          required: ['score', 'reasoning'],
-          additionalProperties: false,
-        },
-        strict: true,
+  const judgeSchema: JsonSchema = {
+    type: 'json_schema',
+    name: 'judge_result',
+    schema: {
+      type: 'object',
+      properties: {
+        score: { type: 'number', description: 'Score from 0.0 to 1.0' },
+        reasoning: { type: 'string', description: 'Brief explanation of score' },
       },
+      required: ['score', 'reasoning'],
+      additionalProperties: false,
     },
+    strict: true,
+  };
+
+  const response = await client.createStructuredJson({
+    model,
+    systemPrompt: JUDGE_SYSTEM_PROMPT,
+    userContent: buildJudgePrompt(input),
+    jsonSchema: judgeSchema,
+    stage: 'judge',
   });
 
-  const content = response.output_text ?? '{}';
+  const content = response.rawText ?? '{}';
   const usage = parseUsage(response.usage, { allowZero: true });
   const costUsd = usage ? estimateCostUsd(model, usage) : null;
   const usageEntry =

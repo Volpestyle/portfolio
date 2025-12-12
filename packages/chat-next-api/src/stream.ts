@@ -1,6 +1,7 @@
-import type OpenAI from 'openai';
+import type { LlmClient } from '@portfolio/chat-llm';
 import type { ChatRequestMessage, ReasoningUpdate, UiPayload } from '@portfolio/chat-contract';
 import type { ChatApi, ChatbotResponse, RunOptions } from './index';
+import { moderateTextForProvider } from './moderation';
 
 export const SSE_HEADERS = {
   'Content-Type': 'text/event-stream',
@@ -32,7 +33,7 @@ const DEFAULT_BUDGET_EXCEEDED_MESSAGE = 'Experiencing technical issues, try agai
 
 export function createChatSseStream(
   api: ChatApi,
-  client: OpenAI,
+  client: LlmClient,
   messages: ChatRequestMessage[],
   options?: StreamOptions
 ) {
@@ -213,22 +214,15 @@ export function createChatSseStream(
 
         resetTimeout();
 
-        type ModerationClient = {
-          moderations?: {
-            create?: (params: { model?: string; input: string }) => Promise<{ results?: Array<{ flagged?: boolean }> }>;
-          };
-        };
-        const moderationClient = client as ModerationClient;
         let blockedByModeration = false;
-        if (moderationEnabled && typeof moderationClient.moderations?.create === 'function') {
+        if (moderationEnabled) {
           try {
             const textToModerate = (result.message || bufferedTokens.join('')).trim();
             if (textToModerate) {
-              const moderation = await moderationClient.moderations.create({
-                model: moderationModel ?? process.env.OPENAI_OUTPUT_MODERATION_MODEL ?? 'omni-moderation-latest',
-                input: textToModerate,
+              const moderation = await moderateTextForProvider(client, textToModerate, {
+                model: moderationModel,
               });
-              blockedByModeration = (moderation?.results ?? []).some((entry: { flagged?: boolean }) => entry?.flagged);
+              blockedByModeration = moderation.flagged;
             }
           } catch (error) {
             options?.onError?.(error);

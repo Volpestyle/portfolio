@@ -38,6 +38,24 @@ export const cardTransitions = {
 } as const;
 
 /**
+ * Nav item transition animations for route changes
+ * Exit: fade out + slide left | Enter: fade in + slide from right (spring)
+ */
+export const navItemTransition = {
+  /** Spring config for entering items */
+  spring: {
+    type: 'spring' as const,
+    stiffness: 400,
+    damping: 28,
+    mass: 0.8,
+  },
+  /** Exit animation duration */
+  exitDuration: 0.2,
+  /** Stagger delay between items */
+  staggerDelay: 0.04,
+} as const;
+
+/**
  * Staggered entry animations for lists of items
  */
 export const staggerConfig = {

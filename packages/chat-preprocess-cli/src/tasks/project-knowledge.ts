@@ -1,10 +1,12 @@
 import OpenAI from 'openai';
 import { fetchPortfolioRepos, fetchPortfolioReposFromDynamo, fetchRepoReadme } from '@portfolio/github-data';
+import type { JsonSchema, LlmClient } from '@portfolio/chat-llm';
 import type { RepoData } from '@portfolio/chat-contract';
 import type { EmbeddingEntry, ProjectRecord } from '@portfolio/chat-data';
 import { requireEnv } from '../env';
 import type { PreprocessMetrics } from '../metrics';
 import type { PreprocessContext, PreprocessTaskResult, RepoMatcher, ResolvedRepoSelection } from '../types';
+import { getPreprocessLlmClient } from '../llm';
 
 type RepoFacts = {
   languages: string[];
@@ -43,6 +45,64 @@ const EMPTY_FACTS: RepoFacts = {
   tooling: [],
   notableFeatures: [],
   aliases: [],
+};
+
+const REPO_FACTS_SCHEMA: JsonSchema = {
+  type: 'json_schema',
+  name: 'repo_facts',
+  strict: true,
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['languages', 'frameworks', 'platforms', 'domains', 'tooling', 'notableFeatures', 'aliases'],
+    properties: {
+      languages: { type: 'array', items: { type: 'string' } },
+      frameworks: { type: 'array', items: { type: 'string' } },
+      platforms: { type: 'array', items: { type: 'string' } },
+      domains: { type: 'array', items: { type: 'string' } },
+      tooling: { type: 'array', items: { type: 'string' } },
+      notableFeatures: { type: 'array', items: { type: 'string' } },
+      aliases: { type: 'array', items: { type: 'string' } },
+    },
+  },
+};
+
+const PROJECT_NARRATIVE_SCHEMA: JsonSchema = {
+  type: 'json_schema',
+  name: 'project_narrative',
+  strict: true,
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['oneLiner', 'description', 'bullets', 'techStack', 'tags', 'context'],
+    properties: {
+      oneLiner: { type: 'string' },
+      description: { type: 'string' },
+      bullets: { type: 'array', items: { type: 'string' } },
+      techStack: { type: 'array', items: { type: 'string' } },
+      tags: { type: 'array', items: { type: 'string' } },
+      impactSummary: { type: 'string' },
+      sizeOrScope: { type: 'string' },
+      context: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['type'],
+        properties: {
+          type: { type: 'string', enum: ['personal', 'work', 'oss', 'academic', 'other'] },
+          organization: { type: 'string' },
+          role: { type: 'string' },
+          timeframe: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              start: { type: 'string' },
+              end: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+  },
 };
 
 function repoMatches(repo: RepoData, matcher: RepoMatcher): boolean {
@@ -96,40 +156,41 @@ async function withRetries<T>(fn: () => Promise<T>, attempts = 3, delayMs = 250)
 }
 
 async function runJsonSchemaCompletion<T>(params: {
-  client: OpenAI;
+  llm: LlmClient;
   model: string;
   systemPrompt: string;
   userContent: string;
+  schema: JsonSchema;
   metrics?: PreprocessMetrics;
   stage?: string;
   meta?: Record<string, unknown>;
 }): Promise<T> {
-  const { client, model, systemPrompt, userContent, metrics, stage, meta } = params;
-  // response_format json_object requires that at least one message mention "json"
-  const systemPromptWithJsonHint = `${systemPrompt}\n\nReturn a JSON object (json only).`;
-  const completion = await withRetries(() =>
+  const { llm, model, systemPrompt, userContent, metrics, stage, meta, schema } = params;
+
+  const response = await withRetries(() =>
     metrics
       ? metrics.wrapLlm({ stage: stage ?? 'project_json', model, meta }, () =>
-          client.chat.completions.create({
-            model,
-            response_format: { type: 'json_object' },
-            messages: [
-              { role: 'system', content: systemPromptWithJsonHint },
-              { role: 'user', content: userContent },
-            ],
-          })
-        )
-      : client.chat.completions.create({
+        llm.createStructuredJson({
           model,
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: systemPromptWithJsonHint },
-            { role: 'user', content: userContent },
-          ],
+          systemPrompt,
+          userContent,
+          jsonSchema: schema,
+          stage: stage ?? 'project_json',
         })
+      )
+      : llm.createStructuredJson({
+        model,
+        systemPrompt,
+        userContent,
+        jsonSchema: schema,
+        stage: stage ?? 'project_json',
+      })
   );
-  const raw = completion.choices[0]?.message?.content ?? '{}';
-  return JSON.parse(raw) as T;
+
+  const raw = response.rawText ?? '{}';
+  const jsonStart = raw.indexOf('{');
+  const candidate = jsonStart >= 0 ? raw.slice(jsonStart) : raw;
+  return JSON.parse(candidate) as T;
 }
 
 function normalizeStringArray(value: unknown): string[] {
@@ -332,9 +393,9 @@ function normalizeContext(input: ProjectContextCandidate | undefined, repo: Repo
   let timeframe =
     timeframeCandidate.start || timeframeCandidate.end
       ? {
-          start: timeframeCandidate.start || repoTimeframe?.start,
-          end: timeframeCandidate.end || repoTimeframe?.end,
-        }
+        start: timeframeCandidate.start || repoTimeframe?.start,
+        end: timeframeCandidate.end || repoTimeframe?.end,
+      }
       : repoTimeframe;
 
   const today = toDateOnly(new Date().toISOString());
@@ -354,7 +415,7 @@ function normalizeContext(input: ProjectContextCandidate | undefined, repo: Repo
 }
 
 async function generateRepoFacts(
-  client: OpenAI,
+  llm: LlmClient,
   repo: RepoData,
   readme: string,
   model: string,
@@ -362,8 +423,9 @@ async function generateRepoFacts(
 ): Promise<RepoFacts> {
   try {
     const parsed = await runJsonSchemaCompletion<Partial<RepoFacts>>({
-      client,
+      llm,
       model,
+      schema: REPO_FACTS_SCHEMA,
       systemPrompt:
         "Extract every explicit technology reference from the repo README. Capture frameworks, runtimes, domains, tooling, and notable features. DO NOT extract programming languages as they come from GitHub's deterministic language detection. Include common acronyms or aliases so downstream filters can match multiple phrasings. Return empty arrays when information is missing.",
       userContent: `Repository: ${repo.name}\nDescription: ${repo.description ?? 'n/a'}\n\nREADME:\n${truncateReadme(
@@ -381,7 +443,7 @@ async function generateRepoFacts(
 }
 
 async function generateProjectNarrative(
-  client: OpenAI,
+  llm: LlmClient,
   repo: RepoData,
   readme: string,
   facts: RepoFacts,
@@ -412,8 +474,9 @@ async function generateProjectNarrative(
       impactSummary?: string;
       sizeOrScope?: string;
     }>({
-      client,
+      llm,
       model,
+      schema: PROJECT_NARRATIVE_SCHEMA,
       systemPrompt:
         "You are a meticulous summarizer creating structured project descriptions for a developer's portfolio. Produce a snappy one-liner (1-2 sentences) plus a richer description (2-4 sentences) grounded strictly in the provided facts/README. Make sure bullets are concrete contributions or results. When context is not explicit, infer conservatively (e.g., personal side project). Include impactSummary (1 sentence) and sizeOrScope (team size, users, scale) when possible.",
       userContent: `Repository: ${repo.name}
@@ -486,15 +549,15 @@ async function buildEmbedding(
 
   const response = await (metrics
     ? metrics.wrapLlm({ stage: 'project_enrichment', model, meta: { repo: repoName } }, () =>
-        client.embeddings.create({
-          model,
-          input: `${repoName}\n${embeddingPayload}`,
-        })
-      )
-    : client.embeddings.create({
+      client.embeddings.create({
         model,
         input: `${repoName}\n${embeddingPayload}`,
-      }));
+      })
+    )
+    : client.embeddings.create({
+      model,
+      input: `${repoName}\n${embeddingPayload}`,
+    }));
   return response.data[0]?.embedding ?? [];
 }
 
@@ -532,6 +595,7 @@ export async function runProjectKnowledgeTask(context: PreprocessContext): Promi
   const openAiKey = requireEnv('OPENAI_API_KEY');
   const { projectsOutput, projectsEmbeddingsOutput } = context.paths;
   const repoSelection = context.repoSelection;
+  const llm = getPreprocessLlmClient(context.config.provider);
 
   const client = new OpenAI({ apiKey: openAiKey });
   const { projectTextModel, projectEmbeddingModel } = context.models;
@@ -596,8 +660,8 @@ export async function runProjectKnowledgeTask(context: PreprocessContext): Promi
         readme = repo.description ?? 'No README or description available.';
       }
 
-      const facts = await generateRepoFacts(client, repo, readme, projectTextModel, context.metrics);
-      const narrative = await generateProjectNarrative(client, repo, readme, facts, projectTextModel, context.metrics);
+      const facts = await generateRepoFacts(llm, repo, readme, projectTextModel, context.metrics);
+      const narrative = await generateProjectNarrative(llm, repo, readme, facts, projectTextModel, context.metrics);
       const readmeText = normalizeReadmeContent(readme, narrative.description || narrative.oneLiner);
 
       const languages = buildLanguageList(repo, facts);
