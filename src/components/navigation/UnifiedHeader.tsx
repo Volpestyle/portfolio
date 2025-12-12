@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
 import { HeaderTypewriter, resolveHeaderBaseText } from '@/components/HeaderTypewriter';
 import { useHover } from '@/context/HoverContext';
 import { usePageTransition, TransitionLink } from '@/components/PageTransition';
@@ -49,6 +48,16 @@ export function UnifiedHeader() {
       setTappedIndex(null);
     }
   }, [isMobile, tappedIndex]);
+
+  // Reset interaction state on breakpoint flips (prevents "stuck" hover/tap after resizing)
+  useEffect(() => {
+    if (navConfig.useHoverContext) {
+      setHoverText('');
+    }
+    setHeaderHoverText('');
+    setHoveredIndex(null);
+    setTappedIndex(null);
+  }, [isMobile, navConfig.useHoverContext, setHoverText]);
 
   // Reset hover states on route change within same nav
   useEffect(() => {

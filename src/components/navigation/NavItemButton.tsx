@@ -50,9 +50,11 @@ export function NavItemButton({
     duration: tapActive && !isExiting ? 0.12 : 0.25,
     ease: 'easeOut' as const,
   };
-  const targetMobileColor = useMobileEffects ? (mobileFillOpacity > 0 ? '#000' : '#fff') : undefined;
-  const iconColorMobile = targetMobileColor;
-  const labelColorMobile = targetMobileColor;
+  // IMPORTANT:
+  // Avoid inline animated `color` styles for mobile effects. When resizing between breakpoints,
+  // Framer can retain previously-animated inline styles and cause unreadable text on desktop.
+  // Instead, apply deterministic Tailwind text color classes only in mobile-effects mode.
+  const mobileTextClass = useMobileEffects ? (mobileFillOpacity > 0 ? 'text-black' : 'text-white') : undefined;
   const shouldExpand = !isMobile && isHovered;
   const shouldShowGlass = useMobileEffects && (tapActive || isActive);
   const mobileGlassAnimate = tapActive
@@ -154,28 +156,26 @@ export function NavItemButton({
           animate={{
             x: shouldExpand ? 32 : 0,
             opacity: shouldExpand ? 0 : 1,
-            ...(useMobileEffects && iconColorMobile ? { color: iconColorMobile } : {}),
           }}
           transition={{
             ...springAnimations.iconText,
-            ...(useMobileEffects ? { color: { duration: 0.2, ease: 'easeOut' } } : {}),
           }}
-          style={useMobileEffects && iconColorMobile ? { color: iconColorMobile } : undefined}
-          className="absolute z-10"
+          className={cn('absolute z-10', mobileTextClass)}
         >
           <Icon className={cn('h-5 w-5', isActive && !useMobileEffects && 'text-black')} />
         </motion.div>
         <motion.span
           animate={{
             opacity: shouldExpand ? 1 : 0,
-            ...(useMobileEffects && labelColorMobile ? { color: labelColorMobile } : {}),
           }}
           transition={{
             ...springAnimations.fade,
-            ...(useMobileEffects ? { color: { duration: 0.2, ease: 'easeOut' } } : {}),
           }}
-          style={useMobileEffects && labelColorMobile ? { color: labelColorMobile } : undefined}
-          className={cn('whitespace-nowrap text-sm font-medium', isActive && !useMobileEffects && 'text-black')}
+          className={cn(
+            'whitespace-nowrap text-sm font-medium',
+            mobileTextClass,
+            isActive && !useMobileEffects && 'text-black'
+          )}
         >
           {label}
         </motion.span>
