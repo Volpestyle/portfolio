@@ -168,17 +168,23 @@ function extractRuntimeConfig(event) {
   }
 }
 
-function applyRuntimeConfig(config) {
-  if (!config) {
-    return;
-  }
+	function applyRuntimeConfig(config) {
+	  if (!config) {
+	    return;
+	  }
 
-  for (const [key, value] of Object.entries(config)) {
-    if (typeof value === 'string' && process.env[key] === undefined) {
-      process.env[key] = value;
-    }
-  }
-}
+	  const configuredRegion = config.AWS_REGION;
+	  if (typeof configuredRegion === 'string' && configuredRegion.length > 0) {
+	    process.env.AWS_REGION = configuredRegion;
+	    process.env.AWS_DEFAULT_REGION = configuredRegion;
+	  }
+
+	  for (const [key, value] of Object.entries(config)) {
+	    if (typeof value !== 'string') continue;
+	    if (key === 'AWS_REGION' || key === 'AWS_DEFAULT_REGION') continue;
+	    if (process.env[key] === undefined) process.env[key] = value;
+	  }
+	}
 
 async function loadHandler(event) {
   if (!cachedHandlerPromise) {
