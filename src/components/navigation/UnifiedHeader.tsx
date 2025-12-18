@@ -131,7 +131,6 @@ export function UnifiedHeader() {
           >
             <HeaderTypewriter
               hoverText={headerHoverText}
-              baseTextOverride={navConfig.headerText}
               typeSpeed={90}
               backspaceSpeed={40}
               className="block w-full text-left"
