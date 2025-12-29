@@ -1,3 +1,7 @@
 packages:
   - infra/cdk
   - packages/*
+
+overrides:
+  '@volpestyle/devops': link:../../Library/pnpm/global/5/node_modules/@volpestyle/devops
+  devops: link:../../Library/pnpm/global/5/node_modules/@volpestyle/devops

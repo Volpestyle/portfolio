@@ -2,6 +2,7 @@ import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
 import GitHub from 'next-auth/providers/github';
 import { isAdminEmail } from '@/lib/auth/allowlist';
+import { getAppTokenAllowedOrigins } from '@/lib/auth/app-tokens';
 import { resolveSecretValue } from '@/lib/secrets/manager';
 
 type AuthSecrets = {
@@ -122,6 +123,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   providers: buildProviders(authSecrets),
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      const allowedOrigins = new Set(getAppTokenAllowedOrigins());
+      try {
+        const target = new URL(url, baseUrl);
+        const baseOrigin = new URL(baseUrl).origin;
+        if (target.origin === baseOrigin || allowedOrigins.has(target.origin)) {
+          return target.toString();
+        }
+      } catch {
+        // Fall back to baseUrl.
+      }
+      return baseUrl;
+    },
     async jwt({ token, user, profile }) {
       token.email ??= user?.email ?? profile?.email ?? token.email;
       return token;

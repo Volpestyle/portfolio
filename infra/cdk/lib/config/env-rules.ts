@@ -42,6 +42,13 @@ const defaultExplicitEdgeKeys = [
   'ADMIN_EMAILS',
   'ADMIN_TABLE_NAME',
   'PORTFOLIO_GIST_ID',
+  'APP_JWT_ALLOWED_APPS',
+  'APP_JWT_ALLOWED_ORIGINS',
+  'APP_JWT_ISSUER',
+  'APP_JWT_AUDIENCE',
+  'APP_JWT_TTL_SECONDS',
+  'APP_JWT_KEY_ID',
+  'APP_JWT_ALG',
 ];
 
 const defaultEdgeBlocklist = [

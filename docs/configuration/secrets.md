@@ -40,6 +40,8 @@ GH_CLIENT_SECRET=your-github-oauth-secret
 | `GH_CLIENT_SECRET` | GitHub OAuth |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth |
 | `UPSTASH_REDIS_REST_TOKEN` | Rate limiting |
+| `APP_JWT_PRIVATE_KEY` | RSA private key for app tokens |
+| `APP_JWT_PUBLIC_KEY` | RSA public key for app tokens |
 
 ## GitHub Secrets
 
@@ -55,6 +57,8 @@ Configure in Settings > Secrets and variables > Actions:
 | `NEXTAUTH_SECRET` | Auth session secret |
 | `REVALIDATE_SECRET` | ISR revalidation |
 | `UPSTASH_REDIS_REST_TOKEN` | Redis auth |
+| `APP_JWT_PRIVATE_KEY` | App token signing key |
+| `APP_JWT_PUBLIC_KEY` | App token public key |
 
 ### Environment Secrets
 
@@ -96,7 +100,9 @@ Contains cross-environment secrets:
 ```json
 {
   "GH_TOKEN": "ghp_...",
-  "ADMIN_EMAILS": "admin@example.com"
+  "ADMIN_EMAILS": "admin@example.com",
+  "APP_JWT_PRIVATE_KEY": "-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----",
+  "APP_JWT_PUBLIC_KEY": "-----BEGIN PUBLIC KEY-----\\n...\\n-----END PUBLIC KEY-----"
 }
 ```
 
@@ -179,7 +185,7 @@ async function loadSecrets() {
 pnpm sync:prod:github
 ```
 
-Uses `scripts/sync-env-to-github.ts`.
+Uses `sync-env-to-github` from `@volpestyle/devops`.
 
 ### To AWS
 
@@ -188,7 +194,7 @@ Uses `scripts/sync-env-to-github.ts`.
 pnpm sync:prod:aws
 ```
 
-Uses `scripts/sync-env-to-aws.ts`.
+Uses `sync-env-to-aws` from `@volpestyle/devops`.
 
 ### Full Production Sync
 

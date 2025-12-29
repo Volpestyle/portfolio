@@ -50,6 +50,7 @@ Welcome to the portfolio documentation. This guide covers setup, development, ar
 - [Overview](./deployment/overview.md) - Deployment strategy
 - [CI/CD](./deployment/ci-cd.md) - GitHub Actions
 - [Environments](./deployment/environments.md) - Environment setup
+- [Apps Domain Convention](./deployment/apps-domain-convention.md) - Apps + API routing and central SSO
 
 ### Testing
 

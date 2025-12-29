@@ -141,6 +141,20 @@ Complete reference for all environment variables used in the portfolio.
 | `APP_CERTIFICATE_ARN` | No | ACM certificate ARN |
 | `APP_ALTERNATE_DOMAINS` | No | Additional domains |
 
+## App Token Exchange
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `APP_JWT_PRIVATE_KEY` | Yes | RSA private key (PKCS8 PEM) |
+| `APP_JWT_PUBLIC_KEY` | Yes | RSA public key (SPKI PEM) |
+| `APP_JWT_ALLOWED_APPS` | No | Allowlist of app names (defaults to `yt-channel-expert`) |
+| `APP_JWT_ALLOWED_ORIGINS` | No | CORS allowlist for `/api/apps/token` (include app subdomains) |
+| `APP_JWT_ISSUER` | No | JWT issuer override (defaults to `NEXTAUTH_URL`) |
+| `APP_JWT_AUDIENCE` | No | JWT audience (set to `<app-name>.jcvolpe.me` for per-app subdomains) |
+| `APP_JWT_TTL_SECONDS` | No | Token TTL in seconds (defaults to 600) |
+| `APP_JWT_KEY_ID` | No | JWKS key id |
+| `APP_JWT_ALG` | No | JWT signing algorithm (defaults to `RS256`) |
+
 ## Testing
 
 ### Fixture Mode
