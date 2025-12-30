@@ -4,10 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  devops: link:../../Library/pnpm/global/5/node_modules/@volpestyle/devops
-  '@volpestyle/devops': link:../../Library/pnpm/global/5/node_modules/@volpestyle/devops
-
 importers:
 
   .:
@@ -84,9 +80,6 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
-      devops:
-        specifier: link:../../Library/pnpm/global/5/node_modules/@volpestyle/devops
-        version: link:../../Library/pnpm/global/5/node_modules/@volpestyle/devops
       dotenv:
         specifier: ^16.6.1
         version: 16.6.1
@@ -206,8 +199,8 @@ importers:
         specifier: ^8.46.2
         version: 8.48.1(eslint@9.39.1(jiti@1.21.7))(typescript@5.9.3)
       '@volpestyle/devops':
-        specifier: link:../../Library/pnpm/global/5/node_modules/@volpestyle/devops
-        version: link:../../Library/pnpm/global/5/node_modules/@volpestyle/devops
+        specifier: github:Volpestyle/devops#main
+        version: https://codeload.github.com/Volpestyle/devops/tar.gz/5079f9f5bfebf478c776fbf6ffe74d5a8dce864d
       autoprefixer:
         specifier: ^10.4.20
         version: 10.4.22(postcss@8.5.6)
@@ -2283,6 +2276,11 @@ packages:
 
   '@upstash/redis@1.35.7':
     resolution: {integrity: sha512-bdCdKhke+kYUjcLLuGWSeQw7OLuWIx3eyKksyToLBAlGIMX9qiII0ptp8E0y7VFE1yuBxBd/3kSzJ8774Q4g+A==}
+
+  '@volpestyle/devops@https://codeload.github.com/Volpestyle/devops/tar.gz/5079f9f5bfebf478c776fbf6ffe74d5a8dce864d':
+    resolution: {tarball: https://codeload.github.com/Volpestyle/devops/tar.gz/5079f9f5bfebf478c776fbf6ffe74d5a8dce864d}
+    version: 0.1.0
+    hasBin: true
 
   abort-controller@3.0.0:
     resolution: {integrity: sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg==}
@@ -7322,6 +7320,15 @@ snapshots:
   '@upstash/redis@1.35.7':
     dependencies:
       uncrypto: 0.1.3
+
+  '@volpestyle/devops@https://codeload.github.com/Volpestyle/devops/tar.gz/5079f9f5bfebf478c776fbf6ffe74d5a8dce864d':
+    dependencies:
+      '@aws-sdk/client-secrets-manager': 3.943.0
+      '@octokit/rest': 21.1.1
+      libsodium-wrappers: 0.7.15
+      tsx: 4.21.0
+    transitivePeerDependencies:
+      - aws-crt
 
   abort-controller@3.0.0:
     dependencies:
