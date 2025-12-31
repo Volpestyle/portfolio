@@ -13,7 +13,6 @@ concurrency:
 
 env:
   NODE_VERSION: '20'
-  PNPM_VERSION: '9'
   ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
   GH_CLIENT_ID: ${{ vars.GH_CLIENT_ID }}
   GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
@@ -31,8 +30,6 @@ jobs:
 
       - name: Enable pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node and pnpm cache
         uses: actions/setup-node@v4

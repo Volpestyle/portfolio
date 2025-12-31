@@ -37,7 +37,6 @@ env:
 
   # --- Tooling versions ---
   NODE_VERSION: '20'
-  PNPM_VERSION: '9'
 
   # --- Required by your stack / code paths ---
   # Region must be us-east-1 due to Lambda@Edge in your app code.
@@ -74,8 +73,6 @@ jobs:
 
       - name: Enable pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node with pnpm cache
         uses: actions/setup-node@v4
@@ -264,8 +261,6 @@ jobs:
 
       - name: Enable pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node with pnpm cache
         uses: actions/setup-node@v4
