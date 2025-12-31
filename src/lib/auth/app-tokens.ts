@@ -1,9 +1,9 @@
 import { SignJWT, calculateJwkThumbprint, exportJWK, importPKCS8, importSPKI, type JWK, type KeyLike } from 'jose';
 import { resolveSecretValue } from '@/lib/secrets/manager';
 
-const DEFAULT_ALLOWED_APPS = ['yt-channel-expert'];
+const DEFAULT_ALLOWED_APPS = ['yt-expert'];
 const DEFAULT_ALLOWED_ORIGINS = [
-  'https://yt-channel-expert.jcvolpe.me',
+  'https://yt-expert.jcvolpe.me',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
 ];
@@ -60,7 +60,7 @@ const resolveIssuer = (): string => {
   return 'https://jcvolpe.me';
 };
 
-const resolveAudience = (): string => process.env.APP_JWT_AUDIENCE?.trim() || 'yt-channel-expert.jcvolpe.me';
+const resolveAudience = (): string => process.env.APP_JWT_AUDIENCE?.trim() || 'yt-expert.jcvolpe.me';
 
 const resolveTtlSeconds = (): number => {
   const raw = process.env.APP_JWT_TTL_SECONDS?.trim();
