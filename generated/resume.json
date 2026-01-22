@@ -1,22 +1,22 @@
 {
-  "snapshotDate": "2025-12-05",
+  "snapshotDate": "2026-01-22",
   "experiences": [
     {
       "type": "experience",
       "id": "lowes-software-engineer",
-      "slug": "lowe-s-software-engineer",
-      "company": "Lowe's",
+      "slug": "lowes-software-engineer",
+      "company": "Lowes",
       "title": "Software Engineer",
       "location": "Charlotte, NC",
       "startDate": "2025-03-01",
       "endDate": null,
       "isCurrent": true,
       "experienceType": "full_time",
-      "summary": "Led frontend and BFF work for Lowe's Returns Android and Web apps, improving scalability and developer velocity.",
+      "summary": "Led front-end and BFF work for the Lowe’s Returns Android and web apps, improving scalability and developer velocity.",
       "bullets": [
         "Led adoption of a micro-frontend architecture for the Lowe’s Returns Android app, improving scalability and developer velocity.",
-        "Implemented new UX flows in React, Ionic, and Capacitor for the Returns Android application used by sales-floor associates.",
-        "Built and maintained a Node.js + Fastify Backend-for-Frontend (BFF) service powering the Returns Android and Web apps, including optimized REST APIs, request validation, and cross-service orchestration."
+        "Implemented new UX flows using React, Ionic, and Capacitor for the Returns Android application used by sales-floor associates.",
+        "Built and maintained a Node.js + Fastify Backend-for-Frontend (BFF) powering Returns Android and Web apps, including optimized REST APIs, request validation, and cross-service orchestration."
       ],
       "skills": [
         "React",
@@ -25,15 +25,14 @@
         "Node.js",
         "Fastify",
         "REST APIs",
-        "Micro-frontends",
-        "Android"
+        "Micro-frontends"
       ],
       "linkedProjects": [],
       "monthsOfExperience": null
     },
     {
       "type": "experience",
-      "id": "freelance-full-stack-developer",
+      "id": "freelance-full-stack-web-developer",
       "slug": "freelance-full-stack-web-developer",
       "company": "Freelance",
       "title": "Full-stack Web Developer",
@@ -42,21 +41,20 @@
       "endDate": "2025-02-01",
       "isCurrent": false,
       "experienceType": "full_time",
-      "summary": "Delivered end-to-end web applications for startups and SMBs, owning scoping, architecture, development, and deployment.",
+      "summary": "Delivered end-to-end web applications and infrastructure for startups and SMBs, handling scoping, development, and deployments.",
       "bullets": [
-        "Delivered end-to-end web applications for startups and SMBs, covering scoping, architecture, and full-stack development.",
-        "Developed with Next.js, Node.js, and Go.",
-        "Deployed applications on AWS using custom CDKs and set up CI/CD pipelines with GitHub Actions.",
-        "Sourced clients through Upwork and managed project delivery."
+        "Delivered end-to-end web applications for startups and SMBs, handling scoping, architecture, and full-stack development.",
+        "Implemented applications using Next.js, Node.js, and Go.",
+        "Deployed on AWS using custom CDK stacks and built CI/CD pipelines with GitHub Actions.",
+        "Sourced and managed clients through Upwork."
       ],
       "skills": [
         "Next.js",
         "Node.js",
         "Go",
         "AWS",
-        "AWS CDK",
-        "GitHub Actions",
-        "CI/CD"
+        "CDK",
+        "GitHub Actions"
       ],
       "linkedProjects": [],
       "monthsOfExperience": 26
@@ -72,19 +70,18 @@
       "endDate": "2023-01-01",
       "isCurrent": false,
       "experienceType": "full_time",
-      "summary": "Implemented React experiences on the AWS IAM Console and supported operational health through on-call responsibilities.",
+      "summary": "Built and launched React experiences for the AWS IAM Console and participated in operational on-call and status reporting.",
       "bullets": [
         "Led implementation and launch of new React user experiences on the AWS Identity and Access Management (IAM) Console, impacting thousands of customers.",
-        "Participated in a monthly on-call rotation: resolved customer issues, triaged CloudWatch alarms, debugged service degradations, and collaborated with backend teams.",
+        "Participated in a monthly on-call rotation: resolved customer issues, triaged CloudWatch alarms, debugged service degradations, and collaborated with backend teams to restore service health.",
         "Presented weekly operational status updates to the broader Identity organization.",
-        "Voluntarily left AWS to relocate closer to family in Chicago; was not affected by layoffs."
+        "Voluntarily relocated closer to family and left AWS (not affected by layoffs)."
       ],
       "skills": [
         "React",
-        "AWS IAM",
         "CloudWatch",
         "On-call operations",
-        "Incident triage"
+        "Operational monitoring"
       ],
       "linkedProjects": [],
       "monthsOfExperience": 19
@@ -100,10 +97,10 @@
       "endDate": "2020-08-01",
       "isCurrent": false,
       "experienceType": "internship",
-      "summary": "Contributed to a Dart + React–based web application and participated in Agile development and testing.",
+      "summary": "Contributed to a Dart + React web application and followed Agile practices including testing and code review.",
       "bullets": [
         "Contributed to development on a Dart + React–based web application (Wdesk).",
-        "Worked in Agile development processes, participated in code review, and wrote unit and integration tests."
+        "Worked within Agile methodologies; participated in code reviews and wrote unit and integration tests."
       ],
       "skills": [
         "Dart",
@@ -126,9 +123,9 @@
       "endDate": "2019-08-01",
       "isCurrent": false,
       "experienceType": "internship",
-      "summary": "Sole developer of a full-stack Audio Engineering discrepancy logger using the MEAN/Node stack, containerized for CI/CD.",
+      "summary": "Sole developer of an Audio Engineering discrepancy logger using a MEAN-style stack and containerized for CI/CD.",
       "bullets": [
-        "Built an Audio Engineering discrepancy logger web application using MongoDB, Express.js, Angular, and Node.js as the sole developer.",
+        "Developed an Audio Engineering discrepancy logger as sole developer using MongoDB, Express.js, Angular, and Node.js.",
         "Containerized the application with Docker for CI/CD."
       ],
       "skills": [
@@ -136,8 +133,7 @@
         "Express.js",
         "Angular",
         "Node.js",
-        "Docker",
-        "CI/CD"
+        "Docker"
       ],
       "linkedProjects": [],
       "monthsOfExperience": 4
@@ -146,7 +142,7 @@
   "education": [
     {
       "type": "education",
-      "id": "iowa-state-bs-software-engineering",
+      "id": "iowa-state-software-engineering-bs",
       "institution": "Iowa State University",
       "degree": "B.S.",
       "field": "Software Engineering",
@@ -154,7 +150,7 @@
       "startDate": "2017-08-01",
       "endDate": "2021-05-01",
       "isCurrent": false,
-      "summary": "Bachelor of Science in Software Engineering.",
+      "summary": "Bachelor of Software Engineering; coursework and projects in software development.",
       "bullets": [
         "GPA: 3.01"
       ],
@@ -166,7 +162,6 @@
       "type": "award",
       "id": "technical-education-senior-award-2021",
       "title": "Technical Education Senior Award",
-      "issuer": "Iowa State University",
       "date": "2021-05-01",
       "summary": "Awarded for outstanding work and dedication in Technical Education.",
       "bullets": [
@@ -180,9 +175,9 @@
       "title": "WSC Logo Design — 1st Place",
       "issuer": "Wheaton Sport Center",
       "date": "2017-05-01",
-      "summary": "First place prize in a logo design competition; $1,000 award.",
+      "summary": "First place prize in a logo design competition.",
       "bullets": [
-        "Won 1st place prize of $1,000 for a logo design competition hosted by the Wheaton Sport Center in Wheaton, IL."
+        "Won 1st place and $1,000 in a logo design competition hosted by the Wheaton Sport Center (Wheaton, IL)."
       ],
       "skills": []
     }
@@ -193,23 +188,20 @@
       "id": "react",
       "name": "React",
       "category": "Technical",
-      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": []
     },
     {
       "type": "skill",
       "id": "typescript",
-      "name": "TypeScript",
+      "name": "Typescript",
       "category": "Technical",
-      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": []
     },
     {
       "type": "skill",
       "id": "javascript",
-      "name": "JavaScript",
+      "name": "Javascript",
       "category": "Technical",
-      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": []
     },
     {
@@ -217,15 +209,13 @@
       "id": "svelte",
       "name": "Svelte",
       "category": "Technical",
-      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": []
     },
     {
       "type": "skill",
-      "id": "next-js",
-      "name": "Next.js",
+      "id": "nextjs",
+      "name": "NextJS",
       "category": "Technical",
-      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": []
     },
     {
@@ -233,7 +223,6 @@
       "id": "tailwindcss",
       "name": "TailwindCSS",
       "category": "Technical",
-      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": []
     },
     {
@@ -241,7 +230,6 @@
       "id": "tanstack",
       "name": "TanStack",
       "category": "Technical",
-      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": []
     },
     {
@@ -249,7 +237,6 @@
       "id": "go",
       "name": "Go",
       "category": "Technical",
-      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": []
     },
     {
@@ -257,7 +244,6 @@
       "id": "java",
       "name": "Java",
       "category": "Technical",
-      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": []
     },
     {
@@ -265,7 +251,6 @@
       "id": "spring-boot",
       "name": "Spring Boot",
       "category": "Technical",
-      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": []
     },
     {
@@ -273,7 +258,6 @@
       "id": "node-js",
       "name": "Node.js",
       "category": "Technical",
-      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": []
     },
     {
@@ -281,7 +265,6 @@
       "id": "fastify",
       "name": "Fastify",
       "category": "Technical",
-      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": []
     },
     {
@@ -289,7 +272,6 @@
       "id": "swift",
       "name": "Swift",
       "category": "Technical",
-      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": []
     },
     {
@@ -297,7 +279,6 @@
       "id": "python",
       "name": "Python",
       "category": "Technical",
-      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": []
     },
     {
@@ -305,37 +286,58 @@
       "id": "pytorch",
       "name": "PyTorch",
       "category": "Technical",
-      "summary": "Frontend, backend, and ML frameworks and languages.",
       "skills": []
     },
     {
       "type": "skill",
-      "id": "platforms-infrastructure",
-      "name": "Platforms & Infrastructure",
+      "id": "dart",
+      "name": "Dart",
       "category": "Technical",
-      "summary": "Cloud, AI, and big data platforms.",
+      "skills": []
+    },
+    {
+      "type": "skill",
+      "id": "angular",
+      "name": "Angular",
+      "category": "Technical",
+      "skills": []
+    },
+    {
+      "type": "skill",
+      "id": "express-js",
+      "name": "Express.js",
+      "category": "Technical",
+      "skills": []
+    },
+    {
+      "type": "skill",
+      "id": "platforms-tools",
+      "name": "Platforms & Tools",
+      "category": "Technical",
       "skills": [
         "AWS",
         "Google Vertex AI",
         "RAG",
         "Hadoop ecosystem",
         "Druid",
-        "BigQuery"
+        "BigQuery",
+        "GitHub Actions",
+        "Docker",
+        "CDK",
+        "CloudWatch"
       ]
     },
     {
       "type": "skill",
-      "id": "databases",
-      "name": "Databases & APIs",
+      "id": "databases-data",
+      "name": "Databases & Data",
       "category": "Technical",
-      "summary": "Datastores and API technologies.",
       "skills": [
         "MongoDB",
         "GraphQL",
         "DynamoDB",
         "Redis",
-        "PostgreSQL",
-        "REST APIs"
+        "PostgreSQL"
       ]
     }
   ]
