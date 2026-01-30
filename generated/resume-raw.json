@@ -1,5 +1,5 @@
 {
-  "snapshotDate": "2026-01-22",
+  "snapshotDate": "2026-01-30",
   "experiences": [
     {
       "id": "lowes-software-engineer",
@@ -8,7 +8,7 @@
       "location": "Charlotte, NC",
       "startDate": "2025-03-01",
       "endDate": null,
-      "summary": "Led front-end and BFF work for the Lowe’s Returns Android and web apps, improving scalability and developer velocity.",
+      "summary": "Led frontend and BFF work for the Lowe’s Returns Android and web applications to improve scalability and developer velocity.",
       "bullets": [
         "Led adoption of a micro-frontend architecture for the Lowe’s Returns Android app, improving scalability and developer velocity.",
         "Implemented new UX flows using React, Ionic, and Capacitor for the Returns Android application used by sales-floor associates.",
@@ -33,12 +33,11 @@
       "location": "Remote",
       "startDate": "2023-01-01",
       "endDate": "2025-02-01",
-      "summary": "Delivered end-to-end web applications and infrastructure for startups and SMBs, handling scoping, development, and deployments.",
+      "summary": "Delivered end-to-end web applications for startups and SMBs, handling scoping, architecture, development, and deployments.",
       "bullets": [
-        "Delivered end-to-end web applications for startups and SMBs, handling scoping, architecture, and full-stack development.",
-        "Implemented applications using Next.js, Node.js, and Go.",
-        "Deployed on AWS using custom CDK stacks and built CI/CD pipelines with GitHub Actions.",
-        "Sourced and managed clients through Upwork."
+        "Delivered end-to-end web applications for startups and SMBs sourced via Upwork, handling client scoping and project architecture.",
+        "Implemented full-stack solutions using Next.js, Node.js, and Go.",
+        "Deployed applications to AWS using custom CDKs and built CI/CD pipelines with GitHub Actions."
       ],
       "skills": [
         "Next.js",
@@ -46,7 +45,8 @@
         "Go",
         "AWS",
         "CDK",
-        "GitHub Actions"
+        "GitHub Actions",
+        "CI/CD"
       ],
       "linkedProjects": [],
       "experienceType": "full_time"
@@ -58,18 +58,19 @@
       "location": "Seattle, WA",
       "startDate": "2021-07-01",
       "endDate": "2023-01-01",
-      "summary": "Built and launched React experiences for the AWS IAM Console and participated in operational on-call and status reporting.",
+      "summary": "Implemented React experiences for the AWS Identity and Access Management console and participated in operational support.",
       "bullets": [
         "Led implementation and launch of new React user experiences on the AWS Identity and Access Management (IAM) Console, impacting thousands of customers.",
         "Participated in a monthly on-call rotation: resolved customer issues, triaged CloudWatch alarms, debugged service degradations, and collaborated with backend teams to restore service health.",
         "Presented weekly operational status updates to the broader Identity organization.",
-        "Voluntarily relocated closer to family and left AWS (not affected by layoffs)."
+        "Voluntarily left AWS to relocate closer to family in Chicago (not affected by layoffs)."
       ],
       "skills": [
         "React",
         "CloudWatch",
-        "On-call operations",
-        "Operational monitoring"
+        "Operational support",
+        "On-call incident response",
+        "Frontend engineering"
       ],
       "linkedProjects": [],
       "experienceType": "full_time"
@@ -81,10 +82,11 @@
       "location": "Ames, IA",
       "startDate": "2020-05-01",
       "endDate": "2020-08-01",
-      "summary": "Contributed to a Dart + React web application and followed Agile practices including testing and code review.",
+      "summary": "Contributed to a Dart + React web application, worked in Agile, and wrote tests and code reviews.",
       "bullets": [
-        "Contributed to development on a Dart + React–based web application (Wdesk).",
-        "Worked within Agile methodologies; participated in code reviews and wrote unit and integration tests."
+        "Contributed to development of a Dart + React–based web application (Wdesk).",
+        "Worked within Agile methodologies and participated in code reviews.",
+        "Wrote unit and integration tests."
       ],
       "skills": [
         "Dart",
@@ -103,7 +105,7 @@
       "location": "Washington, D.C.",
       "startDate": "2019-05-01",
       "endDate": "2019-08-01",
-      "summary": "Sole developer of an Audio Engineering discrepancy logger using a MEAN-style stack and containerized for CI/CD.",
+      "summary": "Sole developer of an audio engineering discrepancy logger using a full-stack JS stack and Docker for CI/CD.",
       "bullets": [
         "Developed an Audio Engineering discrepancy logger as sole developer using MongoDB, Express.js, Angular, and Node.js.",
         "Containerized the application with Docker for CI/CD."
@@ -113,7 +115,8 @@
         "Express.js",
         "Angular",
         "Node.js",
-        "Docker"
+        "Docker",
+        "CI/CD"
       ],
       "linkedProjects": [],
       "experienceType": "internship"
@@ -121,14 +124,14 @@
   ],
   "education": [
     {
-      "id": "iowa-state-software-engineering-bs",
+      "id": "iowa-state-university-bs-software-engineering",
       "institution": "Iowa State University",
       "degree": "B.S.",
       "field": "Software Engineering",
       "location": "Ames, Iowa",
       "startDate": "2017-08-01",
       "endDate": "2021-05-01",
-      "summary": "Bachelor of Software Engineering; coursework and projects in software development.",
+      "summary": "Bachelor of Science in Software Engineering.",
       "bullets": [
         "GPA: 3.01"
       ],
@@ -137,23 +140,23 @@
   ],
   "awards": [
     {
-      "id": "technical-education-senior-award-2021",
+      "id": "technical-education-senior-award",
       "title": "Technical Education Senior Award",
       "date": "2021-05-01",
       "summary": "Awarded for outstanding work and dedication in Technical Education.",
       "bullets": [
-        "Awarded to students who exhibited outstanding work and dedication in the area of Technical Education."
+        "“Awarded to students who exhibited outstanding work and dedication in the area of Technical Education.”"
       ],
       "skills": []
     },
     {
-      "id": "wsc-logo-design-1st-place-2017",
+      "id": "wsc-logo-design-1st-place",
       "title": "WSC Logo Design — 1st Place",
       "issuer": "Wheaton Sport Center",
       "date": "2017-05-01",
-      "summary": "First place prize in a logo design competition.",
+      "summary": "First-place prize in a logo design competition hosted by the Wheaton Sport Center.",
       "bullets": [
-        "Won 1st place and $1,000 in a logo design competition hosted by the Wheaton Sport Center (Wheaton, IL)."
+        "Won 1st place prize of $1,000 for a logo design competition hosted by the Wheaton Sport Center in Wheaton, IL."
       ],
       "skills": []
     }
@@ -162,13 +165,14 @@
     {
       "id": "languages-frameworks",
       "name": "Languages & Frameworks",
-      "category": "Technical",
+      "category": "Languages/Frameworks",
+      "summary": "Frontend, backend, and ML libraries and languages used in professional and personal projects.",
       "skills": [
         "React",
-        "Typescript",
-        "Javascript",
+        "TypeScript",
+        "JavaScript",
         "Svelte",
-        "NextJS",
+        "Next.js",
         "TailwindCSS",
         "TanStack",
         "Go",
@@ -180,14 +184,14 @@
         "Python",
         "PyTorch",
         "Dart",
-        "Angular",
-        "Express.js"
+        "Angular"
       ]
     },
     {
-      "id": "platforms-tools",
-      "name": "Platforms & Tools",
-      "category": "Technical",
+      "id": "platforms-and-infrastructure",
+      "name": "Platforms & Infrastructure",
+      "category": "Platforms",
+      "summary": "Cloud, analytics, and AI platforms and architectural patterns.",
       "skills": [
         "AWS",
         "Google Vertex AI",
@@ -195,16 +199,16 @@
         "Hadoop ecosystem",
         "Druid",
         "BigQuery",
-        "GitHub Actions",
-        "Docker",
         "CDK",
-        "CloudWatch"
+        "CI/CD",
+        "GitHub Actions"
       ]
     },
     {
-      "id": "databases-data",
+      "id": "databases",
       "name": "Databases & Data",
-      "category": "Technical",
+      "category": "Databases",
+      "summary": "Datastore and caching technologies used in applications.",
       "skills": [
         "MongoDB",
         "GraphQL",
