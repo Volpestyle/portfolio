@@ -19,5 +19,5 @@ export type CostState = {
 };
 
 export type CostStateResponse =
-  | { available: true; state: CostState }
-  | { available: false; error?: string };
+  | { available: true; state: CostState; appId?: string }
+  | { available: false; error?: string; appId?: string };

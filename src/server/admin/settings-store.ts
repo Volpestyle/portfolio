@@ -9,6 +9,7 @@
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { GetCommand, PutCommand, type GetCommandOutput } from '@aws-sdk/lib-dynamodb';
+import { DEFAULT_MANAGED_APP_ID, resolveManagedAppId } from '@/config/apps';
 
 const PK_SETTINGS = 'SETTINGS' as const;
 const SK_CONFIG = 'CONFIG' as const;
@@ -20,7 +21,7 @@ export type AdminSettings = {
 };
 
 type SettingsRow = AdminSettings & {
-  PK: typeof PK_SETTINGS;
+  PK: string;
   SK: typeof SK_CONFIG;
   // Legacy support
   costThresholdUsd?: number;
@@ -52,6 +53,14 @@ function getDocumentClient(): DynamoDBDocumentClient {
   return docClient;
 }
 
+function buildSettingsKey(appId: string): { PK: string; SK: typeof SK_CONFIG } {
+  return { PK: `${PK_SETTINGS}#${appId}`, SK: SK_CONFIG };
+}
+
+function resolveAppId(appId?: string | null): string {
+  return resolveManagedAppId(appId ?? undefined);
+}
+
 function toSettings(item?: SettingsRow | null): AdminSettings {
   if (!item) {
     return { ...DEFAULT_SETTINGS };
@@ -73,21 +82,37 @@ function toSettings(item?: SettingsRow | null): AdminSettings {
 /**
  * Get current admin settings. Returns defaults if not yet configured.
  */
-export async function getSettings(): Promise<AdminSettings> {
+export async function getSettings(appId?: string): Promise<AdminSettings> {
   const client = getDocumentClient();
   const tableName = getTableName();
+  const resolvedAppId = resolveAppId(appId);
 
-  const response = (await client.send(
+  const primaryResponse = (await client.send(
     new GetCommand({
       TableName: tableName,
-      Key: {
-        PK: PK_SETTINGS,
-        SK: SK_CONFIG,
-      },
+      Key: buildSettingsKey(resolvedAppId),
     })
   )) as GetCommandOutput;
 
-  return toSettings(response.Item as SettingsRow | undefined);
+  const primaryItem = primaryResponse.Item as SettingsRow | undefined;
+  if (primaryItem) {
+    return toSettings(primaryItem);
+  }
+
+  if (resolvedAppId === DEFAULT_MANAGED_APP_ID) {
+    const legacyResponse = (await client.send(
+      new GetCommand({
+        TableName: tableName,
+        Key: {
+          PK: PK_SETTINGS,
+          SK: SK_CONFIG,
+        },
+      })
+    )) as GetCommandOutput;
+    return toSettings(legacyResponse.Item as SettingsRow | undefined);
+  }
+
+  return toSettings(undefined);
 }
 
 export type UpdateSettingsInput = {
@@ -98,16 +123,17 @@ export type UpdateSettingsInput = {
 /**
  * Update admin settings. Merges with existing settings.
  */
-export async function updateSettings(input: UpdateSettingsInput): Promise<AdminSettings> {
+export async function updateSettings(appId: string | undefined, input: UpdateSettingsInput): Promise<AdminSettings> {
   const client = getDocumentClient();
   const tableName = getTableName();
+  const resolvedAppId = resolveAppId(appId);
 
   // Get current settings to merge
-  const current = await getSettings();
+  const current = await getSettings(resolvedAppId);
 
   const updated: SettingsRow = {
-    PK: PK_SETTINGS,
-    SK: SK_CONFIG,
+    PK: buildSettingsKey(resolvedAppId).PK,
+    SK: buildSettingsKey(resolvedAppId).SK,
     monthlyCostLimitUsd: input.monthlyCostLimitUsd ?? current.monthlyCostLimitUsd,
     chatEnabled: input.chatEnabled ?? current.chatEnabled,
     updatedAt: new Date().toISOString(),
@@ -126,9 +152,9 @@ export async function updateSettings(input: UpdateSettingsInput): Promise<AdminS
 /**
  * Check if chat is enabled. Returns true if settings not configured (fail open).
  */
-export async function isChatEnabled(): Promise<boolean> {
+export async function isChatEnabled(appId?: string): Promise<boolean> {
   try {
-    const settings = await getSettings();
+    const settings = await getSettings(appId);
     return settings.chatEnabled;
   } catch {
     // Fail open - if we can't read settings, allow chat
@@ -139,9 +165,9 @@ export async function isChatEnabled(): Promise<boolean> {
 /**
  * Get the monthly cost limit in USD. Returns default if not configured.
  */
-export async function getMonthlyCostLimit(): Promise<number> {
+export async function getMonthlyCostLimit(appId?: string): Promise<number> {
   try {
-    const settings = await getSettings();
+    const settings = await getSettings(appId);
     return settings.monthlyCostLimitUsd;
   } catch {
     return DEFAULT_SETTINGS.monthlyCostLimitUsd;

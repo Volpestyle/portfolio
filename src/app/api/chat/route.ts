@@ -11,10 +11,15 @@ import { buildRateLimitHeaders, enforceChatRateLimit } from '@/lib/rate-limit';
 import { getLlmClient } from '@/server/llm/client';
 import { chatApi, chatLogger, chatRuntimeOptions, chatModerationOptions, chatProvider } from '@/server/chat/pipeline';
 import { resolveSecretValue } from '@/lib/secrets/manager';
+import { resolveManagedAppId } from '@/config/apps';
 import { getSettings } from '@/server/admin/settings-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const CHAT_APP_ID = resolveManagedAppId(
+  process.env.COST_APP_ID ?? process.env.NEXT_PUBLIC_APP_NAME ?? 'portfolio'
+);
 
 const chatHandler = createNextChatHandler({
   chatApi,
@@ -86,7 +91,7 @@ export async function POST(request: NextRequest) {
   let chatEnabled = true;
   let monthlyCostLimit: number | undefined;
   try {
-    const settings = await getSettings();
+    const settings = await getSettings(CHAT_APP_ID);
     chatEnabled = settings.chatEnabled;
     monthlyCostLimit = settings.monthlyCostLimitUsd;
   } catch {

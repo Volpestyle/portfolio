@@ -74,7 +74,7 @@ const PROJECT_NARRATIVE_SCHEMA: JsonSchema = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['oneLiner', 'description', 'bullets', 'techStack', 'tags', 'context'],
+    required: ['oneLiner', 'description', 'bullets', 'techStack', 'tags', 'context', 'impactSummary', 'sizeOrScope'],
     properties: {
       oneLiner: { type: 'string' },
       description: { type: 'string' },
@@ -86,7 +86,7 @@ const PROJECT_NARRATIVE_SCHEMA: JsonSchema = {
       context: {
         type: 'object',
         additionalProperties: false,
-        required: ['type'],
+        required: ['type', 'organization', 'role', 'timeframe'],
         properties: {
           type: { type: 'string', enum: ['personal', 'work', 'oss', 'academic', 'other'] },
           organization: { type: 'string' },
@@ -94,6 +94,7 @@ const PROJECT_NARRATIVE_SCHEMA: JsonSchema = {
           timeframe: {
             type: 'object',
             additionalProperties: false,
+            required: ['start', 'end'],
             properties: {
               start: { type: 'string' },
               end: { type: 'string' },
@@ -187,9 +188,26 @@ async function runJsonSchemaCompletion<T>(params: {
       })
   );
 
-  const raw = response.rawText ?? '{}';
+  const raw = response.rawText || '{}';
   const jsonStart = raw.indexOf('{');
-  const candidate = jsonStart >= 0 ? raw.slice(jsonStart) : raw;
+  if (jsonStart < 0) return JSON.parse(raw) as T;
+
+  // Walk from the first '{' and find its matching '}' so trailing prose is ignored.
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let jsonEnd = -1;
+  for (let i = jsonStart; i < raw.length; i++) {
+    const ch = raw[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') depth++;
+    else if (ch === '}') { depth--; if (depth === 0) { jsonEnd = i; break; } }
+  }
+
+  const candidate = jsonEnd >= 0 ? raw.slice(jsonStart, jsonEnd + 1) : raw.slice(jsonStart);
   return JSON.parse(candidate) as T;
 }
 
@@ -592,12 +610,20 @@ async function fetchPortfolioWithFallback(repoSelection: ResolvedRepoSelection):
 
 export async function runProjectKnowledgeTask(context: PreprocessContext): Promise<PreprocessTaskResult> {
   requireEnv('GH_TOKEN');
-  const openAiKey = requireEnv('OPENAI_API_KEY');
   const { projectsOutput, projectsEmbeddingsOutput } = context.paths;
   const repoSelection = context.repoSelection;
   const llm = getPreprocessLlmClient(context.config.provider);
 
-  const client = new OpenAI({ apiKey: openAiKey });
+  // OpenAI client is only needed for embeddings — lazily initialised so
+  // non-OpenAI text-gen providers (e.g. claude-code-cli) don't require the key.
+  let _embeddingClient: OpenAI | null = null;
+  function getEmbeddingClient(): OpenAI {
+    if (!_embeddingClient) {
+      const openAiKey = requireEnv('OPENAI_API_KEY');
+      _embeddingClient = new OpenAI({ apiKey: openAiKey });
+    }
+    return _embeddingClient;
+  }
   const { projectTextModel, projectEmbeddingModel } = context.models;
   const { starred, normal } = await fetchPortfolioWithFallback(repoSelection);
   const repos = filterReposBySelection([...starred, ...normal], repoSelection);
@@ -689,7 +715,7 @@ export async function runProjectKnowledgeTask(context: PreprocessContext): Promi
       projects.push(project);
 
       const embedding = await buildEmbedding(
-        client,
+        getEmbeddingClient(),
         repo.name,
         narrative,
         facts,

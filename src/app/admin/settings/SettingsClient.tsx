@@ -6,11 +6,12 @@ import { AlertCircle, TrendingUp } from 'lucide-react';
 import type { AdminSettings, CostState, CostStateResponse } from './types';
 
 type SettingsClientProps = {
+  appId: string;
   initialSettings?: AdminSettings | null;
   initialCostState?: CostStateResponse | null;
 };
 
-export function SettingsClient({ initialSettings = null, initialCostState = null }: SettingsClientProps) {
+export function SettingsClient({ appId, initialSettings = null, initialCostState = null }: SettingsClientProps) {
   const [settings, setSettings] = useState<AdminSettings | null>(initialSettings);
   const [loading, setLoading] = useState(!initialSettings);
   const [saving, setSaving] = useState(false);
@@ -30,7 +31,7 @@ export function SettingsClient({ initialSettings = null, initialCostState = null
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/admin/settings', { cache: 'no-store' });
+      const response = await fetch(`/api/admin/settings?app=${encodeURIComponent(appId)}`, { cache: 'no-store' });
       const data = (await response.json()) as { settings?: AdminSettings; error?: string };
       if (!response.ok) {
         throw new Error(data?.error || 'Failed to load settings.');
@@ -45,11 +46,11 @@ export function SettingsClient({ initialSettings = null, initialCostState = null
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [appId]);
 
   const fetchCostState = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/cost-state', { cache: 'no-store' });
+      const response = await fetch(`/api/admin/cost-state?app=${encodeURIComponent(appId)}`, { cache: 'no-store' });
       const data = (await response.json()) as CostStateResponse;
       if (data.available) {
         setCostState(data.state);
@@ -65,7 +66,7 @@ export function SettingsClient({ initialSettings = null, initialCostState = null
       setCostAvailable(false);
       setCostError('Failed to fetch cost state');
     }
-  }, []);
+  }, [appId]);
 
   useEffect(() => {
     const needsSettings = !initialSettings;
@@ -94,7 +95,7 @@ export function SettingsClient({ initialSettings = null, initialCostState = null
     );
 
     try {
-      const response = await fetch('/api/admin/settings', {
+      const response = await fetch(`/api/admin/settings?app=${encodeURIComponent(appId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ monthlyCostLimitUsd: monthlyCostLimit, chatEnabled }),
@@ -162,7 +163,7 @@ export function SettingsClient({ initialSettings = null, initialCostState = null
                   <span className="text-sm text-white/50">/ ${costState.budgetUsd.toFixed(0)} budget</span>
                 </div>
                 <div className="text-xs text-white/50">
-                  {costState.turnCount} turns this month ({costState.monthKey})
+                  {costState.turnCount} requests this month ({costState.monthKey})
                 </div>
               </div>
               <div className="text-right">
@@ -218,14 +219,14 @@ export function SettingsClient({ initialSettings = null, initialCostState = null
         </div>
       )}
 
-      {/* Chat Enabled Toggle */}
+      {/* App Enabled Toggle */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <div>
             <label htmlFor="chat-enabled" className="text-sm font-medium text-white">
-              Chatbot Enabled
+              App Enabled
             </label>
-            <p className="text-xs text-white/50">Kill switch for the chatbot. When disabled, returns 503.</p>
+            <p className="text-xs text-white/50">Kill switch for the app API. When disabled, returns 503.</p>
           </div>
           <button
             id="chat-enabled"
@@ -247,7 +248,7 @@ export function SettingsClient({ initialSettings = null, initialCostState = null
         <div
           className={`text-sm font-medium ${chatEnabled ? 'text-green-400' : 'text-red-400'}`}
         >
-          {chatEnabled ? 'Chat is enabled' : 'Chat is disabled'}
+          {chatEnabled ? 'App is enabled' : 'App is disabled'}
         </div>
       </div>
 
@@ -257,7 +258,7 @@ export function SettingsClient({ initialSettings = null, initialCostState = null
           <label htmlFor="cost-threshold" className="text-sm font-medium text-white">
             Monthly Cost Limit
           </label>
-          <p className="text-xs text-white/50">Maximum monthly spend before chatbot is throttled.</p>
+          <p className="text-xs text-white/50">Maximum monthly spend before the app is throttled.</p>
         </div>
         <div className="flex items-center gap-4">
           <input

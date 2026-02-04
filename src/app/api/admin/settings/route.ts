@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveManagedAppId } from '@/config/apps';
 import { getSettings, updateSettings } from '@/server/admin/settings-store';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const appId = resolveManagedAppId(request.nextUrl.searchParams.get('app'));
   try {
-    const settings = await getSettings();
-    return NextResponse.json({ settings });
+    const settings = await getSettings(appId);
+    return NextResponse.json({ settings, appId });
   } catch (err) {
     console.error('Failed to get settings', err);
     return NextResponse.json({ error: 'Failed to fetch settings.' }, { status: 500 });
@@ -14,6 +16,7 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
+  const appId = resolveManagedAppId(request.nextUrl.searchParams.get('app'));
   let body: { monthlyCostLimitUsd?: number; costThresholdUsd?: number; chatEnabled?: boolean };
   try {
     body = await request.json();
@@ -39,11 +42,11 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const settings = await updateSettings({
+    const settings = await updateSettings(appId, {
       monthlyCostLimitUsd: requestedMonthlyLimit,
       chatEnabled: body.chatEnabled,
     });
-    return NextResponse.json({ settings });
+    return NextResponse.json({ settings, appId });
   } catch (err) {
     console.error('Failed to update settings', err);
     return NextResponse.json({ error: 'Failed to update settings.' }, { status: 500 });

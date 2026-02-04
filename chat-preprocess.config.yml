@@ -1,14 +1,7 @@
-provider: openai # openai | anthropic (Claude)
+provider: openai # openai | anthropic | claude-code-cli
 models:
-  # Base text model for repo facts/narratives and resume parsing
-  textModel: gpt-5-mini-2025-08-07
-  # Optional overrides (fallback to textModel when omitted)
-  # projectTextModel: gpt-5-mini-2025-08-07
-  # resumeTextModel: gpt-5-mini-2025-08-07
-  # Embedding models (defaults already match, set explicitly for clarity)
+  # Embedding models (cheap, ~$0.02/1M tokens)
   embeddingModel: text-embedding-3-small
-  # projectEmbeddingModel: text-embedding-3-large
-  # resumeEmbeddingModel: text-embedding-3-large
 
 resume:
   filename: jcvolpe-resume.pdf

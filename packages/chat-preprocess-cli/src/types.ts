@@ -55,7 +55,7 @@ export type ChatPreprocessConfig = {
    * LLM provider for text-generation tasks (resume parsing, repo enrichment).
    * Embeddings remain OpenAI for now.
    */
-  provider?: 'openai' | 'anthropic';
+  provider?: 'openai' | 'anthropic' | 'claude-code-cli';
   /**
    * List of env files to load before running tasks.
    */
@@ -107,7 +107,7 @@ export type ResolvedRepoSelection = {
 };
 
 export type ResolvedPreprocessConfig = {
-  provider: 'openai' | 'anthropic';
+  provider: 'openai' | 'anthropic' | 'claude-code-cli';
   envFiles: string[];
   paths: PreprocessPaths;
   repos: ResolvedRepoSelection;

@@ -1,8 +1,9 @@
+import { spawn } from 'node:child_process';
 import type OpenAI from 'openai';
 import type { ResponseFormatTextJSONSchemaConfig } from 'openai/resources/responses/responses';
 import Anthropic from '@anthropic-ai/sdk';
 
-export type LlmProviderId = 'openai' | 'anthropic';
+export type LlmProviderId = 'openai' | 'anthropic' | 'claude-code-cli';
 
 export type JsonSchema = ResponseFormatTextJSONSchemaConfig;
 
@@ -56,7 +57,11 @@ export type AnthropicLlmClient = BaseLlmClient & {
   anthropic: Anthropic;
 };
 
-export type LlmClient = OpenAiLlmClient | AnthropicLlmClient;
+export type ClaudeCodeCliLlmClient = BaseLlmClient & {
+  provider: 'claude-code-cli';
+};
+
+export type LlmClient = OpenAiLlmClient | AnthropicLlmClient | ClaudeCodeCliLlmClient;
 
 function buildAnthropicJsonInstruction(jsonSchema: JsonSchema): string {
   const schema = (jsonSchema?.schema ?? {}) as Record<string, unknown>;
@@ -282,6 +287,70 @@ export function createAnthropicLlmClient(client: Anthropic): AnthropicLlmClient 
         rawText: snapshot.trim() || extractAnthropicText(finalMessage),
         usage: finalMessage.usage,
       };
+    },
+  };
+}
+
+function runClaudeCodeCli(combinedPrompt: string, model: string, signal?: AbortSignal): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const args = ['-p', '--output-format', 'text', '--verbose', '--model', model];
+    const child = spawn('claude', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+
+    child.on('error', (err) => {
+      reject(new Error(`Failed to spawn claude CLI: ${err.message}`));
+    });
+
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`claude CLI exited with code ${code}: ${stderr.trim()}`));
+        return;
+      }
+      resolve(stdout.trim());
+    });
+
+    if (signal) {
+      signal.addEventListener('abort', () => {
+        child.kill('SIGTERM');
+      }, { once: true });
+    }
+
+    child.stdin.write(combinedPrompt);
+    child.stdin.end();
+  });
+}
+
+export function createClaudeCodeCliLlmClient(): ClaudeCodeCliLlmClient {
+  return {
+    provider: 'claude-code-cli',
+    async createStructuredJson(prompt): Promise<LlmStructuredResult> {
+      const stage = prompt.stage ?? 'structured_json';
+      prompt.logger?.('llm.request', {
+        provider: 'claude-code-cli',
+        stage,
+        model: prompt.model,
+        maxOutputTokens: prompt.maxOutputTokens ?? null,
+      });
+
+      const schemaInstruction = buildAnthropicJsonInstruction(prompt.jsonSchema);
+      const combinedPrompt = `${prompt.systemPrompt}\n\n${schemaInstruction}\n\n${prompt.userContent}`;
+      const rawText = await runClaudeCodeCli(combinedPrompt, prompt.model, prompt.signal);
+
+      return { rawText };
+    },
+    async streamStructuredJson(prompt): Promise<LlmStructuredResult> {
+      // Claude Code CLI does not support streaming; delegate to non-streaming path.
+      return this.createStructuredJson(prompt);
     },
   };
 }

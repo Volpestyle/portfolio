@@ -41,7 +41,9 @@ const RATE_LIMIT_RULES: RateLimitRule[] = [
 const DEV_RATE_LIMIT_OVERRIDE = process.env.ENABLE_DEV_RATE_LIMIT?.toLowerCase();
 const ENABLE_DEV_RATE_LIMIT = DEV_RATE_LIMIT_OVERRIDE === undefined ? true : DEV_RATE_LIMIT_OVERRIDE === 'true';
 const RATE_LIMIT_RETRY_MS = 60_000;
-const REDIS_RATE_LIMIT_PREFIX = 'chat:ratelimit';
+const RATE_LIMIT_APP_ID =
+  process.env.RATE_LIMIT_APP_ID ?? process.env.NEXT_PUBLIC_APP_NAME ?? process.env.APP_NAME ?? 'portfolio';
+const REDIS_RATE_LIMIT_PREFIX = `chat:ratelimit:${RATE_LIMIT_APP_ID}`;
 
 let chatRateLimiters: RateLimiterInstance[] | null = null;
 let chatRateLimiterPromise: Promise<RateLimiterInstance[] | null> | null = null;

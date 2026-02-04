@@ -32,13 +32,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function normalizeProvider(value: unknown): 'openai' | 'anthropic' | undefined {
+function normalizeProvider(value: unknown): 'openai' | 'anthropic' | 'claude-code-cli' | undefined {
   if (typeof value !== 'string') {
     return undefined;
   }
   const normalized = value.trim().toLowerCase();
   if (normalized === 'openai') return 'openai';
   if (normalized === 'anthropic' || normalized === 'claude') return 'anthropic';
+  if (normalized === 'claude-code-cli' || normalized === 'claude-code' || normalized === 'cli') return 'claude-code-cli';
   return undefined;
 }
 

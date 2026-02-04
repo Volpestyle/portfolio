@@ -1,9 +1,10 @@
 import { SignJWT, calculateJwkThumbprint, exportJWK, importPKCS8, importSPKI, type JWK, type KeyLike } from 'jose';
 import { resolveSecretValue } from '@/lib/secrets/manager';
 
-const DEFAULT_ALLOWED_APPS = ['yt-expert'];
+const DEFAULT_ALLOWED_APPS = ['yt-expert', 'y2k'];
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://yt-expert.jcvolpe.me',
+  'https://y2k.jcvolpe.me',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
 ];
@@ -18,7 +19,7 @@ export type AppTokenRequest = {
 
 export type AppTokenIssuerConfig = {
   issuer: string;
-  audience: string;
+  audience?: string;
   ttlSeconds: number;
   algorithm: string;
   keyId: string;
@@ -60,7 +61,13 @@ const resolveIssuer = (): string => {
   return 'https://jcvolpe.me';
 };
 
-const resolveAudience = (): string => process.env.APP_JWT_AUDIENCE?.trim() || 'yt-expert.jcvolpe.me';
+const resolveAudience = (): string | undefined => process.env.APP_JWT_AUDIENCE?.trim() || undefined;
+
+const resolveAudienceForApp = (app: string, configured?: string): string => {
+  if (configured) return configured;
+  if (app.includes('.')) return app;
+  return `${app}.jcvolpe.me`;
+};
 
 const resolveTtlSeconds = (): number => {
   const raw = process.env.APP_JWT_TTL_SECONDS?.trim();
@@ -137,7 +144,7 @@ export const issueAppToken = async ({ app, email, subject }: AppTokenRequest): P
     .setProtectedHeader({ alg: config.algorithm, kid: config.keyId })
     .setIssuedAt(now)
     .setIssuer(config.issuer)
-    .setAudience(config.audience)
+    .setAudience(resolveAudienceForApp(app, config.audience))
     .setExpirationTime(now + config.ttlSeconds)
     .sign(privateKey);
 };
