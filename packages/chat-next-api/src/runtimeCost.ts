@@ -156,6 +156,19 @@ async function publishCostMetrics(
             { Name: 'YearMonth', Value: yearMonth },
           ],
         },
+        // Alarm-friendly rollup: identical MTD value published without the
+        // rolling YearMonth dimension so CloudWatch MetricAlarms can bind to
+        // a stable dimension set (MetricAlarms do not support SEARCH).
+        {
+          MetricName: 'RuntimeCostMtdUsd',
+          Value: monthTotalUsd,
+          Unit: StandardUnit.None,
+          StorageResolution: 60,
+          Dimensions: [
+            { Name: 'App', Value: appId },
+            { Name: 'Env', Value: clients.env },
+          ],
+        },
       ],
     })
   );

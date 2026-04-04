@@ -69,16 +69,23 @@ export class ChatInfra extends Construct {
     }
 
     // Monitor the metric that the active runtime cost publisher emits per
-    // chat turn (see packages/chat-next-api/src/runtimeCost.ts). Each metric
-    // stream is dimensioned by App/Env/YearMonth; SEARCH picks up the
-    // currently-active stream without us having to hard-code dimension
-    // values or rotate the alarm every month. Wrapping in MAX reduces the
-    // result to a single time series for alarm evaluation.
-    const mtdCostExpression =
-      "MAX(SEARCH('{PortfolioChat/Costs,App,Env,YearMonth} MetricName=\"RuntimeCostMtdUsd\"', 'Maximum', 300))";
-    const mtdCost = new cloudwatch.MathExpression({
-      expression: mtdCostExpression,
-      usingMetrics: {},
+    // chat turn (see packages/chat-next-api/src/runtimeCost.ts). CloudWatch
+    // MetricAlarms do not support SEARCH expressions, so the publisher also
+    // emits RuntimeCostMtdUsd with just App/Env dimensions (no rolling
+    // YearMonth) specifically so this alarm can bind to a stable dimension
+    // set without needing to be rotated every month.
+    const appId =
+      runtimeEnvironment['COST_APP_ID'] ??
+      runtimeEnvironment['NEXT_PUBLIC_APP_NAME'] ??
+      runtimeEnvironment['APP_NAME'] ??
+      'portfolio';
+    const rawEnv = runtimeEnvironment['APP_ENV'] ?? runtimeEnvironment['NEXT_PUBLIC_APP_ENV'] ?? 'prod';
+    const env = rawEnv === 'production' ? 'prod' : rawEnv;
+    const mtdCost = new cloudwatch.Metric({
+      namespace: 'PortfolioChat/Costs',
+      metricName: 'RuntimeCostMtdUsd',
+      dimensionsMap: { App: appId, Env: env },
+      statistic: 'Maximum',
       period: Duration.minutes(5),
       label: 'ChatMtdCostUsd',
     });
