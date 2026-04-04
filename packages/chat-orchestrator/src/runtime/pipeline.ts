@@ -1508,8 +1508,10 @@ function buildAnswerUserContent(input: { conversationSnippet: string; retrieved:
     //   tokens/doc with duplicate noise.
     // - `description` + `sizeOrScope`: redundant with `impactSummary`.
     // - `context` object: retrieval-time metadata, not used for answers.
-    // - experiences `summary`: kept `impactSummary` as the canonical summary.
-    // - experiences `location`: rarely relevant to portfolio chat answers.
+    // Resume docs don't consistently populate `impactSummary`, so we keep a
+    // single canonical `summary` field and prefer `impactSummary` only when it
+    // exists. We also keep resume `location` because it's the only explicit
+    // geography in the corpus for location/background questions.
     `## Retrieved Projects (${retrieved.projects.length})`,
     JSON.stringify(
       retrieved.projects.map((p) => ({
@@ -1531,11 +1533,12 @@ function buildAnswerUserContent(input: { conversationSnippet: string; retrieved:
         id: e.id,
         company: e.company,
         title: e.title,
+        location: e.location,
         startDate: e.startDate,
         endDate: e.endDate,
         isCurrent: e.isCurrent,
         experienceType: e.experienceType,
-        impactSummary: normalizeSnippet(e.impactSummary),
+        summary: normalizeSnippet(e.impactSummary ?? e.summary),
         skills: e.skills,
         linkedProjects: e.linkedProjects,
         bullets: e.bullets?.slice(0, EXPERIENCE_BODY_SNIPPET_COUNT),
@@ -1551,6 +1554,7 @@ function buildAnswerUserContent(input: { conversationSnippet: string; retrieved:
         institution: e.institution,
         degree: e.degree,
         field: e.field,
+        location: e.location,
         startDate: e.startDate,
         endDate: e.endDate,
         isCurrent: e.isCurrent,

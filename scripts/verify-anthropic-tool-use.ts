@@ -57,53 +57,100 @@ Explain your high level step by step reasoning and how you arrrived at the **fin
 - Don't be too verbose, keep your responses laid back while still being informative
 - Generously include sarcasm or wit when the user is being too far off topic, sarcastic, joking, mocking, trying to hack you.`;
 
-// ~6KB of structured retrieval context similar to what prod pipeline sends.
-const PROD_USER_CONTENT = `## Conversation
-USER: yo, have u modded any games?
-## Retrieved Projects (3)
-[
-  {
-    "id": "kh2-multiplayer",
-    "relevance": 1,
-    "name": "kh2-multiplayer",
-    "oneLiner": "KH2 Final Mix multiplayer mod enabling in-game control of friend party members with full animation, movement, and camera via in-process DLL injection; managed by a host-authoritative ENet server.",
-    "description": "A Windows-only KH2FM multiplayer mod that lets players control friend NPCs (e.g., Donald) with independent camera support, backed by a host-authoritative server and a runtime bridge that hooks KH2 memory. It includes a test harness and build/test tooling to exercise the end-to-end flow.",
-    "impactSummary": "Delivers a Windows KH2FM multiplayer experience with up to 3 players in a host-authoritative session, backed by a test harness, shared memory IPC, and a memory-bridge runtime for live KH2 interaction.",
-    "techStack": ["ENet", "CMake", "PowerShell", "C++", "DLL injection", "ReadProcessMemory", "WriteProcessMemory"],
-    "languages": ["C++", "Python", "CMake", "PowerShell"],
-    "tags": ["KH2", "multiplayer", "DLL-injection", "IPC", "ENet", "Windows", "OpenKH"],
-    "bullets": [
-      "In-process DLL injection enables full animation, movement, and camera control for Donald (Friend1).",
-      "Runtime bridge attaches to KH2 via ReadProcessMemory/WriteProcessMemory.",
-      "Shared-memory IPC (InputMailbox) coordinates communication between the runtime and the inject DLL.",
-      "Networking layer features a binary codec, host-authoritative session server with version gating, slot assignment, and snapshot broadcast."
-    ]
-  },
-  {
-    "id": "game-asset-pipeline",
-    "relevance": 0.68,
-    "name": "game-asset-pipeline",
-    "oneLiner": "An AI-powered sprite animation pipeline that turns reference images into web/mobile-ready sprite sheets.",
-    "description": "Built a Next.js 15 project that generates consistent character animations from reference art, with a Character Identity System and a timeline-based Animation Editor.",
-    "techStack": ["Next.js 15", "React", "Tailwind CSS", "OpenAI Sora", "Replicate", "FFmpeg"],
-    "languages": ["TypeScript", "Python", "JavaScript"],
-    "bullets": ["Scaffolded Next.js 15 app", "Implemented Character Identity System", "Built timeline Animation Editor"]
-  },
-  {
-    "id": "portfolio",
-    "relevance": 0.5,
-    "name": "portfolio",
-    "oneLiner": "Personal portfolio with AI-powered chat over portfolio content.",
-    "description": "Full-stack Next.js portfolio with RAG chat interface.",
-    "techStack": ["Next.js", "TypeScript", "AWS CDK", "OpenNext", "OpenAI", "Anthropic"],
-    "languages": ["TypeScript"]
-  }
-]
-## Retrieved Resume (2)
-[
-  {"id": "resume-1", "company": "Lowes", "role": "Software Engineer", "relevance": 0.4},
-  {"id": "resume-2", "company": "Previous", "role": "Engineer", "relevance": 0.3}
-]`;
+// Representative answer-stage payload matching the current trimmed prod shape.
+const PROD_RETRIEVED = {
+  projects: [
+    {
+      id: 'kh2-multiplayer',
+      name: 'kh2-multiplayer',
+      oneLiner:
+        'KH2 Final Mix multiplayer mod enabling in-game control of friend party members with full animation, movement, and camera via in-process DLL injection; managed by a host-authoritative ENet server.',
+      impactSummary:
+        'Delivers a Windows KH2FM multiplayer experience with up to 3 players in a host-authoritative session, backed by a test harness, shared memory IPC, and a memory-bridge runtime for live KH2 interaction.',
+      techStack: ['ENet', 'CMake', 'PowerShell', 'C++', 'DLL injection', 'ReadProcessMemory', 'WriteProcessMemory'],
+      languages: ['C++', 'Python', 'CMake', 'PowerShell'],
+      bullets: [
+        'In-process DLL injection enables full animation, movement, and camera control for Donald (Friend1).',
+        'Runtime bridge attaches to KH2 via ReadProcessMemory/WriteProcessMemory.',
+        'Shared-memory IPC (InputMailbox) coordinates communication between the runtime and the inject DLL.',
+        'Networking layer features a binary codec, host-authoritative session server with version gating, slot assignment, and snapshot broadcast.',
+      ],
+    },
+    {
+      id: 'game-asset-pipeline',
+      name: 'game-asset-pipeline',
+      oneLiner:
+        'An AI-powered sprite animation pipeline that turns reference images into web/mobile-ready sprite sheets.',
+      impactSummary:
+        'Delivers a complete, identity-driven AI sprite pipeline that outputs web and mobile-ready sprite sheets with frames and metadata from reference art.',
+      techStack: ['Next.js 15', 'React', 'Tailwind CSS', 'OpenAI Sora', 'Replicate', 'FFmpeg'],
+      languages: ['TypeScript', 'Python', 'JavaScript'],
+      bullets: [
+        'Scaffolded Next.js 15 app',
+        'Implemented Character Identity System',
+        'Built timeline Animation Editor',
+      ],
+    },
+    {
+      id: 'portfolio',
+      name: 'portfolio',
+      oneLiner: 'Personal portfolio with AI-powered chat over portfolio content.',
+      impactSummary:
+        'Delivers a fully integrated, edge-enabled portfolio with AI-powered chat, a scalable blog CMS, and a GitHub-backed project viewer on AWS.',
+      techStack: ['Next.js', 'TypeScript', 'AWS CDK', 'OpenNext', 'OpenAI', 'Anthropic'],
+      languages: ['TypeScript'],
+      bullets: ['Implemented AI-powered chat with RAG and semantic search across portfolio content'],
+    },
+  ],
+  experiences: [
+    {
+      id: 'amazon-web-services-front-end-engineer-seattle-2021-2023',
+      company: 'Amazon Web Services',
+      title: 'Front End Engineer',
+      location: 'Seattle, WA',
+      startDate: '2021-07-01',
+      endDate: '2023-01-31',
+      isCurrent: false,
+      experienceType: 'full_time',
+      summary:
+        'Led frontend enhancements and cross-team collaboration for the AWS IAM Console, positively impacting thousands of customers.',
+      skills: ['React', 'IAM Console', 'CloudWatch', 'On-call rotations'],
+      linkedProjects: [],
+      bullets: [
+        'Led implementation and launch of new React user experiences on the AWS Identity and Access Management (IAM) Console, impacting thousands of customers.',
+      ],
+    },
+  ],
+  education: [
+    {
+      id: 'iowa-state-university',
+      institution: 'Iowa State University',
+      degree: 'B.S.',
+      field: 'Software Engineering',
+      location: 'Ames, Iowa',
+      startDate: '2017-08-01',
+      endDate: '2021-05-01',
+      isCurrent: false,
+      summary: 'Software engineering degree with a GPA of 3.01.',
+      skills: [],
+      bullets: ['GPA 3.01'],
+    },
+  ],
+};
+
+const PROD_USER_CONTENT = [
+  '## Conversation',
+  'USER: yo, have u modded any games?',
+  '',
+  `## Retrieved Projects (${PROD_RETRIEVED.projects.length})`,
+  JSON.stringify(PROD_RETRIEVED.projects, null, 2),
+  '',
+  `## Retrieved Experiences (${PROD_RETRIEVED.experiences.length})`,
+  JSON.stringify(PROD_RETRIEVED.experiences, null, 2),
+  '',
+  `## Retrieved Education (${PROD_RETRIEVED.education.length})`,
+  JSON.stringify(PROD_RETRIEVED.education, null, 2),
+].join('\n');
 
 async function runOne(
   client: ReturnType<typeof createAnthropicLlmClient>,
