@@ -2,6 +2,7 @@
 
 import ReactMarkdown, { type Components } from 'react-markdown';
 import type { ReactNode } from 'react';
+import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
@@ -389,6 +390,7 @@ export function Markdown({
   return (
     <div className={cn('max-w-none text-base leading-relaxed text-gray-200 [&>*:first-child]:mt-0', className)}>
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, markdownSanitizeSchema], rehypeHighlight]}
         components={components}
       >
