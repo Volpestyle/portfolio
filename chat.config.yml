@@ -3,7 +3,9 @@ models:
   # plannerModel: gpt-5-nano-2025-08-07
   # answerModel: gpt-5-nano-2025-08-07
   plannerModel: claude-haiku-4-5
-  answerModel: claude-haiku-4-5
+  # Sonnet handles the AnswerPayloadSchema (nested uiHints/cardReasoning)
+  # reliably; Haiku 4.5 drops fields ~20% of the time with this schema.
+  answerModel: claude-sonnet-4-6
   # answerModelNoRetrieval: gpt-5-nano-2025-08-07
   embeddingModel: text-embedding-3-small
   reasoning:

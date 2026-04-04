@@ -20,7 +20,7 @@ export class ChatInfra extends Construct {
 
     this.chatExportBucket = this.createChatExportBucket();
     this.chatCostTable = this.createChatCostTable();
-    this.createOpenAiCostAlarm(props.runtimeEnvironment);
+    this.createChatCostAlarm(props.runtimeEnvironment);
   }
 
   private createChatExportBucket(): s3.Bucket {
@@ -53,58 +53,56 @@ export class ChatInfra extends Construct {
     });
   }
 
-  private createOpenAiCostAlarm(runtimeEnvironment: Record<string, string>) {
-    const email = runtimeEnvironment['OPENAI_COST_ALERT_EMAIL'];
-    const metricsEnabled = runtimeEnvironment['OPENAI_COST_METRICS_ENABLED'] === 'true';
-    if (!email || !metricsEnabled) {
+  private createChatCostAlarm(runtimeEnvironment: Record<string, string>) {
+    // `CHAT_COST_ALERT_EMAIL` is the preferred env var; fall back to the
+    // legacy `OPENAI_COST_ALERT_EMAIL` name, then to the first entry in
+    // `ADMIN_EMAILS` (which the deploy workflow already exposes) so this
+    // alarm self-configures without requiring new CI variables.
+    const explicitEmail = runtimeEnvironment['CHAT_COST_ALERT_EMAIL'] ?? runtimeEnvironment['OPENAI_COST_ALERT_EMAIL'];
+    const adminEmailFallback = runtimeEnvironment['ADMIN_EMAILS']
+      ?.split(',')
+      .map((entry) => entry.trim())
+      .find((entry) => entry.length > 0);
+    const email = explicitEmail ?? adminEmailFallback;
+    if (!email) {
       return;
     }
 
-    const namespace = runtimeEnvironment['OPENAI_COST_METRIC_NAMESPACE'] ?? 'PortfolioChat/OpenAI';
-    const metricName = runtimeEnvironment['OPENAI_COST_METRIC_NAME'] ?? 'EstimatedCost';
-
-    const dailyCost = new cloudwatch.Metric({
-      namespace,
-      metricName,
-      statistic: 'Sum',
-      period: Duration.days(1),
+    // Monitor the metric that the active runtime cost publisher emits per
+    // chat turn (see packages/chat-next-api/src/runtimeCost.ts). Each metric
+    // stream is dimensioned by App/Env/YearMonth; SEARCH picks up the
+    // currently-active stream without us having to hard-code dimension
+    // values or rotate the alarm every month. Wrapping in MAX reduces the
+    // result to a single time series for alarm evaluation.
+    const mtdCostExpression =
+      "MAX(SEARCH('{PortfolioChat/Costs,App,Env,YearMonth} MetricName=\"RuntimeCostMtdUsd\"', 'Maximum', 300))";
+    const mtdCost = new cloudwatch.MathExpression({
+      expression: mtdCostExpression,
+      usingMetrics: {},
+      period: Duration.minutes(5),
+      label: 'ChatMtdCostUsd',
     });
 
-    const rolling30d = new cloudwatch.MathExpression({
-      expression: 'SUM([cost], 30)',
-      usingMetrics: { cost: dailyCost },
-      period: Duration.days(1),
-      label: 'OpenAICost30d',
-    });
+    const thresholdRaw = runtimeEnvironment['CHAT_COST_ALERT_THRESHOLD_USD'];
+    const parsedThreshold = thresholdRaw ? Number(thresholdRaw) : NaN;
+    const threshold = Number.isFinite(parsedThreshold) && parsedThreshold > 0 ? parsedThreshold : 10;
 
-    const alarm = new cloudwatch.Alarm(this, 'OpenAICostAlarm', {
-      metric: rolling30d,
-      threshold: 10,
+    const alarm = new cloudwatch.Alarm(this, 'ChatMtdCostAlarm', {
+      metric: mtdCost,
+      threshold,
       evaluationPeriods: 1,
       datapointsToAlarm: 1,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-      alarmDescription: 'OpenAI estimated cost over the last ~30 days exceeded $10.',
+      alarmDescription: `Chat month-to-date cost exceeded $${threshold} USD.`,
     });
 
-    const missingDataAlarm = new cloudwatch.Alarm(this, 'OpenAICostMetricMissing', {
-      metric: dailyCost.with({ statistic: 'SampleCount' }),
-      threshold: 1,
-      evaluationPeriods: 3,
-      datapointsToAlarm: 3,
-      treatMissingData: cloudwatch.TreatMissingData.BREACHING,
-      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
-      alarmDescription: 'No OpenAI cost metrics received for 3 days; publishing may be broken.',
-    });
-
-    const topic = new sns.Topic(this, 'OpenAICostAlarmTopic', {
-      displayName: 'OpenAI Cost Alarm',
+    const topic = new sns.Topic(this, 'ChatCostAlarmTopic', {
+      displayName: 'Chat Cost Alarm',
     });
     topic.addSubscription(new subs.EmailSubscription(email));
 
     alarm.addAlarmAction(new cloudwatchActions.SnsAction(topic));
     alarm.addOkAction(new cloudwatchActions.SnsAction(topic));
-    missingDataAlarm.addAlarmAction(new cloudwatchActions.SnsAction(topic));
-    missingDataAlarm.addOkAction(new cloudwatchActions.SnsAction(topic));
   }
 }

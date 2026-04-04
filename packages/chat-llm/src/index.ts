@@ -65,12 +65,34 @@ export type LlmClient = OpenAiLlmClient | AnthropicLlmClient | ClaudeCodeCliLlmC
 
 function buildAnthropicJsonInstruction(jsonSchema: JsonSchema): string {
   const schema = (jsonSchema?.schema ?? {}) as Record<string, unknown>;
-  // Keep it short-ish; Claude does well with explicit "JSON only" rules.
+  // Fallback prompt-only guidance when the schema is empty and we can't use
+  // Anthropic's native tool_use structured output path.
   return [
     'You MUST respond with valid JSON only (no markdown, no prose).',
     'The JSON must conform to this JSON Schema:',
     JSON.stringify(schema),
   ].join('\n');
+}
+
+function hasUsableJsonSchema(jsonSchema: JsonSchema): boolean {
+  const schema = jsonSchema?.schema as Record<string, unknown> | undefined;
+  if (!schema || typeof schema !== 'object') return false;
+  // Anthropic's Tool.InputSchema requires `type: 'object'`. If the caller gave
+  // us anything else (primitive, array, missing type), fall back to
+  // prompt-engineering mode rather than attempting an invalid tool definition.
+  return schema['type'] === 'object';
+}
+
+function buildAnthropicToolFromSchema(jsonSchema: JsonSchema): Anthropic.Messages.Tool {
+  const schemaObj = jsonSchema.schema as Record<string, unknown>;
+  // Tool.InputSchema requires `type: 'object'` and allows arbitrary extra keys.
+  // We've already guarded on `type === 'object'` so this cast is safe.
+  const input_schema = schemaObj as Anthropic.Messages.Tool.InputSchema;
+  return {
+    name: jsonSchema.name,
+    ...(jsonSchema.description ? { description: jsonSchema.description } : {}),
+    input_schema,
+  };
 }
 
 function extractAnthropicText(message: Anthropic.Messages.Message): string {
@@ -81,6 +103,15 @@ function extractAnthropicText(message: Anthropic.Messages.Message): string {
     }
   }
   return parts.join('').trim();
+}
+
+function extractAnthropicToolInput(message: Anthropic.Messages.Message, toolName: string): unknown {
+  for (const block of message.content ?? []) {
+    if (block.type === 'tool_use' && block.name === toolName) {
+      return block.input;
+    }
+  }
+  return undefined;
 }
 
 function extractOpenAiStructured(response: unknown): unknown {
@@ -94,7 +125,10 @@ function extractOpenAiStructured(response: unknown): unknown {
     const content = Array.isArray(item.content) ? (item.content as Array<Record<string, unknown>>) : [];
     for (const chunk of content) {
       if (!chunk || typeof chunk !== 'object') continue;
-      if (Object.prototype.hasOwnProperty.call(chunk, 'parsed') && (chunk as { parsed?: unknown }).parsed !== undefined) {
+      if (
+        Object.prototype.hasOwnProperty.call(chunk, 'parsed') &&
+        (chunk as { parsed?: unknown }).parsed !== undefined
+      ) {
         return (chunk as { parsed?: unknown }).parsed;
       }
     }
@@ -125,7 +159,9 @@ export function createOpenAiLlmClient(client: OpenAI): OpenAiLlmClient {
             { role: 'user', content: prompt.userContent, type: 'message' },
           ],
           ...(prompt.openAiReasoning ? { reasoning: prompt.openAiReasoning as Record<string, unknown> } : {}),
-          ...(typeof prompt.maxOutputTokens === 'number' && Number.isFinite(prompt.maxOutputTokens) && prompt.maxOutputTokens > 0
+          ...(typeof prompt.maxOutputTokens === 'number' &&
+          Number.isFinite(prompt.maxOutputTokens) &&
+          prompt.maxOutputTokens > 0
             ? { max_output_tokens: Math.floor(prompt.maxOutputTokens) }
             : {}),
           ...(typeof prompt.temperature === 'number' && Number.isFinite(prompt.temperature)
@@ -162,7 +198,9 @@ export function createOpenAiLlmClient(client: OpenAI): OpenAiLlmClient {
             { role: 'user', content: prompt.userContent, type: 'message' },
           ],
           ...(prompt.openAiReasoning ? { reasoning: prompt.openAiReasoning as Record<string, unknown> } : {}),
-          ...(typeof prompt.maxOutputTokens === 'number' && Number.isFinite(prompt.maxOutputTokens) && prompt.maxOutputTokens > 0
+          ...(typeof prompt.maxOutputTokens === 'number' &&
+          Number.isFinite(prompt.maxOutputTokens) &&
+          prompt.maxOutputTokens > 0
             ? { max_output_tokens: Math.floor(prompt.maxOutputTokens) }
             : {}),
           ...(typeof prompt.temperature === 'number' && Number.isFinite(prompt.temperature)
@@ -223,23 +261,50 @@ export function createAnthropicLlmClient(client: Anthropic): AnthropicLlmClient 
     anthropic: client,
     async createStructuredJson(prompt): Promise<LlmStructuredResult> {
       const stage = prompt.stage ?? 'structured_json';
+      const useTool = hasUsableJsonSchema(prompt.jsonSchema);
       prompt.logger?.('llm.request', {
         provider: 'anthropic',
         stage,
         model: prompt.model,
         maxOutputTokens: prompt.maxOutputTokens ?? null,
+        mode: useTool ? 'tool_use' : 'prompt_json',
       });
 
+      const baseParams: Anthropic.Messages.MessageCreateParamsNonStreaming = {
+        model: prompt.model,
+        max_tokens: clampAnthropicMaxTokens(prompt.maxOutputTokens),
+        system: prompt.systemPrompt,
+        messages: [{ role: 'user', content: prompt.userContent }],
+        ...(typeof prompt.temperature === 'number' && Number.isFinite(prompt.temperature)
+          ? { temperature: prompt.temperature }
+          : {}),
+      };
+
+      if (useTool) {
+        const tool = buildAnthropicToolFromSchema(prompt.jsonSchema);
+        const message = await client.messages.create(
+          {
+            ...baseParams,
+            tools: [tool],
+            tool_choice: { type: 'tool', name: tool.name, disable_parallel_tool_use: true },
+          },
+          prompt.signal ? { signal: prompt.signal } : undefined
+        );
+
+        const structured = extractAnthropicToolInput(message, tool.name);
+        return {
+          rawText: typeof structured !== 'undefined' ? JSON.stringify(structured) : extractAnthropicText(message),
+          structured,
+          usage: message.usage,
+        };
+      }
+
+      // Fallback: schema-less prompt-engineered JSON mode
       const schemaInstruction = buildAnthropicJsonInstruction(prompt.jsonSchema);
       const message = await client.messages.create(
         {
-          model: prompt.model,
-          max_tokens: clampAnthropicMaxTokens(prompt.maxOutputTokens),
+          ...baseParams,
           system: `${prompt.systemPrompt}\n\n${schemaInstruction}`,
-          messages: [{ role: 'user', content: prompt.userContent }],
-          ...(typeof prompt.temperature === 'number' && Number.isFinite(prompt.temperature)
-            ? { temperature: prompt.temperature }
-            : {}),
         },
         prompt.signal ? { signal: prompt.signal } : undefined
       );
@@ -251,26 +316,81 @@ export function createAnthropicLlmClient(client: Anthropic): AnthropicLlmClient 
     },
     async streamStructuredJson(prompt): Promise<LlmStructuredResult> {
       const stage = prompt.stage ?? 'structured_json';
+      const useTool = hasUsableJsonSchema(prompt.jsonSchema);
       prompt.logger?.('llm.request', {
         provider: 'anthropic',
         stage,
         model: prompt.model,
         maxOutputTokens: prompt.maxOutputTokens ?? null,
         streaming: true,
+        mode: useTool ? 'tool_use' : 'prompt_json',
       });
 
-      const schemaInstruction = buildAnthropicJsonInstruction(prompt.jsonSchema);
-      let snapshot = '';
+      const baseParams: Anthropic.Messages.MessageStreamParams = {
+        model: prompt.model,
+        max_tokens: clampAnthropicMaxTokens(prompt.maxOutputTokens),
+        system: prompt.systemPrompt,
+        messages: [{ role: 'user', content: prompt.userContent }],
+        ...(typeof prompt.temperature === 'number' && Number.isFinite(prompt.temperature)
+          ? { temperature: prompt.temperature }
+          : {}),
+      };
 
+      let snapshot = '';
+      let latestJsonSnapshot: unknown;
+
+      if (useTool) {
+        const tool = buildAnthropicToolFromSchema(prompt.jsonSchema);
+        const stream = client.messages.stream(
+          {
+            ...baseParams,
+            tools: [tool],
+            tool_choice: { type: 'tool', name: tool.name, disable_parallel_tool_use: true },
+          },
+          prompt.signal ? { signal: prompt.signal } : undefined
+        );
+
+        stream.on('inputJson', (partialJson: string, jsonSnapshot: unknown) => {
+          if (typeof partialJson === 'string' && partialJson.length) {
+            snapshot += partialJson;
+          }
+          if (typeof jsonSnapshot !== 'undefined') {
+            latestJsonSnapshot = jsonSnapshot;
+          }
+          if (snapshot) {
+            prompt.onTextSnapshot?.(snapshot);
+          }
+        });
+
+        const finalMessage = await stream.finalMessage();
+        const structured = extractAnthropicToolInput(finalMessage, tool.name) ?? latestJsonSnapshot;
+
+        const rawText = (() => {
+          const trimmed = snapshot.trim();
+          if (trimmed) return trimmed;
+          if (typeof structured !== 'undefined') {
+            try {
+              return JSON.stringify(structured);
+            } catch {
+              return '';
+            }
+          }
+          return extractAnthropicText(finalMessage);
+        })();
+
+        return {
+          rawText,
+          structured,
+          usage: finalMessage.usage,
+        };
+      }
+
+      // Fallback: schema-less prompt-engineered JSON mode with text streaming
+      const schemaInstruction = buildAnthropicJsonInstruction(prompt.jsonSchema);
       const stream = client.messages.stream(
         {
-          model: prompt.model,
-          max_tokens: clampAnthropicMaxTokens(prompt.maxOutputTokens),
+          ...baseParams,
           system: `${prompt.systemPrompt}\n\n${schemaInstruction}`,
-          messages: [{ role: 'user', content: prompt.userContent }],
-          ...(typeof prompt.temperature === 'number' && Number.isFinite(prompt.temperature)
-            ? { temperature: prompt.temperature }
-            : {}),
         },
         prompt.signal ? { signal: prompt.signal } : undefined
       );
@@ -320,9 +440,13 @@ function runClaudeCodeCli(combinedPrompt: string, model: string, signal?: AbortS
     });
 
     if (signal) {
-      signal.addEventListener('abort', () => {
-        child.kill('SIGTERM');
-      }, { once: true });
+      signal.addEventListener(
+        'abort',
+        () => {
+          child.kill('SIGTERM');
+        },
+        { once: true }
+      );
     }
 
     child.stdin.write(combinedPrompt);
@@ -354,4 +478,3 @@ export function createClaudeCodeCliLlmClient(): ClaudeCodeCliLlmClient {
     },
   };
 }
-

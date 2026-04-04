@@ -118,6 +118,18 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     prompt: { amount: 1.0, perTokens: TOKENS_PER_MILLION },
     completion: { amount: 5.0, perTokens: TOKENS_PER_MILLION },
   },
+  // Claude Sonnet 4.6 (pricing per 1M tokens, base input/output only; cache
+  // writes ($3.75/$6) and cache reads ($0.30) are not tracked separately.)
+  // Source: https://platform.claude.com/docs/en/about-claude/pricing
+  'claude-sonnet-4-6': {
+    prompt: { amount: 3.0, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 15.0, perTokens: TOKENS_PER_MILLION },
+  },
+  // Claude Sonnet 4.5 uses the same pricing as Sonnet 4.6.
+  'claude-sonnet-4-5': {
+    prompt: { amount: 3.0, perTokens: TOKENS_PER_MILLION },
+    completion: { amount: 15.0, perTokens: TOKENS_PER_MILLION },
+  },
 };
 
 export const MODEL_ALIASES: Record<string, string> = {
@@ -135,6 +147,10 @@ export const MODEL_ALIASES: Record<string, string> = {
   'claude-3-5-haiku-latest': 'claude-3-5-haiku',
   'claude-haiku-4-5-latest': 'claude-haiku-4-5',
   'claude-4-5-haiku-latest': 'claude-haiku-4-5',
+  'claude-sonnet-4-6-latest': 'claude-sonnet-4-6',
+  'claude-sonnet-4-5-latest': 'claude-sonnet-4-5',
+  'claude-4-6-sonnet': 'claude-sonnet-4-6',
+  'claude-4-5-sonnet': 'claude-sonnet-4-5',
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {

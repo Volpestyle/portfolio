@@ -91,10 +91,10 @@ export class PortfolioStack extends Stack {
         ? acm.Certificate.fromCertificateArn(this, 'PortfolioCertificate', certificateArn)
         : domainName && hostedZone
           ? new acm.Certificate(this, 'PortfolioCertificate', {
-            domainName,
-            validation: acm.CertificateValidation.fromDns(hostedZone),
-            subjectAlternativeNames: alternateDomainNames,
-          })
+              domainName,
+              validation: acm.CertificateValidation.fromDns(hostedZone),
+              subjectAlternativeNames: alternateDomainNames,
+            })
           : undefined;
 
     this.runtimeEnvironment = this.enrichRuntimeEnvironment(environment);
@@ -172,11 +172,17 @@ export class PortfolioStack extends Stack {
     }
 
     const additionalOrigins = this.createAdditionalOrigins(baseEnv);
-    for (const resource of Object.values(additionalOrigins)) {
+    for (const [key, resource] of Object.entries(additionalOrigins)) {
       if (resource.function) {
         this.grantRuntimeAccess(resource.function);
         this.grantSecretAccess(resource.function);
         this.attachSesPermissions(resource.function);
+        // Chat orchestrator publishes per-turn and month-to-date cost metrics
+        // to CloudWatch; without this grant, every chat turn logs
+        // AccessDenied for cloudwatch:PutMetricData.
+        if (key === 'chat') {
+          this.attachCostMetricPermissions(resource.function);
+        }
       }
     }
 
@@ -378,10 +384,10 @@ export class PortfolioStack extends Stack {
         ephemeralStorageSize: Size.gibibytes(4),
         cacheControl: copy.cached
           ? [
-            s3deploy.CacheControl.setPublic(),
-            s3deploy.CacheControl.immutable(),
-            s3deploy.CacheControl.maxAge(Duration.days(365)),
-          ]
+              s3deploy.CacheControl.setPublic(),
+              s3deploy.CacheControl.immutable(),
+              s3deploy.CacheControl.maxAge(Duration.days(365)),
+            ]
           : [s3deploy.CacheControl.setPublic(), s3deploy.CacheControl.noCache()],
       });
     });
@@ -554,10 +560,8 @@ export class PortfolioStack extends Stack {
 
         // The chat endpoint must accept unsigned requests from CloudFront viewers,
         // so disable IAM auth just for that origin to avoid SigV4 errors.
-        const functionAuthType =
-          key === 'chat' ? lambda.FunctionUrlAuthType.NONE : lambda.FunctionUrlAuthType.AWS_IAM;
-        const oacSigning =
-          functionAuthType === lambda.FunctionUrlAuthType.NONE ? cloudfront.Signing.NEVER : undefined;
+        const functionAuthType = key === 'chat' ? lambda.FunctionUrlAuthType.NONE : lambda.FunctionUrlAuthType.AWS_IAM;
+        const oacSigning = functionAuthType === lambda.FunctionUrlAuthType.NONE ? cloudfront.Signing.NEVER : undefined;
 
         const fnUrl = fn.addFunctionUrl({
           authType: functionAuthType,
@@ -673,12 +677,12 @@ export class PortfolioStack extends Stack {
       // (like 'chat') handle requests themselves and don't need the edge function.
       const edgeLambdas = isDefaultOrigin
         ? [
-          {
-            eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
-            functionVersion: serverEdgeFunction.currentVersion,
-            includeBody: true,
-          },
-        ]
+            {
+              eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
+              functionVersion: serverEdgeFunction.currentVersion,
+              includeBody: true,
+            },
+          ]
         : undefined;
 
       const behaviorOptions: cloudfront.BehaviorOptions = {
@@ -704,9 +708,9 @@ export class PortfolioStack extends Stack {
     certificate?: acm.ICertificate
   ):
     | {
-      domainNames: string[];
-      certificate: acm.ICertificate;
-    }
+        domainNames: string[];
+        certificate: acm.ICertificate;
+      }
     | undefined {
     if (!domainName) {
       return undefined;
@@ -856,14 +860,19 @@ export class PortfolioStack extends Stack {
     );
   }
 
-  private attachCostMetricPermissions(fn: cloudfrontExperimental.EdgeFunction) {
-    fn.addToRolePolicy(
+  private attachCostMetricPermissions(grantable: iam.IGrantable) {
+    const allowedNamespaces = [
+      this.runtimeEnvironment['OPENAI_COST_METRIC_NAMESPACE'] ?? 'PortfolioChat/OpenAI',
+      this.runtimeEnvironment['CHAT_COST_METRIC_NAMESPACE'] ?? 'PortfolioChat/Costs',
+    ].filter((value, index, arr) => arr.indexOf(value) === index);
+
+    grantable.grantPrincipal.addToPrincipalPolicy(
       new iam.PolicyStatement({
         actions: ['cloudwatch:PutMetricData'],
         resources: ['*'],
         conditions: {
           StringEquals: {
-            'cloudwatch:namespace': this.runtimeEnvironment['OPENAI_COST_METRIC_NAMESPACE'] ?? 'PortfolioChat/OpenAI',
+            'cloudwatch:namespace': allowedNamespaces,
           },
         },
       })
@@ -910,10 +919,9 @@ export class PortfolioStack extends Stack {
 
   private buildSecretResourceArns(secretId: string): string[] {
     const stack = Stack.of(this);
-    const baseArn =
-      secretId.startsWith('arn:')
-        ? secretId
-        : stack.formatArn({
+    const baseArn = secretId.startsWith('arn:')
+      ? secretId
+      : stack.formatArn({
           service: 'secretsmanager',
           resource: 'secret',
           resourceName: secretId,
