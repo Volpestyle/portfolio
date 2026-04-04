@@ -23,10 +23,23 @@ export type TokenUsage = {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  // Cache-related input tokens (Anthropic prompt caching). `cacheWriteTokens`
+  // are tokens newly added to the cache (billed at ~1.25x base input rate for
+  // 5-min ephemeral); `cacheReadTokens` are tokens served from cache (billed
+  // at ~0.10x base input rate). These are NOT included in `promptTokens`
+  // because Anthropic reports them separately. `totalTokens` sums all four.
+  cacheWriteTokens?: number;
+  cacheReadTokens?: number;
 };
 
 const PROMPT_TOKEN_KEYS = ['prompt_tokens', 'promptTokens', 'input_tokens'] as const;
 const COMPLETION_TOKEN_KEYS = ['completion_tokens', 'completionTokens', 'output_tokens'] as const;
+const CACHE_WRITE_TOKEN_KEYS = ['cache_creation_input_tokens', 'cacheCreationInputTokens'] as const;
+const CACHE_READ_TOKEN_KEYS = ['cache_read_input_tokens', 'cacheReadInputTokens'] as const;
+// Anthropic prompt-cache rates as multipliers of the base input rate.
+// Source: https://platform.claude.com/docs/en/about-claude/pricing
+const CACHE_WRITE_RATE_MULTIPLIER = 1.25; // 5-min ephemeral write premium
+const CACHE_READ_RATE_MULTIPLIER = 0.1; // 10x discount on cache reads
 const MODEL_SUFFIXES = ['-latest', '-preview'] as const;
 const ISO_DATE_SUFFIX = /-\d{4}-\d{2}-\d{2}$/;
 const COMPACT_DATE_SUFFIX = /-\d{8}$/; // e.g. claude-3-5-haiku-20241022
@@ -201,13 +214,18 @@ export function parseUsage(usageCandidate: unknown, options: ParseUsageOptions =
 
   const promptTokens = pickTokenCount(usageCandidate, PROMPT_TOKEN_KEYS);
   const completionTokens = pickTokenCount(usageCandidate, COMPLETION_TOKEN_KEYS);
-  const totalTokens = promptTokens + completionTokens;
+  const cacheWriteTokens = pickTokenCount(usageCandidate, CACHE_WRITE_TOKEN_KEYS);
+  const cacheReadTokens = pickTokenCount(usageCandidate, CACHE_READ_TOKEN_KEYS);
+  const totalTokens = promptTokens + completionTokens + cacheWriteTokens + cacheReadTokens;
 
   if (!options.allowZero && totalTokens <= 0) {
     return null;
   }
 
-  return { promptTokens, completionTokens, totalTokens };
+  const usage: TokenUsage = { promptTokens, completionTokens, totalTokens };
+  if (cacheWriteTokens > 0) usage.cacheWriteTokens = cacheWriteTokens;
+  if (cacheReadTokens > 0) usage.cacheReadTokens = cacheReadTokens;
+  return usage;
 }
 
 function isModelSuffix(model: string): boolean {
@@ -269,7 +287,15 @@ export function getNormalizedPricing(model?: string | null): NormalizedModelPric
 export function calculateCost(usage: TokenUsage, pricing: NormalizedModelPricing): number {
   const promptCost = (usage.promptTokens / TOKENS_PER_THOUSAND) * pricing.prompt;
   const completionCost = (usage.completionTokens / TOKENS_PER_THOUSAND) * pricing.completion;
-  return promptCost + completionCost;
+  // Anthropic prompt-caching adjustments: cache writes are billed at the
+  // input rate plus a 25% premium, cache reads at 10% of the input rate.
+  const cacheWriteCost = usage.cacheWriteTokens
+    ? (usage.cacheWriteTokens / TOKENS_PER_THOUSAND) * pricing.prompt * CACHE_WRITE_RATE_MULTIPLIER
+    : 0;
+  const cacheReadCost = usage.cacheReadTokens
+    ? (usage.cacheReadTokens / TOKENS_PER_THOUSAND) * pricing.prompt * CACHE_READ_RATE_MULTIPLIER
+    : 0;
+  return promptCost + completionCost + cacheWriteCost + cacheReadCost;
 }
 
 export type EstimateCostOptions = {

@@ -131,9 +131,22 @@ async function runOne(
     },
   });
 
+  const usage = result.usage as
+    | {
+        input_tokens?: number;
+        cache_creation_input_tokens?: number;
+        cache_read_input_tokens?: number;
+        output_tokens?: number;
+      }
+    | undefined;
   console.log(
     `  snapshots=${snapshots} rawText.len=${result.rawText.length} structured.type=${typeof result.structured}`
   );
+  if (usage) {
+    console.log(
+      `  tokens: input=${usage.input_tokens ?? 0} cache_write=${usage.cache_creation_input_tokens ?? 0} cache_read=${usage.cache_read_input_tokens ?? 0} output=${usage.output_tokens ?? 0}`
+    );
+  }
 
   const validation = AnswerPayloadSchema.safeParse(result.structured);
   if (!validation.success) {

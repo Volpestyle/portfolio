@@ -186,7 +186,9 @@ function _extractResponseOutputText(response: { output_text?: string; output?: u
     return response.output_text.trim();
   }
   const parts: string[] = [];
-  const outputItems = Array.isArray(response.output) ? (response.output as Array<{ type?: string; content?: unknown[] }>) : [];
+  const outputItems = Array.isArray(response.output)
+    ? (response.output as Array<{ type?: string; content?: unknown[] }>)
+    : [];
   for (const item of outputItems) {
     if (!item || typeof item !== 'object') continue;
     const content = Array.isArray((item as { content?: unknown[] }).content)
@@ -217,7 +219,10 @@ function _extractResponseParsedContent(response: { output?: unknown[] } | null |
     const content = Array.isArray(item.content) ? (item.content as Array<Record<string, unknown>>) : [];
     for (const chunk of content) {
       if (!chunk || typeof chunk !== 'object') continue;
-      if (Object.prototype.hasOwnProperty.call(chunk, 'parsed') && (chunk as { parsed?: unknown }).parsed !== undefined) {
+      if (
+        Object.prototype.hasOwnProperty.call(chunk, 'parsed') &&
+        (chunk as { parsed?: unknown }).parsed !== undefined
+      ) {
         return (chunk as { parsed?: unknown }).parsed;
       }
     }
@@ -342,7 +347,8 @@ const DEFAULT_PROFILE_IDENTITY = {
 
 function applyProfileTemplate(prompt: string, profileContext?: ProfileContext): string {
   const ownerName = profileContext?.fullName?.trim() || DEFAULT_PROFILE_IDENTITY.fullName;
-  const domainLabel = profileContext?.domainLabel?.trim() || profileContext?.headline?.trim() || DEFAULT_PROFILE_IDENTITY.domainLabel;
+  const domainLabel =
+    profileContext?.domainLabel?.trim() || profileContext?.headline?.trim() || DEFAULT_PROFILE_IDENTITY.domainLabel;
   const retrievalTopics = profileContext?.retrievalTriggers?.length
     ? profileContext.retrievalTriggers.join(', ')
     : 'your background, locations, experiences, resume, skills, etc.';
@@ -378,10 +384,7 @@ export function buildPlannerSystemPrompt(profileContext?: ProfileContext): strin
   return profileSection ? `${base}\n\n${profileSection}` : base;
 }
 
-export function buildAnswerSystemPrompt(
-  persona?: PersonaSummary,
-  profileContext?: ProfileContext
-): string {
+export function buildAnswerSystemPrompt(persona?: PersonaSummary, profileContext?: ProfileContext): string {
   const sections: string[] = [];
 
   if (persona?.systemPersona?.trim()) {
@@ -468,8 +471,7 @@ function groupIntoTurns(messages: ChatRequestMessage[]): ConversationTurn[] {
   const pushTurn = () => {
     if (!currentTurn.user) return;
     const assistant = currentTurn.assistant;
-    const estimatedTokens =
-      countTokens(currentTurn.user.content) + (assistant ? countTokens(assistant.content) : 0);
+    const estimatedTokens = countTokens(currentTurn.user.content) + (assistant ? countTokens(assistant.content) : 0);
     turns.push({
       user: currentTurn.user,
       assistant,
@@ -525,7 +527,9 @@ function applySlidingWindow(
     }
   }
 
-  const truncatedMessages = keptTurns.flatMap((turn) => [turn.user, turn.assistant].filter(Boolean)) as ChatRequestMessage[];
+  const truncatedMessages = keptTurns.flatMap((turn) =>
+    [turn.user, turn.assistant].filter(Boolean)
+  ) as ChatRequestMessage[];
   const droppedTurns = Math.max(0, turns.length - keptTurns.length);
 
   return {
@@ -584,7 +588,6 @@ function normalizeSnippet(text?: string | null, maxChars = MAX_BODY_SNIPPET_CHAR
   if (!normalized) return undefined;
   return normalized.length > maxChars ? normalized.slice(0, maxChars) : normalized;
 }
-
 
 function sanitizeProfileContext(profile?: ProfileContext): ProfileContext | undefined {
   if (!profile) return undefined;
@@ -671,7 +674,11 @@ function resolveModelConfig(options?: ChatRuntimeOptions): ModelConfig {
   };
 }
 
-function resolveReasoningParams(model: string, allowReasoning: boolean, effort?: ReasoningEffort): Reasoning | undefined {
+function resolveReasoningParams(
+  model: string,
+  allowReasoning: boolean,
+  effort?: ReasoningEffort
+): Reasoning | undefined {
   if (!allowReasoning || !effort) return undefined;
   const normalizedModel = model.trim().toLowerCase();
   const isReasoningModel = normalizedModel.startsWith('gpt-5') || normalizedModel.startsWith('o');
@@ -683,7 +690,11 @@ function resolveReasoningParams(model: string, allowReasoning: boolean, effort?:
 function coerceReasoningEffort(value?: unknown): ReasoningEffort | undefined {
   if (typeof value !== 'string') return undefined;
   const normalized = value.trim().toLowerCase();
-  return normalized === 'none' || normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high'
+  return normalized === 'none' ||
+    normalized === 'minimal' ||
+    normalized === 'low' ||
+    normalized === 'medium' ||
+    normalized === 'high'
     ? (normalized as ReasoningEffort)
     : undefined;
 }
@@ -697,7 +708,10 @@ function clampQueryLimit(_value?: number | null): number {
 function sanitizePlannerQueryText(text: string): string {
   const trimmed = (text ?? '').trim();
   if (!trimmed) return '';
-  const stripped = trimmed.replace(/\b(projects?|experiences?|experience|resume)\b/gi, '').replace(/\s+/g, ' ').trim();
+  const stripped = trimmed
+    .replace(/\b(projects?|experiences?|experience|resume)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
   return stripped.length ? stripped : trimmed;
 }
 
@@ -807,7 +821,9 @@ async function _runJsonResponse<T>({
         userContent,
         jsonSchema: jsonSchemaFormat,
         maxOutputTokens:
-          typeof maxTokens === 'number' && Number.isFinite(maxTokens) && maxTokens > 0 ? Math.floor(maxTokens) : undefined,
+          typeof maxTokens === 'number' && Number.isFinite(maxTokens) && maxTokens > 0
+            ? Math.floor(maxTokens)
+            : undefined,
         temperature: typeof temperature === 'number' && Number.isFinite(temperature) ? temperature : undefined,
         openAiReasoning: reasoning,
         signal,
@@ -868,7 +884,12 @@ async function _runJsonResponse<T>({
       const validated = schema.safeParse(candidate);
       if (!validated.success) {
         lastError = validated.error.issues;
-        logger?.('chat.pipeline.model.validation_error', { stage: stageLabel, model, attempt, issues: validated.error.issues });
+        logger?.('chat.pipeline.model.validation_error', {
+          stage: stageLabel,
+          model,
+          attempt,
+          issues: validated.error.issues,
+        });
         let candidatePreview: string | undefined;
         try {
           if (candidate === null) {
@@ -900,7 +921,11 @@ async function _runJsonResponse<T>({
     }
   }
 
-  logger?.('chat.pipeline.model.fallback', { stage: stageLabel, model, lastError: formatLogValue(lastError ?? 'unknown') });
+  logger?.('chat.pipeline.model.fallback', {
+    stage: stageLabel,
+    model,
+    lastError: formatLogValue(lastError ?? 'unknown'),
+  });
   if (throwOnFailure) {
     throw new Error(`chat_pipeline_model_failure:${model}`);
   }
@@ -945,7 +970,8 @@ async function runStreamingJsonResponse<T>({
   };
   const stageLabel = usageStage ?? 'json_response';
   const effectiveMaxAttempts = onTextDelta ? 1 : maxAttempts;
-  const normalizeEscapes = (s: string) => s.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\r/g, '\r').replace(/\\\\/g, '\\');
+  const normalizeEscapes = (s: string) =>
+    s.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\r/g, '\r').replace(/\\\\/g, '\\');
   const sharedPrefixLength = (a: string, b: string) => {
     const max = Math.min(a.length, b.length);
     let idx = 0;
@@ -1055,7 +1081,9 @@ async function runStreamingJsonResponse<T>({
         userContent,
         jsonSchema: jsonSchemaFormat,
         maxOutputTokens:
-          typeof maxTokens === 'number' && Number.isFinite(maxTokens) && maxTokens > 0 ? Math.floor(maxTokens) : undefined,
+          typeof maxTokens === 'number' && Number.isFinite(maxTokens) && maxTokens > 0
+            ? Math.floor(maxTokens)
+            : undefined,
         temperature: typeof temperature === 'number' && Number.isFinite(temperature) ? temperature : undefined,
         openAiReasoning: reasoning,
         signal,
@@ -1093,11 +1121,13 @@ async function runStreamingJsonResponse<T>({
           logger?.('chat.pipeline.error', { stage: `${stageLabel}_raw_debug`, model, error: formatLogValue(err) });
         }
       }
-      const structuredCandidate = typeof finalResponse.structured !== 'undefined' ? finalResponse.structured : streamedParsed;
+      const structuredCandidate =
+        typeof finalResponse.structured !== 'undefined' ? finalResponse.structured : streamedParsed;
       logger?.('chat.pipeline.model.raw', { stage: stageLabel, model, raw: rawContent, attempt });
 
       let candidate = structuredCandidate;
-      let parsedFrom: 'structured' | 'text' | undefined = typeof structuredCandidate !== 'undefined' ? 'structured' : undefined;
+      let parsedFrom: 'structured' | 'text' | undefined =
+        typeof structuredCandidate !== 'undefined' ? 'structured' : undefined;
 
       if (typeof candidate === 'undefined') {
         const trimmedContent = typeof rawContent === 'string' ? rawContent.trim() : '';
@@ -1148,10 +1178,18 @@ async function runStreamingJsonResponse<T>({
           onParsedDelta?.(candidate);
         }
       } catch (err) {
-        logger?.('chat.pipeline.error', { stage: `${stageLabel}_parsed_delta_final`, model, error: formatLogValue(err) });
+        logger?.('chat.pipeline.error', {
+          stage: `${stageLabel}_parsed_delta_final`,
+          model,
+          error: formatLogValue(err),
+        });
       }
 
-      if (candidate && typeof candidate === 'object' && typeof (candidate as { message?: unknown }).message === 'string') {
+      if (
+        candidate &&
+        typeof candidate === 'object' &&
+        typeof (candidate as { message?: unknown }).message === 'string'
+      ) {
         const currentMessage = (candidate as { message: string }).message as string;
         (candidate as { message: string }).message = sanitizeMessageSnapshot(
           currentMessage,
@@ -1203,7 +1241,11 @@ async function runStreamingJsonResponse<T>({
     }
   }
 
-  logger?.('chat.pipeline.model.fallback', { stage: stageLabel, model, lastError: formatLogValue(lastError ?? 'unknown') });
+  logger?.('chat.pipeline.model.fallback', {
+    stage: stageLabel,
+    model,
+    lastError: formatLogValue(lastError ?? 'unknown'),
+  });
   if (throwOnFailure) {
     throw new Error(`chat_pipeline_model_failure:${model}`);
   }
@@ -1215,17 +1257,17 @@ async function runStreamingJsonResponse<T>({
 function normalizePlannerOutput(plan: PlannerLLMOutput, model?: string): RetrievalPlan {
   const queries: RetrievalPlan['queries'] = Array.isArray(plan.queries)
     ? plan.queries
-      .map((query) => {
-        const source = query?.source;
-        const text = source === 'profile' ? undefined : sanitizePlannerQueryText(query?.text ?? '');
-        return {
-          source,
-          // Profile retrieval is a fetch-all; ignore any planner-provided text.
-          text,
-          limit: clampQueryLimit(query?.limit),
-        };
-      })
-      .filter((query) => query.source === 'projects' || query.source === 'resume' || query.source === 'profile')
+        .map((query) => {
+          const source = query?.source;
+          const text = source === 'profile' ? undefined : sanitizePlannerQueryText(query?.text ?? '');
+          return {
+            source,
+            // Profile retrieval is a fetch-all; ignore any planner-provided text.
+            text,
+            limit: clampQueryLimit(query?.limit),
+          };
+        })
+        .filter((query) => query.source === 'projects' || query.source === 'resume' || query.source === 'profile')
     : [];
 
   const deduped: RetrievalPlan['queries'] = [];
@@ -1237,9 +1279,7 @@ function normalizePlannerOutput(plan: PlannerLLMOutput, model?: string): Retriev
     deduped.push(query);
   }
   const thoughts = Array.isArray(plan.thoughts)
-    ? plan.thoughts
-      .map((thought) => (typeof thought === 'string' ? thought.trim() : ''))
-      .filter(Boolean)
+    ? plan.thoughts.map((thought) => (typeof thought === 'string' ? thought.trim() : '')).filter(Boolean)
     : [];
 
   return {
@@ -1305,7 +1345,13 @@ function normalizeDocId(id: string): string {
 async function executeRetrievalPlan(
   retrieval: RetrievalDrivers,
   plan: RetrievalPlan,
-  options?: { logger?: ChatRuntimeOptions['logger']; cache?: RetrievalCache; embeddingModel?: string; minRelevanceScore?: number; onQueryResult?: (summary: RetrievalSummary) => void }
+  options?: {
+    logger?: ChatRuntimeOptions['logger'];
+    cache?: RetrievalCache;
+    embeddingModel?: string;
+    minRelevanceScore?: number;
+    onQueryResult?: (summary: RetrievalSummary) => void;
+  }
 ): Promise<ExecutedRetrievalResult> {
   const cache = options?.cache;
 
@@ -1388,7 +1434,10 @@ async function executeRetrievalPlan(
     parts.flatMap((p) => p.projects),
     (p) => p.id
   );
-  const resumeDocs = dedupeById(parts.flatMap((p) => p.resumeDocs), (d) => d.id);
+  const resumeDocs = dedupeById(
+    parts.flatMap((p) => p.resumeDocs),
+    (d) => d.id
+  );
   const resumeSplit = splitResumeDocs(resumeDocs);
   const profile = parts.find((p) => p.profile)?.profile;
 
@@ -1401,7 +1450,10 @@ async function executeRetrievalPlan(
     skills: Array.from(resumeSplit.skill.values()),
     profile,
   };
-  const relevantResult = filterByRelevanceScore(unfilteredResult, options?.minRelevanceScore ?? DEFAULT_MIN_RELEVANCE_SCORE);
+  const relevantResult = filterByRelevanceScore(
+    unfilteredResult,
+    options?.minRelevanceScore ?? DEFAULT_MIN_RELEVANCE_SCORE
+  );
   const cappedResult = trimRetrievedDocs(relevantResult, 12);
 
   const summaries: RetrievalSummary[] = plan.queries.map((query) => ({
@@ -1417,9 +1469,9 @@ async function executeRetrievalPlan(
             ? 1
             : 0
           : cappedResult.experiences.length +
-          cappedResult.education.length +
-          cappedResult.awards.length +
-          cappedResult.skills.length,
+            cappedResult.education.length +
+            cappedResult.awards.length +
+            cappedResult.skills.length,
     embeddingModel: options?.embeddingModel,
   }));
 
@@ -1442,30 +1494,31 @@ function buildPlannerUserContent(conversationSnippet: string, userMessage: strin
     .join('\n');
 }
 
-function buildAnswerUserContent(input: {
-  conversationSnippet: string;
-  retrieved: RetrievalResult;
-}): string {
+function buildAnswerUserContent(input: { conversationSnippet: string; retrieved: RetrievalResult }): string {
   const { conversationSnippet, retrieved } = input;
 
   return [
     `## Conversation`,
     conversationSnippet,
     '',
+    // Retrieval docs are pre-sorted by relevance, so we drop numeric `_score`
+    // (saves ~20 tokens/doc). We also drop fields that overlap with others
+    // or aren't referenced by the answer prompts:
+    // - `tags`: ~90% overlap with `techStack`; keeping both wastes ~400
+    //   tokens/doc with duplicate noise.
+    // - `description` + `sizeOrScope`: redundant with `impactSummary`.
+    // - `context` object: retrieval-time metadata, not used for answers.
+    // - experiences `summary`: kept `impactSummary` as the canonical summary.
+    // - experiences `location`: rarely relevant to portfolio chat answers.
     `## Retrieved Projects (${retrieved.projects.length})`,
     JSON.stringify(
       retrieved.projects.map((p) => ({
         id: p.id,
-        relevance: p._score ?? 0,
         name: p.name,
         oneLiner: p.oneLiner,
-        description: normalizeSnippet(p.description),
         impactSummary: normalizeSnippet(p.impactSummary),
-        sizeOrScope: p.sizeOrScope,
         techStack: p.techStack,
         languages: p.languages,
-        tags: p.tags,
-        context: p.context,
         bullets: p.bullets?.slice(0, PROJECT_BODY_SNIPPET_COUNT),
       })),
       null,
@@ -1476,17 +1529,13 @@ function buildAnswerUserContent(input: {
     JSON.stringify(
       retrieved.experiences.map((e) => ({
         id: e.id,
-        relevance: e._score ?? 0,
         company: e.company,
         title: e.title,
-        location: e.location,
         startDate: e.startDate,
         endDate: e.endDate,
         isCurrent: e.isCurrent,
         experienceType: e.experienceType,
-        summary: normalizeSnippet(e.summary),
         impactSummary: normalizeSnippet(e.impactSummary),
-        sizeOrScope: e.sizeOrScope,
         skills: e.skills,
         linkedProjects: e.linkedProjects,
         bullets: e.bullets?.slice(0, EXPERIENCE_BODY_SNIPPET_COUNT),
@@ -1499,11 +1548,9 @@ function buildAnswerUserContent(input: {
     JSON.stringify(
       retrieved.education.map((e) => ({
         id: e.id,
-        relevance: e._score ?? 0,
         institution: e.institution,
         degree: e.degree,
         field: e.field,
-        location: e.location,
         startDate: e.startDate,
         endDate: e.endDate,
         isCurrent: e.isCurrent,
@@ -1519,7 +1566,11 @@ function buildAnswerUserContent(input: {
     .join('\n');
 }
 
-function buildUi(uiHints: AnswerUiHints | undefined, retrieved: RetrievalResult, profileContext?: ProfileContext): UiPayload {
+function buildUi(
+  uiHints: AnswerUiHints | undefined,
+  retrieved: RetrievalResult,
+  profileContext?: ProfileContext
+): UiPayload {
   const socialLinks = profileContext?.socialLinks ?? retrieved.profile?.socialLinks ?? [];
   const normalizedLinks = new Set<SocialPlatform>(
     socialLinks
@@ -1682,7 +1733,11 @@ function buildErrorTrace(stage: ReasoningStage, error: Error): ReasoningUpdate {
 
 // --- Runtime ---
 
-function createAbortSignal(runOptions?: RunChatPipelineOptions): { signal: AbortSignal; cleanup: () => void; timedOut: () => boolean } {
+function createAbortSignal(runOptions?: RunChatPipelineOptions): {
+  signal: AbortSignal;
+  cleanup: () => void;
+  timedOut: () => boolean;
+} {
   const controller = new AbortController();
   const parent = runOptions?.abortSignal;
   const timeoutMs = typeof runOptions?.softTimeoutMs === 'number' ? runOptions.softTimeoutMs : undefined;
@@ -1721,7 +1776,10 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
   const embeddingModel = modelConfig.embeddingModel;
   const stageReasoning = options?.modelConfig?.reasoning;
   const tokenLimits = options?.tokenLimits ?? {};
-  const minRelevanceScore = Math.max(0, Math.min(1, options?.retrieval?.minRelevanceScore ?? DEFAULT_MIN_RELEVANCE_SCORE));
+  const minRelevanceScore = Math.max(
+    0,
+    Math.min(1, options?.retrieval?.minRelevanceScore ?? DEFAULT_MIN_RELEVANCE_SCORE)
+  );
   const logger = options?.logger;
   const runtimePersona = options?.persona;
   const runtimeProfileContext = buildProfileContext(options?.profile, runtimePersona);
@@ -1743,14 +1801,14 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       const streamingTrace =
         update.delta || update.notes || typeof update.progress === 'number'
           ? buildPartialReasoningTrace({
-            streaming: {
-              [update.stage]: {
-                text: update.delta,
-                notes: update.notes,
-                progress: update.progress,
+              streaming: {
+                [update.stage]: {
+                  text: update.delta,
+                  notes: update.notes,
+                  progress: update.progress,
+                },
               },
-            },
-          })
+            })
           : null;
       const incomingTrace = streamingTrace ? mergeReasoningTraces(baseTrace, streamingTrace) : baseTrace;
       streamedReasoning = mergeReasoningTraces(streamedReasoning, incomingTrace);
@@ -1760,7 +1818,11 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
   };
 
   return {
-    async run(client: LlmClient, messages: ChatRequestMessage[], runOptions?: RunChatPipelineOptions): Promise<ChatbotResponse> {
+    async run(
+      client: LlmClient,
+      messages: ChatRequestMessage[],
+      runOptions?: RunChatPipelineOptions
+    ): Promise<ChatbotResponse> {
       const tStart = performance.now();
       const devDebugEnabled = process.env.NODE_ENV !== 'production';
       const timings: Record<string, number> = {};
@@ -1795,13 +1857,18 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           (acc, entry) => {
             const promptTokens = entry.usage?.promptTokens ?? 0;
             const completionTokens = entry.usage?.completionTokens ?? 0;
+            const cacheWriteTokens = entry.usage?.cacheWriteTokens ?? 0;
+            const cacheReadTokens = entry.usage?.cacheReadTokens ?? 0;
             acc.promptTokens += promptTokens;
             acc.completionTokens += completionTokens;
-            acc.totalTokens += entry.usage?.totalTokens ?? promptTokens + completionTokens;
+            acc.cacheWriteTokens += cacheWriteTokens;
+            acc.cacheReadTokens += cacheReadTokens;
+            acc.totalTokens +=
+              entry.usage?.totalTokens ?? promptTokens + completionTokens + cacheWriteTokens + cacheReadTokens;
             acc.costUsd += entry.costUsd ?? 0;
             return acc;
           },
-          { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0 }
+          { promptTokens: 0, completionTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, totalTokens: 0, costUsd: 0 }
         );
 
         logger('chat.pipeline.summary', {
@@ -1810,17 +1877,24 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           answer: (result as { reasoningTrace?: ReasoningTrace })?.reasoningTrace?.answer ?? null,
           totalPromptTokens: totals.promptTokens,
           totalCompletionTokens: totals.completionTokens,
+          totalCacheWriteTokens: totals.cacheWriteTokens,
+          totalCacheReadTokens: totals.cacheReadTokens,
           totalTokens: totals.totalTokens,
           totalCostUsd: totals.costUsd,
           stages: usageEntries.map((entry) => {
             const promptTokens = entry.usage?.promptTokens ?? 0;
             const completionTokens = entry.usage?.completionTokens ?? 0;
-            const totalTokens = entry.usage?.totalTokens ?? promptTokens + completionTokens;
+            const cacheWriteTokens = entry.usage?.cacheWriteTokens ?? 0;
+            const cacheReadTokens = entry.usage?.cacheReadTokens ?? 0;
+            const totalTokens =
+              entry.usage?.totalTokens ?? promptTokens + completionTokens + cacheWriteTokens + cacheReadTokens;
             return {
               stage: entry.stage,
               model: entry.model,
               promptTokens,
               completionTokens,
+              ...(cacheWriteTokens > 0 ? { cacheWriteTokens } : {}),
+              ...(cacheReadTokens > 0 ? { cacheReadTokens } : {}),
               totalTokens,
               costUsd: entry.costUsd,
             };
@@ -1858,7 +1932,9 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         throw error;
       }
 
-      const boundedMessages = windowedMessages.messages.length ? windowedMessages.messages : messages.slice(-DEFAULT_MAX_CONTEXT);
+      const boundedMessages = windowedMessages.messages.length
+        ? windowedMessages.messages
+        : messages.slice(-DEFAULT_MAX_CONTEXT);
       const userText = extractUserText(boundedMessages);
       const conversationSnippet = buildContextSnippet(boundedMessages);
       const truncationApplied = windowedMessages.truncated;
@@ -1927,7 +2003,11 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         const tPlan = performance.now();
         const cachedPlan = plannerCache.get(plannerKey);
         let rawPlan: RetrievalPlan;
-        const plannerReasoning = resolveReasoningParams(plannerModel, Boolean(runOptions?.reasoningEnabled), stageReasoning?.planner);
+        const plannerReasoning = resolveReasoningParams(
+          plannerModel,
+          Boolean(runOptions?.reasoningEnabled),
+          stageReasoning?.planner
+        );
         if (cachedPlan) {
           logger?.('chat.cache.planner', { event: 'hit', key: plannerKey });
           rawPlan = cachedPlan;
@@ -1991,7 +2071,9 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         cleanupAborters();
         logger?.('chat.pipeline.error', { stage: 'plan', error: formatLogValue(error) });
         const timeout = timedOut();
-        const message = timeout ? 'I ran out of time planning—please try again.' : 'I hit a planning issue—please try again.';
+        const message = timeout
+          ? 'I ran out of time planning—please try again.'
+          : 'I hit a planning issue—please try again.';
         emitReasoning(buildErrorTrace('planner', error as Error));
         return finalize({
           message: '',
@@ -2008,9 +2090,9 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           debug:
             devDebugEnabled && (plannerPromptDebug || plannerRawResponse)
               ? {
-                plannerPrompt: plannerPromptDebug,
-                plannerRawResponse,
-              }
+                  plannerPrompt: plannerPromptDebug,
+                  plannerRawResponse,
+                }
               : undefined,
         }),
       });
@@ -2034,7 +2116,8 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
             cache: retrievalCache,
             embeddingModel,
             minRelevanceScore,
-            onQueryResult: (summary) => emitReasoning({ stage: 'retrieval', notes: `${summary.source}: ${summary.numResults} results` }),
+            onQueryResult: (summary) =>
+              emitReasoning({ stage: 'retrieval', notes: `${summary.source}: ${summary.numResults} results` }),
           });
           retrieved = executed.result;
           retrievalSummaries = executed.summaries;
@@ -2073,11 +2156,16 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
             debug:
               devDebugEnabled && retrieved
                 ? {
-                  retrievalDocs: {
-                    projects: retrieved.projects,
-                    resume: [...retrieved.experiences, ...retrieved.education, ...retrieved.awards, ...retrieved.skills],
-                  },
-                }
+                    retrievalDocs: {
+                      projects: retrieved.projects,
+                      resume: [
+                        ...retrieved.experiences,
+                        ...retrieved.education,
+                        ...retrieved.awards,
+                        ...retrieved.skills,
+                      ],
+                    },
+                  }
                 : undefined,
           }),
         });
@@ -2118,7 +2206,8 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
 
         // Stream cardReasoning to reasoning panel
         const cardReasoning = typed.cardReasoning !== undefined ? typed.cardReasoning : undefined;
-        const cardReasoningChanged = cardReasoning !== undefined && JSON.stringify(cardReasoning) !== JSON.stringify(lastStreamedCardReasoning);
+        const cardReasoningChanged =
+          cardReasoning !== undefined && JSON.stringify(cardReasoning) !== JSON.stringify(lastStreamedCardReasoning);
 
         if (thoughtsChanged || cardReasoningChanged) {
           if (thoughtsChanged) lastStreamedThoughts = thoughts;
@@ -2148,7 +2237,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
 
       const answerModel = hasQueries
         ? modelConfig.answerModel
-        : modelConfig.answerModelNoRetrieval ?? modelConfig.answerModel;
+        : (modelConfig.answerModelNoRetrieval ?? modelConfig.answerModel);
 
       const userContent = buildAnswerUserContent({
         conversationSnippet,
@@ -2168,8 +2257,14 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
         });
       }
 
-      const answerReasoningEffort = hasQueries ? stageReasoning?.answer : stageReasoning?.answerNoRetrieval ?? 'minimal';
-      const answerReasoning = resolveReasoningParams(answerModel, Boolean(runOptions?.reasoningEnabled), answerReasoningEffort);
+      const answerReasoningEffort = hasQueries
+        ? stageReasoning?.answer
+        : (stageReasoning?.answerNoRetrieval ?? 'minimal');
+      const answerReasoning = resolveReasoningParams(
+        answerModel,
+        Boolean(runOptions?.reasoningEnabled),
+        answerReasoningEffort
+      );
       let answer: AnswerPayload;
       try {
         const tAnswer = performance.now();
@@ -2208,7 +2303,11 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           message: '',
           ui: { showProjects: [], showExperiences: [], showEducation: [], showLinks: [] },
           usage: stageUsages,
-          error: buildStreamError(timeout ? 'llm_timeout' : 'llm_error', 'I had trouble generating a reply—please try again.', true),
+          error: buildStreamError(
+            timeout ? 'llm_timeout' : 'llm_error',
+            'I had trouble generating a reply—please try again.',
+            true
+          ),
         });
       }
 
@@ -2218,8 +2317,7 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       }
 
       const ui = emitUiFromHints(answer.uiHints) ?? buildUi(answer.uiHints, retrieved, profileContextForAnswer);
-      const shouldEmitFinalUi =
-        !latestUiPayload || !uiPayloadEquals(latestUiPayload, ui) || !uiEmittedDuringStreaming;
+      const shouldEmitFinalUi = !latestUiPayload || !uiPayloadEquals(latestUiPayload, ui) || !uiEmittedDuringStreaming;
       if (shouldEmitFinalUi) {
         latestUiPayload = ui;
         try {
@@ -2232,7 +2330,12 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
       }
 
       const projectMap = new Map(retrieved.projects.map((p) => [normalizeDocId(p.id), p]));
-      const resumeMaps: ResumeMaps = splitResumeDocs([...retrieved.experiences, ...retrieved.education, ...retrieved.awards, ...retrieved.skills]);
+      const resumeMaps: ResumeMaps = splitResumeDocs([
+        ...retrieved.experiences,
+        ...retrieved.education,
+        ...retrieved.awards,
+        ...retrieved.skills,
+      ]);
       const attachments = buildAttachmentPayloads(ui, projectMap, resumeMaps);
 
       const answerUsage = stageUsages.find((entry) => entry.stage === 'answer');
@@ -2260,9 +2363,9 @@ export function createChatRuntime(retrieval: RetrievalDrivers, options?: ChatRun
           debug:
             devDebugEnabled && (answerPromptDebug || answerRawResponse)
               ? {
-                answerPrompt: answerPromptDebug,
-                answerRawResponse,
-              }
+                  answerPrompt: answerPromptDebug,
+                  answerRawResponse,
+                }
               : undefined,
         }),
       });

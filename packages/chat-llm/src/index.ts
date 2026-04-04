@@ -255,6 +255,26 @@ function clampAnthropicMaxTokens(value: number | undefined): number {
   return Math.max(1, Math.min(DEFAULT_ANTHROPIC_MAX_OUTPUT_TOKENS, Math.floor(value)));
 }
 
+/**
+ * Build the `system` param as a single cached text block so Anthropic can
+ * reuse the prefix across turns (5-min ephemeral cache). System prompts are
+ * stable between turns in a session, so cache reads cost $0.30/MTok vs the
+ * $3/MTok Sonnet base rate -- a 10x discount on repeat turns. Writes are 25%
+ * above base rate, so a single cache hit within 5 minutes nets positive.
+ * Anthropic enforces a minimum cacheable length (~1024 tokens for Sonnet,
+ * ~2048 for Haiku); if the block is smaller it simply won't cache and there
+ * is no price penalty.
+ */
+function buildCachedSystemParam(systemPrompt: string): Anthropic.Messages.TextBlockParam[] {
+  return [
+    {
+      type: 'text',
+      text: systemPrompt,
+      cache_control: { type: 'ephemeral' },
+    },
+  ];
+}
+
 export function createAnthropicLlmClient(client: Anthropic): AnthropicLlmClient {
   return {
     provider: 'anthropic',
@@ -273,7 +293,7 @@ export function createAnthropicLlmClient(client: Anthropic): AnthropicLlmClient 
       const baseParams: Anthropic.Messages.MessageCreateParamsNonStreaming = {
         model: prompt.model,
         max_tokens: clampAnthropicMaxTokens(prompt.maxOutputTokens),
-        system: prompt.systemPrompt,
+        system: buildCachedSystemParam(prompt.systemPrompt),
         messages: [{ role: 'user', content: prompt.userContent }],
         ...(typeof prompt.temperature === 'number' && Number.isFinite(prompt.temperature)
           ? { temperature: prompt.temperature }
@@ -304,7 +324,7 @@ export function createAnthropicLlmClient(client: Anthropic): AnthropicLlmClient 
       const message = await client.messages.create(
         {
           ...baseParams,
-          system: `${prompt.systemPrompt}\n\n${schemaInstruction}`,
+          system: buildCachedSystemParam(`${prompt.systemPrompt}\n\n${schemaInstruction}`),
         },
         prompt.signal ? { signal: prompt.signal } : undefined
       );
@@ -329,7 +349,7 @@ export function createAnthropicLlmClient(client: Anthropic): AnthropicLlmClient 
       const baseParams: Anthropic.Messages.MessageStreamParams = {
         model: prompt.model,
         max_tokens: clampAnthropicMaxTokens(prompt.maxOutputTokens),
-        system: prompt.systemPrompt,
+        system: buildCachedSystemParam(prompt.systemPrompt),
         messages: [{ role: 'user', content: prompt.userContent }],
         ...(typeof prompt.temperature === 'number' && Number.isFinite(prompt.temperature)
           ? { temperature: prompt.temperature }
@@ -390,7 +410,7 @@ export function createAnthropicLlmClient(client: Anthropic): AnthropicLlmClient 
       const stream = client.messages.stream(
         {
           ...baseParams,
-          system: `${prompt.systemPrompt}\n\n${schemaInstruction}`,
+          system: buildCachedSystemParam(`${prompt.systemPrompt}\n\n${schemaInstruction}`),
         },
         prompt.signal ? { signal: prompt.signal } : undefined
       );
