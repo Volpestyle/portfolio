@@ -29,18 +29,40 @@ function validate() {
   template.resourceCountIs('AWS::SNS::Topic', 1);
   template.resourceCountIs('AWS::SNS::Subscription', 1);
 
-  // Alarm must reference the active runtime cost metric via a SEARCH
-  // expression so it follows the currently-active YearMonth dimension
-  // automatically.
+  // Alarm must reference the RuntimeCostMtdUsd metric with explicit App/Env
+  // dimensions. CloudWatch MetricAlarms do not support SEARCH expressions,
+  // so the publisher emits a dedicated rollup without the YearMonth dim.
   template.hasResourceProperties('AWS::CloudWatch::Alarm', {
     Threshold: 10,
     ComparisonOperator: 'GreaterThanOrEqualToThreshold',
     Metrics: Match.arrayWith([
       Match.objectLike({
-        Expression: Match.stringLikeRegexp('SEARCH.*PortfolioChat/Costs.*RuntimeCostMtdUsd'),
+        MetricStat: Match.objectLike({
+          Metric: Match.objectLike({
+            Namespace: 'PortfolioChat/Costs',
+            MetricName: 'RuntimeCostMtdUsd',
+            Dimensions: Match.arrayWith([
+              { Name: 'App', Value: 'portfolio' },
+              { Name: 'Env', Value: 'prod' },
+            ]),
+          }),
+          Stat: 'Maximum',
+        }),
       }),
     ]),
   });
+  // Importantly, the alarm must NOT use a SEARCH expression — CloudWatch
+  // MetricAlarms do not support it and deploys will fail with
+  // "SEARCH is not supported on Metric Alarms".
+  const alarms = template.findResources('AWS::CloudWatch::Alarm');
+  for (const alarm of Object.values(alarms)) {
+    const metrics = (alarm as { Properties?: { Metrics?: Array<{ Expression?: string }> } }).Properties?.Metrics ?? [];
+    for (const entry of metrics) {
+      if (typeof entry.Expression === 'string' && entry.Expression.includes('SEARCH')) {
+        throw new Error('Alarm uses unsupported SEARCH expression.');
+      }
+    }
+  }
 
   template.hasResourceProperties('AWS::SNS::Subscription', {
     Protocol: 'email',
